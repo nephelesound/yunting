@@ -9,6 +9,8 @@ Facts Facts.qml
 GroupHeader GroupHeader.qml
 HomePage HomePage.qml
 IconButton IconButton.qml
+LoginDialog LoginDialog.qml
+QueuePanel QueuePanel.qml
 MediaTile MediaTile.qml
 NowPlayingPage NowPlayingPage.qml
 PageTitle PageTitle.qml

@@ -33,6 +33,7 @@ Item {
     signal seekRequested(real seconds)
     signal likeToggled()
     signal nowPlayingToggled()
+    signal queueRequested()
 
     // 没有曲目或时长未知时进度为 0、不能拖动，传输控件整体禁用
     readonly property real duration: bar.track ? bar.track.dur : 0
@@ -162,7 +163,7 @@ Item {
                 ToolTip.delay: 600
             }
             IconButton { icon.name: "media-skip-forward"; text: "下一首"; onClicked: bar.nextRequested() }
-            IconButton { icon.name: "view-media-playlist"; text: "播放队列" }
+            IconButton { icon.name: "view-media-playlist"; text: "播放队列"; onClicked: bar.queueRequested() }
         }
 
         // ── 右：时间与视图 ──

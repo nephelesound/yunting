@@ -18,7 +18,10 @@ AbstractButton {
     property bool ranked
     property bool locked // 匿名会话下的 VIP 曲：可见，点击时提示登录
 
+    property bool removable  // 播放队列：悬停时显示「移出」
+
     signal activated(int index)
+    signal removeRequested(int index)
 
     implicitHeight: Tokens.trackRow
     hoverEnabled: true
@@ -140,12 +143,32 @@ AbstractButton {
             elide: Text.ElideRight
         }
 
-        Label {
+        // 时长列；可移除的行（播放队列）在悬停/聚焦时把时长换成「移出」按钮，列宽不变、行不跳动
+        Item {
             Layout.rightMargin: Tokens.space3
-            text: Format.duration(tile.modelData.dur)
-            font.pixelSize: Tokens.textSm
-            font.features: { "tnum": 1 }
-            color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+            Layout.preferredWidth: Math.max(durationLabel.implicitWidth, Tokens.height8)
+            Layout.fillHeight: true
+            readonly property bool showRemove: tile.removable && (tile.hovered || tile.visualFocus)
+
+            Label {
+                id: durationLabel
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                visible: !parent.showRemove
+                text: Format.duration(tile.modelData.dur)
+                font.pixelSize: Tokens.textSm
+                font.features: { "tnum": 1 }
+                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+            }
+            IconButton {
+                anchors.right: parent.right
+                anchors.rightMargin: -Tokens.space2
+                anchors.verticalCenter: parent.verticalCenter
+                visible: parent.showRemove
+                icon.name: "list-remove-symbolic"
+                text: "移出队列"
+                onClicked: tile.removeRequested(tile.index)
+            }
         }
     }
 }

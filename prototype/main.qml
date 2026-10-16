@@ -88,7 +88,43 @@ Kirigami.ApplicationWindow {
         root.play(root.queue, i);
     }
     function requestLogin() {
-        root.showPassiveNotification("扫码登录：待接 NcmClient.loginQr()");
+        loginDialog.state = "waiting";
+        loginDialog.open();
+    }
+
+    // ── 浮层：播放队列（右侧抽屉）与扫码登录（对话框）──
+    // 截图 harness 可用 startOverlay = queue | login，以及 loginState = waiting | scanned | expired
+    // （不能叫 overlay：会遮住 ApplicationWindow.overlay，Kirigami 的对话框就挂不上去了）
+    property string startOverlay: ""
+    property string loginState: "waiting"
+    onStartOverlayChanged: root.openOverlay()
+
+    QueuePanel {
+        id: queuePanel
+        queue: root.queue
+        currentIndex: root.trackIndex
+        vip: root.vip
+        onActivated: index => root.play(root.queue, index)
+        onRemoveRequested: index => {
+            const q = root.queue.slice();
+            q.splice(index, 1);
+            root.queue = q;
+        }
+        onClearRequested: root.queue = root.queue.slice(0, root.trackIndex + 1)
+    }
+
+    LoginDialog {
+        id: loginDialog
+        onRefreshRequested: loginDialog.state = "waiting"
+    }
+
+    function openOverlay() {
+        if (root.startOverlay === "queue")
+            queuePanel.open();
+        else if (root.startOverlay === "login") {
+            loginDialog.state = root.loginState;
+            loginDialog.open();
+        }
     }
 
     // ── 导航：推荐/我的/搜索 是顶层枢轴；排行榜、列表、正在播放压在其上，history 记录来路 ──
@@ -181,6 +217,7 @@ Kirigami.ApplicationWindow {
         onSeekRequested: seconds => root.positionSec = seconds
         onLikeToggled: root.liked = !root.liked
         onNowPlayingToggled: root.toggleNowPlaying()
+        onQueueRequested: queuePanel.drawerOpen ? queuePanel.close() : queuePanel.open()
     }
 
     Component {
