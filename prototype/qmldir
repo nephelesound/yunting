@@ -1,0 +1,14 @@
+singleton Tokens Tokens.qml
+AccentButton AccentButton.qml
+Cover Cover.qml
+CoverTile CoverTile.qml
+DiscoverPage DiscoverPage.qml
+Facts Facts.qml
+IconButton IconButton.qml
+NowPlayingPage NowPlayingPage.qml
+PageTitle PageTitle.qml
+PlayerBar PlayerBar.qml
+PlaylistPage PlaylistPage.qml
+ScreenFrame ScreenFrame.qml
+TopBar TopBar.qml
+TrackTile TrackTile.qml

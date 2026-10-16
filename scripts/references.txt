@@ -5,3 +5,7 @@ elisa|https://invent.kde.org/multimedia/elisa.git|05e8abcd22e9424b87385141a4aa3b
 kirigami|https://invent.kde.org/frameworks/kirigami.git|67cad8ca417c825a6c9123b05aaf9255216a4108
 kirigami-addons|https://invent.kde.org/libraries/kirigami-addons.git|b701e38cb4105212321deb9e815a332a5c619158
 fluentui-qml|https://github.com/zhuzichu520/FluentUI.git|7e33a2f672d18239ef49ab960075b1137a1d18e7
+rune|https://github.com/Losses/rune.git|db69bb8d21a0b5ef6111723de5f4305181a8a926
+kasts|https://invent.kde.org/multimedia/kasts.git|dd076c7204deb514fd026364ae434a7cd4c66f9e
+audiotube|https://invent.kde.org/multimedia/audiotube.git|7d67c86d60a82c560132b0d16c0eb825ceb12beb
+kumone|https://github.com/missuo/kumone.git|32b516cbbc7e117981916fd1a044cdbabe13b68e

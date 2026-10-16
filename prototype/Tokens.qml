@@ -1,0 +1,60 @@
+// 设计令牌：界面里出现的每个尺寸都必须是这里的某一档，组件里不写其它数字。
+// 档位与 dogenet 设计规范一致（4/8/12/16/24 间距、28/32/40/48 高度、2/4/6/8 圆角、三级字号 + 展示字号）。
+pragma Singleton
+
+import QtQuick
+
+QtObject {
+    // 间距：只允许这五档
+    readonly property int space1: 4    // 紧贴：标签内边距、图标与文字
+    readonly property int space2: 8    // 同组元素
+    readonly property int space3: 12   // 行内部、标题与其内容
+    readonly property int space4: 16   // 组件之间
+    readonly property int space6: 24   // 区块之间、页边距
+
+    // 控件高度
+    readonly property int height7: 28  // 紧凑
+    readonly property int height8: 32  // 标准按钮、图标按钮
+    readonly property int height10: 40 // 输入框
+    readonly property int height12: 48 // 曲目行、播放条封面
+
+    // 圆角：嵌套时 内层 = 外层 − 内边距
+    readonly property int radiusSm: 2  // 标签
+    readonly property int radius: 4    // 磁贴、按钮、封面
+    readonly property int radiusMd: 6
+    readonly property int radiusLg: 8  // 浮层
+
+    // 字号（像素）：展示 / 分组标题 / 正文 / 说明 / 标签
+    readonly property int text4xl: 36
+    readonly property int text2xl: 24
+    readonly property int textBase: 16
+    readonly property int textSm: 14
+    readonly property int textXs: 12
+
+    // 图标：跟随 Breeze 的尺寸档（16/22/32），其它尺寸会被缩回最近一档
+    readonly property int iconSm: 16
+    readonly property int iconMd: 22
+    readonly property int iconLg: 32
+
+    // 线宽：只有 1 与 2。播放条顶边那条进度线就是 2，同时充当内容区与播放条的分界
+    readonly property int line: 1
+    readonly property int lineStrong: 2
+
+    // 版面
+    readonly property int pageMargin: space6
+    readonly property int hudHeight: height12 + 2 * space4   // 80
+    readonly property int trackRow: height12                  // 48
+    readonly property int trackColumn: 280                    // 35 × 8
+    readonly property int measureMax: 400                     // 正在播放封面的最大边长（50 × 8）
+    readonly property int wideRow: 480                        // 曲目行宽于此时显示专辑列（60 × 8）
+    readonly property int albumColumn: 160                    // 专辑列宽（20 × 8）
+
+    // 封面磁贴边长：3 块磁贴 + 2 道间距 恰好等于 n 条曲目行（48 + 8）的高度，
+    // 所以「排行榜」与「热歌」两组在全景里上下边缘对齐。n = 9 → 160，n = 6 → 104。
+    function tileFor(availableHeight) {
+        return availableHeight >= 3 * 160 + 2 * space2 ? 160 : 104;
+    }
+    function rowsFor(tile) {
+        return (3 * tile + 2 * space2 + space2) / (trackRow + space2);
+    }
+}
