@@ -24,7 +24,10 @@ build/dark/kdeglobals:
 
 # 截图清单：文件名:根对象属性（逗号分隔，按顺序设置）
 SHOTS = home:page=home home-anon:account=anonymous,page=home charts:page=charts \
-        daily:listKey=daily,page=list hot:listKey=hot,page=list nowplaying:page=nowplaying mine-anon:account=anonymous,page=mine
+        daily:listKey=daily,page=list hot:listKey=hot,page=list nowplaying:page=nowplaying mine-anon:account=anonymous,page=mine \
+        worst-home:fixture=worst,page=home worst-daily:fixture=worst,listKey=daily,page=list worst-charts:fixture=worst,page=charts \
+        worst-nowplaying:fixture=worst,page=nowplaying empty-home:fixture=empty,page=home empty-daily:fixture=empty,listKey=daily,page=list \
+        one-home:fixture=one,page=home one-daily:fixture=one,listKey=daily,page=list
 
 data: ## 重新抓取数据快照（有 gtk4 客户端登录 cookie 时同时生成个人快照）
 	scripts/snapshot.py

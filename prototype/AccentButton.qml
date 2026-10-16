@@ -10,6 +10,7 @@ Button {
     leftPadding: Tokens.space4
     rightPadding: Tokens.space4
     hoverEnabled: true
+    opacity: enabled ? 1 : Tokens.fadedHover
 
     background: Rectangle {
         radius: Tokens.radius

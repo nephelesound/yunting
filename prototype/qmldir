@@ -1,4 +1,5 @@
 singleton Tokens Tokens.qml
+singleton Source Source.qml
 AccentButton AccentButton.qml
 ChartCard ChartCard.qml
 ChartsPage ChartsPage.qml

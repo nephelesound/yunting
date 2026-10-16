@@ -64,11 +64,13 @@ ScreenFrame {
                 spacing: Tokens.space2
 
                 AccentButton {
+                    enabled: page.list.tracks.length > 0
                     icon.name: "media-playback-start"
                     text: "播放全部"
                     onClicked: page.playAllRequested()
                 }
                 Button {
+                    enabled: page.list.tracks.length > 1
                     implicitHeight: Tokens.height8
                     flat: true
                     icon.name: "media-playlist-shuffle"
@@ -103,8 +105,17 @@ ScreenFrame {
                 width: tracks.width - tracks.rightMargin
                 ranked: page.list.ranked || false
                 current: modelData.id === page.currentId
-                locked: !page.vip && modelData.fee === 1
+                locked: modelData.fee === 4 || (!page.vip && modelData.fee === 1)
                 onActivated: index => page.activated(index)
+            }
+
+            // 空列表：说明为什么空，而不是留一片空白
+            Kirigami.PlaceholderMessage {
+                anchors.centerIn: parent
+                width: parent.width - 2 * Tokens.pageMargin
+                visible: tracks.count === 0
+                icon.name: "view-media-playlist"
+                text: page.list.emptyText || "这里还没有歌"
             }
         }
     }

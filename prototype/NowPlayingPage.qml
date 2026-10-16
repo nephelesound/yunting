@@ -7,7 +7,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
-import "Data.js" as Data
 
 ScreenFrame {
     id: page
@@ -26,7 +25,7 @@ ScreenFrame {
     readonly property int focusRow: page.coverTopRow + Math.floor(page.coverRows / 2)
 
     // 快照只抓了一首歌的歌词；其它歌曲显示空状态
-    readonly property var lines: page.track && page.track.id === Data.lyricsTrackId ? Data.lyrics : []
+    readonly property var lines: page.track ? Source.lyrics(page.track.id) : []
     readonly property int lyricIndex: {
         let i = 0;
         while (i + 1 < page.lines.length && page.lines[i + 1].t <= page.elapsed)

@@ -9,3 +9,6 @@ rune|https://github.com/Losses/rune.git|db69bb8d21a0b5ef6111723de5f4305181a8a926
 kasts|https://invent.kde.org/multimedia/kasts.git|dd076c7204deb514fd026364ae434a7cd4c66f9e
 audiotube|https://invent.kde.org/multimedia/audiotube.git|7d67c86d60a82c560132b0d16c0eb825ceb12beb
 kumone|https://github.com/missuo/kumone.git|32b516cbbc7e117981916fd1a044cdbabe13b68e
+ncm-api-enhanced|https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced.git|2db6684453297ee86dec0492842f2320b08182d9
+music163api-go|https://github.com/XiaoMengXinX/Music163Api-Go.git|40d04d988da948557810e4d02d17f6a27313fc69
+music163bot|https://github.com/XiaoMengXinX/Music163bot-Go.git|964495135114103f8fb3522d6cbb4205cc4598b5

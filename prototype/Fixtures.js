@@ -1,0 +1,101 @@
+.pragma library
+
+// 压力测试数据（break-ui）：与 Data.js / Personal.js 同形状，只在数据边界替换，组件不改。
+// 每个值都是网易云上真实会出现的形态，不是随机长串：Live 版长标题、多人合唱、一小时混音、
+// 付费专辑（fee=4）、缺封面、坏链接、空列表、1 首、五位数红心。
+// 用法：main.qml 的 fixture 属性 = worst | empty | one（截图：-- fixture=worst page=home）
+
+var C1 = "http://p1.music.126.net/H2DFRdwP2y5SuCAn-Tuikw==/109951172568091306.jpg?param=120y120";
+var C2 = "https://p1.music.126.net/urByD_AmfBDBrs7fA9-O8A==/109951167976973225.jpg?param=300y300";
+var BROKEN = "https://p1.music.126.net/does-not-exist/0.jpg?param=120y120";
+
+function t(id, name, artist, album, dur, fee, cover) {
+    return { id: id, name: name, artist: artist, album: album, dur: dur, fee: fee, cover: cover };
+}
+
+// 前几行各带一种失败，像真实数据那样混在一起
+var worstTracks = [
+    t(901, "我想要两颗西柚（Live）- 2023 网易云音乐年度盛典现场版", "茄子蛋", "2023 网易云音乐年度盛典 Live 合辑", 251, 1, C1),
+    t(902, "Pretender", "Official髭男dism / Aimer / LiSA / 藤井風 / 米津玄師 / King Gnu", "Traveler", 326, 4, C2),
+    t(903, "雨", "A", "", 61, 0, ""),
+    t(904, "Lo-fi Hip Hop Radio - beats to relax/study to (3 Hour Mix)", "Lofi Girl", "Lofi Girl Mixes Vol. 12: Late Night Study Session", 10835, 8, BROKEN),
+    t(905, "Supercalifragilisticexpialidocious (From \"Mary Poppins\" / Soundtrack Version)", "Julie Andrews / Dick Van Dyke / The Pearlies", "Mary Poppins (Original Motion Picture Soundtrack / 50th Anniversary Edition)", 0, 1, C1),
+    t(906, "😭😭😭", "🌙", "🌙", 199, 8, C2),
+];
+for (var i = 7; i <= 1200; i++)
+    worstTracks.push(t(900 + i, "第 " + i + " 首：平凡的一天", "毛不易", "平凡的一天", 240, i % 3 === 0 ? 1 : 8, i % 7 === 0 ? "" : C1));
+
+var worstLyrics = [
+    { t: 0, text: "作词 : Official髭男dism　作曲 : Official髭男dism　编曲 : Official髭男dism / 蔦谷好位置" },
+    { t: 10, text: "もっと違う設定で もっと違う関係で 出会える世界線 選べたらよかった（更长的一句日文歌词，看它在半屏宽度里会不会被截断）" },
+    { t: 20, text: "纯音乐，请欣赏" },
+    { t: 30, text: "" },
+    { t: 40, text: "最后一句" },
+];
+
+var worst = {
+    data: {
+        toplists: [
+            { id: 1, name: "飙升榜", cover: C2, update: "每天更新", count: 100, preview: [{ name: "我想要两颗西柚（Live）- 2023 网易云音乐年度盛典现场版", artist: "茄子蛋 / 告五人 / 草东没有派对 / 落日飞车" }, { name: "雨", artist: "A" }] },
+            { id: 2, name: "网易云中文说唱榜单（每周五 0 点更新，数据来自全平台播放与收藏）", cover: "", update: "每周五更新", count: 50, preview: [] },
+            { id: 3, name: "新歌榜", cover: BROKEN, update: "", count: 0, preview: [{ name: "😭", artist: "🌙" }, { name: "x", artist: "y" }, { name: "z", artist: "w" }] },
+        ],
+        playlist: { id: 3778678, name: "网易云音乐 2026 年度听歌报告：你最常在深夜循环的 200 首歌", cover: "", description: "这是一段非常长的歌单简介，包含换行。\n第二段说明它是怎么生成的，以及更新频率、数据口径、收录规则和版权说明，足够把三行占满还溢出。", count: 12345, plays: 99999999999 },
+        tracks: worstTracks.slice(0, 200),
+        lyricsTrackId: 902,
+        lyrics: worstLyrics,
+    },
+    personal: {
+        account: { name: "一只想要变成猫但是没有成功的柴犬Official", vip: false, avatar: "" },
+        daily: { date: "10月17日", day: "17", tracks: worstTracks.slice(0, 30) },
+        heart: { seed: worstTracks[1], tracks: worstTracks.slice(1, 3) },
+        radar: { id: 3136952023, name: "私人雷达", description: "今天《我想要两颗西柚（Live）- 2023 网易云音乐年度盛典现场版》爱不释耳", cover: BROKEN, tracks: worstTracks.slice(0, 30) },
+        similar: { seed: worstTracks[0], tracks: [] },
+        liked: { id: 1, count: 12345, tracks: worstTracks },
+        mine: [],
+        playlists: [
+            { id: 1, name: "【温柔女声】在深夜被治愈：适合一个人听的 100 首华语民谣与独立音乐", cover: C2, count: 100, reason: "根据你喜欢的单曲《我想要两颗西柚（Live）- 2023 网易云音乐年度盛典现场版》推荐" },
+            { id: 2, name: "x", cover: "", count: 0, reason: "" },
+            { id: 3, name: "动态歌单", cover: BROKEN, count: 0, reason: "" },
+            { id: 4, name: "1", cover: C2, count: 1, reason: "" },
+        ],
+        fm: { tracks: [worstTracks[3]] },
+    },
+};
+
+var empty = {
+    data: { toplists: [], playlist: { id: 0, name: "空歌单", cover: "", description: "", count: 0, plays: 0 }, tracks: [], lyricsTrackId: 0, lyrics: [] },
+    personal: {
+        account: { name: "新用户", vip: false, avatar: "" },
+        daily: { date: "10月17日", day: "17", tracks: [] },
+        heart: { seed: null, tracks: [] },
+        radar: { id: 3136952023, name: "私人雷达", description: "", cover: "", tracks: [] },
+        similar: { seed: null, tracks: [] },
+        liked: { id: 1, count: 0, tracks: [] },
+        mine: [],
+        playlists: [],
+        fm: { tracks: [] },
+    },
+};
+
+var oneTrack = [t(990, "雨", "A", "雨", 61, 8, C1)];
+var one = {
+    data: {
+        toplists: [{ id: 1, name: "飙升榜", cover: C2, update: "每天更新", count: 1, preview: [{ name: "雨", artist: "A" }] }],
+        playlist: { id: 1, name: "雨", cover: C2, description: "", count: 1, plays: 1 },
+        tracks: oneTrack,
+        lyricsTrackId: 990,
+        lyrics: [{ t: 0, text: "只有一句" }],
+    },
+    personal: {
+        account: { name: "Jo", vip: true, avatar: "" },
+        daily: { date: "10月17日", day: "17", tracks: oneTrack },
+        heart: { seed: oneTrack[0], tracks: oneTrack },
+        radar: { id: 3136952023, name: "私人雷达", description: "今天《雨》爱不释耳", cover: C2, tracks: oneTrack },
+        similar: { seed: oneTrack[0], tracks: oneTrack },
+        liked: { id: 1, count: 1, tracks: oneTrack },
+        mine: [],
+        playlists: [{ id: 1, name: "雨", cover: C2, count: 1, reason: "" }],
+        fm: { tracks: oneTrack },
+    },
+};

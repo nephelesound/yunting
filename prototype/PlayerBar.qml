@@ -9,6 +9,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
+import "Format.js" as Format
 
 Item {
     id: bar
@@ -33,15 +34,11 @@ Item {
     signal likeToggled()
     signal nowPlayingToggled()
 
-    readonly property real duration: bar.track ? bar.track.dur : 1
+    // 没有曲目或时长未知时进度为 0、不能拖动，传输控件整体禁用
+    readonly property real duration: bar.track ? bar.track.dur : 0
+    readonly property bool active: !!bar.track
 
     implicitHeight: Tokens.lineStrong + Tokens.hudHeight
-
-    function formatTime(seconds) {
-        const total = Math.max(0, Math.floor(seconds));
-        const s = total % 60;
-        return Math.floor(total / 60) + ":" + (s < 10 ? "0" : "") + s;
-    }
 
     // ── 顶边：通栏进度线 ──
     Rectangle {
@@ -52,13 +49,14 @@ Item {
         color: Qt.alpha(Kirigami.Theme.textColor, Tokens.track)
 
         Rectangle {
-            width: parent.width * Math.min(1, bar.elapsed / bar.duration)
+            width: bar.duration > 0 ? parent.width * Math.min(1, bar.elapsed / bar.duration) : 0
             height: parent.height
             color: Kirigami.Theme.highlightColor
         }
     }
     MouseArea {
         // 命中区比线粗：线上下各扩 space2
+        enabled: bar.duration > 0
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.verticalCenter: progressTrack.verticalCenter
@@ -87,6 +85,7 @@ Item {
             AbstractButton {
                 Layout.preferredWidth: Tokens.height12
                 Layout.preferredHeight: Tokens.height12
+                enabled: bar.active
                 hoverEnabled: true
                 onClicked: bar.nowPlayingToggled()
                 contentItem: Cover {
@@ -103,20 +102,23 @@ Item {
                 spacing: 0
                 Label {
                     Layout.fillWidth: true
-                    text: bar.track ? bar.track.name : ""
+                    text: bar.active ? bar.track.name : "未在播放"
                     font.pixelSize: Tokens.textBase
-                    font.weight: Font.Medium
+                    font.weight: bar.active ? Font.Medium : Font.Normal
+                    color: bar.active ? Kirigami.Theme.textColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                     elide: Text.ElideRight
                 }
                 Label {
                     Layout.fillWidth: true
-                    text: bar.track ? bar.track.artist : ""
+                    visible: bar.active
+                    text: bar.active ? bar.track.artist : ""
                     font.pixelSize: Tokens.textSm
                     color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                     elide: Text.ElideRight
                 }
             }
             IconButton {
+                enabled: bar.active
                 icon.name: bar.liked ? "love-amarok" : "love-symbolic"
                 text: bar.liked ? "取消喜欢" : "喜欢"
                 onClicked: bar.likeToggled()
@@ -126,6 +128,7 @@ Item {
         // ── 中：传输控制（对称）──
         RowLayout {
             id: transport
+            enabled: bar.active
             anchors.centerIn: parent
             spacing: Tokens.space4
 
@@ -139,12 +142,13 @@ Item {
                 id: play
                 implicitWidth: Tokens.height10
                 implicitHeight: Tokens.height10
-                text: bar.playing ? "暂停" : "播放"
+                text: bar.active && bar.playing ? "暂停" : "播放"
                 display: AbstractButton.IconOnly
-                icon.name: bar.playing ? "media-playback-pause" : "media-playback-start"
+                icon.name: bar.active && bar.playing ? "media-playback-pause" : "media-playback-start"
                 icon.width: Tokens.iconMd
                 icon.height: Tokens.iconMd
                 icon.color: Kirigami.Theme.highlightedTextColor
+                opacity: enabled ? 1 : Tokens.fadedHover
                 hoverEnabled: true
                 onClicked: bar.playPauseRequested()
                 background: Rectangle {
@@ -170,7 +174,8 @@ Item {
 
             Label {
                 Layout.rightMargin: Tokens.space3
-                text: bar.formatTime(bar.elapsed) + " / " + bar.formatTime(bar.duration)
+                visible: bar.duration > 0
+                text: Format.elapsed(bar.elapsed) + " / " + Format.duration(bar.duration)
                 font.pixelSize: Tokens.textSm
                 font.features: { "tnum": 1 }
                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)

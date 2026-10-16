@@ -7,8 +7,6 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
-import "Data.js" as Data
-import "Personal.js" as Personal
 
 ScreenFrame {
     id: page
@@ -18,24 +16,8 @@ ScreenFrame {
 
     currentPivot: "home"
 
-    function large(url) { return url.replace("120y120", "400y400"); }
-    function quoted(name) { return "「" + name + "」"; }
-
-    readonly property var entries: page.loggedIn ? [
-        { key: "daily", title: "每日推荐", cover: page.large(Personal.daily.tracks[0].cover), caption: "从" + page.quoted(Personal.daily.tracks[0].name) + "听起" },
-        { key: "heart", title: "心动模式", cover: page.large(Personal.heart.tracks.find(t => t.id !== Personal.heart.seed.id).cover), caption: "从" + page.quoted(Personal.heart.seed.name) + "出发" },
-        { key: "fm", title: "私人漫游", cover: page.large(Personal.fm.tracks[0].cover), caption: "从" + page.quoted(Personal.fm.tracks[0].name) + "开启漫游" },
-        { key: "radar", title: "私人雷达", cover: Personal.radar.cover, caption: Personal.radar.description.split("|")[0] },
-        { key: "similar", title: "相似歌曲", cover: page.large(Personal.similar.tracks[0].cover), caption: "和" + page.quoted(Personal.similar.seed.name) + "相似" },
-        { key: "liked", title: "我喜欢的音乐", cover: page.large(Personal.liked.tracks[0].cover), caption: Personal.liked.count + " 首" },
-    ] : [
-        { key: "daily", title: "每日推荐", locked: true, caption: "登录后每天 6:00 更新" },
-        { key: "heart", title: "心动模式", locked: true, caption: "登录后从红心歌曲出发" },
-        { key: "fm", title: "私人漫游", cover: page.large(Personal.fm.tracks[0].cover), caption: "从" + page.quoted(Personal.fm.tracks[0].name) + "开启漫游" },
-        { key: "similar", title: "相似歌曲", cover: page.large(Personal.similar.tracks[0].cover), caption: "和" + page.quoted(Personal.similar.seed.name) + "相似" },
-        { key: "charts", title: "排行榜", symbol: "office-chart-line-symbolic", caption: Data.toplists.length + " 个官方与特色榜单" },
-        { key: "liked", title: "我喜欢的音乐", locked: true, caption: "登录后同步红心歌曲" },
-    ]
+    // 入口内容（封面、理由、缺数据时的退化）由 Source 决定，这里只管排版
+    readonly property var entries: Source.homeEntries(page.loggedIn)
 
     // 列网格：最小磁贴 160。宽度够时磁贴撑满两条页边线之间；高度不够时边长改由高度决定（取 8 的倍数），网格靠左
     readonly property int textBlock: Tokens.space2 + Tokens.height12             // 磁贴下方两行字
@@ -75,7 +57,7 @@ ScreenFrame {
             Row {
                 spacing: Tokens.space2
                 Repeater {
-                    model: Personal.playlists.slice(0, page.columns - (page.loggedIn ? 1 : 0))
+                    model: Source.playlists.slice(0, page.columns - (page.loggedIn ? 1 : 0))
                     delegate: MediaTile {
                         required property var modelData
                         required property int index
@@ -91,7 +73,7 @@ ScreenFrame {
                     visible: page.loggedIn
                     width: page.tile
                     title: "排行榜"
-                    caption: Data.toplists.length + " 个官方与特色榜单"
+                    caption: Source.chartsCaption
                     symbol: "office-chart-line-symbolic"
                     onClicked: page.entryOpened("charts")
                 }

@@ -29,15 +29,18 @@ AbstractButton {
             Layout.preferredWidth: tile.size
             Layout.preferredHeight: tile.size
 
+            // 入口（锁定或有符号、没有封面）画淡色调方块 + 符号；其余一律交给 Cover（缺封面时它自己画占位）
+            readonly property bool emblem: tile.cover.length === 0 && (tile.locked || tile.symbol.length > 0)
+
             Cover {
                 anchors.fill: parent
-                visible: tile.cover.length > 0
+                visible: !parent.emblem
                 source: tile.cover
                 pixelSize: 400
             }
             Rectangle {
                 anchors.fill: parent
-                visible: tile.cover.length === 0
+                visible: parent.emblem
                 radius: Tokens.radius
                 color: Qt.alpha(Kirigami.Theme.highlightColor, tile.hovered ? Tokens.tonalHover : Tokens.tonal)
                 Kirigami.Icon {
@@ -52,7 +55,7 @@ AbstractButton {
             // 悬停：封面上叠一层强调色淡色调（与曲目行悬停同一令牌）；按下再深一档
             Rectangle {
                 anchors.fill: parent
-                visible: tile.cover.length > 0
+                visible: !parent.emblem
                 radius: Tokens.radius
                 color: Qt.alpha(Kirigami.Theme.highlightColor, tile.down ? Tokens.tintPressed : tile.hovered ? Tokens.tintHover : 0)
                 Behavior on color { ColorAnimation { duration: Kirigami.Units.shortDuration } }

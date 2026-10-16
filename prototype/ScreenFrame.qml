@@ -4,7 +4,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
-import "Personal.js" as Personal
 
 Kirigami.Page {
     id: screen
@@ -45,7 +44,7 @@ Kirigami.Page {
             }
             Item { Layout.fillWidth: true }
             Label {
-                text: screen.loggedIn ? Personal.account.name : "未登录"
+                text: screen.loggedIn ? Source.account.name : "未登录"
                 font.pixelSize: Tokens.textSm
                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             }

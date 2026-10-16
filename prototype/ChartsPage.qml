@@ -6,10 +6,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
-import org.kde.kirigami as Kirigami
-import "Data.js" as Data
 
 ScreenFrame {
     id: page
@@ -22,8 +19,8 @@ ScreenFrame {
     heading: "排行榜"
     parentText: "推荐"
 
-    readonly property var official: Data.toplists.filter(t => t.preview.length > 0)
-    readonly property var others: Data.toplists.filter(t => t.preview.length === 0)
+    readonly property var official: Source.toplists.filter(t => t.preview.length > 0)
+    readonly property var others: Source.toplists.filter(t => t.preview.length === 0)
 
     readonly property int pitch: Tokens.trackRow + Tokens.space2           // 56
     readonly property int headerHeight: Tokens.height10 + Tokens.space3      // 分组标题行 + 与内容的间距
@@ -65,7 +62,7 @@ ScreenFrame {
                             Layout.fillWidth: true
                             Layout.preferredWidth: 1
                             chart: modelData
-                            onClicked: page.toplistOpened(Data.toplists.indexOf(modelData))
+                            onClicked: page.toplistOpened(Source.toplists.indexOf(modelData))
                         }
                     }
                 }
@@ -91,7 +88,7 @@ ScreenFrame {
                             cover: modelData.cover
                             name: modelData.name
                             detail: modelData.update
-                            onClicked: page.toplistOpened(Data.toplists.indexOf(modelData))
+                            onClicked: page.toplistOpened(Source.toplists.indexOf(modelData))
                         }
                     }
                 }
@@ -106,8 +103,8 @@ ScreenFrame {
             spacing: 0
 
             GroupHeader {
-                text: Data.playlist.name
-                actionText: "全部 " + Data.playlist.count + " 首"
+                text: Source.hotChart.name
+                actionText: "全部 " + Source.hotChart.count + " 首"
                 onActionTriggered: page.toplistOpened(3)
             }
             Grid {
@@ -118,7 +115,7 @@ ScreenFrame {
                 rowSpacing: Tokens.space2
                 columnSpacing: Tokens.space6
                 Repeater {
-                    model: Data.tracks.slice(0, page.hotRows * page.hotColumns)
+                    model: Source.hotChart.tracks.slice(0, page.hotRows * page.hotColumns)
                     delegate: TrackTile {
                         width: hot.tileWidth
                         ranked: true

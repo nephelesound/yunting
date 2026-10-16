@@ -1,10 +1,12 @@
 // 曲目行：高 48 = 封面边长。静止时无底色（重复元素保持 Level 0），悬停才出现淡色调。
 // ranked 时左侧是 32 宽的名次列；正在播放把名次换成强调色播放图标，标题加粗。
-// 不排名时，正在播放用悬挂在对齐线外侧的强调色竖条 + 加粗标题标出。VIP 是标题后的淡色调小标签。
+// 不排名时，正在播放用悬挂在对齐线外侧的强调色竖条 + 加粗标题标出。
+// 购买限制（VIP / 付费专辑）是标题后的淡色调小标签；时长未知时留空。
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
+import "Format.js" as Format
 
 AbstractButton {
     id: tile
@@ -102,7 +104,7 @@ AbstractButton {
                 }
                 Rectangle {
                     id: tag
-                    visible: tile.modelData.fee === 1
+                    visible: vip.text.length > 0
                     x: title.width + Tokens.space2
                     anchors.verticalCenter: title.verticalCenter
                     width: vip.implicitWidth + 2 * Tokens.space1
@@ -112,7 +114,7 @@ AbstractButton {
                     Label {
                         id: vip
                         anchors.centerIn: parent
-                        text: "VIP"
+                        text: Format.restriction(tile.modelData.fee)
                         font.pixelSize: Tokens.textXs
                         font.weight: Font.Medium
                         color: tile.locked ? Kirigami.Theme.disabledTextColor : Kirigami.Theme.highlightColor
@@ -140,10 +142,7 @@ AbstractButton {
 
         Label {
             Layout.rightMargin: Tokens.space3
-            text: {
-                const s = tile.modelData.dur % 60;
-                return Math.floor(tile.modelData.dur / 60) + ":" + (s < 10 ? "0" : "") + s;
-            }
+            text: Format.duration(tile.modelData.dur)
             font.pixelSize: Tokens.textSm
             font.features: { "tnum": 1 }
             color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
