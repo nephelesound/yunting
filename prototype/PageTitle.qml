@@ -36,7 +36,7 @@ Row {
             font.pixelSize: Tokens.text4xl
             font.weight: Font.Light
             elide: Text.ElideRight
-            opacity: active ? 1 : hover.hovered ? 0.5 : 0.25
+            opacity: active ? 1 : hover.hovered ? Tokens.fadedHover : Tokens.faded
             Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
 
             HoverHandler { id: hover; enabled: !item.active; cursorShape: Qt.PointingHandCursor }

@@ -19,7 +19,7 @@ AbstractButton {
 
     background: Rectangle {
         radius: Tokens.radius
-        color: Qt.alpha(Kirigami.Theme.highlightColor, card.down ? 0.16 : card.hovered ? 0.1 : 0)
+        color: Qt.alpha(Kirigami.Theme.highlightColor, card.down ? Tokens.tintPressed : card.hovered ? Tokens.tintHover : 0)
         border.width: card.visualFocus ? Tokens.lineStrong : 0
         border.color: Kirigami.Theme.highlightColor
         Behavior on color { ColorAnimation { duration: Kirigami.Units.shortDuration } }
@@ -53,7 +53,7 @@ AbstractButton {
                     Layout.fillWidth: true
                     text: card.chart ? card.chart.update : ""
                     font.pixelSize: Tokens.textXs
-                    color: Kirigami.Theme.disabledTextColor
+                    color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                     elide: Text.ElideRight
                 }
             }
@@ -73,7 +73,7 @@ AbstractButton {
                         text: line.index + 1
                         font.pixelSize: Tokens.textSm
                         font.features: { "tnum": 1 }
-                        color: Kirigami.Theme.disabledTextColor
+                        color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                     }
                     Label {
                         Layout.fillWidth: true
@@ -86,7 +86,7 @@ AbstractButton {
                         Layout.fillWidth: true
                         text: line.modelData.artist
                         font.pixelSize: Tokens.textSm
-                        color: Kirigami.Theme.disabledTextColor
+                        color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                         elide: Text.ElideRight
                     }
                 }

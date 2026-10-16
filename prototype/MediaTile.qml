@@ -39,7 +39,7 @@ AbstractButton {
                 anchors.fill: parent
                 visible: tile.cover.length === 0
                 radius: Tokens.radius
-                color: Qt.alpha(Kirigami.Theme.highlightColor, tile.hovered ? 0.16 : 0.1)
+                color: Qt.alpha(Kirigami.Theme.highlightColor, tile.hovered ? Tokens.tonalHover : Tokens.tonal)
                 Kirigami.Icon {
                     anchors.centerIn: parent
                     width: Tokens.iconLg
@@ -49,14 +49,22 @@ AbstractButton {
                     isMask: true
                 }
             }
-            // 悬停 / 键盘焦点：强调色描边
+            // 悬停：封面上叠一层强调色淡色调（与曲目行悬停同一令牌）；按下再深一档
+            Rectangle {
+                anchors.fill: parent
+                visible: tile.cover.length > 0
+                radius: Tokens.radius
+                color: Qt.alpha(Kirigami.Theme.highlightColor, tile.down ? Tokens.tintPressed : tile.hovered ? Tokens.tintHover : 0)
+                Behavior on color { ColorAnimation { duration: Kirigami.Units.shortDuration } }
+            }
+            // 键盘焦点：强调色描边，只在 Tab 导航时出现
             Rectangle {
                 anchors.fill: parent
                 radius: Tokens.radius
                 color: "transparent"
                 border.width: Tokens.lineStrong
                 border.color: Kirigami.Theme.highlightColor
-                visible: tile.hovered || tile.visualFocus
+                visible: tile.visualFocus
             }
         }
 
@@ -76,7 +84,7 @@ AbstractButton {
                 Layout.fillWidth: true
                 text: tile.caption
                 font.pixelSize: Tokens.textSm
-                color: Kirigami.Theme.disabledTextColor
+                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                 elide: Text.ElideRight
             }
             Item { Layout.fillHeight: true }

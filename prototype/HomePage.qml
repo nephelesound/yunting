@@ -23,7 +23,7 @@ ScreenFrame {
 
     readonly property var entries: page.loggedIn ? [
         { key: "daily", title: "每日推荐", cover: page.large(Personal.daily.tracks[0].cover), caption: "从" + page.quoted(Personal.daily.tracks[0].name) + "听起" },
-        { key: "heart", title: "心动模式", cover: page.large(Personal.heart.tracks.find(t => t.id !== Personal.heart.seed.id).cover), caption: "从红心歌曲" + page.quoted(Personal.heart.seed.name) + "出发" },
+        { key: "heart", title: "心动模式", cover: page.large(Personal.heart.tracks.find(t => t.id !== Personal.heart.seed.id).cover), caption: "从" + page.quoted(Personal.heart.seed.name) + "出发" },
         { key: "fm", title: "私人漫游", cover: page.large(Personal.fm.tracks[0].cover), caption: "从" + page.quoted(Personal.fm.tracks[0].name) + "开启漫游" },
         { key: "radar", title: "私人雷达", cover: Personal.radar.cover, caption: Personal.radar.description.split("|")[0] },
         { key: "similar", title: "相似歌曲", cover: page.large(Personal.similar.tracks[0].cover), caption: "和" + page.quoted(Personal.similar.seed.name) + "相似" },
@@ -81,7 +81,8 @@ ScreenFrame {
                         required property int index
                         width: page.tile
                         title: modelData.name
-                        caption: modelData.count + " 首"
+                        // 推荐理由优先；没有理由时写曲目数，动态歌单的 0 首不显示（缺失 ≠ 零）
+                        caption: modelData.reason || (modelData.count > 0 ? modelData.count + " 首" : "")
                         cover: modelData.cover
                         onClicked: page.playlistOpened(index)
                     }

@@ -76,7 +76,7 @@ ScreenFrame {
             text: modelData.text
             font.pixelSize: current ? Tokens.text4xl : Tokens.text2xl
             font.weight: current ? Font.Medium : Font.Normal
-            color: current ? Kirigami.Theme.textColor : Kirigami.Theme.disabledTextColor
+            color: current ? Kirigami.Theme.textColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             elide: Text.ElideRight
         }
     }
@@ -89,6 +89,6 @@ ScreenFrame {
         verticalAlignment: Text.AlignVCenter
         text: "暂无歌词"
         font.pixelSize: Tokens.text2xl
-        color: Kirigami.Theme.disabledTextColor
+        color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
     }
 }

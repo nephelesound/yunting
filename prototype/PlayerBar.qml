@@ -1,8 +1,9 @@
 // 播放条（HUD）：顶边是一条通栏进度线，既显示/拖动进度，也是内容区与播放条的分界（网易云同做法）。
 // 线下 80 高（48 封面 + 上下 16），三段：
 //   左＝封面 · 曲名/歌手 · 喜欢（作用于这首歌，所以紧挨曲名）
-//   中＝随机 · 上一首 · 播放（40 圆，强调色实底，是这块区域唯一的主动作）· 下一首 · 循环，对称
-//   右＝已播/总长 · 歌词 · 队列 · 音量
+//   中＝播放模式 · 上一首 · 播放（40 圆，强调色实底，是这块区域唯一的主动作）· 下一首 · 播放队列，对称
+//      播放模式是一个按钮循环切换 列表循环 → 单曲循环 → 随机（三者互斥，不做成两个各自开关的按钮）
+//   右＝已播/总长 · 歌词 · 音量
 // 左右两端挂在页边线上：封面左缘 = pageMargin，最后一个图标的图形右缘 = 窗宽 − pageMargin。
 import QtQuick
 import QtQuick.Controls
@@ -17,6 +18,13 @@ Item {
     property real elapsed
     property bool liked
     property bool nowPlayingShown
+    property int mode: 0 // 0 列表循环 · 1 单曲循环 · 2 随机
+
+    readonly property var modes: [
+        { icon: "media-playlist-repeat-symbolic", text: "列表循环" },
+        { icon: "media-playlist-repeat-song-symbolic", text: "单曲循环" },
+        { icon: "media-playlist-shuffle-symbolic", text: "随机播放" },
+    ]
 
     signal playPauseRequested()
     signal nextRequested()
@@ -41,7 +49,7 @@ Item {
         anchors.top: parent.top
         width: parent.width
         height: Tokens.lineStrong
-        color: Qt.alpha(Kirigami.Theme.textColor, 0.12)
+        color: Qt.alpha(Kirigami.Theme.textColor, Tokens.track)
 
         Rectangle {
             width: parent.width * Math.min(1, bar.elapsed / bar.duration)
@@ -104,7 +112,7 @@ Item {
                     Layout.fillWidth: true
                     text: bar.track ? bar.track.artist : ""
                     font.pixelSize: Tokens.textSm
-                    color: Kirigami.Theme.disabledTextColor
+                    color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                     elide: Text.ElideRight
                 }
             }
@@ -121,7 +129,11 @@ Item {
             anchors.centerIn: parent
             spacing: Tokens.space4
 
-            IconButton { icon.name: "media-playlist-shuffle"; text: "随机播放"; checkable: true }
+            IconButton {
+                icon.name: bar.modes[bar.mode].icon
+                text: bar.modes[bar.mode].text
+                onClicked: bar.mode = (bar.mode + 1) % bar.modes.length
+            }
             IconButton { icon.name: "media-skip-backward"; text: "上一首"; onClicked: bar.previousRequested() }
             RoundButton {
                 id: play
@@ -146,7 +158,7 @@ Item {
                 ToolTip.delay: 600
             }
             IconButton { icon.name: "media-skip-forward"; text: "下一首"; onClicked: bar.nextRequested() }
-            IconButton { icon.name: "media-playlist-repeat"; text: "列表循环"; checkable: true; checked: true }
+            IconButton { icon.name: "view-media-playlist"; text: "播放队列" }
         }
 
         // ── 右：时间与视图 ──
@@ -161,7 +173,7 @@ Item {
                 text: bar.formatTime(bar.elapsed) + " / " + bar.formatTime(bar.duration)
                 font.pixelSize: Tokens.textSm
                 font.features: { "tnum": 1 }
-                color: Kirigami.Theme.disabledTextColor
+                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             }
             IconButton {
                 icon.name: "view-media-lyrics"
@@ -170,7 +182,6 @@ Item {
                 checked: bar.nowPlayingShown
                 onClicked: bar.nowPlayingToggled()
             }
-            IconButton { icon.name: "view-media-playlist"; text: "播放队列" }
             IconButton { icon.name: "audio-volume-high"; text: "音量" }
         }
     }

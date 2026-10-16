@@ -47,7 +47,7 @@ Kirigami.Page {
             Label {
                 text: screen.loggedIn ? Personal.account.name : "未登录"
                 font.pixelSize: Tokens.textSm
-                color: Kirigami.Theme.disabledTextColor
+                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             }
             Button {
                 Layout.rightMargin: -Tokens.space2

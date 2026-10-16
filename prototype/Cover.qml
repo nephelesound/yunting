@@ -12,7 +12,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: cover.radius
-        color: Qt.alpha(Kirigami.Theme.textColor, 0.06)
+        color: Qt.alpha(Kirigami.Theme.textColor, Tokens.placeholder)
         visible: image.status !== Image.Ready
     }
 

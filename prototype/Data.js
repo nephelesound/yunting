@@ -6,7 +6,7 @@ var toplists = [
  {
   "id": 19723756,
   "name": "飙升榜",
-  "cover": "https://p2.music.126.net/rIi7Qzy2i2Y_1QD7cd0MYA==/109951170048506929.jpg?param=300y300",
+  "cover": "https://p1.music.126.net/rIi7Qzy2i2Y_1QD7cd0MYA==/109951170048506929.jpg?param=300y300",
   "update": "每天更新",
   "count": 100,
   "preview": [
@@ -27,7 +27,7 @@ var toplists = [
  {
   "id": 3779629,
   "name": "新歌榜",
-  "cover": "https://p2.music.126.net/5guhqPBTcIrrhLBotgaT6w==/109951170048511751.jpg?param=300y300",
+  "cover": "https://p1.music.126.net/5guhqPBTcIrrhLBotgaT6w==/109951170048511751.jpg?param=300y300",
   "update": "每天更新",
   "count": 100,
   "preview": [
@@ -48,7 +48,7 @@ var toplists = [
  {
   "id": 2884035,
   "name": "原创榜",
-  "cover": "https://p2.music.126.net/BaP9nrocNTL3gGThysv4eQ==/109951170091896587.jpg?param=300y300",
+  "cover": "https://p1.music.126.net/BaP9nrocNTL3gGThysv4eQ==/109951170091896587.jpg?param=300y300",
   "update": "每周四更新",
   "count": 100,
   "preview": [
@@ -69,7 +69,7 @@ var toplists = [
  {
   "id": 3778678,
   "name": "热歌榜",
-  "cover": "https://p2.music.126.net/0SUEG8yDACfx0Bw2MYFv4Q==/109951170048519512.jpg?param=300y300",
+  "cover": "https://p1.music.126.net/0SUEG8yDACfx0Bw2MYFv4Q==/109951170048519512.jpg?param=300y300",
   "update": "每天更新",
   "count": 200,
   "preview": [
@@ -90,7 +90,7 @@ var toplists = [
  {
   "id": 71384707,
   "name": "网易云古典榜",
-  "cover": "https://p2.music.126.net/urByD_AmfBDBrs7fA9-O8A==/109951167976973225.jpg?param=300y300",
+  "cover": "https://p1.music.126.net/urByD_AmfBDBrs7fA9-O8A==/109951167976973225.jpg?param=300y300",
   "update": "每周四更新",
   "count": 100,
   "preview": []
@@ -98,7 +98,7 @@ var toplists = [
  {
   "id": 1978921795,
   "name": "网易云电音榜",
-  "cover": "https://p2.music.126.net/hXGObvXfsGtFjFvRhOYAkA==/109951170091888741.jpg?param=300y300",
+  "cover": "https://p1.music.126.net/hXGObvXfsGtFjFvRhOYAkA==/109951170091888741.jpg?param=300y300",
   "update": "刚刚更新",
   "count": 50,
   "preview": []
@@ -106,7 +106,7 @@ var toplists = [
  {
   "id": 991319590,
   "name": "网易云中文说唱榜",
-  "cover": "https://p2.music.126.net/GgHbgDfGXHpE2YTchU7IvA==/109951171510498108.jpg?param=300y300",
+  "cover": "https://p1.music.126.net/GgHbgDfGXHpE2YTchU7IvA==/109951171510498108.jpg?param=300y300",
   "update": "每周五更新",
   "count": 50,
   "preview": []
@@ -114,7 +114,7 @@ var toplists = [
  {
   "id": 18478568150,
   "name": "小天才热歌榜",
-  "cover": "https://p2.music.126.net/GmmRZwOmh-DFwtF3TVJJrw==/109951174096842449.jpg?param=300y300",
+  "cover": "https://p1.music.126.net/GmmRZwOmh-DFwtF3TVJJrw==/109951174096842449.jpg?param=300y300",
   "update": "更新150首",
   "count": 150,
   "preview": []
@@ -122,7 +122,7 @@ var toplists = [
  {
   "id": 18176153161,
   "name": "实时分享榜",
-  "cover": "https://p2.music.126.net/b2-_Xw-6DwDXWIn7RNuCYQ==/109951173652479140.jpg?param=300y300",
+  "cover": "https://p1.music.126.net/b2-_Xw-6DwDXWIn7RNuCYQ==/109951173652479140.jpg?param=300y300",
   "update": "更新16首",
   "count": 100,
   "preview": []
@@ -130,7 +130,7 @@ var toplists = [
  {
   "id": 14028249541,
   "name": "网易云全球说唱榜",
-  "cover": "https://p2.music.126.net/0hhFjP6WyIjHYDXKW5E7BA==/109951171535150782.jpg?param=300y300",
+  "cover": "https://p1.music.126.net/0hhFjP6WyIjHYDXKW5E7BA==/109951171535150782.jpg?param=300y300",
   "update": "每周五更新",
   "count": 50,
   "preview": []
@@ -138,7 +138,7 @@ var toplists = [
  {
   "id": 13372522766,
   "name": "潮流风向榜",
-  "cover": "https://p2.music.126.net/dIKA5e7jCncz2Br1Toxgaw==/109951170621574552.jpg?param=300y300",
+  "cover": "https://p1.music.126.net/dIKA5e7jCncz2Br1Toxgaw==/109951170621574552.jpg?param=300y300",
   "update": "每天更新",
   "count": 100,
   "preview": []
@@ -146,7 +146,7 @@ var toplists = [
  {
   "id": 12911403728,
   "name": "音乐合伙人推荐榜",
-  "cover": "https://p2.music.126.net/s6ITpmGjKbyDpi7DPkqd2w==/109951170187827373.jpg?param=300y300",
+  "cover": "https://p1.music.126.net/s6ITpmGjKbyDpi7DPkqd2w==/109951170187827373.jpg?param=300y300",
   "update": "每周一更新",
   "count": 100,
   "preview": []
@@ -159,7 +159,7 @@ var playlist = {
  "cover": "https://p1.music.126.net/0SUEG8yDACfx0Bw2MYFv4Q==/109951170048519512.jpg?param=400y400",
  "description": "云音乐热歌榜：云音乐用户一周内收听所有线上歌曲官方TOP排行榜，每日更新。",
  "count": 200,
- "plays": 14191053824
+ "plays": 14191059968
 }
 
 var tracks = [
@@ -197,7 +197,7 @@ var tracks = [
   "album": "天龙八部之宿敌",
   "dur": 263,
   "fee": 1,
-  "cover": "http://p2.music.126.net/Ezo6K3rPFowvnkDtxf-w6Q==/109951172321459335.jpg?param=120y120"
+  "cover": "http://p1.music.126.net/Ezo6K3rPFowvnkDtxf-w6Q==/109951172321459335.jpg?param=120y120"
  },
  {
   "id": 3399839173,
@@ -233,7 +233,7 @@ var tracks = [
   "album": "黑马",
   "dur": 275,
   "fee": 1,
-  "cover": "http://p2.music.126.net/0bk3Iqe2OZGBH2Iuyx7RzA==/109951170045577565.jpg?param=120y120"
+  "cover": "http://p1.music.126.net/0bk3Iqe2OZGBH2Iuyx7RzA==/109951170045577565.jpg?param=120y120"
  },
  {
   "id": 3397415408,
@@ -260,7 +260,7 @@ var tracks = [
   "album": "罗生门（Follow）",
   "dur": 243,
   "fee": 8,
-  "cover": "http://p2.music.126.net/yN1ke1xYMJ718FiHaDWtYQ==/109951165076380471.jpg?param=120y120"
+  "cover": "http://p1.music.126.net/yN1ke1xYMJ718FiHaDWtYQ==/109951165076380471.jpg?param=120y120"
  },
  {
   "id": 1842728629,
@@ -314,7 +314,7 @@ var tracks = [
   "album": "逆光",
   "dur": 289,
   "fee": 1,
-  "cover": "http://p2.music.126.net/wF25xzePLml5EGUWM2eInw==/109951173219336672.jpg?param=120y120"
+  "cover": "http://p1.music.126.net/wF25xzePLml5EGUWM2eInw==/109951173219336672.jpg?param=120y120"
  },
  {
   "id": 316157,
@@ -341,7 +341,7 @@ var tracks = [
   "album": "黑色彩虹",
   "dur": 243,
   "fee": 1,
-  "cover": "http://p2.music.126.net/6Y7tdO1ltV0khSYWLFHODQ==/109951173146696212.jpg?param=120y120"
+  "cover": "http://p1.music.126.net/6Y7tdO1ltV0khSYWLFHODQ==/109951173146696212.jpg?param=120y120"
  },
  {
   "id": 1303464858,
@@ -386,7 +386,7 @@ var tracks = [
   "album": "刻在我心底的名字",
   "dur": 320,
   "fee": 1,
-  "cover": "http://p2.music.126.net/hP30WVUoRy-wE3c-prxr0g==/109951165256630492.jpg?param=120y120"
+  "cover": "http://p1.music.126.net/hP30WVUoRy-wE3c-prxr0g==/109951165256630492.jpg?param=120y120"
  },
  {
   "id": 1827600686,
@@ -395,7 +395,7 @@ var tracks = [
   "album": "还是会想你",
   "dur": 190,
   "fee": 8,
-  "cover": "http://p2.music.126.net/9FhSEQtMhP-JP3_U84YfWQ==/109951165798773745.jpg?param=120y120"
+  "cover": "http://p1.music.126.net/9FhSEQtMhP-JP3_U84YfWQ==/109951165798773745.jpg?param=120y120"
  },
  {
   "id": 1391891631,
@@ -413,7 +413,7 @@ var tracks = [
   "album": "你不要那样看着我的眼睛",
   "dur": 273,
   "fee": 8,
-  "cover": "http://p2.music.126.net/40K_TaZWVJXf-VlmjsZ98A==/109951174112375608.jpg?param=120y120"
+  "cover": "http://p1.music.126.net/40K_TaZWVJXf-VlmjsZ98A==/109951174112375608.jpg?param=120y120"
  },
  {
   "id": 21178386,
@@ -422,7 +422,7 @@ var tracks = [
   "album": "Invincible",
   "dur": 296,
   "fee": 1,
-  "cover": "http://p2.music.126.net/Iik8WEA3vOyPWMHniVR47A==/109951165992940172.jpg?param=120y120"
+  "cover": "http://p1.music.126.net/Iik8WEA3vOyPWMHniVR47A==/109951165992940172.jpg?param=120y120"
  },
  {
   "id": 316100,
@@ -431,7 +431,7 @@ var tracks = [
   "album": "雨爱",
   "dur": 260,
   "fee": 1,
-  "cover": "http://p2.music.126.net/Qt6sfLxRCscFZVXhbQ4bfg==/109951172020385959.jpg?param=120y120"
+  "cover": "http://p1.music.126.net/Qt6sfLxRCscFZVXhbQ4bfg==/109951172020385959.jpg?param=120y120"
  },
  {
   "id": 2018733994,
@@ -449,7 +449,7 @@ var tracks = [
   "album": "颜色",
   "dur": 211,
   "fee": 1,
-  "cover": "http://p2.music.126.net/NBYS2W-x3p2IVNvHMcylMg==/109951170940524301.jpg?param=120y120"
+  "cover": "http://p1.music.126.net/NBYS2W-x3p2IVNvHMcylMg==/109951170940524301.jpg?param=120y120"
  },
  {
   "id": 2083785152,
@@ -485,7 +485,7 @@ var tracks = [
   "album": "Star Crossing Night (feat. GALI)",
   "dur": 205,
   "fee": 1,
-  "cover": "http://p2.music.126.net/fsz6GAKO1-khteFArDidjA==/109951171942679749.jpg?param=120y120"
+  "cover": "http://p1.music.126.net/fsz6GAKO1-khteFArDidjA==/109951171942679749.jpg?param=120y120"
  },
  {
   "id": 28403111,
@@ -512,7 +512,7 @@ var tracks = [
   "album": "再见太难",
   "dur": 288,
   "fee": 1,
-  "cover": "http://p2.music.126.net/zYhMh8fYisHvajzKiL8dzg==/109951174112624480.jpg?param=120y120"
+  "cover": "http://p1.music.126.net/zYhMh8fYisHvajzKiL8dzg==/109951174112624480.jpg?param=120y120"
  },
  {
   "id": 3404238777,
@@ -521,7 +521,7 @@ var tracks = [
   "album": "太热爱",
   "dur": 290,
   "fee": 8,
-  "cover": "http://p2.music.126.net/rDv1qod6MDsYcEHKtxCdAA==/109951173532089932.jpg?param=120y120"
+  "cover": "http://p1.music.126.net/rDv1qod6MDsYcEHKtxCdAA==/109951173532089932.jpg?param=120y120"
  }
 ]
 

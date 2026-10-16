@@ -60,7 +60,9 @@ def track(s):
 
 
 def playlist_card(p, cover_key):
-    return {"id": p["id"], "name": p["name"], "cover": p[cover_key] + "?param=300y300", "count": p.get("trackCount") or 0}
+    # copywriter 是推荐理由（「根据你喜欢的单曲《X》推荐」），首页磁贴用它当信息气味；没有时退回曲目数
+    return {"id": p["id"], "name": p["name"], "cover": p[cover_key] + "?param=300y300",
+            "count": p.get("trackCount") or 0, "reason": p.get("copywriter") or ""}
 
 
 def js(name, value):

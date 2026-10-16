@@ -11,6 +11,7 @@ AbstractButton {
     property string detail
 
     hoverEnabled: true
+    focusPolicy: Qt.StrongFocus
     Accessible.name: tile.name
     ToolTip.text: tile.name + "\n" + tile.detail
     ToolTip.visible: hovered
@@ -21,13 +22,20 @@ AbstractButton {
             anchors.fill: parent
             source: tile.cover
         }
+        // 悬停/按下：强调色淡色调；键盘焦点：强调色描边（与 MediaTile 一致）
+        Rectangle {
+            anchors.fill: parent
+            radius: Tokens.radius
+            color: Qt.alpha(Kirigami.Theme.highlightColor, tile.down ? Tokens.tintPressed : tile.hovered ? Tokens.tintHover : 0)
+            Behavior on color { ColorAnimation { duration: Kirigami.Units.shortDuration } }
+        }
         Rectangle {
             anchors.fill: parent
             radius: Tokens.radius
             color: "transparent"
-            border.width: 2
+            border.width: Tokens.lineStrong
             border.color: Kirigami.Theme.highlightColor
-            visible: tile.hovered || tile.visualFocus
+            visible: tile.visualFocus
         }
     }
 }

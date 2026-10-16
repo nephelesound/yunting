@@ -1,6 +1,6 @@
 // 曲目行：高 48 = 封面边长。静止时无底色（重复元素保持 Level 0），悬停才出现淡色调。
-// ranked 时左侧是 32 宽的名次列；正在播放把名次换成强调色播放图标，标题也用强调色。
-// 不排名时，正在播放用悬挂在对齐线外侧的强调色竖条标出。VIP 是标题后的淡色调小标签。
+// ranked 时左侧是 32 宽的名次列；正在播放把名次换成强调色播放图标，标题加粗。
+// 不排名时，正在播放用悬挂在对齐线外侧的强调色竖条 + 加粗标题标出。VIP 是标题后的淡色调小标签。
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -26,7 +26,7 @@ AbstractButton {
 
     background: Rectangle {
         radius: Tokens.radius
-        color: Qt.alpha(Kirigami.Theme.highlightColor, tile.down ? 0.16 : tile.hovered ? 0.1 : 0)
+        color: Qt.alpha(Kirigami.Theme.highlightColor, tile.down ? Tokens.tintPressed : tile.hovered ? Tokens.tintHover : 0)
         border.width: tile.visualFocus ? Tokens.lineStrong : 0
         border.color: Kirigami.Theme.highlightColor
         Behavior on color { ColorAnimation { duration: Kirigami.Units.shortDuration } }
@@ -59,7 +59,7 @@ AbstractButton {
                 verticalAlignment: Text.AlignVCenter
                 font.pixelSize: Tokens.textBase
                 font.features: { "tnum": 1 }
-                color: Kirigami.Theme.disabledTextColor
+                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             }
             Kirigami.Icon {
                 anchors.right: parent.right
@@ -96,8 +96,8 @@ AbstractButton {
                     width: Math.min(implicitWidth, titleRow.width - (tag.visible ? tag.width + Tokens.space2 : 0))
                     text: tile.modelData.name
                     font.pixelSize: Tokens.textBase
-                    font.weight: tile.current ? Font.Medium : Font.Normal
-                    color: tile.current ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor
+                    // 正在播放靠字重 + 强调色标记区分，标题本身不用强调色（Breeze 亮色下强调色文字对比度只有 2.5:1）
+                    font.weight: tile.current ? Font.DemiBold : Font.Normal
                     elide: Text.ElideRight
                 }
                 Rectangle {
@@ -108,7 +108,7 @@ AbstractButton {
                     width: vip.implicitWidth + 2 * Tokens.space1
                     height: vip.implicitHeight
                     radius: Tokens.radiusSm
-                    color: Qt.alpha(tile.locked ? Kirigami.Theme.textColor : Kirigami.Theme.highlightColor, 0.1)
+                    color: Qt.alpha(tile.locked ? Kirigami.Theme.textColor : Kirigami.Theme.highlightColor, Tokens.tonal)
                     Label {
                         id: vip
                         anchors.centerIn: parent
@@ -123,7 +123,7 @@ AbstractButton {
                 Layout.fillWidth: true
                 text: tile.modelData.artist
                 font.pixelSize: Tokens.textSm
-                color: Kirigami.Theme.disabledTextColor
+                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                 elide: Text.ElideRight
             }
         }
@@ -131,9 +131,10 @@ AbstractButton {
         Label {
             Layout.preferredWidth: Tokens.albumColumn
             visible: tile.width >= Tokens.wideRow
-            text: tile.modelData.album
+            // 单曲的专辑名常与曲名相同，重复就留空（列仍占位，保证时长列对齐）
+            text: tile.modelData.album === tile.modelData.name ? "" : tile.modelData.album
             font.pixelSize: Tokens.textSm
-            color: Kirigami.Theme.disabledTextColor
+            color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             elide: Text.ElideRight
         }
 
@@ -145,7 +146,7 @@ AbstractButton {
             }
             font.pixelSize: Tokens.textSm
             font.features: { "tnum": 1 }
-            color: Kirigami.Theme.disabledTextColor
+            color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
         }
     }
 }

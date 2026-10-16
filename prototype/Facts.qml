@@ -27,7 +27,7 @@ Flow {
                 visible: text.length > 0
                 text: fact.modelData.label || ""
                 font.pixelSize: Tokens.textBase
-                color: Kirigami.Theme.disabledTextColor
+                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             }
         }
     }

@@ -24,6 +24,17 @@ QtObject {
     readonly property int radiusMd: 6
     readonly property int radiusLg: 8  // 浮层
 
+    // 不透明度：只用 5% 档。同一语义全应用只有一个值
+    readonly property real muted: 0.65        // 次要文字 = 正文色 × 0.65（三套配色下对比度都 ≥ 4.5:1；disabledTextColor 只给真正禁用的东西）
+    readonly property real tintHover: 0.1     // 可点行/卡悬停的强调色淡色调（静止时为 0）
+    readonly property real tintPressed: 0.15  // 按下
+    readonly property real tonal: 0.1         // 静止的淡色调面：VIP 标签、无封面的入口磁贴
+    readonly property real tonalHover: 0.15
+    readonly property real placeholder: 0.05  // 封面加载前的占位底
+    readonly property real track: 0.15        // 进度线未播放段
+    readonly property real faded: 0.25        // 非当前枢轴 / 面包屑上级
+    readonly property real fadedHover: 0.5
+
     // 字号（像素）：展示 / 分组标题 / 正文 / 说明 / 标签
     readonly property int text4xl: 36
     readonly property int text2xl: 24

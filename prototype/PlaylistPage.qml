@@ -53,7 +53,7 @@ ScreenFrame {
                 visible: text.length > 0
                 text: page.list.description || ""
                 font.pixelSize: Tokens.textSm
-                color: Kirigami.Theme.disabledTextColor
+                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                 wrapMode: Text.Wrap
                 maximumLineCount: 3
                 elide: Text.ElideRight
@@ -68,8 +68,12 @@ ScreenFrame {
                     text: "播放全部"
                     onClicked: page.playAllRequested()
                 }
-                IconButton {
+                Button {
+                    implicitHeight: Tokens.height8
+                    flat: true
                     icon.name: "media-playlist-shuffle"
+                    icon.width: Tokens.iconSm
+                    icon.height: Tokens.iconSm
                     text: "随机播放"
                     onClicked: page.shuffleRequested()
                 }
