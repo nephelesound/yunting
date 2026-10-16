@@ -1,0 +1,7 @@
+ncm-api|https://github.com/gmg137/netease-cloud-music-api.git|29cb56877e29ff350d5b1f55340602a187be618f
+gtk-client|https://github.com/gmg137/netease-cloud-music-gtk.git|225d14fb42bc0e0fdce1cbcb640577c307efc641
+alger-player|https://github.com/algerkong/AlgerMusicPlayer.git|182b8b90f8042c568d440835d1c7d3de4fc0b7ed
+elisa|https://invent.kde.org/multimedia/elisa.git|05e8abcd22e9424b87385141a4aa3b3aa02a70cb
+kirigami|https://invent.kde.org/frameworks/kirigami.git|67cad8ca417c825a6c9123b05aaf9255216a4108
+kirigami-addons|https://invent.kde.org/libraries/kirigami-addons.git|b701e38cb4105212321deb9e815a332a5c619158
+fluentui-qml|https://github.com/zhuzichu520/FluentUI.git|7e33a2f672d18239ef49ab960075b1137a1d18e7
