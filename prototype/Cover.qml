@@ -37,10 +37,15 @@ Item {
         visible: false
     }
 
+    // 图片到了再淡入（只动 opacity）：换歌、列表滚动加载时封面不会「啪」地跳出来
     Kirigami.ShadowedTexture {
         anchors.fill: parent
         source: image.status === Image.Ready ? image : null
         radius: cover.radius
         color: "transparent"
+        opacity: image.status === Image.Ready ? 1 : 0
+        Behavior on opacity {
+            NumberAnimation { duration: Tokens.motionBase; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut }
+        }
     }
 }

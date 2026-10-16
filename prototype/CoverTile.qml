@@ -27,7 +27,7 @@ AbstractButton {
             anchors.fill: parent
             radius: Tokens.radius
             color: Qt.alpha(Kirigami.Theme.highlightColor, tile.down ? Tokens.tintPressed : tile.hovered ? Tokens.tintHover : 0)
-            Behavior on color { ColorAnimation { duration: Kirigami.Units.shortDuration } }
+            Behavior on color { ColorAnimation { duration: Tokens.motionFast } }
         }
         Rectangle {
             anchors.fill: parent

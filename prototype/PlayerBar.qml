@@ -143,6 +143,9 @@ Item {
                 id: play
                 implicitWidth: Tokens.height10
                 implicitHeight: Tokens.height10
+                // 按下反馈：缩到 0.95（只在指针按下时；空格快捷键不经过这里，不做动画）
+                scale: play.down ? 0.95 : 1
+                Behavior on scale { NumberAnimation { duration: Tokens.motionFast; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut } }
                 text: bar.active && bar.playing ? "暂停" : "播放"
                 display: AbstractButton.IconOnly
                 icon.name: bar.active && bar.playing ? "media-playback-pause" : "media-playback-start"

@@ -6,7 +6,6 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
-import org.kde.kirigami as Kirigami
 
 Row {
     id: title
@@ -37,7 +36,7 @@ Row {
             font.weight: Font.Light
             elide: Text.ElideRight
             opacity: active ? 1 : hover.hovered ? Tokens.fadedHover : Tokens.faded
-            Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
+            Behavior on opacity { NumberAnimation { duration: Tokens.motionFast } }
 
             HoverHandler { id: hover; enabled: !item.active; cursorShape: Qt.PointingHandCursor }
             TapHandler {

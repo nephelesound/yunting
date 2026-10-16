@@ -3,6 +3,7 @@
 pragma Singleton
 
 import QtQuick
+import org.kde.kirigami as Kirigami
 
 QtObject {
     // 间距：只允许这五档
@@ -34,6 +35,15 @@ QtObject {
     readonly property real track: 0.15        // 进度线未播放段
     readonly property real faded: 0.25        // 非当前枢轴 / 面包屑上级
     readonly property real fadedHover: 0.5
+
+    // 动效：时长一律取 Kirigami.Units——桌面平台插件会按 Plasma「动画速度」(AnimationDurationFactor) 缩放，
+    // 用户关掉动画时它们就是 0，减弱动效不用另写分支。
+    readonly property int motionFast: Kirigami.Units.shortDuration      // 100：按下、悬停
+    readonly property int motionBase: Kirigami.Units.longDuration       // 200：页面进入、封面淡入、焦点变化
+    readonly property int motionSlow: Kirigami.Units.veryLongDuration   // 400：只给被动观看的环境运动（歌词滚动）
+    // 曲线：进出用强 ease-out，屏上移动用强 ease-in-out；不用 ease-in
+    readonly property var easeOut: [0.23, 1, 0.32, 1, 1, 1]
+    readonly property var easeInOut: [0.77, 0, 0.175, 1, 1, 1]
 
     // 字号（像素）：展示 / 分组标题 / 正文 / 说明 / 标签
     readonly property int text4xl: 36

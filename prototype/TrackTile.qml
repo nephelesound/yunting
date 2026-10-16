@@ -35,7 +35,7 @@ AbstractButton {
         color: Qt.alpha(Kirigami.Theme.highlightColor, tile.down ? Tokens.tintPressed : tile.hovered ? Tokens.tintHover : 0)
         border.width: tile.visualFocus ? Tokens.lineStrong : 0
         border.color: Kirigami.Theme.highlightColor
-        Behavior on color { ColorAnimation { duration: Kirigami.Units.shortDuration } }
+        Behavior on color { ColorAnimation { duration: Tokens.motionFast } }
 
         Rectangle {
             visible: tile.current && !tile.ranked && tile.hangingMarker

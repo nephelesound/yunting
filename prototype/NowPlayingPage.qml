@@ -63,20 +63,30 @@ ScreenFrame {
         highlightRangeMode: ListView.StrictlyEnforceRange
         preferredHighlightBegin: page.focusRow * page.pitch
         preferredHighlightEnd: (page.focusRow + 1) * page.pitch
-        highlightMoveDuration: Kirigami.Units.longDuration
+        // 换句时列表平滑上移（屏上移动 → ease-in-out）；歌词是被动观看的环境运动，所以用最慢的一档
+        highlightMoveDuration: Tokens.motionSlow
+        highlightMoveVelocity: -1
 
+        // 每句都按展示字号排版，非当前句用 scale 缩到 24/36：换句时只动 transform 与颜色，不重排文字
         delegate: Label {
+            id: line
             required property int index
             required property var modelData
             readonly property bool current: index === page.lyricIndex
-            width: ListView.view.width
+            readonly property real rest: Tokens.text2xl / Tokens.text4xl
+            width: ListView.view.width / line.scale   // 缩小后仍占满列宽，省略号落在列的右缘
             height: page.pitch
             verticalAlignment: Text.AlignVCenter
+            transformOrigin: Item.Left
+            scale: line.current ? 1 : line.rest
             text: modelData.text
-            font.pixelSize: current ? Tokens.text4xl : Tokens.text2xl
-            font.weight: current ? Font.Medium : Font.Normal
-            color: current ? Kirigami.Theme.textColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+            font.pixelSize: Tokens.text4xl
+            font.weight: Font.Medium
+            color: line.current ? Kirigami.Theme.textColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             elide: Text.ElideRight
+
+            Behavior on scale { NumberAnimation { duration: Tokens.motionBase; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut } }
+            Behavior on color { ColorAnimation { duration: Tokens.motionBase } }
         }
     }
 

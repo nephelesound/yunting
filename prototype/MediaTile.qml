@@ -62,7 +62,7 @@ AbstractButton {
                 visible: !parent.emblem
                 radius: tile.corner
                 color: Qt.alpha(Kirigami.Theme.highlightColor, tile.down ? Tokens.tintPressed : tile.hovered ? Tokens.tintHover : 0)
-                Behavior on color { ColorAnimation { duration: Kirigami.Units.shortDuration } }
+                Behavior on color { ColorAnimation { duration: Tokens.motionFast } }
             }
             // 键盘焦点：强调色描边，只在 Tab 导航时出现
             Rectangle {

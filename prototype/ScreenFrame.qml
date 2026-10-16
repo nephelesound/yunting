@@ -66,6 +66,15 @@ Kirigami.Page {
             id: contentArea
             Layout.fillWidth: true
             Layout.fillHeight: true
+
+            // 进入：内容淡入并上移 8px（页头不动，作为空间锚点）。只动 opacity 与 transform
+            opacity: 0
+            transform: Translate { id: rise; y: Tokens.space2 }
+            ParallelAnimation {
+                running: true
+                NumberAnimation { target: contentArea; property: "opacity"; to: 1; duration: Tokens.motionBase; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut }
+                NumberAnimation { target: rise; property: "y"; to: 0; duration: Tokens.motionBase; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut }
+            }
         }
     }
 }

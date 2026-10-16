@@ -17,7 +17,7 @@ Button {
         color: button.down ? Qt.darker(Kirigami.Theme.highlightColor, 1.15)
              : button.hovered ? Qt.lighter(Kirigami.Theme.highlightColor, 1.08)
              : Kirigami.Theme.highlightColor
-        Behavior on color { ColorAnimation { duration: Kirigami.Units.shortDuration } }
+        Behavior on color { ColorAnimation { duration: Tokens.motionFast } }
     }
 
     contentItem: Row {
