@@ -51,8 +51,10 @@ QtObject {
 
     // 封面磁贴边长：3 块磁贴 + 2 道间距 恰好等于 n 条曲目行（48 + 8）的高度，
     // 所以「排行榜」与「热歌」两组在全景里上下边缘对齐。n = 9 → 160，n = 6 → 104。
+    readonly property int tileSm: 104   // 2 行曲目的高度（2 × 56 − 8）
+    readonly property int tileLg: 160
     function tileFor(availableHeight) {
-        return availableHeight >= 3 * 160 + 2 * space2 ? 160 : 104;
+        return availableHeight >= 3 * tileLg + 2 * space2 ? tileLg : tileSm;
     }
     function rowsFor(tile) {
         return (3 * tile + 2 * space2 + space2) / (trackRow + space2);

@@ -1,5 +1,6 @@
 // 曲目行：高 48 = 封面边长。静止时无底色（重复元素保持 Level 0），悬停才出现淡色调。
-// 正在播放：左侧悬挂的强调色竖条 + 强调色标题。VIP 是标题后的淡色调小标签。
+// ranked 时左侧是 32 宽的名次列；正在播放把名次换成强调色播放图标，标题也用强调色。
+// 不排名时，正在播放用悬挂在对齐线外侧的强调色竖条标出。VIP 是标题后的淡色调小标签。
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -12,22 +13,26 @@ AbstractButton {
     required property var modelData
 
     property bool current
+    property bool ranked
     property bool locked // 匿名会话下的 VIP 曲：可见，点击时提示登录
 
     signal activated(int index)
 
     implicitHeight: Tokens.trackRow
     hoverEnabled: true
+    focusPolicy: Qt.StrongFocus
     onClicked: tile.activated(tile.index)
+    Keys.onReturnPressed: tile.activated(tile.index)
 
     background: Rectangle {
         radius: Tokens.radius
         color: Qt.alpha(Kirigami.Theme.highlightColor, tile.down ? 0.16 : tile.hovered ? 0.1 : 0)
+        border.width: tile.visualFocus ? Tokens.lineStrong : 0
+        border.color: Kirigami.Theme.highlightColor
         Behavior on color { ColorAnimation { duration: Kirigami.Units.shortDuration } }
 
-        // 悬挂在对齐线外侧，不推动内容
         Rectangle {
-            visible: tile.current
+            visible: tile.current && !tile.ranked
             width: Tokens.space1
             height: Tokens.space6
             anchors.verticalCenter: parent.verticalCenter
@@ -41,6 +46,33 @@ AbstractButton {
     contentItem: RowLayout {
         spacing: Tokens.space3
 
+        Item {
+            visible: tile.ranked
+            Layout.preferredWidth: Tokens.height8
+            Layout.fillHeight: true
+
+            Label {
+                anchors.fill: parent
+                visible: !tile.current
+                text: tile.index + 1
+                horizontalAlignment: Text.AlignRight
+                verticalAlignment: Text.AlignVCenter
+                font.pixelSize: Tokens.textBase
+                font.features: { "tnum": 1 }
+                color: Kirigami.Theme.disabledTextColor
+            }
+            Kirigami.Icon {
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                visible: tile.current
+                width: Tokens.iconSm
+                height: Tokens.iconSm
+                source: "media-playback-start"
+                color: Kirigami.Theme.highlightColor
+                isMask: true
+            }
+        }
+
         Cover {
             Layout.preferredWidth: Tokens.trackRow
             Layout.preferredHeight: Tokens.trackRow
@@ -50,7 +82,7 @@ AbstractButton {
 
         ColumnLayout {
             Layout.fillWidth: true
-            Layout.preferredWidth: 0 // 宽度只由剩余空间决定，长标题不得挤出时长列
+            Layout.preferredWidth: 0 // 宽度只由剩余空间决定，长标题不得挤出右侧各列
             spacing: 0
 
             // 标题 + VIP 标签：标题先省略，标签始终紧跟其后

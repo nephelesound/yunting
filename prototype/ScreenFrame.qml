@@ -1,8 +1,10 @@
-// 每一屏的骨架：顶栏 → 展示标题 → 事实行 → 内容。页头各行都挂在左页边线上，
-// 页头到内容固定 space6，所以切换页面时标题与内容起点不跳动。内容区占满宽度，自己负责页边距（滚动渐隐需要）。
+// 每一屏的骨架：一行页头（左＝标题/枢轴/面包屑，右＝账号状态与登录）→ space6 → 内容。
+// 页头高 48、起点固定，切换页面时标题与内容起点都不跳动。内容区占满宽度，自己负责页边距。
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
+import "Personal.js" as Personal
 
 Kirigami.Page {
     id: screen
@@ -10,8 +12,7 @@ Kirigami.Page {
     property alias heading: title.text
     property alias pivots: title.pivots
     property alias currentPivot: title.current
-    property alias facts: factRow.items
-    property alias backVisible: topBar.backVisible
+    property alias parentText: title.parentText
     property bool loggedIn
     default property alias content: contentArea.data
 
@@ -26,37 +27,46 @@ Kirigami.Page {
     ColumnLayout {
         anchors.fill: parent
         anchors.topMargin: Tokens.space4
-        spacing: 0
+        spacing: Tokens.space6
 
-        TopBar {
-            id: topBar
+        RowLayout {
             Layout.fillWidth: true
-            Layout.leftMargin: Tokens.pageMargin
-            Layout.rightMargin: Tokens.pageMargin
-            loggedIn: screen.loggedIn
-            onBackRequested: screen.leaveRequested()
-            onLoginRequested: screen.loginRequested()
-        }
-
-        PageTitle {
-            id: title
             Layout.leftMargin: Tokens.pageMargin - 2 // 细体大字的左侧字距补偿，视觉上对齐页边线
-            Layout.topMargin: Tokens.space2
-            onPivotActivated: key => screen.pivotActivated(key)
-        }
+            Layout.rightMargin: Tokens.pageMargin
+            Layout.preferredHeight: Tokens.height12
+            spacing: Tokens.space2
 
-        Facts {
-            id: factRow
-            Layout.leftMargin: Tokens.pageMargin
-            Layout.topMargin: Tokens.space1
-            visible: items.length > 0
+            PageTitle {
+                id: title
+                Layout.fillWidth: true
+                Layout.maximumWidth: implicitWidth
+                onPivotActivated: key => screen.pivotActivated(key)
+                onParentActivated: screen.leaveRequested()
+            }
+            Item { Layout.fillWidth: true }
+            Label {
+                text: screen.loggedIn ? Personal.account.name : "未登录"
+                font.pixelSize: Tokens.textSm
+                color: Kirigami.Theme.disabledTextColor
+            }
+            Button {
+                Layout.rightMargin: -Tokens.space2
+                visible: !screen.loggedIn
+                implicitHeight: Tokens.height8
+                flat: true
+                icon.name: "view-barcode-qr"
+                icon.width: Tokens.iconSm
+                icon.height: Tokens.iconSm
+                text: "扫码登录"
+                font.pixelSize: Tokens.textSm
+                onClicked: screen.loginRequested()
+            }
         }
 
         Item {
             id: contentArea
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.topMargin: Tokens.space6
         }
     }
 }

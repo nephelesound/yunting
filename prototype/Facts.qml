@@ -1,9 +1,9 @@
-// 事实行：数值用前景色、单位/说明用弱化色，事实之间只用间距分隔（不用「·」）。
+// 事实行：数值用前景色、单位/说明用弱化色，事实之间只用间距分隔（不用「·」）；宽度不够时整条事实换行。
 import QtQuick
 import QtQuick.Controls
 import org.kde.kirigami as Kirigami
 
-Row {
+Flow {
     id: facts
 
     property var items: [] // [{ value, label }]，value 可省略
@@ -24,7 +24,8 @@ Row {
                 font.features: { "tnum": 1 }
             }
             Label {
-                text: fact.modelData.label
+                visible: text.length > 0
+                text: fact.modelData.label || ""
                 font.pixelSize: Tokens.textBase
                 color: Kirigami.Theme.disabledTextColor
             }

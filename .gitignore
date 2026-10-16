@@ -4,8 +4,8 @@ node_modules/
 *.user
 .cache/
 
-# 原型截图（截图 harness 未落地）
-prototype/shot*.png
+# 个人数据快照（scripts/snapshot.py 用登录 cookie 生成），不入库
+prototype/Personal.js
 
 # 只读上游参考库：不入库，用 `make refs` 按 SHA 复原
 docs/reference/*/

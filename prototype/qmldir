@@ -1,14 +1,17 @@
 singleton Tokens Tokens.qml
 AccentButton AccentButton.qml
+ChartCard ChartCard.qml
+ChartsPage ChartsPage.qml
 Cover Cover.qml
 CoverTile CoverTile.qml
-DiscoverPage DiscoverPage.qml
 Facts Facts.qml
+GroupHeader GroupHeader.qml
+HomePage HomePage.qml
 IconButton IconButton.qml
+MediaTile MediaTile.qml
 NowPlayingPage NowPlayingPage.qml
 PageTitle PageTitle.qml
 PlayerBar PlayerBar.qml
 PlaylistPage PlaylistPage.qml
 ScreenFrame ScreenFrame.qml
-TopBar TopBar.qml
 TrackTile TrackTile.qml

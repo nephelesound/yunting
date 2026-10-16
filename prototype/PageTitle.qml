@@ -1,4 +1,7 @@
-// 展示标题：36px 细体。有枢轴时，各枢轴并排成一行展示字（当前实色、其余淡出）；没有就显示页名。
+// 展示标题行（36px 细体），三种形态，起点永远在页边线上：
+//   顶层页：各枢轴并排，当前实色、其余淡出，点淡出的切换；
+//   子页：「上级  本页」面包屑，上级淡出、点它返回（代替返回箭头，标题不因返回键而右移）；
+//   否则：只有页名。
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -11,26 +14,36 @@ Row {
     property string text
     property var pivots: []          // [{ key, text }]
     property string current
+    property string parentText       // 非空即为子页
 
     signal pivotActivated(string key)
+    signal parentActivated()
+
+    readonly property var items: title.parentText.length > 0
+        ? [{ key: "..", text: title.parentText }, { key: "", text: title.text }]
+        : title.pivots.length > 0 ? title.pivots : [{ key: "", text: title.text }]
 
     spacing: Tokens.space6
 
     Repeater {
-        model: title.pivots.length > 0 ? title.pivots : [{ key: "", text: title.text }]
+        model: title.items
         delegate: Label {
-            id: pivot
+            id: item
             required property var modelData
-            readonly property bool active: modelData.key === title.current || title.pivots.length === 0
+            readonly property bool active: modelData.key === title.current || modelData.key === ""
 
             text: modelData.text
             font.pixelSize: Tokens.text4xl
             font.weight: Font.Light
+            elide: Text.ElideRight
             opacity: active ? 1 : hover.hovered ? 0.5 : 0.25
             Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
 
-            HoverHandler { id: hover; enabled: !pivot.active; cursorShape: Qt.PointingHandCursor }
-            TapHandler { enabled: !pivot.active; onTapped: title.pivotActivated(pivot.modelData.key) }
+            HoverHandler { id: hover; enabled: !item.active; cursorShape: Qt.PointingHandCursor }
+            TapHandler {
+                enabled: !item.active
+                onTapped: item.modelData.key === ".." ? title.parentActivated() : title.pivotActivated(item.modelData.key)
+            }
         }
     }
 }
