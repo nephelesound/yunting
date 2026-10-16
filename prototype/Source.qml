@@ -31,6 +31,21 @@ QtObject {
     // ── 私人漫游：一个流，直接播放 ──
     readonly property var fmTracks: source.p.fm.tracks
 
+    // ── 我的：最近播放、云盘、创建与收藏的歌单（缺字段时给稳定的空形状）──
+    readonly property var recent: source.p.recent || { total: 0, tracks: [] }
+    readonly property var cloud: source.p.cloud || { count: 0, size: 0, maxSize: 0, tracks: [] }
+    readonly property var myPlaylists: (source.p.mine || []).map(pl => Object.assign({ owned: true }, pl))
+        .concat((source.p.subscribed || []).map(pl => Object.assign({ owned: false }, pl)))
+
+    // ── 搜索：快照只有一个查询词的结果；热门搜索是匿名可得的 ──
+    readonly property var hotSearches: source.d.hotSearches || []
+    readonly property var searchResult: source.d.search || { query: "", songs: [], artists: [], playlists: [], albums: [] }
+
+    // 一位小数且去掉多余的 .0：59.9 GB / 60 GB——取整会把将满显示成「60 / 60」
+    function gigabytes(bytes) {
+        return Number((bytes / 1073741824).toFixed(1)) + " GB";
+    }
+
     function lyrics(trackId) {
         return trackId === source.d.lyricsTrackId ? source.d.lyrics : [];
     }
@@ -112,7 +127,21 @@ QtObject {
         case "liked": return {
             heading: "我喜欢的音乐", cover: source.sized(source.firstCover(p.liked.tracks), 560), tracks: p.liked.tracks,
             facts: [source.songs(p.liked.count)], description: "", emptyText: "还没有红心歌曲" };
+        case "recent": return {
+            heading: "最近播放", cover: source.sized(source.firstCover(source.recent.tracks), 560), tracks: source.recent.tracks,
+            facts: [source.songs(source.recent.total)], description: "", emptyText: "还没有播放记录" };
+        case "cloud": return {
+            heading: "音乐云盘", cover: source.sized(source.firstCover(source.cloud.tracks), 560), tracks: source.cloud.tracks,
+            facts: [source.songs(source.cloud.count), { value: source.gigabytes(source.cloud.size), label: "/ " + source.gigabytes(source.cloud.maxSize) }],
+            description: "", emptyText: "云盘里还没有歌，可以在官方客户端上传" };
         default: {
+            // 推荐歌单：key = "playlist:<序号>"，快照只带了前几个的曲目
+            if (key.startsWith("playlist:")) {
+                const card = source.playlists[Number(key.slice(9))] || { name: "", cover: "", tracks: [], count: 0 };
+                return { heading: card.name, cover: source.sized(card.cover, 560), tracks: card.tracks || [],
+                         facts: card.count > 0 ? [source.songs(card.count)] : [], description: card.description || card.reason || "",
+                         emptyText: "这个歌单的曲目还没取到" };
+            }
             const pl = source.d.playlist;
             const facts = [{ label: "官方榜" }, source.songs(pl.count)];
             if (pl.plays > 0)

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """给 QML 原型生成真实数据快照。
 
-prototype/Data.js      匿名可得的数据（榜单、热歌榜、歌词），入库。
-prototype/Personal.js  个人数据（每日推荐、心动模式、私人漫游、私人雷达、相似推荐、红心、推荐歌单），不入库。
+prototype/Data.js      匿名可得的数据（榜单、热歌榜、歌词、搜索、热搜），入库。
+prototype/Personal.js  个人数据（每日推荐、心动模式、私人漫游、私人雷达、相似推荐、红心、推荐歌单、最近在听、云盘、收藏歌单），不入库。
                        有 netease-cloud-music-gtk4 的登录 cookie 时抓个人版；没有时写匿名替身（公共漫游、公共推荐歌单）。
 
 cookie 只在本进程内拼进请求头，不打印、不写盘。
@@ -55,14 +55,44 @@ def track(s):
         "album": album.get("name") or "",
         "dur": (s.get("dt") or s.get("duration") or 0) // 1000,
         "fee": s.get("fee", 0),
-        "cover": (album.get("picUrl") or "") + "?param=120y120",
+        "cover": sized(album.get("picUrl"), 120),
     }
+
+
+def sized(url, px):
+    """图片地址加尺寸参数；没有图（搜索结果等常见 null）就是空串，不能拼出只有参数的假地址。"""
+    return f"{url}?param={px}y{px}" if url else ""
+
+
+def cloud_track(item):
+    """云盘条目：有 simpleSong 用它（新结构），否则用条目自己的 songName/artist/album 字段。"""
+    if item.get("simpleSong"):
+        return track(item["simpleSong"])
+    return {"id": item.get("songId") or 0, "name": item.get("songName") or item.get("fileName") or "",
+            "artist": item.get("artist") or "", "album": item.get("album") or "", "dur": 0, "fee": 0, "cover": ""}
 
 
 def playlist_card(p, cover_key):
     # copywriter 是推荐理由（「根据你喜欢的单曲《X》推荐」），首页磁贴用它当信息气味；没有时退回曲目数
-    return {"id": p["id"], "name": p["name"], "cover": p[cover_key] + "?param=300y300",
+    return {"id": p["id"], "name": p["name"], "cover": sized(p.get(cover_key), 300),
             "count": p.get("trackCount") or 0, "reason": p.get("copywriter") or ""}
+
+
+def search_artist(a):
+    return {"id": a["id"], "name": a["name"], "cover": sized(a.get("picUrl") or a.get("img1v1Url"), 300),
+            "albums": a.get("albumSize") or 0}
+
+
+def search_playlist(p):
+    return {"id": p["id"], "name": p["name"], "cover": sized(p.get("coverImgUrl"), 300),
+            "count": p.get("trackCount") or 0, "creator": (p.get("creator") or {}).get("nickname") or ""}
+
+
+def search_album(a):
+    ms = a.get("publishTime") or 0
+    return {"id": a["id"], "name": a["name"], "artist": (a.get("artist") or {}).get("name") or "",
+            "cover": sized(a.get("picUrl"), 300),
+            "year": time.gmtime(ms / 1000).tm_year if ms > 0 else 0}
 
 
 def js(name, value):
@@ -89,7 +119,7 @@ def anonymous():
         {
             "id": t["id"],
             "name": t["name"],
-            "cover": t["coverImgUrl"] + "?param=300y300",
+            "cover": sized(t.get("coverImgUrl"), 300),
             "update": t.get("updateFrequency") or "",
             "count": t.get("trackCount") or 0,
             "preview": [{"name": p["first"], "artist": p["second"]} for p in (t.get("tracks") or [])],
@@ -99,26 +129,39 @@ def anonymous():
     playlist = {
         "id": hot["id"],
         "name": hot["name"],
-        "cover": hot["coverImgUrl"] + "?param=400y400",
+        "cover": sized(hot.get("coverImgUrl"), 400),
         "description": (hot.get("description") or "").split("\n")[0],
         "count": hot["trackCount"],
         "plays": hot["playCount"],
     }
+    q = urllib.parse.quote("林俊杰")
+    search = {
+        "query": "林俊杰",
+        "songs": [track(s) for s in get(f"api/search/get?s={q}&type=1&limit=10")["result"]["songs"]],
+        "artists": [search_artist(a) for a in get(f"api/search/get?s={q}&type=100&limit=6")["result"]["artists"]],
+        "playlists": [search_playlist(p) for p in get(f"api/search/get?s={q}&type=1000&limit=6")["result"]["playlists"]],
+        "albums": [search_album(a) for a in get(f"api/search/get?s={q}&type=10&limit=6")["result"]["albums"]],
+    }
+    hot = get("api/hotsearchlist/get").get("data") or []
+    hot_searches = [{"word": h.get("searchWord") or "", "note": h.get("content") or "", "score": h.get("score") or 0}
+                    for h in hot[:20]]
     write("prototype/Data.js", f"匿名接口快照（{time.strftime('%Y-%m-%d')}），由 scripts/snapshot.py 生成",
           [js("toplists", toplists), js("playlist", playlist), js("tracks", tracks),
-           js("lyricsTrackId", tracks[CURRENT]["id"]), js("lyrics", lyrics)])
+           js("lyricsTrackId", tracks[CURRENT]["id"]), js("lyrics", lyrics),
+           js("search", search), js("hotSearches", hot_searches)])
     return tracks
 
 
 def personal(hot_tracks):
-    data = {"account": None, "daily": None, "heart": None, "radar": None, "liked": None, "mine": []}
+    data = {"account": None, "daily": None, "heart": None, "radar": None, "liked": None, "mine": [],
+            "recent": None, "cloud": None, "subscribed": []}
     account = get("api/nuser/account/get", personal=True) if COOKIE else {}
     profile = account.get("profile") or {}
     uid = profile.get("userId")
 
     if uid:
         data["account"] = {"name": profile["nickname"], "vip": (profile.get("vipType") or 0) > 0,
-                           "avatar": profile["avatarUrl"] + "?param=96y96"}
+                           "avatar": sized(profile.get("avatarUrl"), 96)}
         daily = get("api/v3/discovery/recommend/songs", personal=True)["data"]["dailySongs"]
         data["daily"] = {"date": time.strftime("%m月%d日").lstrip("0"), "day": time.strftime("%d").lstrip("0"),
                          "tracks": [track(s) for s in daily[:30]]}
@@ -137,13 +180,40 @@ def personal(hot_tracks):
 
         radar = get(f"api/v6/playlist/detail?id={RADAR}&n=30", personal=True)["playlist"]
         data["radar"] = {"id": radar["id"], "name": "私人雷达", "description": radar["name"],
-                         "cover": radar["coverImgUrl"] + "?param=300y300", "tracks": [track(s) for s in radar["tracks"][:30]]}
+                         "cover": sized(radar.get("coverImgUrl"), 300), "tracks": [track(s) for s in radar["tracks"][:30]]}
 
         recommended = get("api/v1/discovery/recommend/resource", personal=True).get("recommend") or []
         data["playlists"] = [playlist_card(p, "picUrl") for p in recommended]
+        # 前 6 个推荐歌单补 30 首试听曲目和一句简介；其余保持空，原型里点开再取
+        for card in data["playlists"][:6]:
+            pl = get(f"api/v6/playlist/detail?id={card['id']}&n=30", personal=True)["playlist"]
+            card["tracks"] = [track(s) for s in pl["tracks"][:30]]
+            card["description"] = (pl.get("description") or "").split("\n")[0]
+        for card in data["playlists"][6:]:
+            card["tracks"] = []
+            card["description"] = ""
+
+        record = get("api/play-record/song/list?limit=30", personal=True).get("data") or {}
+        data["recent"] = {"total": record.get("total") or 0,
+                          "tracks": [track(x["data"]) for x in (record.get("list") or [])][:30]}
+
+        cloud_resp = get("api/v1/cloud/get?limit=30&offset=0", personal=True)
+        cloud_items = cloud_resp.get("data") or []
+        data["cloud"] = {"count": cloud_resp.get("count") or 0,
+                         "size": cloud_resp.get("size") or 0,
+                         "maxSize": int(cloud_resp.get("maxSize") or 0),
+                         "tracks": [cloud_track(x) for x in cloud_items][:30]}
+
+        # 收藏（非自己创建）的歌单，与 mine 同款磁贴
+        data["subscribed"] = [playlist_card(p, "coverImgUrl") for p in lists[1:]
+                              if (p.get("creator") or {}).get("userId") != uid][:12]
+
         similar_seed = seed
     else:
         data["playlists"] = [playlist_card(p, "picUrl") for p in get("api/personalized/playlist?limit=12")["result"]]
+        for card in data["playlists"]:
+            card["tracks"] = []
+            card["description"] = ""
         similar_seed = hot_tracks[0]
 
     # 公共接口：没登录也能取（登录后漫游是个人的）

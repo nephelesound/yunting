@@ -30,7 +30,10 @@ SHOTS = home:page=home home-anon:account=anonymous,page=home charts:page=charts 
         one-home:fixture=one,page=home one-daily:fixture=one,listKey=daily,page=list \
         queue:page=home,startOverlay=queue empty-queue:fixture=empty,page=home,startOverlay=queue \
         login:account=anonymous,page=home,startOverlay=login login-scanned:account=anonymous,page=home,loginState=scanned,startOverlay=login \
-        login-expired:account=anonymous,page=home,loginState=expired,startOverlay=login
+        login-expired:account=anonymous,page=home,loginState=expired,startOverlay=login \
+        mine:page=mine worst-mine:fixture=worst,page=mine empty-mine:fixture=empty,page=mine \
+        search:page=search search-results:searchQuery=林俊杰,page=search worst-search:fixture=worst,searchQuery=x,page=search \
+        empty-search:fixture=empty,searchQuery=x,page=search
 
 data: ## 重新抓取数据快照（有 gtk4 客户端登录 cookie 时同时生成个人快照）
 	scripts/snapshot.py

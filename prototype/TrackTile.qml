@@ -19,6 +19,7 @@ AbstractButton {
     property bool locked // 匿名会话下的 VIP 曲：可见，点击时提示登录
 
     property bool removable  // 播放队列：悬停时显示「移出」
+    property bool hangingMarker: true  // 左侧没有留白（紧挨别的元素）时关掉悬挂竖条
 
     signal activated(int index)
     signal removeRequested(int index)
@@ -37,7 +38,7 @@ AbstractButton {
         Behavior on color { ColorAnimation { duration: Kirigami.Units.shortDuration } }
 
         Rectangle {
-            visible: tile.current && !tile.ranked
+            visible: tile.current && !tile.ranked && tile.hangingMarker
             width: Tokens.space1
             height: Tokens.space6
             anchors.verticalCenter: parent.verticalCenter

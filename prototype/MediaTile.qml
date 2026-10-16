@@ -14,6 +14,9 @@ AbstractButton {
     property string caption
     property string symbol      // 无封面时显示的图标
     property bool locked        // 需要登录：图标换成锁，点击触发登录
+    property bool round         // 人物（歌手）用圆形，这是通行约定；其余都是方形
+
+    readonly property real corner: tile.round ? tile.size / 2 : Tokens.radius
 
     readonly property int size: width
 
@@ -37,11 +40,12 @@ AbstractButton {
                 visible: !parent.emblem
                 source: tile.cover
                 pixelSize: 400
+                radius: tile.corner
             }
             Rectangle {
                 anchors.fill: parent
                 visible: parent.emblem
-                radius: Tokens.radius
+                radius: tile.corner
                 color: Qt.alpha(Kirigami.Theme.highlightColor, tile.hovered ? Tokens.tonalHover : Tokens.tonal)
                 Kirigami.Icon {
                     anchors.centerIn: parent
@@ -56,14 +60,14 @@ AbstractButton {
             Rectangle {
                 anchors.fill: parent
                 visible: !parent.emblem
-                radius: Tokens.radius
+                radius: tile.corner
                 color: Qt.alpha(Kirigami.Theme.highlightColor, tile.down ? Tokens.tintPressed : tile.hovered ? Tokens.tintHover : 0)
                 Behavior on color { ColorAnimation { duration: Kirigami.Units.shortDuration } }
             }
             // 键盘焦点：强调色描边，只在 Tab 导航时出现
             Rectangle {
                 anchors.fill: parent
-                radius: Tokens.radius
+                radius: tile.corner
                 color: "transparent"
                 border.width: Tokens.lineStrong
                 border.color: Kirigami.Theme.highlightColor
@@ -78,6 +82,7 @@ AbstractButton {
             Label {
                 Layout.fillWidth: true
                 text: tile.title
+                horizontalAlignment: tile.round ? Text.AlignHCenter : Text.AlignLeft
                 font.pixelSize: Tokens.textBase
                 font.weight: Font.Medium
                 color: tile.locked ? Kirigami.Theme.disabledTextColor : Kirigami.Theme.textColor
@@ -86,6 +91,7 @@ AbstractButton {
             Label {
                 Layout.fillWidth: true
                 text: tile.caption
+                horizontalAlignment: tile.round ? Text.AlignHCenter : Text.AlignLeft
                 font.pixelSize: Tokens.textSm
                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                 elide: Text.ElideRight

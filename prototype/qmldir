@@ -12,9 +12,11 @@ IconButton IconButton.qml
 LoginDialog LoginDialog.qml
 QueuePanel QueuePanel.qml
 MediaTile MediaTile.qml
+MinePage MinePage.qml
 NowPlayingPage NowPlayingPage.qml
 PageTitle PageTitle.qml
 PlayerBar PlayerBar.qml
 PlaylistPage PlaylistPage.qml
 ScreenFrame ScreenFrame.qml
+SearchPage SearchPage.qml
 TrackTile TrackTile.qml

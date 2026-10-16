@@ -187,7 +187,10 @@ Kirigami.ApplicationWindow {
         onTapped: root.goBack()
     }
 
-    readonly property var pages: ({ home: homePage, mine: placeholderPage, search: placeholderPage, charts: chartsPage, list: listPage, nowplaying: nowPlayingPage })
+    // 「我的」未登录时是登录引导；搜索词由 harness 的 searchQuery 预填（空 = 热门搜索）
+    property string searchQuery: ""
+    readonly property var pages: ({ home: homePage, mine: root.loggedIn ? minePage : placeholderPage, search: searchPage,
+                                    charts: chartsPage, list: listPage, nowplaying: nowPlayingPage })
     onPageChanged: {
         pageStack.clear();
         pageStack.push(root.pages[root.page]);
@@ -228,7 +231,7 @@ Kirigami.ApplicationWindow {
             onPivotActivated: key => root.switchPivot(key)
             onLoginRequested: root.requestLogin()
             onEntryOpened: key => root.openEntry(key)
-            onPlaylistOpened: index => root.showPassiveNotification("歌单详情：待接 NcmClient.playlist()")
+            onPlaylistOpened: index => root.open("list", "playlist:" + index)
         }
     }
 
@@ -274,6 +277,33 @@ Kirigami.ApplicationWindow {
     }
 
     Component {
+        id: minePage
+        MinePage {
+            pivots: root.pivots
+            loggedIn: root.loggedIn
+            currentId: root.currentTrack ? root.currentTrack.id : 0
+            onPivotActivated: key => root.switchPivot(key)
+            onLoginRequested: root.requestLogin()
+            onEntryOpened: key => root.open("list", key)
+            onPlaylistOpened: index => root.showPassiveNotification("歌单详情：待接 NcmClient.playlist()")
+            onRecentActivated: index => root.play(Source.recent.tracks, index)
+        }
+    }
+
+    Component {
+        id: searchPage
+        SearchPage {
+            pivots: root.pivots
+            loggedIn: root.loggedIn
+            query: root.searchQuery
+            currentId: root.currentTrack ? root.currentTrack.id : 0
+            onPivotActivated: key => root.switchPivot(key)
+            onLoginRequested: root.requestLogin()
+            onTrackActivated: index => root.play(Source.searchResult.songs, index)
+        }
+    }
+
+    Component {
         id: placeholderPage
         ScreenFrame {
             pivots: root.pivots
@@ -282,13 +312,14 @@ Kirigami.ApplicationWindow {
             onPivotActivated: key => root.switchPivot(key)
             onLoginRequested: root.requestLogin()
 
+            // 只用于未登录的「我的」
             Kirigami.PlaceholderMessage {
                 anchors.centerIn: parent
                 width: parent.width - 2 * Tokens.pageMargin
-                icon.name: root.page === "mine" ? "love-symbolic" : "edit-find"
-                text: root.page === "mine" ? (root.loggedIn ? "我的音乐" : "登录后显示你的音乐") : "搜索歌曲、歌手、歌单"
-                explanation: root.page === "mine" ? (root.loggedIn ? "待做：红心、最近播放与自建歌单磁贴" : "我喜欢的音乐、每日推荐、云盘和 VIP 曲目都跟随网易云账号。") : "待接 NcmClient.search()"
-                helpfulAction: root.page === "mine" && !root.loggedIn ? loginAction : null
+                icon.name: "love-symbolic"
+                text: "登录后显示你的音乐"
+                explanation: "我喜欢的音乐、最近播放、云盘和收藏的歌单都跟随网易云账号。"
+                helpfulAction: loginAction
             }
             Kirigami.Action {
                 id: loginAction

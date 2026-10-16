@@ -33,8 +33,29 @@ var worstLyrics = [
     { t: 40, text: "最后一句" },
 ];
 
+var worstHot = [];
+for (var h = 1; h <= 20; h++)
+    worstHot.push({ word: h === 1 ? "我想要两颗西柚（Live）- 2023 网易云音乐年度盛典现场版" : "热搜 " + h, note: h === 2 ? "这条热搜下面附带了一句很长很长的说明文字，用来看它在半屏宽度里会不会挤掉词本身" : (h % 4 === 0 ? "" : "新"), score: 1000000 - h });
+
+var worstSearch = {
+    query: "我想要两颗西柚（Live）",
+    songs: worstTracks.slice(0, 12),
+    artists: [
+        { id: 1, name: "Official髭男dism（ヒゲダン）Japanese Pop Band", cover: C2, albums: 1284 },
+        { id: 2, name: "A", cover: "", albums: 0 },
+        { id: 3, name: "🌙", cover: BROKEN, albums: 1 },
+    ],
+    playlists: [
+        { id: 1, name: "【温柔女声】在深夜被治愈：适合一个人听的 100 首华语民谣与独立音乐", cover: C2, count: 12345, creator: "一只想要变成猫但是没有成功的柴犬Official" },
+        { id: 2, name: "x", cover: "", count: 0, creator: "" },
+    ],
+    albums: [],
+};
+
 var worst = {
     data: {
+        hotSearches: worstHot,
+        search: worstSearch,
         toplists: [
             { id: 1, name: "飙升榜", cover: C2, update: "每天更新", count: 100, preview: [{ name: "我想要两颗西柚（Live）- 2023 网易云音乐年度盛典现场版", artist: "茄子蛋 / 告五人 / 草东没有派对 / 落日飞车" }, { name: "雨", artist: "A" }] },
             { id: 2, name: "网易云中文说唱榜单（每周五 0 点更新，数据来自全平台播放与收藏）", cover: "", update: "每周五更新", count: 50, preview: [] },
@@ -52,7 +73,15 @@ var worst = {
         radar: { id: 3136952023, name: "私人雷达", description: "今天《我想要两颗西柚（Live）- 2023 网易云音乐年度盛典现场版》爱不释耳", cover: BROKEN, tracks: worstTracks.slice(0, 30) },
         similar: { seed: worstTracks[0], tracks: [] },
         liked: { id: 1, count: 12345, tracks: worstTracks },
-        mine: [],
+        recent: { total: 99999, tracks: worstTracks.slice(0, 30) },
+        cloud: { count: 1284, size: 64315222016, maxSize: 64424509440, tracks: worstTracks.slice(0, 30) },
+        mine: [
+            { id: 11, name: "我喜欢的音乐之外的、真正只在深夜一个人开车时才会听的歌（2019—2026 持续更新）", cover: C2, count: 1284, reason: "" },
+            { id: 12, name: "空", cover: "", count: 0, reason: "" },
+        ],
+        subscribed: [
+            { id: 13, name: "收藏的歌单", cover: BROKEN, count: 1, reason: "" },
+        ],
         playlists: [
             { id: 1, name: "【温柔女声】在深夜被治愈：适合一个人听的 100 首华语民谣与独立音乐", cover: C2, count: 100, reason: "根据你喜欢的单曲《我想要两颗西柚（Live）- 2023 网易云音乐年度盛典现场版》推荐" },
             { id: 2, name: "x", cover: "", count: 0, reason: "" },
@@ -64,7 +93,8 @@ var worst = {
 };
 
 var empty = {
-    data: { toplists: [], playlist: { id: 0, name: "空歌单", cover: "", description: "", count: 0, plays: 0 }, tracks: [], lyricsTrackId: 0, lyrics: [] },
+    data: { toplists: [], playlist: { id: 0, name: "空歌单", cover: "", description: "", count: 0, plays: 0 }, tracks: [], lyricsTrackId: 0, lyrics: [],
+            hotSearches: [], search: { query: "没有结果的搜索词", songs: [], artists: [], playlists: [], albums: [] } },
     personal: {
         account: { name: "新用户", vip: false, avatar: "" },
         daily: { date: "10月17日", day: "17", tracks: [] },
@@ -72,7 +102,10 @@ var empty = {
         radar: { id: 3136952023, name: "私人雷达", description: "", cover: "", tracks: [] },
         similar: { seed: null, tracks: [] },
         liked: { id: 1, count: 0, tracks: [] },
+        recent: { total: 0, tracks: [] },
+        cloud: { count: 0, size: 0, maxSize: 0, tracks: [] },
         mine: [],
+        subscribed: [],
         playlists: [],
         fm: { tracks: [] },
     },
@@ -86,6 +119,8 @@ var one = {
         tracks: oneTrack,
         lyricsTrackId: 990,
         lyrics: [{ t: 0, text: "只有一句" }],
+        hotSearches: [{ word: "雨", note: "", score: 1 }],
+        search: { query: "雨", songs: oneTrack, artists: [{ id: 1, name: "A", cover: C2, albums: 1 }], playlists: [{ id: 1, name: "雨", cover: C2, count: 1, creator: "Jo" }], albums: [] },
     },
     personal: {
         account: { name: "Jo", vip: true, avatar: "" },
@@ -94,7 +129,10 @@ var one = {
         radar: { id: 3136952023, name: "私人雷达", description: "今天《雨》爱不释耳", cover: C2, tracks: oneTrack },
         similar: { seed: oneTrack[0], tracks: oneTrack },
         liked: { id: 1, count: 1, tracks: oneTrack },
-        mine: [],
+        recent: { total: 1, tracks: oneTrack },
+        cloud: { count: 1, size: 4194304, maxSize: 64424509440, tracks: oneTrack },
+        mine: [{ id: 1, name: "雨", cover: C2, count: 1, reason: "" }],
+        subscribed: [],
         playlists: [{ id: 1, name: "雨", cover: C2, count: 1, reason: "" }],
         fm: { tracks: oneTrack },
     },
