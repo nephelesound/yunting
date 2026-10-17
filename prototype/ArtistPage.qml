@@ -129,7 +129,8 @@ ScreenFrame {
                 spacing: Tokens.space2
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
-                model: page.songs
+                // 续取只追加新的行，滚动位置不变（见 GrowingModel）
+                model: GrowingModel { values: page.songs }
                 currentIndex: -1
                 ScrollBar.vertical: ScrollBar {}
                 WheelScroll { flickable: tracks }
@@ -144,6 +145,7 @@ ScreenFrame {
                 }
 
                 delegate: TrackTile {
+                    modelData: page.songs[index] || ({ id: 0, name: "", artist: "", dur: 0, fee: 0, cover: "" })
                     width: tracks.width - tracks.rightMargin
                     ranked: false   // 名次只给榜单；歌手的歌按热度排，但不是榜单名次
                     current: modelData.id === page.currentId

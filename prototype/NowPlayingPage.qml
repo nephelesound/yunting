@@ -321,7 +321,11 @@ ScreenFrame {
             topMargin: Tokens.space3
             bottomMargin: Tokens.space6
             boundsBehavior: Flickable.StopAtBounds
-            model: page.commentRows
+            // 续取一页只追加新的行，滚动位置不变（直接用数组当 model 会整个重置、滚回顶部）
+            model: GrowingModel {
+                values: page.commentRows
+                keyOf: c => c.group + "\n" + page.commentKey(c)
+            }
             ScrollBar.vertical: ScrollBar {}
             WheelScroll { flickable: commentList }
             onAtYEndChanged: if (atYEnd && page.track && page.pane === "comments") Source.moreComments(page.track.id)
@@ -336,8 +340,8 @@ ScreenFrame {
 
             delegate: ColumnLayout {
                 id: comment
-                required property var modelData
                 required property int index
+                readonly property var modelData: page.commentRows[comment.index] || ({})
                 width: ListView.view.width - Tokens.space4
                 spacing: Tokens.space3
 

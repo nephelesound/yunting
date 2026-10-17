@@ -44,15 +44,18 @@ void LayerShellHelper::makeOverlay(QWindow *window, int anchors, int margin,
 #endif
 }
 
-void LayerShellHelper::setOverlayMargins(QWindow *window, int left, int top, int right, int bottom)
+void LayerShellHelper::placeOverlay(QWindow *window, int anchors, int left, int top, int right, int bottom)
 {
     if (!window)
         return;
 #ifdef YUNTING_LAYERSHELL
     if (!QGuiApplication::platformName().startsWith(QLatin1String("wayland")))
         return;
-    LayerShellQt::Window::get(window)->setMargins(QMargins(left, top, right, bottom));
+    auto *layer = LayerShellQt::Window::get(window);
+    layer->setAnchors(LayerShellQt::Window::Anchors(LayerShellQt::Window::Anchors::fromInt(anchors)));
+    layer->setMargins(QMargins(left, top, right, bottom));
 #else
+    Q_UNUSED(anchors);
     Q_UNUSED(left);
     Q_UNUSED(top);
     Q_UNUSED(right);

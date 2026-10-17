@@ -24,6 +24,7 @@ Cover Cover.qml
 CoverTile CoverTile.qml
 Facts Facts.qml
 LinkText LinkText.qml
+GrowingModel GrowingModel.qml
 Tag Tag.qml
 GroupHeader GroupHeader.qml
 HomePage HomePage.qml

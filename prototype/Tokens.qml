@@ -45,6 +45,8 @@ QtObject {
     readonly property real coverScrim: 0.6
     // 桌面歌词悬停时的深色底：压在任意壁纸上，白字仍可读，又不挡住桌面
     readonly property real desktopBacking: 0.45
+    // 桌面歌词悬停时的深色底板：白字在任意壁纸与窗口上都看得清，又透出一点底下的东西
+    readonly property real desktopPanel: 0.6
     // 桌面歌词：隔着一段距离看的字，三档（当前句 / 第二行）；填色可选系统强调色或这几种在任意壁纸上都醒目的颜色
     readonly property var desktopLyricSizes: [[text2xl, textBase], [text4xl, text2xl], [48, text4xl]]
     readonly property var desktopLyricColors: ["#4fc3f7", "#ff8a80", "#69f0ae", "#ffd740"]

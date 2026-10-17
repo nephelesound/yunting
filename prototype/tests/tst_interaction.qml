@@ -20,13 +20,36 @@ Item {
     Component { id: nowPlayingComponent; NowPlayingPage { width: root.width; height: root.height } }
     Component { id: spyComponent; SignalSpy {} }
     Component { id: queueComponent; QueuePanel {} }
+    // 分页列表：与评论区、歌手页同一种接法（GrowingModel + values[index]）
+    Component {
+        id: pagedComponent
+        ListView {
+            id: paged
+            property var items: []
+            width: 300
+            height: 200
+            model: GrowingModel { values: paged.items }
+            delegate: Text {
+                required property int index
+                width: 300
+                height: 20
+                text: (paged.items[index] || { name: "" }).name
+            }
+        }
+    }
     Component { id: lyricsComponent; DesktopLyrics {} }
-    // 假的 layer-shell：只记下最后一次设的边距
+    // 假的 layer-shell：只记下最后一次设的锚定边与边距，并数一共请求了几次
     QtObject {
         id: fakeLayerShell
         property var margins: null
+        property int anchors: 0
+        property int placements: 0
         function makeOverlay(window, anchors, margin, keyboard, scope) {}
-        function setOverlayMargins(window, left, top, right, bottom) { margins = [left, top, right, bottom]; }
+        function placeOverlay(window, anchors, left, top, right, bottom) {
+            fakeLayerShell.anchors = anchors;
+            fakeLayerShell.margins = [left, top, right, bottom];
+            fakeLayerShell.placements++;
+        }
     }
     TextEdit { id: pasteTarget; visible: false }
 
@@ -156,6 +179,52 @@ Item {
             compare(w.left, 0);
             compare(w.bottomGap, w.screenHeight - w.height);
             compare(fakeLayerShell.margins, [0, 0, 0, w.screenHeight - w.height]);
+        }
+
+        // 拖动：按下时窗口铺满屏幕（一次请求），拖动中只在窗口里挪歌词、不再打扰合成器，松手时缩回并落到新位置（一次请求）
+        function test_desktopLyricsDragDoesNotMoveTheSurface() {
+            const w = desktopLyrics({});
+            w.visible = true;
+            w.placeDefault();
+            const normalWidth = w.width;
+            w.beginDrag(Qt.point(10, 10));
+            compare(w.width, w.screenWidth);
+            compare(fakeLayerShell.anchors, 1 | 2 | 4 | 8);
+            tryVerify(() => w.expandedReady);
+            const before = fakeLayerShell.placements;
+            const target = Math.floor((w.screenWidth - normalWidth) / 2);   // 屏幕内的一个横向位置
+            for (let x = 10; x <= 10 + target; x += 4)
+                w.dragTo(Qt.point(x, 200));
+            compare(fakeLayerShell.placements, before, "拖动中不请求合成器挪窗口");
+            compare(w.left, target);
+            w.endDrag();
+            compare(w.width, normalWidth);
+            compare(fakeLayerShell.anchors, 2 | 4);
+            compare(fakeLayerShell.margins, [target, 0, 0, w.screenHeight - (200 - 10) - w.height]);
+        }
+
+        // 滚到底续取下一页：位置不跳回顶部，已有的行不重建；状态变化（同样内容的新数组）不动；换内容才重建
+        function test_pagingKeepsScrollPosition() {
+            const page = n => Array.from({ length: n }, (_, i) => ({ id: i + 1, name: "第 " + (i + 1) + " 条" }));
+            const view = createTemporaryObject(pagedComponent, root, { items: page(30) });
+            compare(view.count, 30);
+            view.positionViewAtEnd();
+            const bottom = view.contentY;
+            verify(bottom > 0);
+            const firstRow = view.itemAtIndex(29);
+
+            view.items = page(60);                       // 下一页到了
+            compare(view.count, 60);
+            compare(view.contentY, bottom, "不跳回顶部");
+            verify(view.itemAtIndex(29) === firstRow, "已有的行原地保留");
+
+            view.items = page(60);                       // 只是「加载中」之类的状态变了：内容相同
+            compare(view.contentY, bottom);
+            verify(view.itemAtIndex(29) === firstRow);
+
+            view.items = [{ id: 999, name: "另一首歌的评论" }];   // 换了歌：重建
+            compare(view.count, 1);
+            tryVerify(() => view.itemAtIndex(0) !== null && view.itemAtIndex(0).text === "另一首歌的评论");
         }
 
         function lyricsPage() {
