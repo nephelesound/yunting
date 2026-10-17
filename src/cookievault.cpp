@@ -1,0 +1,220 @@
+#include "cookievault.h"
+
+#include <qt6keychain/keychain.h>
+
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QLoggingCategory>
+#include <utility>
+
+Q_LOGGING_CATEGORY(lcVault, "ncm.vault", QtWarningMsg)
+
+namespace {
+// legacy 明文 cookie 文件（钥匙串引入前的落点），respect XDG_DATA_HOME；
+// 也是钥匙串不可用时的后备落点
+QString fallbackJarPath()
+{
+    QString base = qEnvironmentVariable("XDG_DATA_HOME");
+    if (base.isEmpty())
+        base = QDir::home().filePath(".local/share");
+    return base + "/ncm-player/cookies.json";
+}
+} // namespace
+
+CookieVault::CookieVault(QObject *parent)
+    : QObject(parent), m_fallbackPath(fallbackJarPath()),
+      m_service([] {
+          // 开发与测试用别的服务名，不碰日常凭据（DESIGN.md「凭据存储」）
+          const QString override = qEnvironmentVariable("NCM_KEYCHAIN_SERVICE");
+          return override.isEmpty() ? QStringLiteral("ncm-player") : override;
+      }()),
+      m_key(QStringLiteral("cookies"))
+{
+}
+
+void CookieVault::enqueue(const Op &op)
+{
+    m_pending.append(op);
+    pump();
+}
+
+void CookieVault::pump()
+{
+    if (m_busy)
+        return;
+
+    if (m_mode == Mode::Undecided) {
+        if (m_probeInFlight)
+            return;
+        // 首个操作兼作钥匙串可用性探测（读一次）；等 finished 里按结论重放
+        m_probeInFlight = true;
+        auto *probe = new QKeychain::ReadPasswordJob(m_service, this);
+        probe->setKey(m_key);
+        connect(probe, &QKeychain::ReadPasswordJob::finished, this, [this, probe] {
+            m_probeInFlight = false;
+            m_probeData = probe->binaryData();
+            // EntryNotFound 是好答案：钥匙串在、还没有条目。其余错误（无会话总线、
+            // 后端出错、用户拒绝）都算钥匙串不可用
+            const bool keychainOk =
+                probe->error() == QKeychain::NoError || probe->error() == QKeychain::EntryNotFound;
+            m_mode = keychainOk ? Mode::Keychain : Mode::File;
+            if (!keychainOk)
+                logFallback(probe->errorString().toUtf8().constData());
+            probe->deleteLater();
+            m_busy = false;
+            pump();
+        });
+        probe->start();
+        m_busy = true;
+        return;
+    }
+
+    // File 模式的操作是同步的：一次清空队列（否则后续操作没人再 pump，ready 永远不来）
+    while (!m_pending.isEmpty() && m_mode == Mode::File) {
+        const Op op = m_pending.takeFirst();
+        if (op.write) {
+            writeFile(op.json);
+            emit saved(true);
+        } else {
+            emit loaded(loadFile());
+        }
+        if (op.migration)
+            emit migrated();
+    }
+    if (m_pending.isEmpty())
+        return;
+    // Keychain 模式：取一个，等它异步完成后再 pump 下一个
+    const Op op = m_pending.takeFirst();
+    if (op.write) {
+        if (op.migration) {
+            // 迁移写只在钥匙串还没有条目时才有意义；探测读非空 = 已迁过或已是新式数据
+            if (!m_probeData.isEmpty()) {
+                // 不用 qCInfo：本机日志配置会吞掉 info；qCDebug 在 --verbose 下可见（同 ncm.net）
+                qCDebug(lcVault) << "cookie migration skipped: keychain entry already exists";
+                emit migrated();
+            } else {
+                writeMigrated(op.json);
+            }
+        } else {
+            runSave(op.json);
+        }
+    } else {
+        readKeychain();
+    }
+}
+
+void CookieVault::load()
+{
+    enqueue({false, false, {}});
+}
+
+void CookieVault::save(const QByteArray &json)
+{
+    enqueue({true, false, json});
+}
+
+void CookieVault::migrate()
+{
+    QFile legacy(m_fallbackPath);
+    if (!legacy.open(QIODevice::ReadOnly)) {
+        emit migrated();
+        return;
+    }
+    const QByteArray json = legacy.readAll();
+    legacy.close();
+    enqueue({true, true, json});
+}
+
+void CookieVault::runSave(const QByteArray &json)
+{
+    auto *job = new QKeychain::WritePasswordJob(m_service, this);
+    job->setKey(m_key);
+    job->setBinaryData(json);
+    connect(job, &QKeychain::WritePasswordJob::finished, this, [this, json](QKeychain::Job *done) {
+        const bool ok = done->error() == QKeychain::NoError;
+        if (!ok) {
+            // 钥匙串写失败（用户拒绝、后端消失）：同一份数据退回后备文件，之后一直走文件
+            logFallback(done->errorString().toUtf8().constData());
+            m_mode = Mode::File;
+            writeFile(json);
+        }
+        done->deleteLater();
+        m_busy = false;
+        pump();
+        emit saved(ok);
+    });
+    job->start();
+    m_busy = true;
+}
+
+void CookieVault::readKeychain()
+{
+    auto *job = new QKeychain::ReadPasswordJob(m_service, this);
+    job->setKey(m_key);
+    connect(job, &QKeychain::ReadPasswordJob::finished, this, [this, job](QKeychain::Job *done) {
+        // 读失败不能当「无条目」悄悄过去：空 jar 会让随后的匿名 NMTID 落盘，覆盖真凭据。
+        // 至少把错误留下来，排障时能看到这一步
+        if (done->error() != QKeychain::NoError && done->error() != QKeychain::EntryNotFound)
+            qCWarning(lcVault) << "keychain read failed:" << done->errorString();
+        const QByteArray data = done->error() == QKeychain::NoError ? job->binaryData() : QByteArray();
+        done->deleteLater();
+        m_busy = false;
+        pump();
+        emit loaded(data);
+    });
+    job->start();
+    m_busy = true;
+}
+
+void CookieVault::writeMigrated(const QByteArray &json)
+{
+    auto *job = new QKeychain::WritePasswordJob(m_service, this);
+    job->setKey(m_key);
+    job->setBinaryData(json);
+    connect(job, &QKeychain::WritePasswordJob::finished, this, [this, json](QKeychain::Job *done) {
+        if (done->error() == QKeychain::NoError) {
+            QFile::remove(m_fallbackPath);
+            // 不用 qCInfo：本机日志配置会吞掉 info；qCDebug 在 --verbose 下可见（同 ncm.net）
+            qCDebug(lcVault) << "cookie migration: legacy cookies.json imported into keychain";
+        } else {
+            // 迁移写失败不切后备模式（本次启动已按 load 结果工作）；文件留着，下次启动再迁
+            qCWarning(lcVault) << "cookie migration write failed:" << done->errorString();
+        }
+        done->deleteLater();
+        m_busy = false;
+        pump();
+        emit migrated();
+    });
+    job->start();
+    m_busy = true;
+}
+
+void CookieVault::writeFile(const QByteArray &json) const
+{
+    QDir().mkpath(QFileInfo(m_fallbackPath).path());
+    QFile f(m_fallbackPath);
+    if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        f.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);   // 登录凭据：只给本人读写
+        f.write(json);
+    } else {
+        qCWarning(lcVault) << "cannot write cookie file:" << m_fallbackPath << f.errorString();
+    }
+}
+
+QByteArray CookieVault::loadFile() const
+{
+    QFile f(m_fallbackPath);
+    if (!f.open(QIODevice::ReadOnly))
+        return {};
+    return f.readAll();
+}
+
+void CookieVault::logFallback(const char *why)
+{
+    if (m_fallbackLogged)
+        return;
+    m_fallbackLogged = true;
+    qCWarning(lcVault) << "keychain unavailable, using cookie file" << m_fallbackPath
+                       << "(" << why << ")";
+}
