@@ -188,13 +188,17 @@ void AudioEngine::setMuted(bool muted)
     emit mutedChanged();
 }
 
-void AudioEngine::setQuality(const QString &quality)
+QStringList AudioEngine::qualityLevels()
 {
-    static const QStringList levels{
+    return {
         QStringLiteral("auto"), QStringLiteral("standard"), QStringLiteral("higher"),
         QStringLiteral("exhigh"), QStringLiteral("lossless"), QStringLiteral("hires"),
     };
-    const QString normalized = levels.contains(quality) ? quality : QStringLiteral("auto");
+}
+
+void AudioEngine::setQuality(const QString &quality)
+{
+    const QString normalized = qualityLevels().contains(quality) ? quality : QStringLiteral("auto");
     if (normalized == m_quality)
         return;
     m_quality = normalized;

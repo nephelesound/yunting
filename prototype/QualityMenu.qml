@@ -25,8 +25,10 @@ Menu {
 
     title: "音质：" + Format.qualityLevel(qualityMenu.quality)
 
+    // 档位由引擎给（AudioEngine.qualities，原型里 SimEngine 同名同义）；这里只管显示名
     Instantiator {
-        model: ["auto", "standard", "higher", "exhigh", "lossless", "hires"]
+        model: qualityMenu.audio !== null && qualityMenu.audio !== undefined && qualityMenu.audio.qualities
+            ? qualityMenu.audio.qualities : []
         delegate: MenuItem {
             required property string modelData
             text: Format.qualityLevel(modelData) + (modelData === "auto" ? "（按曲目最高可用）" : "")

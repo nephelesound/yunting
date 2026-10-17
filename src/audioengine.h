@@ -33,6 +33,8 @@ class AudioEngine : public QObject {
     Q_PROPERTY(bool muted READ muted WRITE setMuted NOTIFY mutedChanged)
     // auto / standard / higher / exhigh / lossless / hires
     Q_PROPERTY(QString quality READ quality WRITE setQuality NOTIFY qualityChanged)
+    // 可选的音质档位（auto 在最前）：界面的音质菜单与命令行帮助都从这里取
+    Q_PROPERTY(QStringList qualities READ qualities CONSTANT)
     // DSP 可用（-DYUNTING_EXPERIMENTAL_EQ=OFF 时为 false，隐藏 EQ UI）；默认播放走系统
     // QAudioOutput，只有 EQ 非平直时才切到自建 QAudioSink，避免主线程忙时拖累普通播放
     Q_PROPERTY(bool eqAvailable READ eqAvailable CONSTANT)
@@ -56,6 +58,8 @@ public:
     double volume() const { return m_volume; }
     bool muted() const { return m_muted; }
     QString quality() const { return m_quality; }
+    static QStringList qualityLevels();
+    QStringList qualities() const { return qualityLevels(); }
     bool eqAvailable() const
     {
 #ifdef YUNTING_EXPERIMENTAL_EQ

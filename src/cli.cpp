@@ -55,7 +55,7 @@ struct CommandLine {
                                   "Resolve a song's play URL and play it for a few seconds",
                                   "songId"};
     QCommandLineOption audioQuality{"audio-quality",
-                                    "Set playback quality: auto|standard|higher|exhigh|lossless|hires",
+                                    "Set playback quality: " + AudioEngine::qualityLevels().join(u'|'),
                                     "level"};
     QCommandLineOption importGtk4Cookies{"import-gtk4-cookies",
                                          "Import MUSIC_U/__csrf/NMTID from netease-cloud-music-gtk4 once"};

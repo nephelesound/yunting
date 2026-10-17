@@ -12,6 +12,7 @@ Item {
     property real volume: 0.7      // 0–1，滑块刻度
     property bool muted: false
     property string quality: "auto"   // 与 AudioEngine 同名同义；原型里只记住，不影响模拟播放
+    readonly property var qualities: ["auto", "standard", "higher", "exhigh", "lossless", "hires"]   // 与 AudioEngine.qualities 同义
     readonly property real duration: engine.track ? engine.track.dur : 0
 
     signal finished()
