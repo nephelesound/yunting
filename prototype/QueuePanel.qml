@@ -1,5 +1,5 @@
 // 播放队列：从右侧滑出的浮层（Kirigami 原生抽屉，自带遮罩与投影。它真的浮在页面之上，所以投影是对的）。
-// 只回答「接下来放什么」：页头（播放队列 · N 首 · 清空）→ 正在播放 → 接下来播放。
+// 只回答「接下来放什么」：页头（播放队列 · N 首 · 智能 · 清空）→ 正在播放 → 接下来播放。
 // 点一行跳到那首；悬停一行可移出队列；拖行首的把手（或聚焦后 Alt+↑/↓）调整顺序。
 pragma ComponentBehavior: Bound
 
@@ -14,8 +14,10 @@ Kirigami.OverlayDrawer {
     property var queue: []
     property int currentIndex: -1
     property bool vip
+    property bool smartEnabled: false
 
     signal activated(int index)
+    signal smartToggled(bool enabled)
     signal removeRequested(int index)
     signal clearRequested()
     signal moveRequested(int from, int to)   // 队列里的绝对位置
@@ -125,6 +127,24 @@ Kirigami.OverlayDrawer {
                 font.pixelSize: Tokens.textSm
                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             }
+            // 智能续播：与「清空」同一套 flat 文本按钮，不引入 Switch；只在本机算口味
+            Button {
+                implicitHeight: Tokens.height8
+                flat: true
+                checkable: true
+                checked: panel.smartEnabled
+                icon.name: "media-playlist-append-symbolic"
+                icon.width: Tokens.iconSm
+                icon.height: Tokens.iconSm
+                text: "智能"
+                font.pixelSize: Tokens.textSm
+                onClicked: panel.smartToggled(checked)
+                ToolTip.text: panel.smartEnabled
+                    ? "智能续播已开启：按本机播放/跳过/红心记录补充队列"
+                    : "开启智能续播：按本机口味补充队列，不上传数据"
+                ToolTip.visible: hovered
+                ToolTip.delay: 600
+            }
             Item { Layout.fillWidth: true }
             Button {
                 implicitHeight: Tokens.height8
@@ -153,6 +173,7 @@ Kirigami.OverlayDrawer {
             index: panel.currentIndex
             modelData: panel.current || { name: "", artist: "", album: "", dur: 0, fee: 0, cover: "" }
             current: true
+            showReason: !!modelData.smartReason
         }
 
         // 接下来播放
@@ -223,6 +244,7 @@ Kirigami.OverlayDrawer {
                     width: parent.width
                     index: row.index
                     modelData: row.track
+                    showReason: !!row.track.smartReason
                     removable: true
                     hangingMarker: false
                     locked: panel.locked(row.track)

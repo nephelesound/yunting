@@ -86,6 +86,13 @@ Kirigami.ApplicationWindow {
                 playback.append(Source.fmTracks);
         }
     }
+    // 智能续播：只在应用里持久化口味；原型/截图不写配置
+    SmartQueue {
+        id: smartQueue
+        player: playback
+        source: Source
+        persist: root.backend !== null
+    }
 
     // 红心是乐观更新：失败时 Store 已经改回，这里只说明原因
     Connections {
@@ -181,6 +188,8 @@ Kirigami.ApplicationWindow {
         queue: playback.queue
         currentIndex: playback.index
         vip: root.vip
+        smartEnabled: smartQueue.enabled
+        onSmartToggled: enabled => smartQueue.enabled = enabled
         onActivated: index => playback.play(playback.queue, index)
         onRemoveRequested: index => playback.remove(index)
         onClearRequested: playback.clearUpcoming()

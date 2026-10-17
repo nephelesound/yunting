@@ -83,6 +83,9 @@ public:
 
     Q_INVOKABLE void toggle();
     Q_INVOKABLE void seek(double seconds);
+    // 预取下一首的播放地址：只填 URL 缓存，不改变当前曲目/播放状态。
+    // 智能续播补队后调用，减少切歌时的取址等待。
+    Q_INVOKABLE void prefetch(double songId);
     // DSP：未启用 YUNTING_EXPERIMENTAL_EQ 时 no-op
     Q_INVOKABLE void setEqGain(int band, double db);
     Q_INVOKABLE void resetEq();

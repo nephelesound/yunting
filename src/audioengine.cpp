@@ -411,6 +411,14 @@ void AudioEngine::seek(double seconds)
 
 // 播放地址有时效（接口给 expi 秒数，通常 20 分钟）：时效内重播、切回同一首都直接用缓存。
 // 用 v1 的 level 而不是旧的 br：旧接口最高只到 lossless，v1 才能请求 hires。
+void AudioEngine::prefetch(double songId)
+{
+    if (songId <= 0 || m_track.value("id").toDouble() == songId)
+        return;
+    // resolveUrl 的回包只在 songId 仍是当前曲目时才 startSource；预取时只落缓存。
+    resolveUrl(songId);
+}
+
 void AudioEngine::resolveUrl(double songId)
 {
     const QString level = effectiveLevel();

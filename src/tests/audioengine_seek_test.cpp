@@ -117,6 +117,51 @@ private slots:
         QVERIFY2(audio.position() < 0.6, "the previous track's seek leaked into the next track");
     }
 
+
+    // 预取只拉下一首的地址，不改变当前曲目/播放；切到下一首时直接用缓存，不再发一次取址
+    void prefetchCachesNextUrlWithoutStartingIt()
+    {
+        MediaServer server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        const QString base = QStringLiteral("http://127.0.0.1:%1/").arg(server.serverPort());
+        const QByteArray wav = silentWav();
+        const QByteArray urlJson = QJsonDocument(QJsonObject{
+            {"code", 200},
+            {"data", QJsonArray{QJsonObject{{"url", base + QStringLiteral("audio.wav")}, {"expi", 1200}}}}})
+            .toJson(QJsonDocument::Compact);
+
+        int urlRequests = 0;
+        server.handler = [&urlRequests, wav, urlJson](const QByteArray &path) {
+            if (path.startsWith("/weapi/song/enhance/player/url"))
+                ++urlRequests;
+            if (path.startsWith("/weapi/song/enhance/player/url"))
+                return qMakePair(QByteArray("application/json"), urlJson);
+            return qMakePair(QByteArray("audio/wav"), wav);
+        };
+
+        NcmClient client(nullptr, false);
+        client.setApiBase(base);
+        AudioEngine audio(&client);
+        audio.setTrack(QVariantMap{{"id", 1.0}, {"dur", 3.0}});
+
+        auto waitFor = [](auto condition) {
+            QDeadlineTimer deadline(5 * 1000);
+            while (!condition() && !deadline.hasExpired())
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+            return condition();
+        };
+        QVERIFY(waitFor([&] { return urlRequests >= 1; }));
+        audio.prefetch(2.0);
+        QVERIFY(waitFor([&] { return urlRequests >= 2; }));
+        QCOMPARE(audio.track().value("id").toDouble(), 1.0);
+        QCOMPARE(audio.position(), 0.0);
+
+        audio.setTrack(QVariantMap{{"id", 2.0}, {"dur", 3.0}});
+        audio.setPlaying(true);
+        QVERIFY(waitFor([&] { return audio.position() > 0.05; }));
+        QCOMPARE(urlRequests, 2);
+    }
+
 private:
     QTemporaryDir m_dir;
 };

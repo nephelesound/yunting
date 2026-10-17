@@ -48,3 +48,4 @@ SessionState SessionState.qml
 SimEngine SimEngine.qml
 SimSession SimSession.qml
 TrackTile TrackTile.qml
+SmartQueue SmartQueue.qml
