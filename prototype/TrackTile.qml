@@ -24,6 +24,7 @@ AbstractButton {
     property bool canMoveDown: true
     readonly property bool liked: Source.isLiked(tile.modelData.id)
     property bool showReason // 每日推荐：标题后多一个推荐理由标签（「超 76% 人收藏」）
+    property string endText  // 时长列换成别的数（听歌排行的播放次数）；空串时显示时长
     property bool showAlbum: true  // 专辑页里每行的专辑都相同：细节列留空（列仍占位，时长列对齐）
     readonly property string alias: tile.modelData.alias || ""
     property bool hangingMarker: true  // 左侧没有留白（紧挨别的元素）时关掉悬挂竖条
@@ -219,7 +220,7 @@ AbstractButton {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 visible: !endColumn.showAction
-                text: Format.duration(tile.modelData.dur)
+                text: tile.endText || Format.duration(tile.modelData.dur)
                 font.pixelSize: Tokens.textSm
                 font.features: { "tnum": 1 }
                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)

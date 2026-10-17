@@ -248,6 +248,72 @@ QtObject {
                  failed: Boolean(source.failure("user:" + id)) };
     }
 
+    // 下面几种数据后端不经缓存、不去重：这里只读不要，由页面在打开那一栏时 need 一次
+    // 关注 / 粉丝：kind 是 userFollows | userFolloweds；data 里只放最近取回的一个人的
+    function people(kind, uid) {
+        const l = source.d[kind];
+        if (l && l.userId === uid)   // moreFailed：下一页（按已有条数翻）没取到，可重试
+            return Object.assign({ failed: false, moreFailed: Boolean(source.failure(kind + ":" + uid + ":" + l.items.length)) }, l);
+        return { userId: uid, items: [], more: false, pending: true, moreFailed: false,
+                 failed: Boolean(source.failure(kind + ":" + uid)) };
+    }
+    function morePeople(kind, list) {
+        if (list.more && !list.pending)
+            source.retryKey(kind + ":" + list.userId + ":" + list.items.length);
+    }
+    // 听歌排行（只有自己的）：type 是 week | month。排行条目不是完整的曲目，补成曲目行能用的形状
+    function listenRank(type) {
+        const r = source.d.listenRank;
+        if (!r || r.type !== type)
+            return { type: type, songCount: 0, tracks: [], pending: true, failed: Boolean(source.failure("listenRank:" + type)) };
+        const tracks = r.items.map(i => ({
+            id: i.id, name: i.name, album: i.album, albumId: 0, cover: i.cover, dur: 0, plays: i.playCount,
+            artists: i.artists, artist: i.artists.map(a => a.name).join(" / "),
+            artistId: i.artists.length > 0 ? i.artists[0].id : 0,
+        }));
+        return { type: type, songCount: r.songCount, tracks: tracks, pending: false, failed: false };
+    }
+    // 楼中楼：一条评论下的回复；data 里只放最近展开的那一条的
+    function replies(songId, commentId) {
+        const r = source.d.commentReplies;
+        if (r && r.songId === songId && r.commentId === commentId)
+            return Object.assign({ pending: false, failed: false }, r);
+        return { songId: songId, commentId: commentId, before: 0, more: false, items: [], pending: true,
+                 failed: Boolean(source.failure("commentReplies:" + songId + ":" + commentId)) };
+    }
+    function moreReplies(r) {
+        if (r.more && !r.pending)
+            source.need("commentReplies:" + r.songId + ":" + r.commentId + ":" + r.before);
+    }
+
+    // 私信（只读）：会话列表与当前打开的一段对话；对话在 data 里只放最近取回的一段
+    // moreFailed：下一页没取到（失败按请求时的 key 记），可重试
+    readonly property var inbox: source.d.inbox
+        ? Object.assign({ pending: false, moreFailed: Boolean(source.failure("inbox:" + source.d.inbox.items.length)) }, source.d.inbox)
+        : { unread: 0, more: false, items: [], pending: true, moreFailed: false }
+    function moreInbox() {
+        if (source.d.inbox && source.d.inbox.more)
+            source.retryKey("inbox:" + source.d.inbox.items.length);
+    }
+    function thread(uid) {
+        const t = source.d.inboxThread;
+        if (t && t.userId === uid)
+            return Object.assign({ pending: false, failed: false,
+                                   moreFailed: Boolean(source.failure("inboxThread:" + uid + ":" + t.before)) }, t);
+        return { userId: uid, before: 0, more: false, items: [], pending: true, moreFailed: false,
+                 failed: Boolean(source.failure("inboxThread:" + uid)) };
+    }
+    function moreThread(t) {
+        if (t.more && !t.pending)
+            source.retryKey("inboxThread:" + t.userId + ":" + t.before);
+    }
+    // 未读私信数（自己的主页上「私信」旁边用）：打开自己的主页、离开私信页时各取一次通知计数，不在后台轮询
+    readonly property int unreadMessages: source.d.notifications ? source.d.notifications.msg : 0
+
+    // 自己的累计听歌时长（秒）与升级进度；还没取到时为 0 / null
+    readonly property real listenSeconds: source.d.listenTotal ? source.d.listenTotal.seconds : 0
+    readonly property var level: source.d.userLevel || null
+
     // MV：data 里只放最近取回的一个，id 对上才用；没对上就向 live 要
     function mv(id) {
         const m = source.d.mv;
@@ -284,11 +350,38 @@ QtObject {
     }
 
     function lyrics(trackId) {
+        // 有逐字歌词就用它：行的形状相同，每句多一个 words（逐字歌词由 main 在换歌时要一次）
+        const timed = source.d.lyricsNew;
+        if (timed && timed.songId === trackId && timed.lines.length > 0 && timed.lines[0].words !== undefined)
+            return timed.lines;
         if (trackId === source.d.lyricsTrackId)
             return source.d.lyrics;
         source.need("lyrics:" + trackId);
         return [];
     }
+    // 当前句唱到了哪（0–1）。有逐字时间：唱完的字 + 正在唱的那个字唱了多少，按字数计；
+    // 没有：按本句开始到下一句开始（最后一句到歌曲结束）之间的时间比例
+    function lineFill(line, next, songEnd, time) {
+        if (!line)
+            return 0;
+        if (line.words && line.words.length > 0) {
+            const total = line.words.reduce((n, w) => n + w.text.length, 0);
+            let sung = 0;
+            for (const w of line.words) {
+                if (time >= w.t + w.d) {
+                    sung += w.text.length;
+                    continue;
+                }
+                if (time > w.t && w.d > 0)
+                    sung += w.text.length * (time - w.t) / w.d;
+                break;
+            }
+            return total > 0 ? Math.min(1, sung / total) : 0;
+        }
+        const end = next ? next.t : Math.max(line.t + 1, songEnd);
+        return Math.max(0, Math.min(1, (time - line.t) / (end - line.t)));
+    }
+
     // 封面 URL 换成需要的尺寸；没有封面就是空串，交给 Cover 显示占位
     function sized(url, px) {
         return url ? url.replace(/\?param=\d+y\d+$/, "?param=" + px + "y" + px) : "";

@@ -58,12 +58,14 @@ function quality(q) {
     return q === "hires" ? "Hi-Res" : q === "lossless" ? "无损" : "";
 }
 
-// 次数（播放、点赞、评论数）：一万以下照写，一亿以下按万（十万以下留一位小数），再往上按亿
+// 次数（播放、点赞、评论数）：一万以下照写，一亿以下按万（十万以下留一位小数），再往上按亿。
+// 小数是 .0 时去掉（1.0 万 → 1 万）
 function count(n) {
+    const short = (value, digits) => value.toFixed(digits).replace(/\.0$/, "");
     if (n >= 1e8)
-        return (n / 1e8).toFixed(1) + " 亿";
+        return short(n / 1e8, 1) + " 亿";
     if (n >= 1e4)
-        return (n / 1e4).toFixed(n >= 1e5 ? 0 : 1) + " 万";
+        return short(n / 1e4, n >= 1e5 ? 0 : 1) + " 万";
     return String(n);
 }
 

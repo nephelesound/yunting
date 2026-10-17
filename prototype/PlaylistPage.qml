@@ -192,9 +192,9 @@ ScreenFrame {
                 visible: tracks.count === 0
                 icon.name: "view-media-playlist"
                 text: page.list.failed ? "曲目取不到，点此重试" : (page.list.emptyText || "这里还没有歌")
-                HoverHandler { enabled: page.list.failed; cursorShape: Qt.PointingHandCursor }
+                HoverHandler { enabled: page.list.failed === true; cursorShape: Qt.PointingHandCursor }
                 TapHandler {
-                    enabled: page.list.failed
+                    enabled: page.list.failed === true
                     onTapped: Source.retryKey(page.listKey || "")
                 }
             }

@@ -22,6 +22,7 @@ FullscreenCover FullscreenCover.qml
 AccentButton AccentButton.qml
 ChartCard ChartCard.qml
 ChartsPage ChartsPage.qml
+CommentRow CommentRow.qml
 Cover Cover.qml
 CoverTile CoverTile.qml
 Facts Facts.qml
@@ -32,12 +33,14 @@ Tag Tag.qml
 GroupHeader GroupHeader.qml
 HomePage HomePage.qml
 IconButton IconButton.qml
+InboxPage InboxPage.qml
 LoginDialog LoginDialog.qml
 QueuePanel QueuePanel.qml
 MediaTile MediaTile.qml
 MinePage MinePage.qml
 NowPlayingPage NowPlayingPage.qml
 PageTitle PageTitle.qml
+PersonRow PersonRow.qml
 PlayerBar PlayerBar.qml
 Playback Playback.qml
 PlaylistPage PlaylistPage.qml
@@ -47,4 +50,5 @@ SessionState SessionState.qml
 SimEngine SimEngine.qml
 SimSession SimSession.qml
 TrackTile TrackTile.qml
+Toast Toast.qml
 SmartQueue SmartQueue.qml

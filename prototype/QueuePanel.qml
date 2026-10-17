@@ -18,6 +18,7 @@ Kirigami.OverlayDrawer {
     property bool smartEnabled: false
 
     signal activated(int index)
+    signal nowPlayingRequested()
     signal smartToggled(bool enabled)
     signal removeRequested(int index)
     signal clearRequested()
@@ -175,6 +176,8 @@ Kirigami.OverlayDrawer {
             modelData: panel.current || { name: "", artist: "", album: "", dur: 0, fee: 0, cover: "" }
             current: true
             showReason: !!modelData.smartReason
+            // 点正在播放的这一首：不重头放，去正在播放页（与点播放条封面同一个去处）
+            onActivated: panel.nowPlayingRequested()
         }
 
         // 接下来播放

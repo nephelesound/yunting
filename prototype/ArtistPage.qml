@@ -166,9 +166,9 @@ ScreenFrame {
                     icon.name: "view-media-artist"
                     text: page.artist.failed ? "歌手的歌取不到，点此重试"
                         : Source.live ? "正在取回歌手的歌…" : "这位歌手的歌还没取到"
-                    HoverHandler { enabled: page.artist.failed; cursorShape: Qt.PointingHandCursor }
+                    HoverHandler { enabled: page.artist.failed === true; cursorShape: Qt.PointingHandCursor }
                     TapHandler {
-                        enabled: page.artist.failed
+                        enabled: page.artist.failed === true
                         onTapped: Source.retryKey("artist:" + page.artistId)
                     }
                 }

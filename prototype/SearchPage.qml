@@ -178,9 +178,9 @@ ScreenFrame {
                     font.pixelSize: Tokens.textSm
                     font.underline: page.result.failed
                     color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
-                    HoverHandler { enabled: page.result.failed; cursorShape: Qt.PointingHandCursor }
+                    HoverHandler { enabled: page.result.failed === true; cursorShape: Qt.PointingHandCursor }
                     TapHandler {
-                        enabled: page.result.failed
+                        enabled: page.result.failed === true
                         onTapped: Source.retryKey("search:" + page.query)
                     }
                 }

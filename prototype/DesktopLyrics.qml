@@ -49,14 +49,9 @@ Window {
     readonly property int index: Source.lyricIndex(lyricsWindow.lines, lyricsWindow.clock)
     readonly property var current: lyricsWindow.lines.length > 0 ? lyricsWindow.lines[lyricsWindow.index] : null
     readonly property var next: lyricsWindow.index + 1 < lyricsWindow.lines.length ? lyricsWindow.lines[lyricsWindow.index + 1] : null
-    // 当前句唱到了哪：本句开始到下一句开始（最后一句到歌曲结束）之间的比例
-    readonly property real fill: {
-        if (!lyricsWindow.current)
-            return 0;
-        const end = lyricsWindow.next ? lyricsWindow.next.t
-            : Math.max(lyricsWindow.current.t + 1, lyricsWindow.track ? lyricsWindow.track.dur || 0 : 0);
-        return Math.max(0, Math.min(1, (lyricsWindow.clock - lyricsWindow.current.t) / (end - lyricsWindow.current.t)));
-    }
+    // 当前句唱到了哪：有逐字歌词时逐字推进，否则按时间比例（规则在 Source.lineFill）
+    readonly property real fill: Source.lineFill(lyricsWindow.current, lyricsWindow.next,
+                                                 lyricsWindow.track ? lyricsWindow.track.dur || 0 : 0, lyricsWindow.clock)
     // 第二行：有译文显示译文，否则显示下一句
     readonly property string second: !lyricsWindow.showSecond || !lyricsWindow.current ? ""
         : lyricsWindow.current.tr ? lyricsWindow.current.tr : lyricsWindow.next ? lyricsWindow.next.text : ""

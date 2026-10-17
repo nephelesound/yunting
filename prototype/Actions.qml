@@ -16,6 +16,9 @@ QtObject {
     signal playlistMenuRequested(var playlist)   // 「我的」里的歌单磁贴：{ id, name, owned }
     signal newPlaylistRequested()
     signal likeToggleRequested(var track)        // 曲目行、播放条、曲目菜单的红心都走这一处（未登录时引向登录）
+    signal playRequested(var tracks, int index)  // 不是曲目列表页的地方要放歌：听歌排行、私信里分享的歌
+
+    function play(tracks, index) { if (index >= 0 && index < tracks.length) playRequested(tracks, index); }
 
     function trackMenu(track, context) { trackMenuRequested(track, context || {}); }
     function toggleLike(track) { if (track) likeToggleRequested(track); }
@@ -24,4 +27,6 @@ QtObject {
     function openMv(id) { if (id > 0) mvRequested(id); }
     function openUser(id) { if (id > 0) userRequested(id); }
     function openPlaylist(id) { if (id > 0) playlistRequested(id); }
+    signal inboxRequested()
+    function openInbox() { inboxRequested(); }
 }

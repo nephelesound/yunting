@@ -61,6 +61,8 @@ Item {
     }
     Component { id: lyricsComponent; DesktopLyrics {} }
     Component { id: trackMenuComponent; TrackMenu {} }
+    Component { id: commentRowComponent; CommentRow { width: 600 } }
+    Component { id: signalSpyComponent; SignalSpy {} }
     // 假的 layer-shell：记下最后一次设的锚定边与边距；相对拖动由测试直接发 relativeMotion
     QtObject {
         id: fakeLayerShell
@@ -255,6 +257,60 @@ Item {
         }
 
         // 正在播放的那一行滚出视野才出现定位按钮；点一下回到那一行，按钮随之消失
+        // 导航：从一个用户进另一个用户再返回，回到的是来的那一个；返回键的字从不为空；
+        // 重复打开同一页不多一格来路；没有来路的子页返回到推荐
+        function test_navigationReturnsWhereItCameFrom() {
+            const win = createTemporaryObject(Qt.createComponent("../main.qml"), root, { visible: false });
+            verify(win !== null);
+            win.open("user", "", { userId: 11 });
+            win.open("user", "", { userId: 22 });   // 在 11 的粉丝里点了 22
+            compare(win.history.length, 2);
+            verify(win.parentName.length > 0, "返回键总有字");
+            win.open("user", "", { userId: 22 });   // 再点一次同一个人
+            compare(win.history.length, 2, "同一页不重复入栈");
+            win.goBack();
+            compare(win.page, "user");
+            compare(win.userId, 11, "返回到来的那个人，而不是停在当前这个人");
+            win.goBack();
+            compare(win.page, "home");
+            win.open("mv", "", { mvId: 5 });
+            win.history = [];
+            win.goBack();
+            compare(win.page, "home", "没有来路时返回推荐");
+        }
+
+        // 当前句的填色：逐字歌词按字推进（唱完的字 + 正在唱的字唱了多少），否则按句子时间比例
+        function test_lineFillFollowsWords() {
+            const line = { t: 1, text: "abcd", words: [{ t: 1, d: 1, text: "ab" }, { t: 2, d: 2, text: "cd" }] };
+            compare(Source.lineFill(line, null, 0, 0.5), 0);
+            fuzzyCompare(Source.lineFill(line, null, 0, 1.5), 0.25, 0.001);   // 第一个词唱了一半：1/4
+            fuzzyCompare(Source.lineFill(line, null, 0, 3), 0.75, 0.001);     // 第一个词唱完 + 第二个词一半
+            compare(Source.lineFill(line, null, 0, 9), 1);
+            fuzzyCompare(Source.lineFill({ t: 10, text: "x" }, { t: 20 }, 0, 15), 0.5, 0.001);
+        }
+
+        // 评论行：「N 条回复」展开楼中楼；楼中楼里回复的正是父评论时不再引一遍；长评论折起后可展开
+        function test_commentRowRepliesQuoteAndExpand() {
+            const quoteOfParent = [{ id: 1, user: "甲", userId: 5, content: "原话" }];
+            const row = createTemporaryObject(commentRowComponent, root, {
+                comment: { id: 2, user: "乙", userId: 6, content: "短", likes: 1, time: 0, replyCount: 3, beReplied: quoteOfParent } });
+            const toggled = createTemporaryObject(signalSpyComponent, root, { target: row, signalName: "threadToggled" });
+            verify(row.quoted !== null, "评论区里照常引出被回复的那条");
+            row.threadOf = 1;
+            verify(row.quoted === null, "楼中楼里回复的就是父评论：不重复引用");
+            const link = findChild(row, "threadLink");
+            mouseClick(link, 4, link.height / 2);
+            compare(toggled.count, 1);
+
+            const long = createTemporaryObject(commentRowComponent, root, {
+                comment: { id: 3, user: "丙", content: Array(40).fill("很长的一段话，").join(""), likes: 0, time: 0 } });
+            const expand = findChild(long, "expandLink");
+            tryVerify(() => expand.visible, 2000, "超过 6 行时给「展开全文」");
+            waitForRendering(long);   // 链接刚出现：等布局把它放到位再点（用户也是看到了才点）
+            mouseClick(expand, 4, expand.height / 2);
+            verify(long.expanded, "点「展开全文」后整段显示");
+        }
+
         // 能不能播看后端按 privilege 给的 playable；后端只能按 fee 猜的「会员歌」，会员账号照样能播
         function test_blockedByFollowsPrivilege() {
             compare(Format.blockedBy({ playable: true, fee: 1 }, false), "");

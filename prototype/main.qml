@@ -57,20 +57,20 @@ Kirigami.ApplicationWindow {
         vip: root.vip
         onBlocked: (track, reason) => {
             if (reason === "paid")
-                root.showPassiveNotification("「" + track.name + "」所在专辑需要单独购买");
+                root.notify("「" + track.name + "」所在专辑需要单独购买");
             else if (reason === "unavailable")
-                root.showPassiveNotification("「" + track.name + "」已下架或暂时没有版权，不能播放");
+                root.notify("「" + track.name + "」已下架或暂时没有版权，不能播放");
             else if (root.loggedIn)
-                root.showPassiveNotification("「" + track.name + "」是 VIP 曲目，开通会员后可播放");
+                root.notify("「" + track.name + "」是 VIP 曲目，开通会员后可播放");
             else
-                root.showPassiveNotification("「" + track.name + "」是 VIP 曲目，登录后可播放", "long", "扫码登录", () => root.requestLogin());
+                root.notify("「" + track.name + "」是 VIP 曲目，登录后可播放", "long", "扫码登录", () => root.requestLogin());
         }
     }
     Connections {
         target: playback.engine
         function onFailed(reason) {
             console.warn(logUi, "playback failed:", root.currentTrack ? root.currentTrack.id : 0, reason);
-            root.showPassiveNotification(reason);
+            root.notify(reason);
         }
     }
     // 私人漫游是一个流：放到倒数第二首时续取一批，取回来的接在队尾，不会放完一轮又从头循环
@@ -102,7 +102,7 @@ Kirigami.ApplicationWindow {
         ignoreUnknownSignals: true
         function onLikeFailed(songId, liked, message) {
             console.warn(logUi, "like failed:", songId, liked ? "on" : "off", message);
-            root.showPassiveNotification((liked ? "没能加上红心：" : "没能取消红心：") + message);
+            root.notify((liked ? "没能加上红心：" : "没能取消红心：") + message);
         }
     }
     // 媒体键 / 锁屏 / Plasma 媒体控件 / 托盘菜单的上一首、下一首：同样走 Playback，切歌规则只有一份
@@ -141,6 +141,9 @@ Kirigami.ApplicationWindow {
     }
 
     readonly property var currentTrack: playback.current
+    // 逐字歌词：后端不缓存这个接口，所以每换一首歌要一次，不在绑定里要（绑定会反复求值）
+    readonly property real currentTrackId: root.currentTrack ? root.currentTrack.id : 0
+    onCurrentTrackIdChanged: if (root.currentTrackId > 0) Source.need("lyricsNew:" + root.currentTrackId)
 
     // 关掉再打开回到原样（只在应用里；原型与截图不读不写）
     Loader {
@@ -177,6 +180,15 @@ Kirigami.ApplicationWindow {
 
     function play(tracks, i) { playback.play(tracks, i); }
     function requestLogin() { loginDialog.open(); }
+    // 一句话的提示（失败原因、操作结果）：参数与 Kirigami 的 showPassiveNotification 相同，样子与位置是应用自己的
+    function notify(message, timeout, actionText, action) { toast.show(message, timeout, actionText, action); }
+    Toast {
+        id: toast
+        parent: root.overlay
+        anchors.fill: parent
+        bottomInset: playerBar.visible ? playerBar.height : 0
+        z: 1
+    }
 
     // 浮层：播放队列（右侧抽屉）与扫码登录（对话框）
     // 截图 harness 可用 startOverlay = queue | login，以及 loginState = waiting | scanned | expired
@@ -193,6 +205,11 @@ Kirigami.ApplicationWindow {
         smartEnabled: smartQueue.enabled
         onSmartToggled: enabled => smartQueue.enabled = enabled
         onActivated: index => playback.play(playback.queue, index)
+        onNowPlayingRequested: {
+            queuePanel.close();
+            if (root.page !== "nowplaying")
+                root.toggleNowPlaying();
+        }
         onRemoveRequested: index => playback.remove(index)
         onClearRequested: playback.clearUpcoming()
         onMoveRequested: (from, to) => playback.move(from, to)
@@ -224,7 +241,7 @@ Kirigami.ApplicationWindow {
             root.noteOnSuccess(playlistId, "移出歌单", "已从歌单移除「" + track.name + "」");
             Source.removeFromPlaylist(playlistId, track.id);
         }
-        onCopied: root.showPassiveNotification("已复制歌曲链接")
+        onCopied: root.notify("已复制歌曲链接")
     }
 
     // 歌单写操作成功时 Store 只发 playlistChanged(id)、失败只发 playlistActionFailed(操作名, 原因)：
@@ -366,7 +383,7 @@ Kirigami.ApplicationWindow {
                 Source.addToPlaylist(id, root.trackForNewPlaylist.id);
                 root.trackForNewPlaylist = null;
             } else {
-                root.showPassiveNotification("已创建歌单「" + name + "」");
+                root.notify("已创建歌单「" + name + "」");
             }
         }
         function onPlaylistChanged(id) {
@@ -378,17 +395,17 @@ Kirigami.ApplicationWindow {
             if (notes[id].length === 0)
                 delete notes[id];
             root.successNotes = notes;
-            root.showPassiveNotification(queued[0].text);
+            root.notify(queued[0].text);
         }
         function onFollowFailed(action, message) {
-            root.showPassiveNotification(action + "失败：" + message);
+            root.notify(action + "失败：" + message);
         }
         function onCommentLikeFailed(songId, commentId, message) {
-            root.showPassiveNotification("评论点赞失败：" + message);
+            root.notify("评论点赞失败：" + message);
         }
         function onRequestFailed(key, message) {
             Source.markRequestFailed(key, message);
-            root.showPassiveNotification(message);
+            root.notify(message);
         }
         function onPlaylistActionFailed(action, message) {
             console.warn(logUi, "playlist action failed:", action, message);
@@ -396,7 +413,7 @@ Kirigami.ApplicationWindow {
             root.takeNote(note => note.action === action);
             if (action === "创建歌单")
                 root.trackForNewPlaylist = null;
-            root.showPassiveNotification(message);
+            root.notify(message);
         }
     }
 
@@ -433,32 +450,24 @@ Kirigami.ApplicationWindow {
     property var history: []
     readonly property var pageNames: ({ home: "推荐", mine: "我的", search: "搜索", charts: "排行榜", playlists: "全部歌单",
                                         nowplaying: "正在播放", mv: "MV", user: "用户" })
-    readonly property string parentName: {
-        const prev = root.history.length > 0 ? root.history[root.history.length - 1] : { page: "home" };
-        if (prev.page === "list")
-            return Source.list(prev.listKey).heading;
-        if (prev.page === "artist")
-            return Source.artist(Number(prev.listKey.slice(7))).name;
-        if (prev.page === "mv")
-            return Source.mv(prev.mvId || 0).name;
-        if (prev.page === "user")
-            return Source.user(prev.userId || 0).name;
-        return root.pageNames[prev.page] || "推荐";
-    }
+    // 返回键上的字：离开那一页时记下的标题（见 open）；记下时还没取到名字就用页的类别名，永远不为空
+    readonly property string parentName: root.history.length > 0
+        ? root.history[root.history.length - 1].title || root.pageNames[root.history[root.history.length - 1].page] || "推荐"
+        : "推荐"
 
     // 深处组件经 Actions 发来的导航请求：歌手页、专辑页（列表页的一种）、任意歌单（含榜单）
     Connections {
         target: Actions
+        function onPlayRequested(tracks, index) { root.play(tracks, index); }
+        function onInboxRequested() { root.open("inbox"); }
         function onArtistRequested(id) { root.open("artist", "artist:" + id); }
         function onAlbumRequested(id) { root.open("list", "album:" + id); }
         function onMvRequested(id) {
             playback.engine.playing = false;   // MV 自带音轨：不要和主播放器同时出声
-            root.mvId = id;
-            root.open("mv");
+            root.open("mv", "", { mvId: id });
         }
         function onUserRequested(id) {
-            root.userId = id;
-            root.open("user");
+            root.open("user", "", { userId: id });
         }
         function onPlaylistRequested(id) {
             // 热歌榜在快照里有现成曲目，用它；其余歌单按 id 取
@@ -473,7 +482,7 @@ Kirigami.ApplicationWindow {
         function onNewPlaylistRequested() { playlistNameDialog.ask(0, "", null); }
         function onLikeToggleRequested(track) {
             if (!root.loggedIn) {
-                root.showPassiveNotification("红心会同步到你的网易云账号，登录后可用", "long", "扫码登录", () => root.requestLogin());
+                root.notify("红心会同步到你的网易云账号，登录后可用", "long", "扫码登录", () => root.requestLogin());
                 return;
             }
             Source.setLiked(track.id, !Source.isLiked(track.id));
@@ -527,22 +536,38 @@ Kirigami.ApplicationWindow {
         }
     }
 
-    function open(page, listKey) {
-        root.history = root.history.concat([{ page: root.page, listKey: root.listKey,
-                                                mvId: root.mvId, userId: root.userId }]);
-        if (listKey)
-            root.listKey = listKey;
+    // 打开一页：先把「现在在哪」连同它此刻的标题记进来路，再换成新的页与参数（ids：{ mvId, userId }）。
+    // 标题存快照：返回键上直接显示，不再按 id 去取数据（单槽数据会被来回挤掉，取数会互相触发、标题会变空）。
+    // 已经在这一页（同一个列表 / 歌手 / 用户 / MV）就什么都不做，来路里不会出现重复的一格
+    function open(page, listKey, ids) {
+        const next = { listKey: listKey || root.listKey, mvId: root.mvId, userId: root.userId };
+        Object.assign(next, ids || {});
+        if (page === root.page && next.listKey === root.listKey && next.mvId === root.mvId && next.userId === root.userId)
+            return;
+        root.history = root.history.concat([{ page: root.page, listKey: root.listKey, mvId: root.mvId,
+                                              userId: root.userId, title: root.currentTitle() }]);
+        root.listKey = next.listKey;
+        root.mvId = next.mvId;
+        root.userId = next.userId;
         root.page = page;
     }
     function goBack() {
-        if (root.history.length === 0)
+        // 没有来路的子页（例如启动时直接打开）：返回键写着「推荐」，就回推荐，任何时候都回得去
+        if (root.history.length === 0) {
+            if (root.page !== "home" && root.page !== "mine" && root.page !== "search")
+                root.switchPivot("home");
             return;
+        }
         const prev = root.history[root.history.length - 1];
         root.history = root.history.slice(0, -1);
         root.listKey = prev.listKey;
         root.mvId = prev.mvId || 0;
         root.userId = prev.userId || 0;
         root.page = prev.page;
+    }
+    function currentTitle() {
+        const item = pageStack.currentItem as ScreenFrame;
+        return item && item.heading ? item.heading : (root.pageNames[root.page] || "推荐");
     }
     function switchPivot(key) {
         root.history = [];
@@ -648,7 +673,13 @@ Kirigami.ApplicationWindow {
         id: miniPlayer
         track: root.currentTrack
         playing: playback.engine.playing
+        elapsed: playback.engine.position
+        volume: playback.engine.volume
         liked: root.currentTrack !== null && Source.isLiked(root.currentTrack.id)
+        onVolumeRequested: v => {
+            playback.engine.volume = v;
+            playback.engine.muted = false;
+        }
         onPlayPauseRequested: playback.engine.toggle()
         onPreviousRequested: playback.previous()
         onNextRequested: playback.next()
@@ -712,7 +743,7 @@ Kirigami.ApplicationWindow {
     Shortcut { sequence: "Right"; onActivated: playback.engine.seek(playback.engine.position + 5) }
     Shortcut { sequence: "Ctrl+Left"; onActivated: playback.previous() }
     Shortcut { sequence: "Ctrl+Right"; onActivated: playback.next() }
-    Shortcut { sequence: StandardKey.Find; onActivated: root.switchPivot("search") }
+    Shortcut { sequences: [StandardKey.Find]; onActivated: root.switchPivot("search") }
     Shortcut {
         sequences: ["Esc", StandardKey.Back]
         onActivated: {
@@ -733,7 +764,7 @@ Kirigami.ApplicationWindow {
     property string searchQuery: ""
     readonly property var pages: ({ home: homePage, mine: root.loggedIn ? minePage : placeholderPage, search: searchPage,
                                     charts: chartsPage, list: listPage, artist: artistPage, playlists: playlistsPage,
-                                    nowplaying: nowPlayingPage, mv: mvPage, user: userPage })
+                                    nowplaying: nowPlayingPage, mv: mvPage, user: userPage, inbox: inboxPage })
     onPageChanged: {
         pageStack.clear();
         pageStack.push(root.pages[root.page]);
@@ -865,7 +896,7 @@ Kirigami.ApplicationWindow {
             onShareRequested: (kind, id, title, cover) => root.shareList(kind, id, title, cover)
             onAlbumSubscriptionToggled: (id, subscribed) => {
                 if (!root.loggedIn) {
-                    root.showPassiveNotification("收藏专辑需要登录", "long", "扫码登录", () => root.requestLogin());
+                    root.notify("收藏专辑需要登录", "long", "扫码登录", () => root.requestLogin());
                     return;
                 }
                 Source.setAlbumSubscribed(id, subscribed);
@@ -890,7 +921,7 @@ Kirigami.ApplicationWindow {
             onLoginRequested: root.requestLogin()
             onFollowToggled: (id, followed) => {
                 if (!root.loggedIn) {
-                    root.showPassiveNotification("关注歌手需要登录", "long", "扫码登录", () => root.requestLogin());
+                    root.notify("关注歌手需要登录", "long", "扫码登录", () => root.requestLogin());
                     return;
                 }
                 Source.setArtistSubscribed(id, followed);
@@ -902,9 +933,22 @@ Kirigami.ApplicationWindow {
         id: userPage
         UserPage {
             userId: root.userId
+            currentId: root.currentTrack ? root.currentTrack.id : 0
             loggedIn: root.loggedIn
             parentText: root.parentName
             onLeaveRequested: root.goBack()
+            onLoginRequested: root.requestLogin()
+        }
+    }
+
+    Component {
+        id: inboxPage
+        InboxPage {
+            loggedIn: root.loggedIn
+            currentId: root.currentTrack ? root.currentTrack.id : 0
+            parentText: root.parentName
+            onLeaveRequested: root.goBack()
+            onLoginRequested: root.requestLogin()
         }
     }
 
@@ -915,6 +959,7 @@ Kirigami.ApplicationWindow {
             loggedIn: root.loggedIn
             parentText: root.parentName
             onLeaveRequested: root.goBack()
+            onLoginRequested: root.requestLogin()
             onVideoPlayingChanged: root.videoPlaying = videoPlaying
             Component.onDestruction: root.videoPlaying = false
         }
@@ -926,6 +971,7 @@ Kirigami.ApplicationWindow {
             pane: root.nowPlayingPane
             track: root.currentTrack
             elapsed: playback.engine.position
+            playing: playback.engine.playing
             loggedIn: root.loggedIn
             parentText: root.parentName
             onLeaveRequested: root.goBack()

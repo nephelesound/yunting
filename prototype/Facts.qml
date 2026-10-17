@@ -1,4 +1,5 @@
 // 事实行：数值用前景色、单位/说明用弱化色，事实之间只用间距分隔（不用「·」）；宽度不够时整条事实换行。
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import org.kde.kirigami as Kirigami
@@ -6,7 +7,10 @@ import org.kde.kirigami as Kirigami
 Flow {
     id: facts
 
-    property var items: [] // [{ value, label, artistId, albumId, artists }]，都可省略
+    property var items: [] // [{ value, label, artistId, albumId, artists, key }]，都可省略
+
+    // 带 key 的事实：说明文字是链接，点了发 activated(key)，由调用方决定去哪（用户页的关注 / 粉丝）
+    signal activated(string key)
 
     spacing: Tokens.space4
 
@@ -29,9 +33,11 @@ Flow {
                 readonly property bool link: (fact.modelData.artistId || 0) > 0 || (fact.modelData.albumId || 0) > 0
                 visible: text.length > 0
                 parts: fact.modelData.artists || (fact.modelData.label
-                    ? [{ text: fact.modelData.label, artistId: fact.modelData.artistId, albumId: fact.modelData.albumId }] : [])
+                    ? [{ text: fact.modelData.label, artistId: fact.modelData.artistId, albumId: fact.modelData.albumId,
+                         link: Boolean(fact.modelData.key) }] : [])
                 font.pixelSize: Tokens.textBase
                 color: link || fact.modelData.artists ? Kirigami.Theme.textColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                onActivated: facts.activated(fact.modelData.key)
             }
         }
     }

@@ -82,7 +82,7 @@ Kirigami.Page {
                 id: account
                 readonly property bool active: screen.loggedIn && !Source.sessionExpired
                 Layout.rightMargin: account.active ? -Tokens.space2 : 0
-                enabled: account.active && (Source.account.id || 0) > 0
+                enabled: account.active && Source.account !== null && Source.account.id > 0
                 hoverEnabled: true
                 implicitHeight: Tokens.height8
                 leftPadding: account.active ? Tokens.space1 : 0

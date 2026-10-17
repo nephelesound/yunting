@@ -74,11 +74,19 @@ ScreenFrame {
                     elide: Text.ElideRight
                     Layout.maximumWidth: parent.width
                 }
-                Label {
+                // 没取到（可点重试）/ 详情到了但没有可播放的地址（会员、版权、下架）/ 还在取
+                LinkText {
                     Layout.alignment: Qt.AlignHCenter
-                    text: Source.live ? (page.mv.id > 0 ? "正在取回 MV…" : "没有可播放的 MV") : "原型数据里没有 MV 播放地址"
+                    readonly property bool failed: Boolean(Source.failure("mv:" + page.mvId))
+                    readonly property bool unplayable: page.mv.name !== "" && page.mv.urlPending === false
+                    parts: [{ text: !Source.live ? "原型数据里没有 MV 播放地址"
+                                  : failed ? "MV 没取到，点此重试"
+                                  : unplayable ? "这个 MV 暂时不能播放（可能需要会员，或已下架）"
+                                  : "正在取回 MV…",
+                              link: failed }]
                     font.pixelSize: Tokens.textSm
                     color: Qt.alpha("white", Tokens.muted)
+                    onActivated: Source.retryKey("mv:" + page.mvId)
                 }
             }
 

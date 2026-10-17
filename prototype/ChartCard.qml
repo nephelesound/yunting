@@ -77,7 +77,7 @@ AbstractButton {
                     }
                     Label {
                         Layout.fillWidth: true
-                        Layout.maximumWidth: implicitWidth
+                        Layout.maximumWidth: Math.ceil(implicitWidth)   // 宽度带小数时往下取整会省略掉最后一个字
                         text: line.modelData.name
                         font.pixelSize: Tokens.textSm
                         elide: Text.ElideRight

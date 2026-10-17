@@ -15,7 +15,22 @@ ScreenFrame {
 
     property var track
     property real elapsed
+    property bool playing
     property string pane: "lyrics"   // lyrics | comments
+
+    // 逐字填色要逐帧走（引擎的进度更新得没那么勤）：播放时每帧前进，与引擎偏差大或暂停时对齐（与桌面歌词同一做法）
+    property real clock: 0
+    onElapsedChanged: if (!page.playing || Math.abs(page.elapsed - page.clock) > 0.35) page.clock = page.elapsed
+    onPlayingChanged: page.clock = page.elapsed
+    FrameAnimation {
+        running: page.visible && page.playing && page.pane === "lyrics" && page.timed
+        onTriggered: page.clock += frameTime
+    }
+    // 这首有逐字时间吗；有才给当前句填色（只按时间比例填是猜的，在应用里不画）
+    readonly property bool timed: page.lines.length > 0 && page.lines[0].words !== undefined
+    readonly property real fill: page.timed
+        ? Source.lineFill(page.lines[page.lyricIndex], page.lines[page.lyricIndex + 1] || null, page.track ? page.track.dur || 0 : 0, page.clock)
+        : 0
 
     signal seekRequested(real seconds)   // 点了某句歌词：跳到这句开始
     // 共享封面转场的一端：main 读它的位置，飞行期间 coverHidden
@@ -59,8 +74,23 @@ ScreenFrame {
             Source.moreComments(page.track.id);
     }
     onPaneChanged: page.startComments()
-    onTrackChanged: page.startComments()
+    onTrackChanged: {
+        page.openThread = 0;
+        page.startComments();
+    }
     Component.onCompleted: page.startComments()
+
+    // 展开着回复的那条评论（0 = 都没展开）。展开时要第一页回复，再点收起
+    property real openThread: 0
+    function toggleThread(commentId) {
+        if (page.openThread === commentId) {
+            page.openThread = 0;
+            return;
+        }
+        page.openThread = commentId;
+        if (Source.replies(page.track.id, commentId).pending)
+            Source.need("commentReplies:" + page.track.id + ":" + commentId);
+    }
     readonly property int lyricIndex: Source.lyricIndex(page.lines, page.elapsed)
 
 
@@ -266,6 +296,23 @@ ScreenFrame {
                     elide: Text.ElideRight
                     Behavior on scale { NumberAnimation { duration: Tokens.motionBase; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut } }
                     Behavior on color { ColorAnimation { duration: Tokens.motionBase } }
+
+                    // 逐字歌词：同样的字用强调色、按唱到的位置从左裁出一段，盖在当前句上
+                    Item {
+                        visible: line.current && page.timed
+                        width: original.contentWidth * page.fill
+                        height: parent.height
+                        clip: true
+                        Label {
+                            width: original.width
+                            height: original.height
+                            verticalAlignment: original.verticalAlignment
+                            text: original.text
+                            font: original.font
+                            color: Kirigami.Theme.highlightColor
+                            elide: Text.ElideRight
+                        }
+                    }
                 }
                 Label {
                     visible: line.translation.length > 0
@@ -296,14 +343,20 @@ ScreenFrame {
             onClicked: lyrics.resume()
         }
 
-        Label {
+        // 没有歌词时说清楚是哪种：没取到（可点重试）/ 还在取 / 这首真的没有
+        LinkText {
+            readonly property bool failed: page.track !== null && Boolean(Source.failure("lyrics:" + page.track.id))
+            readonly property bool loading: page.track !== null && Source.live !== null && Source.d.lyricsTrackId !== page.track.id
             y: page.focusRow * page.pitch
             height: page.pitch
             visible: page.pane === "lyrics" && page.lines.length === 0
             verticalAlignment: Text.AlignVCenter
-            text: page.track ? "暂无歌词" : "还没有在播放的歌"
+            parts: [{ text: !page.track ? "还没有在播放的歌" : failed ? "歌词没取到，点此重试"
+                          : loading ? "正在取回歌词…" : "暂无歌词",
+                      link: failed }]
             font.pixelSize: Tokens.text2xl
             color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+            onActivated: Source.retryKey("lyrics:" + page.track.id)
         }
 
         // 评论：阅读模式，头像、名字、内容、赞数。先精彩评论，再最新评论（滚到底取下一页）
@@ -336,119 +389,63 @@ ScreenFrame {
             }
 
             delegate: ColumnLayout {
-                id: comment
+                id: entry
                 required property int index
-                readonly property var modelData: page.commentRows[comment.index] || ({})
+                readonly property var modelData: page.commentRows[entry.index] || ({})
                 width: ListView.view.width - Tokens.space4
                 spacing: Tokens.space3
 
                 // 分组标题：每组第一条之前，与队列的「正在播放 / 接下来播放」同一种小节标题
                 Label {
-                    visible: comment.index === 0 || page.commentRows[comment.index - 1].group !== comment.modelData.group
-                    Layout.topMargin: comment.index === 0 ? 0 : Tokens.space6
-                    text: comment.modelData.group === "hot" ? "精彩评论"
+                    visible: entry.index === 0 || page.commentRows[entry.index - 1].group !== entry.modelData.group
+                    Layout.topMargin: entry.index === 0 ? 0 : Tokens.space6
+                    text: entry.modelData.group === "hot" ? "精彩评论"
                         : "最新评论" + (page.latest && page.latest.total > 0 ? " " + Format.count(page.latest.total) : "")
                     font.pixelSize: Tokens.textSm
                     color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                 }
 
-                // 一条评论：头像 | 作者与时间挨在一起（都是关于「谁、何时」），赞数在右；正文放宽行距便于阅读
-                RowLayout {
+                CommentRow {
                     Layout.fillWidth: true
-                    spacing: Tokens.space3
-
-                    PersonAvatar {
-                        Layout.alignment: Qt.AlignTop
-                        implicitWidth: Tokens.height8
-                        implicitHeight: Tokens.height8
-                        name: comment.modelData.user
-                        source: comment.modelData.avatar || ""
-                        HoverHandler {
-                            enabled: (comment.modelData.userId || 0) > 0
-                            cursorShape: Qt.PointingHandCursor
+                    comment: entry.modelData
+                    threadOpen: page.openThread === entry.modelData.id
+                    onLikeRequested: liked => {
+                        if (!page.loggedIn) {
+                            page.loginRequested();
+                            return;
                         }
-                        TapHandler {
-                            enabled: (comment.modelData.userId || 0) > 0
-                            onTapped: Actions.openUser(comment.modelData.userId)
+                        Source.setCommentLiked(page.track.id, entry.modelData.id, liked);
+                    }
+                    onThreadToggled: page.toggleThread(entry.modelData.id)
+                }
+
+                // 楼中楼：展开在这条下面，缩进到正文的左缘；一次只展开一条（后端只留最近展开的那一条）
+                ColumnLayout {
+                    readonly property var thread: Source.replies(page.track ? page.track.id : 0, entry.modelData.id || 0)
+                    visible: page.openThread === entry.modelData.id && entry.modelData.id > 0
+                    Layout.fillWidth: true
+                    Layout.leftMargin: Tokens.height8 + Tokens.space3
+                    spacing: Tokens.space4
+
+                    Repeater {
+                        model: parent.visible ? parent.thread.items : []
+                        delegate: CommentRow {
+                            required property var modelData
+                            Layout.fillWidth: true
+                            comment: modelData
+                            likeable: false
+                            threadOf: entry.modelData.id || 0
                         }
                     }
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: Tokens.space1
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: Tokens.space2
-                            Label {
-                                Layout.maximumWidth: implicitWidth
-                                Layout.fillWidth: true
-                                text: comment.modelData.user
-                                font.pixelSize: Tokens.textSm
-                                elide: Text.ElideRight
-                                HoverHandler {
-                                    enabled: (comment.modelData.userId || 0) > 0
-                                    cursorShape: Qt.PointingHandCursor
-                                }
-                                TapHandler {
-                                    enabled: (comment.modelData.userId || 0) > 0
-                                    onTapped: Actions.openUser(comment.modelData.userId)
-                                }
-                            }
-                            Label {
-                                text: Format.commentTime(comment.modelData.time)
-                                font.pixelSize: Tokens.textSm
-                                font.features: { "tnum": 1 }
-                                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
-                            }
-                            Item { Layout.fillWidth: true }
-                            AbstractButton {
-                                id: commentLike
-                                readonly property bool liked: comment.modelData.liked === true
-                                enabled: (comment.modelData.id || 0) > 0 || !Source.live
-                                implicitHeight: Tokens.height7
-                                leftPadding: Tokens.space1
-                                rightPadding: Tokens.space1
-                                hoverEnabled: true
-                                Accessible.name: commentLike.liked ? "取消点赞评论" : "点赞评论"
-                                background: Rectangle {
-                                    radius: Tokens.radius
-                                    color: Qt.alpha(Kirigami.Theme.highlightColor,
-                                                    commentLike.down ? Tokens.tintPressed
-                                                                     : commentLike.hovered ? Tokens.tintHover : 0)
-                                }
-                                contentItem: RowLayout {
-                                    spacing: Tokens.space1
-                                    Kirigami.Icon {
-                                        implicitWidth: Tokens.iconSm
-                                        implicitHeight: Tokens.iconSm
-                                        source: commentLike.liked ? Tokens.upvotedIcon : Tokens.upvoteIcon
-                                        color: commentLike.liked ? Tokens.liked : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
-                                        isMask: true
-                                    }
-                                    Label {
-                                        text: Format.count(comment.modelData.likes)
-                                        font.pixelSize: Tokens.textSm
-                                        font.features: { "tnum": 1 }
-                                        color: commentLike.liked ? Tokens.liked : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
-                                    }
-                                }
-                                onClicked: {
-                                    if (!page.loggedIn) {
-                                        page.loginRequested();
-                                        return;
-                                    }
-                                    Source.setCommentLiked(page.track.id, comment.modelData.id, !commentLike.liked);
-                                }
-                            }
-                        }
-                        Label {
-                            Layout.fillWidth: true
-                            text: comment.modelData.content
-                            font.pixelSize: Tokens.textBase
-                            lineHeight: 1.4
-                            wrapMode: Text.Wrap
-                            maximumLineCount: 6
-                            elide: Text.ElideRight
-                        }
+                    LinkText {
+                        readonly property var thread: parent.thread
+                        visible: thread.more || thread.pending || thread.failed
+                        parts: [{ text: thread.failed ? "回复没取到，点此重试" : thread.pending ? "正在取回回复…" : "更多回复",
+                                  link: !thread.pending || thread.failed }]
+                        font.pixelSize: Tokens.textSm
+                        color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                        onActivated: thread.failed ? Source.retryKey("commentReplies:" + thread.songId + ":" + thread.commentId)
+                                                   : Source.moreReplies(thread)
                     }
                 }
             }
