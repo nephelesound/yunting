@@ -1,12 +1,4 @@
-<svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-  <!-- 云听：云（tabler:cloud-filled，MIT）里刻着声波（lucide:audio-lines，ISC），见 data/ICON-LICENSE -->
-  <defs>
-    <linearGradient id="base" x1="24" x2="24" y1="4" y2="44" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#26a69a" offset="0"/>
-      <stop stop-color="#16796f" offset="1"/>
-    </linearGradient>
-  </defs>
-  <rect x="4" y="4" width="40" height="40" rx="8" fill="url(#base)"/>
-  <path transform="translate(6 6.4) scale(1.5)" fill="#fff" d="M10.04 4.305c2.195-.667 4.615-.224 6.36 1.176c1.386 1.108 2.188 2.686 2.252 4.34l.003.212l.091.003c2.3.107 4.143 1.961 4.25 4.27l.004.211c0 2.407-1.885 4.372-4.255 4.482l-.21.005H6.657l-.222-.008c-2.94-.11-5.317-2.399-5.43-5.263L1 13.517C1 10.77 3.08 8.507 5.784 8.1l.114-.016l.07-.181c.663-1.62 2.056-2.906 3.829-3.518l.244-.08z"/>
-  <path transform="translate(16.8 18.6) scale(0.6)" fill="none" stroke="url(#base)" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M2 10v3m4-7v11m4-14v18m4-13v7m4-10v13m4-8v3"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+  <!-- streamline-plump-color:music-note-2（Streamline，CC BY 4.0，经 icones.js.org 选取），原样使用，见 data/ICON-LICENSE -->
+  <g fill="none" stroke-width="3"><path fill="#8fbffa" d="M14 12.923c0-1.88 1.049-3.62 2.772-4.372c9.086-3.96 18.557-5.094 23.24-5.42C41.663 3.018 43 4.345 43 6.002v26h-.014A8.5 8.5 0 1 1 37 23.375v-8.801c-4.183.507-10.216 1.612-17 4.018v18.41h-.015A8.5 8.5 0 1 1 14 28.374z"/><path stroke="#2859c5" stroke-linecap="round" stroke-linejoin="round" d="M14 12.922c0-1.88 1.049-3.62 2.772-4.372c9.086-3.96 18.557-5.094 23.24-5.42C41.663 3.017 43 4.344 43 6.001v26h-.014A8.5 8.5 0 1 1 37 23.374v-8.801c-4.183.507-10.216 1.613-17 4.018v18.41h-.015A8.5 8.5 0 1 1 14 28.373z"/></g>
 </svg>
