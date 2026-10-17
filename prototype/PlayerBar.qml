@@ -152,13 +152,25 @@ Item {
                 text: "分享"
                 onClicked: bar.shareRequested()
             }
-            // 评论：从哪一页都能直接到这首歌的评论（正在播放页的「评论」）
-            IconButton {
+            // 评论：从哪一页都能直接到这首歌的评论（正在播放页的「评论」）。图标加评论数（网易云的写法 999+、1w+），
+            // 系统原生的按钮整个自己画（主题图标由样式着色），不叠自绘图标
+            ToolButton {
+                id: commentsButton
+                readonly property string count: bar.active ? Format.corner(Source.commentTotal(bar.track.id)) : ""
                 visible: !hud.compact
                 enabled: bar.active
-                icon.source: Tokens.commentsIcon
-                text: "评论"
-                corner: bar.active ? Format.corner(Source.commentTotal(bar.track.id)) : ""
+                implicitHeight: Tokens.height8
+                icon.name: "comment-symbolic"
+                icon.width: Tokens.iconSm
+                icon.height: Tokens.iconSm
+                display: commentsButton.count ? AbstractButton.TextBesideIcon : AbstractButton.IconOnly
+                text: commentsButton.count
+                font.pixelSize: Tokens.textSm
+                font.features: { "tnum": 1 }
+                Accessible.name: "评论"
+                ToolTip.text: "评论"
+                ToolTip.visible: hovered
+                ToolTip.delay: 600
                 onClicked: bar.commentsRequested()
             }
         }
@@ -313,7 +325,7 @@ Item {
                     }
                     MenuItem {
                         enabled: bar.active
-                        icon.source: Tokens.commentsIcon
+                        icon.name: "comment-symbolic"
                         text: "评论"
                         onTriggered: bar.commentsRequested()
                     }

@@ -73,8 +73,6 @@ QtObject {
     readonly property int textBase: 16
     readonly property int textSm: 14
     readonly property int textXs: 12
-    // 图标角上的小数字（评论数，网易云的写法）：比 16 的图标小一档才像上标；只用在这里
-    readonly property int textCorner: 10
 
     // 图标：跟随 Breeze 的尺寸档（16/22/32），其它尺寸会被缩回最近一档
     readonly property int iconSm: 16
@@ -96,8 +94,6 @@ QtObject {
     readonly property url miniIcon: Qt.resolvedUrl("icons/picture-in-picture-16-regular.svg")
     // 关于：Breeze 的 help-about 是一个实心的粗「i」，在页头里太重；Fluent 的圆圈线条与旁边的文字同一份量
     readonly property url aboutIcon: Qt.resolvedUrl("icons/info-16-regular.svg")
-    // 评论：Breeze 的 dialog-messages 是两个叠着的气泡，像「私信」；评论是一个气泡
-    readonly property url commentsIcon: Qt.resolvedUrl("icons/comment-16-regular.svg")
 
     // 线宽：只有 1 与 2。播放条顶边那条进度线就是 2，同时充当内容区与播放条的分界
     readonly property int line: 1

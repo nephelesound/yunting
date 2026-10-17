@@ -6,7 +6,7 @@ heart-filled.svg
   Breeze love-symbolic 的外轮廓填实。breeze-icons, LGPL-3.0-or-later, https://invent.kde.org/frameworks/breeze-icons
 
 thumb-like-16-regular.svg, thumb-like-16-filled.svg, arrow-exit-16-regular.svg,
-text-bullet-list-16-regular.svg, picture-in-picture-16-regular.svg, info-16-regular.svg, comment-16-regular.svg
+text-bullet-list-16-regular.svg, picture-in-picture-16-regular.svg, info-16-regular.svg
   Fluent UI System Icons, https://github.com/microsoft/fluentui-system-icons
   经 https://icones.js.org/ (Iconify) 取得，未改动路径。
 
