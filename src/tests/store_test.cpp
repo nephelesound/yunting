@@ -764,7 +764,44 @@ private slots:
         QCOMPARE(m_store->online(), false);
     }
 
-    // 分类不看 message 文本：服务器自己的措辞不能冒充限流/过期
+    // 歌单详情与补取的歌曲详情都把 privileges 放在歌曲旁边的平行数组里：能不能播以它为准，
+    // 不能只看 fee（fee=1 的歌对会员账号可以播）
+    void playlistTracksUseParallelPrivileges()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/v6/playlist/detail") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"playlist", QJsonObject{
+                        {"id", 601}, {"name", "P"}, {"trackCount", 2},
+                        {"tracks", QJsonArray{QJsonObject{{"id", 7}, {"name", "a"}, {"fee", 1}}}},
+                        {"trackIds", QJsonArray{QJsonObject{{"id", 7}}, QJsonObject{{"id", 8}}}}}},
+                    {"privileges", QJsonArray{QJsonObject{{"id", 7}, {"fee", 1}, {"pl", 320000}, {"st", 0}}}}}));
+                return;
+            }
+            if (req.path == "/api/v3/song/detail") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"songs", QJsonArray{QJsonObject{{"id", 8}, {"name", "b"}, {"fee", 1}}}},
+                    {"privileges", QJsonArray{QJsonObject{{"id", 8}, {"fee", 1}, {"pl", 0}, {"st", 0}}}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("playlist:601"));
+        QVERIFY(waitUntil([&] {
+            const QVariantMap detail = m_store->personal().value("playlistDetails").toMap()
+                                           .value(QStringLiteral("601")).toMap();
+            return detail.value("tracks").toList().size() == 2;
+        }));
+        const QVariantList tracks = m_store->personal().value("playlistDetails").toMap()
+                                        .value(QStringLiteral("601")).toMap().value("tracks").toList();
+        QCOMPARE(tracks.at(0).toMap().value("playable").toBool(), true);
+        QCOMPARE(tracks.at(1).toMap().value("playable").toBool(), false);
+        QCOMPARE(tracks.at(1).toMap().value("blockedBy").toString(), QStringLiteral("vip"));
+    }
+
     // 拒绝的原因只有网易云知道：用它的 message；没有 message 时才用通用的一句
     void rejectionUsesServerMessage()
     {
