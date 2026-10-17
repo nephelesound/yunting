@@ -61,6 +61,21 @@ private slots:
         QCOMPARE(got, (QVariantList{1, 1}));
     }
 
+    // refresh：缓存里有旧值也不交付、新值也不入缓存（签名 URL 每次都要新取）
+    void refreshNeverServesOrKeepsCachedValue()
+    {
+        QTemporaryDir dir;
+        QueryCache cache(dir.filePath("q.json"));
+        cache.remember("mvUrl:7", "old");
+        FakeFetch fetch;
+        fetch.next = "new";
+        QVariantList got;
+        cache.refresh("mvUrl:7", fetch.fn(), [&](const QVariant &v) { got.append(v); });
+        QCOMPARE(fetch.calls, 1);
+        QCOMPARE(got, (QVariantList{"new"}));
+        QCOMPARE(cache.peek("mvUrl:7"), QVariant("old"));   // 刷新结果不写回缓存
+    }
+
     void concurrentRequestsShareOneFetch()
     {
         QTemporaryDir dir;

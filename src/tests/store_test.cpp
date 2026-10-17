@@ -638,6 +638,55 @@ private slots:
         QCOMPARE(reply.value("userId").toDouble(), 9.0);
     }
 
+    // MV 播放地址是签名 URL，过期即失效：同一 MV 再次打开必须重新取地址；详情仍用缓存
+    void reopenMvFetchesSignedUrlAgain()
+    {
+        int detailRequests = 0;
+        int urlRequests = 0;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/weapi/v1/mv/detail") {
+                ++detailRequests;
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"subed", false},
+                    {"data", QJsonObject{
+                        {"id", 7}, {"name", "MV"}, {"cover", "http://cover"},
+                        {"artistName", "A"}, {"artistId", 9}, {"duration", 120000},
+                        {"playCount", 1}, {"subCount", 2}, {"shareCount", 3},
+                        {"commentCount", 4}, {"publishTime", "2020-01-01"}, {"desc", "d"}}}}));
+                return;
+            }
+            if (req.path == "/weapi/song/enhance/play/mv/url") {
+                ++urlRequests;
+                // expi 是秒：第一份地址 1 秒后过期，第二次打开必须拿不到它
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"data", QJsonObject{
+                        {"code", 200},
+                        {"url", QStringLiteral("http://media/%1").arg(urlRequests)},
+                        {"r", 1080}, {"size", 100}, {"expi", 1}}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        const auto url = [this] {
+            return m_store->data().value("mv").toMap().value("url").toString();
+        };
+
+        m_store->request(QStringLiteral("mv:7"));
+        QVERIFY(waitUntil([&] { return url() == QStringLiteral("http://media/1"); }));
+        QCOMPARE(detailRequests, 1);
+        QCOMPARE(urlRequests, 1);
+
+        QTest::qWait(1100);   // 越过第一份地址的 expi
+
+        m_store->request(QStringLiteral("mv:7"));
+        QVERIFY(waitUntil([&] { return url() == QStringLiteral("http://media/2"); }));
+        QCOMPARE(detailRequests, 1);   // 详情仍是缓存里的那份
+        QCOMPARE(urlRequests, 2);
+    }
+
     // 按需请求失败必须发 requestFailed，页面才能从「加载中」切到「重试」
     void failedOnDemandRequestNotifies()
     {

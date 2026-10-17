@@ -63,7 +63,18 @@ void QueryCache::query(const QString &key, const Fetcher &fetch, const Deliver &
         deliver(cached->value);          // 先给缓存（新鲜或过期都给）
     if (isFresh(key))
         return;                          // 新鲜：不发请求
+    startFetch(key, fetch, deliver, true);
+}
 
+void QueryCache::refresh(const QString &key, const Fetcher &fetch, const Deliver &deliver)
+{
+    qCDebug(lcPerf).nospace() << "cache refresh kind=" << key.section(u':', 0, 0);
+    startFetch(key, fetch, deliver, false);
+}
+
+void QueryCache::startFetch(const QString &key, const Fetcher &fetch, const Deliver &deliver,
+                            bool keep)
+{
     auto waiting = m_waiting.find(key);
     if (waiting != m_waiting.end()) {    // 已在途：排队等结果，不重复请求
         waiting->append(deliver);
@@ -73,7 +84,7 @@ void QueryCache::query(const QString &key, const Fetcher &fetch, const Deliver &
     const quint64 generation = m_generation;
     QElapsedTimer timer;
     timer.start();
-    fetch([this, key, generation, kind, timer](const QVariant &value, bool ok) {
+    fetch([this, key, generation, timer, keep](const QVariant &value, bool ok) {
         if (generation != m_generation)
             return;                      // 期间退出登录：旧请求的结果属于上一个账号
         const QList<Deliver> waiters = m_waiting.take(key);
@@ -81,11 +92,13 @@ void QueryCache::query(const QString &key, const Fetcher &fetch, const Deliver &
             emit fetchFailed(key);       // 失败：保留旧值，通知界面可重试
             return;
         }
-        m_entries.insert(key, {value, QDateTime::currentDateTimeUtc()});
-        qCDebug(lcPerf).nospace() << "cache fetch kind=" << kind << " ok=" << ok
-                                  << " ms=" << timer.elapsed();
-        if (persistent(key))
-            scheduleSave();
+        if (keep) {
+            m_entries.insert(key, {value, QDateTime::currentDateTimeUtc()});
+            if (persistent(key))
+                scheduleSave();
+        }
+        qCDebug(lcPerf).nospace() << "cache fetch kind=" << key.section(u':', 0, 0)
+                                  << " ok=" << ok << " ms=" << timer.elapsed();
         for (const Deliver &d : waiters)
             d(value);
     });

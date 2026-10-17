@@ -420,80 +420,95 @@ void Store::requestArtistSongs(const QString &key, double artistId, int offset)
 }
 
 
-// MV：详情 + 播放地址（均为 Web /weapi，两请求并发；地址失败仍返回详情）
+// MV：详情走缓存；播放地址是签名 URL，过期即失效，每次打开都重新取（不进缓存）
 void Store::requestMv(const QString &key, double mvId)
 {
+    // 同一个 MV 再打开：先清掉上一次的地址，新地址回来前界面不能拿着死链
+    const QVariantMap shown = m_data.value(QStringLiteral("mv")).toMap();
+    if (shown.value("id").toDouble() == mvId && !shown.value("url").toString().isEmpty()) {
+        QVariantMap cleared = shown;
+        cleared.insert("url", QString{});
+        cleared.insert("br", 0.0);
+        cleared.insert("size", 0.0);
+        cleared.insert("expires", 0.0);
+        put("mv", cleared, false);
+    }
+
+    struct State {
+        QVariantMap mv;
+        QVariantMap url;
+        bool detailOk = false;
+        bool urlSettled = false;
+    };
+    auto state = std::make_shared<State>();
+    const auto deliver = [this, state] {
+        if (!state->detailOk || !state->urlSettled)
+            return;
+        QVariantMap mv = state->mv;
+        mv.insert("url", state->url.value("url", QString{}));
+        mv.insert("br", state->url.value("br", 0.0));
+        mv.insert("size", state->url.value("size", 0.0));
+        mv.insert("expires", state->url.value("expires", 0.0));
+        put("mv", mv, false);
+    };
+
     m_cache.query(key,
         [this, mvId](QueryCache::Done done) {
-            struct State {
-                QVariantMap mv;
-                QString url;
-                double br = 0;
-                double size = 0;
-                double expires = 0;
-                bool detailOk = false;
-                int left = 2;
-            };
-            auto state = std::make_shared<State>();
-            const auto finish = [state, done] {
-                if (--state->left != 0)
-                    return;
-                if (!state->detailOk) {
+            m_client->postWeapi("v1/mv/detail", QJsonObject{{"id", num(mvId)}}, true,
+                                [done](const QJsonDocument &doc, bool ok) {
+                const QJsonObject root = body(doc);
+                const QJsonObject d = root.value("data").toObject();
+                if (!ok || root.value("code").toInt() != 200 || d.isEmpty()) {
                     done({}, false);
                     return;
                 }
-                state->mv.insert("url", state->url);
-                state->mv.insert("br", state->br);
-                state->mv.insert("size", state->size);
-                state->mv.insert("expires", state->expires);
-                done(state->mv, true);
-            };
-
-            m_client->postWeapi("v1/mv/detail", QJsonObject{{"id", num(mvId)}}, true,
-                                [state, finish](const QJsonDocument &doc, bool ok) {
-                const QJsonObject root = body(doc);
-                const QJsonObject d = root.value("data").toObject();
-                if (ok && root.value("code").toInt() == 200 && !d.isEmpty()) {
-                    state->detailOk = true;
-                    state->mv = QVariantMap{
-                        {"id", d.value("id").toDouble()},
-                        {"name", d.value("name").toString()},
-                        {"cover", ncmSized(d.value("cover"), 400)},
-                        {"artist", d.value("artistName").toString()},
-                        {"artistId", d.value("artistId").toDouble()},
-                        {"duration", std::floor(d.value("duration").toDouble() / 1000)},
-                        {"playCount", d.value("playCount").toDouble()},
-                        {"subCount", d.value("subCount").toDouble()},
-                        {"shareCount", d.value("shareCount").toDouble()},
-                        {"commentCount", d.value("commentCount").toDouble()},
-                        {"publishTime", d.value("publishTime").toString()},
-                        {"description", d.value("desc").toString()},
-                        {"subscribed", root.value("subed").toBool()},
-                        {"url", QString{}},
-                        {"br", 0.0},
-                        {"size", 0.0},
-                        {"expires", 0.0},
-                    };
-                }
-                finish();
-            });
-
-            m_client->postWeapi("song/enhance/play/mv/url", QJsonObject{{"id", num(mvId)}, {"r", 1080}}, true,
-                                [state, finish](const QJsonDocument &doc, bool ok) {
-                const QJsonObject root = body(doc);
-                const QJsonObject d = root.value("data").toObject();
-                if (ok && root.value("code").toInt() == 200 && !d.isEmpty()) {
-                    if (d.value("code").toInt() == 200) {
-                        state->url = d.value("url").toString();
-                        state->br = d.value("r").toDouble();
-                        state->size = d.value("size").toDouble();
-                        state->expires = d.value("expi").toDouble();
-                    }
-                }
-                finish();
+                done(QVariantMap{
+                    {"id", d.value("id").toDouble()},
+                    {"name", d.value("name").toString()},
+                    {"cover", ncmSized(d.value("cover"), 400)},
+                    {"artist", d.value("artistName").toString()},
+                    {"artistId", d.value("artistId").toDouble()},
+                    {"duration", std::floor(d.value("duration").toDouble() / 1000)},
+                    {"playCount", d.value("playCount").toDouble()},
+                    {"subCount", d.value("subCount").toDouble()},
+                    {"shareCount", d.value("shareCount").toDouble()},
+                    {"commentCount", d.value("commentCount").toDouble()},
+                    {"publishTime", d.value("publishTime").toString()},
+                    {"description", d.value("desc").toString()},
+                    {"subscribed", root.value("subed").toBool()},
+                }, true);
             });
         },
-        [this](const QVariant &mv) { put("mv", mv, false); });
+        [state, deliver](const QVariant &value) {
+            state->mv = value.toMap();
+            state->detailOk = true;
+            deliver();
+        });
+
+    // 地址失败只让 url 为空，详情照常落地
+    m_cache.refresh(QStringLiteral("mvUrl:%1").arg(num(mvId)),
+        [this, mvId](QueryCache::Done done) {
+            m_client->postWeapi("song/enhance/play/mv/url",
+                                QJsonObject{{"id", num(mvId)}, {"r", 1080}}, true,
+                                [done](const QJsonDocument &doc, bool ok) {
+                const QJsonObject root = body(doc);
+                const QJsonObject d = root.value("data").toObject();
+                if (!ok || root.value("code").toInt() != 200
+                    || d.value("code").toInt() != 200) {
+                    done(QVariantMap{}, true);
+                    return;
+                }
+                done(QVariantMap{{"url", d.value("url").toString()},
+                                 {"br", d.value("r").toDouble()},
+                                 {"size", d.value("size").toDouble()},
+                                 {"expires", d.value("expi").toDouble()}}, true);
+            });
+        },
+        [state, deliver](const QVariant &value) {
+            state->url = value.toMap();
+            state->urlSettled = true;
+            deliver();
+        });
 }
 
 

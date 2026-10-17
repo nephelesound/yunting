@@ -28,6 +28,9 @@ public:
     ~QueryCache() override;
 
     void query(const QString &key, const Fetcher &fetch, const Deliver &deliver);
+    // 过期即失效、旧值绝不能再用到的数据（签名 URL）：不交付缓存值，结果也不入缓存；
+    // 同一 key 在途时仍只发一次请求。
+    void refresh(const QString &key, const Fetcher &fetch, const Deliver &deliver);
 
     // 首屏数据由 Store 的请求管线逐块拼成，不是一次 fetch：Store 自己写（remember）、启动时先读（peek）
     QVariant peek(const QString &key) const;
@@ -48,6 +51,8 @@ private:
     static qint64 freshFor(const QString &key);   // 秒；<0 = 永不过期
     static bool persistent(const QString &key);
     bool isFresh(const QString &key) const;
+    // query / refresh 的共同部分：在途去重后执行 fetch；keep=false 时不读写 m_entries
+    void startFetch(const QString &key, const Fetcher &fetch, const Deliver &deliver, bool keep);
     void load();
     void scheduleSave();
     void save() const;
