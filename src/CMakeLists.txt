@@ -42,14 +42,14 @@ qt_add_executable(yunting
 
 # 界面 QML/JS 编进可执行文件：整个 prototype/ 目录挂到 qrc:/qt/qml/org/nephelesound/yunting/ 下，
 # qmldir 与组件同目录，singleton 声明照常解析。Snapshot.qml 与它读的 Data.js / Personal.js /
-# Fixtures.js 是原型与截图专用，不编入；其中 Personal.js 是账号数据，绝不能进二进制。
+# Anonymous.js / Fixtures.js 是原型与截图专用，不编入；其中 Personal.js 是账号数据，绝不能进二进制。
 file(GLOB _app_qml RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/../prototype"
     CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/../prototype/*.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/../prototype/*.js"
     "${CMAKE_CURRENT_SOURCE_DIR}/../prototype/icons/*.svg"
     "${CMAKE_CURRENT_SOURCE_DIR}/../prototype/qmldir")
-list(FILTER _app_qml EXCLUDE REGEX "^(Snapshot\\.qml|Data\\.js|Personal\\.js|Fixtures\\.js)$")
+list(FILTER _app_qml EXCLUDE REGEX "^(Snapshot\\.qml|Data\\.js|Personal\\.js|Anonymous\\.js|Fixtures\\.js)$")
 # qt_add_resources 的 FILES 接受绝对路径；RELATIVE 摘出的裸文件名会被qt_add_executable 误当源码解析
 list(TRANSFORM _app_qml REPLACE "^" "${CMAKE_CURRENT_SOURCE_DIR}/../prototype/")
 

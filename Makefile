@@ -73,8 +73,9 @@ SHOTS = home:page=home home-anon:account=anonymous,page=home charts:page=charts 
 data: ## 重新抓取数据快照（有 gtk4 客户端登录 cookie 时同时生成个人快照）
 	scripts/snapshot.py
 
+# 没有个人快照（贡献者、CI）：用入库的匿名替身，不联网、不改 Data.js；要真的个人快照用 make data
 prototype/Personal.js:
-	scripts/snapshot.py
+	cp prototype/Anonymous.js $@
 
 shots: build/qmlshot/qmlshot build/dark/kdeglobals prototype/Personal.js ## 各屏截图到 build/shots/（系统配色、Breeze Dark、窄窗）
 	@mkdir -p build/shots
