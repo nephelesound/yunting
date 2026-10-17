@@ -58,6 +58,13 @@ explicit NcmClient(QObject *parent = nullptr, bool loadCookies = true);
     // 明文 /api/ 表单 POST（听歌打卡 /api/feedback/weblog 用），同样不重试。
     void postForm(const QString &path, const QUrlQuery &form, bool personal, GetCallback callback);
 
+    // 客户端日志（NCBL）上传：multipart 已由 Ncbl::multipart 组好，cookie 是完整设备上下文。
+    // 不参与 Store 的 online 计数；失败只回调一次，不重试。
+    void postClientLog(const QByteArray &multipart, const QString &boundary,
+                       const QString &cookie, GetCallback callback);
+    // NCBL 需要的 cookie jar（只读快照；不要在调用方打印）
+    QMap<QString, QString> cookieJar() const { return m_jar; }
+
     // 测试接缝：把 API 指到本地 QTcpServer。默认 music.163.com。
     void setApiBase(const QString &base);
 

@@ -213,6 +213,17 @@ QtObject {
         return { id: id, name: "", artist: "", artistId: 0, cover: "", description: "", company: "", publishTime: 0, tracks: [] };
     }
 
+    // 用户主页：data 里只放最近取回的一个；资料 + 公开歌单
+    function user(id) {
+        const u = source.d.user;
+        if (u && (u.id === id || !source.live))
+            return u;
+        source.need("user:" + id);
+        return { id: id, name: "", avatar: "", background: "", signature: "",
+                 followed: false, follows: 0, followeds: 0, playlistCount: 0,
+                 level: 0, playlists: [] };
+    }
+
     // MV：data 里只放最近取回的一个，id 对上才用；没对上就向 live 要
     function mv(id) {
         const m = source.d.mv;
@@ -236,6 +247,8 @@ QtObject {
     function reorderPlaylistTracks(id, ids) { if (source.live) source.live.reorderPlaylistTracks(id, ids); }
     function setArtistSubscribed(id, subscribed) { if (source.live) source.live.setArtistSubscribed(id, subscribed); }
     function setAlbumSubscribed(id, subscribed) { if (source.live) source.live.setAlbumSubscribed(id, subscribed); }
+    // 评论点赞：live 走 Store 乐观更新；原型不写网络
+    function setCommentLiked(songId, commentId, liked) { if (source.live) source.live.setCommentLiked(songId, commentId, liked); }
     function logout() { if (source.live) source.live.logout(); }
 
     // 当前句：最后一个开始时间不晚于 elapsed 的句子（正在播放页与桌面歌词共用这一条规则）
@@ -258,6 +271,16 @@ QtObject {
         return url ? url.replace(/\?param=\d+y\d+$/, "?param=" + px + "y" + px) : "";
     }
     function quoted(name) { return "「" + name + "」"; }
+    function shareUrl(kind, id) {
+        switch (kind) {
+        case "song": return "https://music.163.com/song?id=" + id;
+        case "playlist": return "https://music.163.com/playlist?id=" + id;
+        case "album": return "https://music.163.com/album?id=" + id;
+        case "artist": return "https://music.163.com/artist?id=" + id;
+        case "mv": return "https://music.163.com/mv?id=" + id;
+        default: return "";
+        }
+    }
     function firstCover(tracks) { return tracks.length > 0 ? tracks[0].cover : ""; }
     function songs(n) { return { value: String(n), label: "首" }; }
 

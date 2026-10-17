@@ -6,6 +6,9 @@
 #include "eqaudiosink.h"
 #include <QAudioBufferOutput>
 #endif
+#ifdef YUNTING_NCBL
+#include "ncbl.h"
+#endif
 
 #include <QAudioOutput>
 #include <QCoreApplication>
@@ -388,7 +391,10 @@ void AudioEngine::scrobbleStart()
     if (m_scrobbleStarted || m_track.isEmpty() || !m_client->hasMusicU())
         return;
     m_scrobbleStarted = true;
-    sendWeblog("startplay", 0);
+    m_scrobbleRoundMode = m_scrobbleMode;
+    // NCBL 只在结算时上传 PLV/PLD；本地「最近播放」两种模式都要立即更新
+    if (m_scrobbleRoundMode != QLatin1String("ncbl"))
+        sendWeblog("startplay", 0);
     emit scrobbled(m_track);
 }
 
@@ -402,7 +408,97 @@ void AudioEngine::scrobbleFinish()
     if (seconds <= 0)
         return;
     m_scrobbleFinished = true;
-    sendWeblog("play", seconds);
+    if (m_scrobbleRoundMode == QLatin1String("ncbl"))
+        scrobbleNcbl(seconds);
+    else
+        sendWeblog("play", seconds);
+}
+
+void AudioEngine::setScrobbleMode(const QString &mode)
+{
+    if (mode != QLatin1String("legacy") && mode != QLatin1String("ncbl"))
+        return;
+    if (m_scrobbleMode == mode)
+        return;
+    m_scrobbleMode = mode;
+    emit scrobbleModeChanged();
+}
+
+void AudioEngine::scrobbleNcbl(int seconds)
+{
+#ifdef YUNTING_NCBL
+    if (!m_client->hasMusicU() || m_track.isEmpty())
+        return;
+    const QString level = m_track.value("quality").toString();
+    const QString levelName = (level.isEmpty() || level == QLatin1String("auto"))
+        ? QStringLiteral("exhigh") : level;
+    int bitrate = 320000;
+    if (levelName == QLatin1String("hires") || levelName == QLatin1String("lossless"))
+        bitrate = 999000;
+    else if (levelName == QLatin1String("exhigh"))
+        bitrate = 320000;
+    else if (levelName == QLatin1String("higher"))
+        bitrate = 192000;
+    else if (levelName == QLatin1String("standard"))
+        bitrate = 128000;
+    const int rawFee = m_track.value("fee").toInt();
+    const int fee = (rawFee == 1 || rawFee == 4 || rawFee == 8) ? rawFee : 0;
+
+    Ncbl::Song song;
+    song.id = m_track.value("id").toDouble();
+    song.name = m_track.value("name").toString();
+    song.artist = m_track.value("artist").toString();
+    song.bitrate = bitrate;
+    song.level = levelName;
+    song.fee = fee;
+    song.duration = qRound(duration());
+    song.sourceId = num(song.id);
+    song.sourceType = QStringLiteral("track");
+    song.sourceName = QStringLiteral("track");
+
+    const Ncbl::Context context = Ncbl::context(m_client->cookieJar());
+    if (context.cookie.isEmpty() || context.meta.isEmpty())
+        return;
+    const qint64 now = QDateTime::currentSecsSinceEpoch();
+    const auto record = [now](const char *action, const QJsonObject &json) {
+        return Ncbl::records({{now, QByteArray(action) + '\x01'
+                                       + QJsonDocument(json).toJson(QJsonDocument::Compact)}});
+    };
+    const Ncbl::Bytes plv = Ncbl::multipart(
+        Ncbl::encrypt(context.meta, record("_plv", Ncbl::plv(song, context))));
+    const int played = song.duration > 0 ? std::min(seconds, song.duration) : seconds;
+    const Ncbl::Bytes pld = Ncbl::multipart(
+        Ncbl::encrypt(context.meta, record("_pld", Ncbl::pld(song, context, played))));
+
+    const auto check = [](const Ncbl::Bytes &bytes, const QJsonDocument &doc, bool ok) {
+        if (!ok || doc.object().value("code").toInt() != 200)
+            return false;
+        const QJsonArray files = doc.object().value("data").toObject()
+                                     .value("successfiles").toArray();
+        for (const QJsonValue &v : files)
+            if (v.toString() == bytes.fileName)
+                return true;
+        return false;
+    };
+    m_client->postClientLog(plv.body, plv.boundary, context.cookie,
+                            [this, check, plv, pld, context](const QJsonDocument &doc, bool ok) {
+        if (!check(plv, doc, ok)) {
+            qWarning() << "NCBL PLV upload failed:" << doc.object().value("code").toInt();
+            return;
+        }
+        qCDebug(lcPerf) << "NCBL PLV accepted";
+        m_client->postClientLog(pld.body, pld.boundary, context.cookie,
+                                [check, pld](const QJsonDocument &doc, bool ok) {
+            if (!check(pld, doc, ok))
+                qWarning() << "NCBL PLD upload failed:" << doc.object().value("code").toInt();
+            else
+                qCDebug(lcPerf) << "NCBL PLD accepted";
+        });
+    });
+#else
+    Q_UNUSED(seconds);
+    qWarning() << "NCBL support is not compiled in";
+#endif
 }
 
 void AudioEngine::sendWeblog(const char *action, int seconds)

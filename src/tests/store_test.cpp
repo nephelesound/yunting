@@ -447,6 +447,81 @@ private slots:
         QCOMPARE(album.first().at(0).toDouble(), 32311.0);
         QCOMPARE(album.first().at(1).toBool(), true);
     }
+
+    // 评论点赞：成功乐观更新；失败把 liked 与计数都改回
+    void commentLikeUpdatesThenRollsBack()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path.startsWith("/api/v1/resource/hotcomments/")) {
+                respond(200, R"json({"code":200,"hotComments":[
+                    {"commentId":500,"content":"a","likedCount":10,"liked":false,"time":1,
+                     "user":{"userId":7,"nickname":"u"}},
+                    {"commentId":501,"content":"b","likedCount":20,"liked":true,"time":2,
+                     "user":{"userId":8,"nickname":"v"}}]})json");
+                return;
+            }
+            if (req.path == "/weapi/v1/comment/like") {
+                respond(200, "{\"code\":200}");
+                return;
+            }
+            if (req.path == "/weapi/v1/comment/unlike") {
+                respond(200, "{\"code\":500,\"message\":\"no\"}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("comments:1"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("comments").toMap().value("items").toList().size() == 2;
+        }));
+        m_store->setCommentLiked(1, 500, true);
+        QVERIFY(waitUntil([&] {
+            const QVariantMap c = m_store->data().value("comments").toMap().value("items").toList().first().toMap();
+            return c.value("liked").toBool() && c.value("likes").toDouble() == 11;
+        }));
+
+        QSignalSpy failed(m_store, &Store::commentLikeFailed);
+        m_store->setCommentLiked(1, 501, false);
+        QVERIFY(waitUntil([&] { return failed.count() == 1; }));
+        const QVariantMap second = m_store->data().value("comments").toMap().value("items").toList().at(1).toMap();
+        QVERIFY(second.value("liked").toBool());
+        QCOMPARE(second.value("likes").toDouble(), 20.0);
+    }
+
+    // 用户主页：资料 + 公开歌单都进 data.user
+    void userProfileAndPlaylists()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/weapi/v1/user/detail/42") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"profile", QJsonObject{{"userId", 42}, {"nickname", "Listener"},
+                                            {"signature", "hi"}, {"follows", 3}, {"followeds", 4},
+                                            {"playlistCount", 1}, {"avatarUrl", ""}}}}));
+                return;
+            }
+            if (req.path == "/weapi/user/playlist") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"playlist", QJsonArray{QJsonObject{
+                        {"id", 7}, {"name", "Public"}, {"coverImgUrl", ""}, {"trackCount", 2},
+                        {"description", "d"}, {"creator", QJsonObject{{"userId", 42}}}}}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        m_store->request(QStringLiteral("user:42"));
+        QVERIFY(waitUntil([&] {
+            const QVariantMap u = m_store->data().value("user").toMap();
+            return u.value("name").toString() == "Listener"
+                && u.value("playlists").toList().size() == 1;
+        }));
+        const QVariantMap u = m_store->data().value("user").toMap();
+        QCOMPARE(u.value("id").toDouble(), 42.0);
+        QCOMPARE(u.value("follows").toDouble(), 3.0);
+        QCOMPARE(u.value("playlists").toList().first().toMap().value("name").toString(), QStringLiteral("Public"));
+    }
 };
 
 QTEST_GUILESS_MAIN(StoreTest)

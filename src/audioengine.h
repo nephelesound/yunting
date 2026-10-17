@@ -41,6 +41,8 @@ class AudioEngine : public QObject {
     Q_PROPERTY(double stereoWidth READ stereoWidth WRITE setStereoWidth NOTIFY stereoWidthChanged)
     // 空串 = 系统默认输出
     Q_PROPERTY(QString outputDevice READ outputDevice NOTIFY outputDeviceChanged)
+    // legacy = /api/feedback/weblog；ncbl = 官方 PC 客户端 PLV/PLD（默认 legacy）
+    Q_PROPERTY(QString scrobbleMode READ scrobbleMode WRITE setScrobbleMode NOTIFY scrobbleModeChanged)
 public:
     explicit AudioEngine(NcmClient *client, QObject *parent = nullptr);
 
@@ -67,6 +69,8 @@ public:
     void setBassBoost(double db);
     void setStereoWidth(double width);
     QString outputDevice() const { return m_outputDeviceId; }
+    QString scrobbleMode() const { return m_scrobbleMode; }
+    void setScrobbleMode(const QString &mode);
 
     void setTrack(const QVariantMap &track);
     void setPlaying(bool playing);
@@ -100,6 +104,7 @@ signals:
     void bassBoostChanged();
     void stereoWidthChanged();
     void outputDeviceChanged();
+    void scrobbleModeChanged();
     void seeked();   // 跳转生效（MPRIS 据此发 Seeked）
     // 自然播完
     void finished();
@@ -116,6 +121,7 @@ private:
     // 听歌打卡：startplay 写「最近播放」，play 写「听歌排行」；每首歌各一次
     void scrobbleStart();
     void scrobbleFinish();
+    void scrobbleNcbl(int seconds);
     void sendWeblog(const char *action, int seconds);
 
     struct CachedUrl {
@@ -140,6 +146,8 @@ private:
     bool m_muted = false;
     QString m_quality = QStringLiteral("auto");
     QString m_outputDeviceId;
+    QString m_scrobbleMode = QStringLiteral("legacy");
+    QString m_scrobbleRoundMode;   // 开始时锁定，避免中途切模式导致只发一半
     QVariantList m_eqGains = QVariantList(10, 0.0);
     double m_bassBoost = 0;
     double m_stereoWidth = 1;

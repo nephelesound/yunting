@@ -12,3 +12,4 @@ kumone|https://github.com/missuo/kumone.git|32b516cbbc7e117981916fd1a044cdbabe13
 ncm-api-enhanced|https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced.git|2db6684453297ee86dec0492842f2320b08182d9
 music163api-go|https://github.com/XiaoMengXinX/Music163Api-Go.git|40d04d988da948557810e4d02d17f6a27313fc69
 music163bot|https://github.com/XiaoMengXinX/Music163bot-Go.git|964495135114103f8fb3522d6cbb4205cc4598b5
+splayer-next|https://github.com/SPlayer-Dev/SPlayer-Next.git|68834a4fdc11f1d9eb692922e4ef77508d7e61d2

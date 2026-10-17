@@ -366,6 +366,14 @@ ScreenFrame {
                         implicitHeight: Tokens.height8
                         name: comment.modelData.user
                         source: comment.modelData.avatar || ""
+                        HoverHandler {
+                            enabled: (comment.modelData.userId || 0) > 0
+                            cursorShape: Qt.PointingHandCursor
+                        }
+                        TapHandler {
+                            enabled: (comment.modelData.userId || 0) > 0
+                            onTapped: Actions.openUser(comment.modelData.userId)
+                        }
                     }
                     ColumnLayout {
                         Layout.fillWidth: true
@@ -379,6 +387,14 @@ ScreenFrame {
                                 text: comment.modelData.user
                                 font.pixelSize: Tokens.textSm
                                 elide: Text.ElideRight
+                                HoverHandler {
+                                    enabled: (comment.modelData.userId || 0) > 0
+                                    cursorShape: Qt.PointingHandCursor
+                                }
+                                TapHandler {
+                                    enabled: (comment.modelData.userId || 0) > 0
+                                    onTapped: Actions.openUser(comment.modelData.userId)
+                                }
                             }
                             Label {
                                 text: Format.commentTime(comment.modelData.time)
@@ -387,11 +403,46 @@ ScreenFrame {
                                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                             }
                             Item { Layout.fillWidth: true }
-                            Label {
-                                text: page.count(comment.modelData.likes) + " 赞"
-                                font.pixelSize: Tokens.textSm
-                                font.features: { "tnum": 1 }
-                                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                            AbstractButton {
+                                id: commentLike
+                                readonly property bool liked: comment.modelData.liked === true
+                                enabled: (comment.modelData.id || 0) > 0 || !Source.live
+                                implicitHeight: Tokens.height7
+                                leftPadding: Tokens.space1
+                                rightPadding: Tokens.space1
+                                hoverEnabled: true
+                                Accessible.name: commentLike.liked ? "取消点赞评论" : "点赞评论"
+                                background: Rectangle {
+                                    radius: Tokens.radius
+                                    color: Qt.alpha(Kirigami.Theme.highlightColor,
+                                                    commentLike.down ? Tokens.tintPressed
+                                                                     : commentLike.hovered ? Tokens.tintHover : 0)
+                                }
+                                contentItem: RowLayout {
+                                    spacing: Tokens.space1
+                                    Kirigami.Icon {
+                                        implicitWidth: Tokens.iconSm
+                                        implicitHeight: Tokens.iconSm
+                                        source: commentLike.liked ? "emblem-favorite-symbolic" : "love-symbolic"
+                                        color: commentLike.liked ? Kirigami.Theme.negativeTextColor
+                                                                 : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                                        isMask: true
+                                    }
+                                    Label {
+                                        text: page.count(comment.modelData.likes)
+                                        font.pixelSize: Tokens.textSm
+                                        font.features: { "tnum": 1 }
+                                        color: commentLike.liked ? Kirigami.Theme.negativeTextColor
+                                                                 : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                                    }
+                                }
+                                onClicked: {
+                                    if (!page.loggedIn) {
+                                        page.loginRequested();
+                                        return;
+                                    }
+                                    Source.setCommentLiked(page.track.id, comment.modelData.id, !commentLike.liked);
+                                }
                             }
                         }
                         Label {

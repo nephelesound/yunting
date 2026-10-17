@@ -19,6 +19,7 @@ Menu {
     signal addRequested(var playlist, var track)
     signal removeRequested(real playlistId, var track)
     signal copied()
+    signal shareRequested(var track)
 
     function show(track, context) {
         trackMenu.track = track;
@@ -103,6 +104,11 @@ Menu {
         icon.name: "view-media-album-cover"
         text: trackMenu.track && trackMenu.track.album ? "专辑：" + trackMenu.shorten(trackMenu.track.album) : "专辑"
         onTriggered: Actions.openAlbum(trackMenu.track.albumId)
+    }
+    MenuItem {
+        icon.name: "document-share"
+        text: "分享…"
+        onTriggered: trackMenu.shareRequested(trackMenu.track)
     }
     MenuItem {
         icon.name: "edit-copy"

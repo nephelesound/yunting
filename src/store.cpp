@@ -47,6 +47,7 @@ Store::Store(NcmClient *client, QObject *parent)
         {"artistSongs", nullVariant()},
         {"album", nullVariant()},
         {"mv", nullVariant()},
+        {"user", nullVariant()},
     };
     m_personal = QVariantMap{
         {"account", nullVariant()},

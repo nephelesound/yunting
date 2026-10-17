@@ -59,6 +59,8 @@ public:
     // 关注歌手 / 收藏专辑：成功只发对应 changed，失败发 followFailed
     Q_INVOKABLE void setArtistSubscribed(double id, bool subscribed);
     Q_INVOKABLE void setAlbumSubscribed(double id, bool subscribed);
+    // 评论点赞：乐观更新 comments / commentPage，失败回滚并发 commentLikeFailed
+    Q_INVOKABLE void setCommentLiked(double songId, double commentId, bool liked);
 
 public slots:
     // AudioEngine 打卡成功后调用：本地「最近播放」立刻反映刚听的歌，不必等下次 refresh
@@ -83,6 +85,7 @@ signals:
     void artistChanged(double id, bool subscribed);
     void albumChanged(double id, bool subscribed);
     void followFailed(const QString &action, const QString &message);
+    void commentLikeFailed(double songId, double commentId, const QString &message);
 
 private slots:
     // NcmClient 每个请求的落地真相：收敛 online / sessionExpired 与欠账刷新
@@ -144,6 +147,7 @@ private:
     void requestAlbum(const QString &key, double albumId);
     void requestMoreFm();
     void requestMv(const QString &key, double mvId);
+    void requestUser(const QString &key, double uid);
     // 首屏的 stale-while-revalidate：启动时先放上次的值，refresh() 的结果陆续覆盖
     void restoreScreen();
     QString personalKey() const;
@@ -177,4 +181,5 @@ private:
     QHash<double, LikeState> m_likes;   // 同一首歌的红心请求在途时排队最后一次意图
     quint64 m_likeGeneration = 0;       // 每次红心改动递增：旧的 like/get 快照要与本地合并
     QSet<double> m_likeTouched;         // 上次快照之后改过的歌
+    QSet<QString> m_commentLikePending; // songId:commentId 在途，防连点重复发
 };

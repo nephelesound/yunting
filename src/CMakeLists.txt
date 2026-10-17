@@ -10,13 +10,18 @@ find_package(Qt6Keychain REQUIRED)
 find_package(KF6StatusNotifierItem REQUIRED)
 find_package(OpenSSL REQUIRED COMPONENTS Crypto)
 find_package(LayerShellQt QUIET)
+find_package(PkgConfig QUIET)
+if (PkgConfig_FOUND)
+    pkg_check_modules(QRENCODE QUIET libqrencode)
+    pkg_check_modules(ZSTD QUIET libzstd)
+endif()
 option(YUNTING_EXPERIMENTAL_EQ "Build QAudioBufferOutput + biquad EQ path" ON)
 
 qt_add_executable(yunting
     main.cpp
     ncmclient.h ncmclient.cpp
     cookievault.h cookievault.cpp
-    store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_on_demand.cpp
+    store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_comment.cpp store_user.cpp store_on_demand.cpp
     querycache.h querycache.cpp
     imagecache.h
     json_util.h
@@ -102,7 +107,7 @@ add_test(NAME cookievault COMMAND cookievault_test)
 
 # Store 的缓存/写操作行为：本地假接口，不碰外网
 qt_add_executable(store_test tests/store_test.cpp
-    store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_on_demand.cpp
+    store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_comment.cpp store_user.cpp store_on_demand.cpp
     querycache.h querycache.cpp
     ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp
     normalize.h normalize.cpp json_util.h crypto.h crypto.cpp perf.h perf.cpp)
@@ -136,11 +141,33 @@ endif()
 if (YUNTING_EXPERIMENTAL_EQ)
     target_compile_definitions(yunting PRIVATE YUNTING_EXPERIMENTAL_EQ=1)
 endif()
+if (QRENCODE_FOUND)
+    target_sources(yunting PRIVATE qrcodeimage.h qrcodeimage.cpp)
+    target_compile_definitions(yunting PRIVATE YUNTING_QRCODE=1)
+    target_include_directories(yunting PRIVATE ${QRENCODE_INCLUDE_DIRS})
+    target_link_libraries(yunting PRIVATE ${QRENCODE_LIBRARIES})
+endif()
+if (ZSTD_FOUND)
+    target_sources(yunting PRIVATE ncbl.h ncbl.cpp)
+    target_compile_definitions(yunting PRIVATE YUNTING_NCBL=1)
+    target_include_directories(yunting PRIVATE ${ZSTD_INCLUDE_DIRS})
+    target_link_libraries(yunting PRIVATE ${ZSTD_LIBRARIES})
+endif()
 
 # 电源抑制：对着真的会话总线测（没有 Plasma 电源管理时自行跳过），所以不像其他测试那样断开总线
 qt_add_executable(powerinhibitor_test tests/powerinhibitor_test.cpp powerinhibitor.h powerinhibitor.cpp)
 target_link_libraries(powerinhibitor_test PRIVATE Qt6::Core Qt6::Gui Qt6::DBus Qt6::Test)
 add_test(NAME powerinhibitor COMMAND powerinhibitor_test)
+
+if (ZSTD_FOUND)
+    qt_add_executable(ncbl_test tests/ncbl_test.cpp ncbl.h ncbl.cpp)
+    target_compile_definitions(ncbl_test PRIVATE YUNTING_NCBL=1)
+    target_include_directories(ncbl_test PRIVATE ${ZSTD_INCLUDE_DIRS})
+    target_link_libraries(ncbl_test PRIVATE Qt6::Core Qt6::Test OpenSSL::Crypto ${ZSTD_LIBRARIES})
+    add_test(NAME ncbl COMMAND ncbl_test)
+    set_tests_properties(ncbl PROPERTIES ENVIRONMENT
+        "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent;XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/data;XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/cache")
+endif()
 
 qt_add_executable(crypto_test tests/crypto_test.cpp crypto.h crypto.cpp)
 target_link_libraries(crypto_test PRIVATE Qt6::Core Qt6::Test OpenSSL::Crypto)

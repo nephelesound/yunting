@@ -5,6 +5,9 @@
 #include "imagecache.h"
 #include "layershellhelper.h"
 #include "mpris.h"
+#ifdef YUNTING_QRCODE
+#include "qrcodeimage.h"
+#endif
 #include "ncmclient.h"
 #include "powerinhibitor.h"
 #include "session.h"
@@ -118,6 +121,9 @@ int main(int argc, char *argv[])
     QCommandLineOption soakOption("soak-audio",
                                   "Headless playback soak: cycle tracks/seek/EQ/device for N seconds",
                                   "seconds");
+    QCommandLineOption scrobbleModeOption("scrobble-mode",
+                                          "Listening log: legacy (web) or ncbl (PC client PLV/PLD)",
+                                          "mode");
     parser.addOption(dumpOption);
     parser.addOption(smokeOption);
     parser.addOption(audioQualityOption);
@@ -139,6 +145,7 @@ int main(int argc, char *argv[])
     parser.addOption(shotOption);
     parser.addOption(eqPresetOption);
     parser.addOption(soakOption);
+    parser.addOption(scrobbleModeOption);
     parser.process(app);
 
     if (parser.isSet(verboseOption) || parser.isSet(shotOption)) {
@@ -189,6 +196,8 @@ int main(int argc, char *argv[])
     AudioEngine audio(&client);
     if (parser.isSet(eqPresetOption))
         audio.applyEqPreset(parser.value(eqPresetOption));
+    if (parser.isSet(scrobbleModeOption))
+        audio.setScrobbleMode(parser.value(scrobbleModeOption));
     Session session(&client, &store);
     Mpris mpris(&audio);
     // 打卡成功后本地「最近播放」立即更新；服务端数据仍是权威，下次 refresh 会覆盖
@@ -599,13 +608,19 @@ int main(int argc, char *argv[])
     engine.setNetworkAccessManagerFactory(&imageCache);
     // main.qml 用 root.backend.{store,audio,session,mpris,tray,layerShell,power} 取后端；QVariantMap 的 key 就是属性名
     LayerShellHelper layerShell;
+    bool qrAvailable = false;
+#ifdef YUNTING_QRCODE
+    engine.addImageProvider(QStringLiteral("qrcode"), new QrCodeImageProvider);
+    qrAvailable = true;
+#endif
     QVariantMap backend{{"store", QVariant::fromValue<QObject *>(&store)},
                         {"audio", QVariant::fromValue<QObject *>(&audio)},
                         {"session", QVariant::fromValue<QObject *>(&session)},
                         {"mpris", QVariant::fromValue<QObject *>(&mpris)},
                         {"tray", QVariant::fromValue<QObject *>(&tray)},
                         {"layerShell", QVariant::fromValue<QObject *>(&layerShell)},
-                        {"power", QVariant::fromValue<QObject *>(&power)}};
+                        {"power", QVariant::fromValue<QObject *>(&power)},
+                        {"qr", qrAvailable}};
     engine.setInitialProperties({{"backend", backend}});
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
                      [] { QCoreApplication::exit(1); }, Qt::QueuedConnection);

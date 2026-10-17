@@ -116,10 +116,13 @@ QVariantMap ncmHotComments(const QJsonObject &resp, double songId)
         const QJsonObject user = c.value("user").toObject();
         items.append(QVariantMap{
             {"user", textOr(user, "nickname")},
+            {"userId", user.value("userId").toDouble()},
             {"avatar", ncmSized(user.value("avatarUrl"), 96)},
             {"content", textOr(c, "content")},
             {"likes", c.value("likedCount").toDouble()},
             {"time", c.value("time").toDouble()},
+            {"id", c.value("commentId").toDouble()},
+            {"liked", c.value("liked").toBool()},
         });
     }
     return {{"songId", songId}, {"items", items}};

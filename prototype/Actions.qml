@@ -10,6 +10,7 @@ QtObject {
     signal artistRequested(real id)
     signal albumRequested(real id)
     signal mvRequested(real id)
+    signal userRequested(real id)
     signal playlistRequested(real id)
     signal logoutRequested()
     signal playlistMenuRequested(var playlist)   // 「我的」里的歌单磁贴：{ id, name, owned }
@@ -21,5 +22,6 @@ QtObject {
     function openArtist(id) { if (id > 0) artistRequested(id); }
     function openAlbum(id) { if (id > 0) albumRequested(id); }
     function openMv(id) { if (id > 0) mvRequested(id); }
+    function openUser(id) { if (id > 0) userRequested(id); }
     function openPlaylist(id) { if (id > 0) playlistRequested(id); }
 }

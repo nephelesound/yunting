@@ -179,10 +179,13 @@ def hot_comments(song_id):
     # 实测热评在顶层 hotComments（不在 data 里），保持接口顺序
     return {"songId": song_id,
             "items": [{"user": (c.get("user") or {}).get("nickname") or "",
+                       "userId": (c.get("user") or {}).get("userId") or 0,
                        "avatar": sized((c.get("user") or {}).get("avatarUrl"), 96),
                        "content": c.get("content") or "",
                        "likes": c.get("likedCount") or 0,
-                       "time": c.get("time") or 0}
+                       "time": c.get("time") or 0,
+                       "id": c.get("commentId") or 0,
+                       "liked": bool(c.get("liked"))}
                       for c in (resp.get("hotComments") or [])[:10]]}
 
 
@@ -232,7 +235,7 @@ def anonymous():
            js("comments", hot_comments(tracks[CURRENT]["id"])),
            js("commentPage", None), js("searchUsers", None), js("searchRadios", None),
            js("search", search), js("hotSearches", hot_searches),
-           js("artist", None), js("artistSongs", None), js("album", None), js("mv", None)])
+           js("artist", None), js("artistSongs", None), js("album", None), js("mv", None), js("user", None)])
     return tracks
 
 

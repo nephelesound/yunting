@@ -25,6 +25,7 @@ ScreenFrame {
     signal deleteRequested(real id, string name)
     signal subscribeToggled(real id, string name, bool subscribed)
     signal albumSubscriptionToggled(real id, bool subscribed)
+    signal shareRequested(string kind, real id, string title, string cover)
 
     // 歌单才有操作：自己建的（「我喜欢的音乐」除外）改名/删除，别人的收藏/取消收藏
     readonly property bool hasListActions: (page.list.listId || 0) > 0 && page.loggedIn
@@ -135,6 +136,13 @@ ScreenFrame {
                         icon.name: page.list.subscribed ? "bookmark-remove" : "bookmark-new"
                         text: page.list.subscribed ? "取消收藏" : "收藏歌单"
                         onTriggered: page.subscribeToggled(page.list.listId, page.list.heading, !page.list.subscribed)
+                    }
+                    MenuItem {
+                        icon.name: "document-share"
+                        text: "分享…"
+                        onTriggered: page.shareRequested(page.list.isAlbum ? "album" : "playlist",
+                                                        page.list.isAlbum ? page.list.albumId : page.list.listId,
+                                                        page.list.heading, page.list.cover)
                     }
                 }
             }

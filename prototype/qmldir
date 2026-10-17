@@ -13,6 +13,8 @@ CoverFlight CoverFlight.qml
 DesktopLyrics DesktopLyrics.qml
 MiniPlayer MiniPlayer.qml
 MvPage MvPage.qml
+UserPage UserPage.qml
+ShareDialog ShareDialog.qml
 QualityMenu QualityMenu.qml
 EqualizerPanel EqualizerPanel.qml
 WheelScroll WheelScroll.qml

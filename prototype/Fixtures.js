@@ -46,10 +46,10 @@ var worstLyrics = [
 ];
 
 var worstComments = { songId: 903, items: [
-    { user: "一只想要变成猫但是没有成功的柴犬Official", avatar: C2, likes: 1284567, time: 1700000000000,
+    { user: "一只想要变成猫但是没有成功的柴犬Official", userId: 42, avatar: C2, likes: 1284567, time: 1700000000000, id: 9001, liked: false,
       content: "第一次听这首歌是在高三晚自习结束后回家的路上，耳机里放着它，路灯一盏一盏往后退。那时候觉得未来很远，现在回头看，原来那就是最好的时候。这条评论写得很长，用来看评论在半屏宽度里最多显示几行、省略号落在哪里。还要再长一点，再长一点，再长一点。" },
-    { user: "A", avatar: "", likes: 1, time: 1700000000000, content: "好" },
-    { user: "🌙", avatar: BROKEN, likes: 99999, time: 1700000000000, content: "😭😭😭" },
+    { user: "A", userId: 43, avatar: "", likes: 1, time: 1700000000000, id: 9002, liked: false, content: "好" },
+    { user: "🌙", userId: 44, avatar: BROKEN, likes: 99999, time: 1700000000000, id: 9003, liked: true, content: "😭😭😭" },
 ] };
 
 var worstHot = [];

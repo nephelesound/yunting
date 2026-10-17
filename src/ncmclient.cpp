@@ -301,6 +301,36 @@ QString NcmClient::cookieHeader(bool personal) const
     return header;
 }
 
+void NcmClient::postClientLog(const QByteArray &multipart, const QString &boundary,
+                                 const QString &cookie, GetCallback callback)
+{
+    QNetworkRequest request(QUrl(QStringLiteral(
+        "https://clientlog3.music.163.com/api/clientlog/encrypt/upload?multiupload=true")));
+    request.setHeader(QNetworkRequest::ContentTypeHeader,
+                      QStringLiteral("multipart/form-data; boundary=%1").arg(boundary));
+    request.setRawHeader("Referer", "https://music.163.com/di");
+    request.setRawHeader("User-Agent",
+                         "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 "
+                         "(KHTML, like Gecko) Safari/537.36 Chrome/91.0.4472.164 "
+                         "NeteaseMusicDesktop/3.1.37");
+    request.setRawHeader("Accept-Encoding", "identity");
+    request.setRawHeader("Accept-Language", "zh-CN,zh;q=0.8");
+    request.setRawHeader("Cookie", cookie.toUtf8());
+    QNetworkReply *reply = m_nam->post(request, multipart);
+    connect(reply, &QNetworkReply::finished, this, [reply, callback] {
+        const QByteArray bytes = reply->readAll();
+        const QJsonDocument doc = QJsonDocument::fromJson(bytes);
+        const bool ok = reply->error() == QNetworkReply::NoError && doc.isObject();
+        if (!ok)
+            qWarning() << "clientlog upload failed:" << reply->errorString()
+                       << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
+                       << bytes.left(300);
+        if (callback)
+            callback(ok ? doc : QJsonDocument(), ok);
+        reply->deleteLater();
+    });
+}
+
 void NcmClient::setApiBase(const QString &base)
 {
     m_apiBase = base;

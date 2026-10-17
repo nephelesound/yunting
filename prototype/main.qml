@@ -26,6 +26,7 @@ Kirigami.ApplicationWindow {
     property string page: "home"
     property string listKey: "daily"
     property real mvId: 0
+    property real userId: 0
     property string account: "personal"   // anonymous：即使有个人快照也按未登录显示
     property string fixture: ""           // worst | empty | one：Fixtures.js 压力测试数据（截图用，必须在 page 之前设置）
     onFixtureChanged: root.applyFixture()
@@ -191,6 +192,11 @@ Kirigami.ApplicationWindow {
         session: root.backend ? root.backend.session : simSession
     }
 
+    ShareDialog {
+        id: shareDialog
+        qrAvailable: root.backend && root.backend.qr === true
+    }
+
     // 曲目菜单与歌单写操作
     TrackMenu {
         id: trackMenu
@@ -198,6 +204,7 @@ Kirigami.ApplicationWindow {
         loggedIn: root.loggedIn
         onLoginRequested: root.requestLogin()
         onNewPlaylistRequested: track => playlistNameDialog.ask(0, "", track)
+        onShareRequested: track => root.shareTrack(track)
         onAddRequested: (playlist, track) => {
             root.noteOnSuccess(playlist.id, "添加歌曲", "已添加到「" + playlist.name + "」");
             Source.addToPlaylist(playlist.id, track.id);
@@ -365,6 +372,9 @@ Kirigami.ApplicationWindow {
         function onFollowFailed(action, message) {
             root.showPassiveNotification(action + "失败：" + message);
         }
+        function onCommentLikeFailed(songId, commentId, message) {
+            root.showPassiveNotification("评论点赞失败：" + message);
+        }
         function onPlaylistActionFailed(action, message) {
             console.warn(logUi, "playlist action failed:", action, message);
             // 只撤掉这次失败的那条；新建失败时才放弃「建好后要加入的歌」
@@ -396,6 +406,8 @@ Kirigami.ApplicationWindow {
             Qt.callLater(() => playerBar.openQualityMenu());
         else if (root.startOverlay === "fullscreen")
             root.fullscreenShown = true;
+        else if (root.startOverlay === "share")
+            Qt.callLater(() => root.shareTrack(root.currentTrack || root.openList.tracks[0]));
         else if (root.startOverlay === "login") {
             loginDialog.open();
             simSession.state = root.loginState;
@@ -405,7 +417,7 @@ Kirigami.ApplicationWindow {
     // 导航：推荐/我的/搜索 是顶层枢轴；排行榜、列表、歌手、正在播放压在其上，history 记录来路
     property var history: []
     readonly property var pageNames: ({ home: "推荐", mine: "我的", search: "搜索", charts: "排行榜", playlists: "全部歌单",
-                                        nowplaying: "正在播放", mv: "MV" })
+                                        nowplaying: "正在播放", mv: "MV", user: "用户" })
     readonly property string parentName: {
         const prev = root.history.length > 0 ? root.history[root.history.length - 1] : { page: "home" };
         if (prev.page === "list")
@@ -414,6 +426,8 @@ Kirigami.ApplicationWindow {
             return Source.artist(Number(prev.listKey.slice(7))).name;
         if (prev.page === "mv")
             return Source.mv(prev.mvId || 0).name;
+        if (prev.page === "user")
+            return Source.user(prev.userId || 0).name;
         return root.pageNames[prev.page] || "推荐";
     }
 
@@ -426,6 +440,10 @@ Kirigami.ApplicationWindow {
             playback.engine.playing = false;   // MV 自带音轨：不要和主播放器同时出声
             root.mvId = id;
             root.open("mv");
+        }
+        function onUserRequested(id) {
+            root.userId = id;
+            root.open("user");
         }
         function onPlaylistRequested(id) {
             // 热歌榜在快照里有现成曲目，用它；其余歌单按 id 取
@@ -495,7 +513,8 @@ Kirigami.ApplicationWindow {
     }
 
     function open(page, listKey) {
-        root.history = root.history.concat([{ page: root.page, listKey: root.listKey, mvId: root.mvId }]);
+        root.history = root.history.concat([{ page: root.page, listKey: root.listKey,
+                                                mvId: root.mvId, userId: root.userId }]);
         if (listKey)
             root.listKey = listKey;
         root.page = page;
@@ -507,6 +526,7 @@ Kirigami.ApplicationWindow {
         root.history = root.history.slice(0, -1);
         root.listKey = prev.listKey;
         root.mvId = prev.mvId || 0;
+        root.userId = prev.userId || 0;
         root.page = prev.page;
     }
     function switchPivot(key) {
@@ -636,6 +656,27 @@ Kirigami.ApplicationWindow {
         parent: Overlay.overlay
         anchors.fill: parent
     }
+    function shareTrack(track) {
+        if (!track)
+            return;
+        shareDialog.shareTitle = track.name;
+        shareDialog.shareSubtitle = track.artist;
+        shareDialog.shareUrl = Source.shareUrl("song", track.id);
+        shareDialog.shareText = "分享歌曲" + Source.quoted(track.name) + " - " + track.artist;
+        shareDialog.cover = track.cover;
+        shareDialog.open();
+    }
+    function shareList(kind, id, title, cover) {
+        if (!id)
+            return;
+        shareDialog.shareTitle = title;
+        shareDialog.shareSubtitle = kind === "album" ? "专辑" : "歌单";
+        shareDialog.shareUrl = Source.shareUrl(kind, id);
+        shareDialog.shareText = "分享" + shareDialog.shareSubtitle + Source.quoted(title);
+        shareDialog.cover = cover;
+        shareDialog.open();
+    }
+
     function openEntry(key) {
         if (key === "charts")
             root.open("charts");
@@ -677,7 +718,7 @@ Kirigami.ApplicationWindow {
     property string searchQuery: ""
     readonly property var pages: ({ home: homePage, mine: root.loggedIn ? minePage : placeholderPage, search: searchPage,
                                     charts: chartsPage, list: listPage, artist: artistPage, playlists: playlistsPage,
-                                    nowplaying: nowPlayingPage, mv: mvPage })
+                                    nowplaying: nowPlayingPage, mv: mvPage, user: userPage })
     onPageChanged: {
         pageStack.clear();
         pageStack.push(root.pages[root.page]);
@@ -743,10 +784,13 @@ Kirigami.ApplicationWindow {
         onMuteToggled: playback.engine.muted = !playback.engine.muted
         quality: playback.engine.quality
         audio: playback.engine
+        scrobbleMode: playback.engine.scrobbleMode
+        onScrobbleModeRequested: mode => playback.engine.scrobbleMode = mode
         onQualityRequested: q => playback.engine.quality = q
         desktopLyricsShown: root.desktopLyricsShown
         onDesktopLyricsToggled: root.desktopLyricsShown = !root.desktopLyricsShown
         onMiniRequested: root.enterMini()
+        onShareRequested: root.shareTrack(root.currentTrack)
         onFullscreenRequested: root.fullscreenShown = true
         liked: root.currentTrack !== null && Source.isLiked(root.currentTrack.id)
         nowPlayingShown: root.page === "nowplaying"
@@ -804,6 +848,7 @@ Kirigami.ApplicationWindow {
                 root.noteOnSuccess(id, subscribed ? "收藏歌单" : "取消收藏歌单", (subscribed ? "已收藏「" : "已取消收藏「") + name + "」");
                 Source.setPlaylistSubscribed(id, subscribed);
             }
+            onShareRequested: (kind, id, title, cover) => root.shareList(kind, id, title, cover)
             onAlbumSubscriptionToggled: (id, subscribed) => {
                 if (!root.loggedIn) {
                     root.showPassiveNotification("收藏专辑需要登录", "long", "扫码登录", () => root.requestLogin());
@@ -836,6 +881,16 @@ Kirigami.ApplicationWindow {
                 }
                 Source.setArtistSubscribed(id, followed);
             }
+        }
+    }
+
+    Component {
+        id: userPage
+        UserPage {
+            userId: root.userId
+            loggedIn: root.loggedIn
+            parentText: root.parentName
+            onLeaveRequested: root.goBack()
         }
     }
 

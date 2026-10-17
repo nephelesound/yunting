@@ -80,6 +80,8 @@ void Store::request(const QString &key)
         requestArtistSongs(key, parts.value(1).toDouble(), parts.value(2).toInt());
     } else if (key.startsWith(QLatin1String("artist:")))
         requestArtist(key, arg.toDouble());
+    else if (key.startsWith(QLatin1String("user:")))
+        requestUser(key, arg.toDouble());
     else if (key.startsWith(QLatin1String("mv:")))
         requestMv(key, arg.toDouble());
     else if (key.startsWith(QLatin1String("album:")))
@@ -219,12 +221,14 @@ void Store::requestCommentPage(const QString &key, double songId, int offset)
                     const QJsonObject user = c.value("user").toObject();
                     items.append(QVariantMap{
                         {"user", user.value("nickname").toString()},
+                        {"userId", user.value("userId").toDouble()},
                         {"avatar", ncmSized(user.value("avatarUrl"), 96)},
                         {"content", c.value("content").toString()},
                         {"likes", c.value("likedCount").toDouble()},
                         {"time", c.value("time").toDouble()},
                         {"id", c.value("commentId").toDouble()},
                         {"parentId", c.value("parentCommentId").toDouble()},
+                        {"liked", c.value("liked").toBool()},
                     });
                 }
                 const double total = resp.value("total").toDouble();

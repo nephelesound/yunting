@@ -26,6 +26,7 @@ Item {
     property bool muted: false
     property string quality: "auto"   // auto · standard · higher · exhigh · lossless · hires
     property var audio: null          // AudioEngine：音质之外还要取输出设备与 EQ
+    property string scrobbleMode: "legacy"
     // 共享封面转场的一端（另一端是正在播放页的封面）
     readonly property Item coverItem: coverButton
 
@@ -48,6 +49,8 @@ Item {
     signal qualityRequested(string quality)
     signal desktopLyricsToggled()
     signal miniRequested()
+    signal shareRequested()
+    signal scrobbleModeRequested(string mode)
     signal fullscreenRequested()
 
     property bool desktopLyricsShown
@@ -140,6 +143,13 @@ Item {
                 icon.color: bar.liked ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.textColor
                 text: bar.liked ? "取消喜欢" : "喜欢"
                 onClicked: bar.likeToggled()
+            }
+            IconButton {
+                visible: !hud.compact
+                enabled: bar.active
+                icon.name: "document-share"
+                text: "分享"
+                onClicked: bar.shareRequested()
             }
         }
 
@@ -287,9 +297,27 @@ Item {
                         onTriggered: bar.miniRequested()
                     }
                     MenuItem {
+                        icon.name: "document-share"
+                        text: "分享当前歌曲"
+                        onTriggered: bar.shareRequested()
+                    }
+                    MenuItem {
                         icon.name: "view-fullscreen"
                         text: "全屏封面"
                         onTriggered: bar.fullscreenRequested()
+                    }
+                    MenuSeparator {}
+                    MenuItem {
+                        text: "听歌日志：网页"
+                        checkable: true
+                        checked: bar.scrobbleMode === "legacy"
+                        onTriggered: bar.scrobbleModeRequested("legacy")
+                    }
+                    MenuItem {
+                        text: "听歌日志：客户端 NCBL"
+                        checkable: true
+                        checked: bar.scrobbleMode === "ncbl"
+                        onTriggered: bar.scrobbleModeRequested("ncbl")
                     }
                 }
             }

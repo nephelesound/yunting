@@ -24,6 +24,7 @@ Item {
         property real volume: 0.7
         property bool muted: false
         property string quality: "auto"
+        property string scrobbleMode: "legacy"
         property int mode: 0
         property string page: "home"
         property int width: 0
@@ -50,6 +51,8 @@ Item {
         engine.volume = saved.volume;
         engine.muted = saved.muted;
         engine.quality = saved.quality;
+        if (saved.scrobbleMode === "legacy" || saved.scrobbleMode === "ncbl")
+            engine.scrobbleMode = saved.scrobbleMode;
         persisted.player.mode = saved.mode;
         if (persisted.pivots.includes(saved.page))
             persisted.window.switchPivot(saved.page);
@@ -74,6 +77,7 @@ Item {
     Binding { when: persisted.restored; target: saved; property: "volume"; value: persisted.player.engine.volume }
     Binding { when: persisted.restored; target: saved; property: "muted"; value: persisted.player.engine.muted }
     Binding { when: persisted.restored; target: saved; property: "quality"; value: persisted.player.engine.quality }
+    Binding { when: persisted.restored; target: saved; property: "scrobbleMode"; value: persisted.player.engine.scrobbleMode }
     Binding { when: persisted.restored; target: saved; property: "mode"; value: persisted.player.mode }
     Binding { when: persisted.restored && persisted.pivots.includes(persisted.window.page); target: saved; property: "page"; value: persisted.window.page }
     Binding { when: persisted.restored; target: saved; property: "maximized"; value: persisted.window.visibility === Window.Maximized }
