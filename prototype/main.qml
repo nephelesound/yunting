@@ -784,8 +784,6 @@ Kirigami.ApplicationWindow {
         onMuteToggled: playback.engine.muted = !playback.engine.muted
         quality: playback.engine.quality
         audio: playback.engine
-        scrobbleMode: playback.engine.scrobbleMode
-        onScrobbleModeRequested: mode => playback.engine.scrobbleMode = mode
         onQualityRequested: q => playback.engine.quality = q
         desktopLyricsShown: root.desktopLyricsShown
         onDesktopLyricsToggled: root.desktopLyricsShown = !root.desktopLyricsShown

@@ -20,6 +20,8 @@ Menu {
     readonly property bool eqAvailable: audio !== null && audio !== undefined && audio.eqAvailable === true
     readonly property string device: audio !== null && audio !== undefined && audio.outputDevice !== undefined
         ? audio.outputDevice : ""
+    readonly property string scrobbleMode: audio !== null && audio !== undefined && audio.scrobbleMode !== undefined
+        ? audio.scrobbleMode : ""
 
     title: "音质：" + Format.qualityLevel(qualityMenu.quality)
 
@@ -60,6 +62,24 @@ Menu {
             checkable: true
             checked: qualityMenu.device === ""
             onTriggered: if (qualityMenu.hasAudio) qualityMenu.audio.setOutputDevice("")
+        }
+    }
+
+    // 听歌记录怎样报给网易云（计入听歌排行与累计听歌）：网页版的接口，或官方电脑客户端的格式
+    Menu {
+        title: "听歌记录"
+        enabled: qualityMenu.scrobbleMode !== ""
+        MenuItem {
+            text: "按网页版的方式上报"
+            checkable: true
+            checked: qualityMenu.scrobbleMode === "legacy"
+            onTriggered: qualityMenu.audio.scrobbleMode = "legacy"
+        }
+        MenuItem {
+            text: "按官方电脑客户端的方式上报"
+            checkable: true
+            checked: qualityMenu.scrobbleMode === "ncbl"
+            onTriggered: qualityMenu.audio.scrobbleMode = "ncbl"
         }
     }
 
