@@ -112,9 +112,12 @@ Kirigami.ApplicationWindow {
     // 换数据源。原型（没有 backend）的「正在播放」从热歌榜第 3 首开始、停在 1:23，截图才有内容可看
     function applyFixture() {
         Source.live = root.backend ? root.backend.store : null;
-        Source.fixture = root.fixture;
         if (root.backend)
             return;
+        // 按路径创建：Snapshot 不在 qmldir 里，打包的应用不带它与快照数据
+        if (!Source.snapshot)
+            Source.snapshot = Qt.createComponent("Snapshot.qml").createObject(root);
+        Source.snapshot.fixture = root.fixture;
         playback.restore(Source.hotChart.tracks, 2);
         simEngine.position = Math.min(83, Math.floor(simEngine.duration / 2));   // 短歌也停在中段，不会一启动就播完跳走
         simEngine.playing = true;

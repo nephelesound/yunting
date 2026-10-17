@@ -1,24 +1,28 @@
 // 数据模块：页面只问「要什么」（某个列表、首页入口、某首歌的歌词），不碰快照的原始形状。
 // 缺数据时怎么退化（没有封面、空列表、没有种子歌）也只在这里决定，页面拿到的永远是可直接渲染的值。
-// 原始数据有三个来源，形状完全相同（data / personal 两个对象，字段见 DESIGN.md「后端接口」）：
-//   live 非空      = C++ Store（应用里注入，实时接口，按需加载）
-//   fixture 非空   = Fixtures.js 压力数据（worst | empty | one）
-//   都没有         = 快照（Data.js 匿名 + Personal.js 个人）
+// 原始数据有两个来源，形状完全相同（data / personal 两个对象，字段见 DESIGN.md「后端接口」）：
+//   live     = C++ Store（应用里注入，实时接口，按需加载）
+//   snapshot = Snapshot.qml（原型：快照或压力数据，main.qml 在没有后端时装上）
+// 两者都还没装上的一瞬间是同形的空值，页面照常求值、不报错。
 pragma Singleton
 
 import QtQuick
-import "Data.js" as Data
-import "Personal.js" as Personal
-import "Fixtures.js" as Fixtures
 
 QtObject {
     id: source
 
-    property string fixture: ""
     property var live: null         // C++ Store（鸭子类型）
+    property var snapshot: null     // { data, personal }
 
-    readonly property var d: source.live ? source.live.data : source.fixture === "" ? Data : Fixtures[source.fixture].data
-    readonly property var p: source.live ? source.live.personal : source.fixture === "" ? Personal : Fixtures[source.fixture].personal
+    // 函数而不是中间属性：单例里绑定的求值顺序没有保证，d / p 求值时中间属性可能还没算出来
+    function raw() {
+        return source.live || source.snapshot || {
+            data: { toplists: [], tracks: [], playlist: { name: "", count: 0, plays: 0, cover: "", description: "" } },
+            personal: { playlists: [] },
+        };
+    }
+    readonly property var d: source.raw().data
+    readonly property var p: source.raw().personal
 
     // 按需加载：只有 live 来源需要（快照与压力数据是一次给全的）。key 见 DESIGN.md，Store 自己去重
     function need(key) {
