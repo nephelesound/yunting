@@ -18,7 +18,8 @@ import urllib.request
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 OUT = sys.argv[sys.argv.index("--out") + 1] if "--out" in sys.argv else os.path.join(ROOT, "prototype")
-COOKIE_FILE = os.path.expanduser("~/.local/share/netease-cloud-music-gtk4/cookies.json")
+COOKIE_FILE = os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share"),
+                           "netease-cloud-music-gtk4", "cookies.json")
 HOT_CHART = 3778678
 RADAR = 3136952023
 CURRENT = 2  # 原型里「正在播放」的是热歌榜第 3 首，歌词跟着它取
