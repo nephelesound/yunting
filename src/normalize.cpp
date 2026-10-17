@@ -1,10 +1,14 @@
 #include "normalize.h"
+#include "json_util.h"
 
 #include <QDate>
 #include <QDateTime>
 #include <QRegularExpression>
+#include <QSet>
 #include <QStringList>
 #include <cmath>
+
+using namespace ncm;
 
 namespace {
 // `or ""` 家族：null 与缺失都回到 Python 的缺省值
@@ -19,6 +23,13 @@ double numOr(const QJsonObject &o, const char *key, double fallback = 0)
     const QJsonValue v = o.value(QLatin1String(key));
     return v.isDouble() ? v.toDouble() : fallback;
 }
+
+// Python 的 x 真值：null、缺失都算「没有」，对象与非零数字算「有」
+bool truthy(const QJsonObject &o, const char *key)
+{
+    const QJsonValue v = o.value(QLatin1String(key));
+    return !v.isNull() && !v.isUndefined() && (!v.isDouble() || v.toDouble() != 0);
+}
 } // namespace
 
 QString ncmSized(const QJsonValue &url, int px)
@@ -27,7 +38,7 @@ QString ncmSized(const QJsonValue &url, int px)
     return s.isEmpty() ? QString() : s + QStringLiteral("?param=%1y%2").arg(px).arg(px);
 }
 
-QVariantMap ncmTrack(const QJsonObject &s)
+QVariantMap ncmTrack(const QJsonObject &s, const QString &reason)
 {
     // 新旧两种歌曲结构（ar/al/dt 与 artists/album/duration）
     const QJsonArray artists = s.value("ar").isArray() ? s.value("ar").toArray()
@@ -38,6 +49,17 @@ QVariantMap ncmTrack(const QJsonObject &s)
     for (const QJsonValue &a : artists)
         names.append(a.toObject().value("name").toString());
     const double dt = numOr(s, "dt") != 0 ? numOr(s, "dt") : numOr(s, "duration");
+    // 别名/译名取第一项（新结构 alia，旧结构 alias，再退 tns/transNames）；quality 看有没有更高一档音频
+    QString alias;
+    for (const char *key : {"alia", "alias", "tns", "transNames"}) {
+        const QJsonArray list = s.value(QLatin1String(key)).toArray();
+        if (!list.isEmpty()) {
+            alias = list.first().toString();
+            break;
+        }
+    }
+    const QString quality = truthy(s, "hr") || truthy(s, "hrMusic") ? QStringLiteral("hires")
+        : truthy(s, "sq") || truthy(s, "sqMusic") ? QStringLiteral("lossless") : QString();
 
     return {
         {"id", numOr(s, "id")},
@@ -47,6 +69,11 @@ QVariantMap ncmTrack(const QJsonObject &s)
         {"dur", std::floor(dt / 1000)}, // Python 的 // 1000
         {"fee", numOr(s, "fee")},
         {"cover", ncmSized(album.value("picUrl"), 120)},
+        {"alias", alias},
+        {"quality", quality},
+        {"mv", numOr(s, "mv") != 0 ? numOr(s, "mv") : numOr(s, "mvid")},
+        // 推荐理由只有每日推荐带（data.recommendReasons 里 songId 对上的那条），其余为空
+        {"reason", reason},
     };
 }
 
@@ -62,7 +89,29 @@ QVariantMap ncmCloudTrack(const QJsonObject &item)
         {"dur", 0},
         {"fee", 0},
         {"cover", QString()},
+        {"alias", QString()},
+        {"quality", QString()},
+        {"mv", 0},
+        {"reason", QString()},
     };
+}
+
+QVariantMap ncmHotComments(const QJsonObject &resp, double songId)
+{
+    // 实测热评在顶层 hotComments（不在 data 里），保持接口给的顺序，最多 10 条
+    QVariantList items;
+    for (const QJsonValue &v : take(resp.value("hotComments").toArray(), 10)) {
+        const QJsonObject c = v.toObject();
+        const QJsonObject user = c.value("user").toObject();
+        items.append(QVariantMap{
+            {"user", textOr(user, "nickname")},
+            {"avatar", ncmSized(user.value("avatarUrl"), 96)},
+            {"content", textOr(c, "content")},
+            {"likes", c.value("likedCount").toDouble()},
+            {"time", c.value("time").toDouble()},
+        });
+    }
+    return {{"songId", songId}, {"items", items}};
 }
 
 QVariantMap ncmPlaylistCard(const QJsonObject &p, const char *coverKey)
@@ -126,19 +175,41 @@ QVariantList ncmTracks(const QJsonArray &items)
 
 QVariantList ncmParseLrc(const QString &lrc)
 {
+    return ncmParseLrc(lrc, QString());
+}
+
+// 译文按取整到两位小数的时间戳对上同一句，没有为 ""
+QVariantList ncmParseLrc(const QString &lrc, const QString &tlyric)
+{
     static const QRegularExpression pattern(
         QStringLiteral("\\[(\\d+):(\\d+(?:\\.\\d+)?)\\](.*)"));
+    // 同一时间戳取先出现的一句（Python 的 dict setdefault）；键是取整后的时间戳
+    const auto stampKey = [](double t) { return QString::number(round(t * 100) / 100, 'f', 2); };
+    QHash<QString, QString> tr;
+    for (QRegularExpressionMatchIterator it = pattern.globalMatch(tlyric); it.hasNext();) {
+        const QRegularExpressionMatch m = it.next();
+        const QString line = m.captured(3).trimmed();
+        if (line.isEmpty())
+            continue;
+        const double t = m.captured(1).toDouble() * 60 + m.captured(2).toDouble();
+        if (!tr.contains(stampKey(t)))
+            tr.insert(stampKey(t), line);
+    }
     QVariantList out;
-    QRegularExpressionMatchIterator it = pattern.globalMatch(lrc);
-    while (it.hasNext()) {
+    QSet<QString> seen;
+    for (QRegularExpressionMatchIterator it = pattern.globalMatch(lrc); it.hasNext();) {
         const QRegularExpressionMatch m = it.next();
         const QString text = m.captured(3).trimmed();
         if (text.isEmpty())
             continue;
         const double t = m.captured(1).toDouble() * 60 + m.captured(2).toDouble();
+        if (seen.contains(stampKey(t)))   // dict 键唯一：同时间戳只留第一句
+            continue;
+        seen.insert(stampKey(t));
         out.append(QVariantMap{
             {"t", QVariant(round(t * 100) / 100)}, // Python 的 round(..., 2)
             {"text", text},
+            {"tr", tr.value(stampKey(t))},
         });
     }
     return out;

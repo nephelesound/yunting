@@ -1,4 +1,4 @@
-// Store 的按需加载单元：request(key) 的三个 key（lyrics / playlist / search）与相似歌曲种子。
+// Store 的按需加载单元：request(key) 的四个 key（lyrics / playlist / search / comments）与相似歌曲种子。
 // 取数一律经 QueryCache（stale-while-revalidate + 在途去重 + 落盘）：同一首歌的歌词、同一个歌单、
 // 同一个搜索词，只在过期后才重新请求。首屏管线在 store.cpp；形状仍以 scripts/snapshot.py 为准。
 #include "store.h"
@@ -34,6 +34,8 @@ void Store::request(const QString &key)
         requestPlaylist(key, arg.toDouble());
     else if (key.startsWith(QLatin1String("search:")))
         requestSearch(key, arg);
+    else if (key.startsWith(QLatin1String("comments:")))
+        requestComments(key, arg.toDouble());
     else
         qWarning() << "unknown store key:" << key.section(u':', 0, 0);
 }
@@ -45,8 +47,10 @@ void Store::requestLyrics(const QString &key, double songId)
         [this, songId](QueryCache::Done done) {
             m_client->get("api/song/lyric", query({{"id", num(songId)}, {"lv", "1"}, {"tv", "-1"}}), false,
                           [done](const QJsonDocument &doc, bool ok) {
-                const QString lrc = body(doc).value("lrc").toObject().value("lyric").toString();
-                done(ncmParseLrc(lrc), ok);
+                const QJsonObject resp = body(doc);
+                const QString lrc = resp.value("lrc").toObject().value("lyric").toString();
+                const QString tlyric = resp.value("tlyric").toObject().value("lyric").toString();
+                done(ncmParseLrc(lrc, tlyric), ok);
             });
         },
         [this, songId](const QVariant &lines) {
@@ -110,4 +114,19 @@ void Store::requestSearch(const QString &key, const QString &raw)
             part("10", "6", "albums", [list](const QJsonObject &r) { return list(r, "albums", ncmSearchAlbum); });
         },
         [this](const QVariant &result) { put("search", result, false); });
+}
+
+// 热门评论：写回 data.comments（10 分钟新鲜期，落盘）；保持接口顺序，最多 10 条
+void Store::requestComments(const QString &key, double songId)
+{
+    m_cache.query(key,
+        [this, songId](QueryCache::Done done) {
+            const QString path = QStringLiteral("api/v1/resource/hotcomments/R_SO_4_%1")
+                                     .arg(qlonglong(songId));
+            m_client->get(path, query({{"limit", "10"}}), false,
+                          [done, songId](const QJsonDocument &doc, bool ok) {
+                done(ncmHotComments(body(doc), songId), ok);
+            });
+        },
+        [this](const QVariant &comments) { put("comments", comments, false); });
 }

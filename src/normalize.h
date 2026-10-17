@@ -10,13 +10,16 @@
 #include <QVariantList>
 #include <QVariantMap>
 
-QVariantMap ncmTrack(const QJsonObject &s);
+QVariantMap ncmTrack(const QJsonObject &s, const QString &reason = QString());
 QVariantMap ncmCloudTrack(const QJsonObject &item);
 QVariantMap ncmPlaylistCard(const QJsonObject &p, const char *coverKey);
 QVariantMap ncmSearchArtist(const QJsonObject &a);
 QVariantMap ncmSearchPlaylist(const QJsonObject &p);
 QVariantMap ncmSearchAlbum(const QJsonObject &a);
 QVariantList ncmTracks(const QJsonArray &items);
+// 热门评论：data.comments 的取数形状（snapshot.py 的 hot_comments）
+QVariantMap ncmHotComments(const QJsonObject &resp, double songId);
 QVariantList ncmParseLrc(const QString &lrc);
+QVariantList ncmParseLrc(const QString &lrc, const QString &tlyric);
 QString ncmSized(const QJsonValue &url, int px);
 QString ncmFirstLine(const QString &text);

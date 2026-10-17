@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
     if (parser.isSet(dumpOption)) {
         store.waitForInitial();
         // 按需数据走真实的 request() 路径（经 QueryCache），契约也就覆盖了它：
-        // 搜索一个词、取热歌榜第一首的歌词，等两者落地（兜底 15 秒）
+        // 搜索一个词、取热歌榜第一首的歌词与热评，等三者落地（兜底 15 秒）
         const QString probeQuery = QStringLiteral("林俊杰");
         const QVariantList hot = store.data().value("tracks").toList();
         const double probeSong = hot.isEmpty() ? 0 : hot.first().toMap().value("id").toDouble();
@@ -90,11 +90,14 @@ int main(int argc, char *argv[])
             const QVariantMap d = store.data();
             return d.value("search").toMap().value("query").toString() == probeQuery
                 && !d.value("search").toMap().value("songs").toList().isEmpty()
-                && (probeSong == 0 || d.value("lyricsTrackId").toDouble() == probeSong);
+                && (probeSong == 0 || d.value("lyricsTrackId").toDouble() == probeSong)
+                && (probeSong == 0 || d.value("comments").toMap().value("songId").toDouble() == probeSong);
         };
         store.request(QStringLiteral("search:") + probeQuery);
-        if (probeSong != 0)
+        if (probeSong != 0) {
             store.request(QStringLiteral("lyrics:%1").arg(qlonglong(probeSong)));
+            store.request(QStringLiteral("comments:%1").arg(qlonglong(probeSong)));
+        }
         QEventLoop loop;
         QTimer::singleShot(15 * 1000, &loop, &QEventLoop::quit);
         QObject::connect(&store, &Store::dataChanged, &loop, [&] { if (landed()) loop.quit(); });
