@@ -9,7 +9,7 @@ pkgver() {
 pkgrel=1
 pkgdesc='网易云音乐的 Linux 客户端（Qt 6 / KDE）'
 arch=(x86_64)
-license=('GPL-3.0-or-later' 'CC-BY-4.0')   # CC-BY-4.0：应用图标（Streamline），见 data/ICON-LICENSE
+license=('GPL-3.0-or-later' 'MIT')   # MIT：应用图标（Microsoft Fluent Emoji），见 data/ICON-LICENSE
 # 系统 makepkg.conf 默认开 debug：会把剥过符号的二进制挪进 -debug 子包，主包变空
 options=(!debug)
 depends=(qt6-base qt6-declarative qt6-multimedia kirigami kirigami-addons prison qtkeychain-qt6 kstatusnotifieritem)
