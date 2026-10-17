@@ -372,7 +372,14 @@ Kirigami.ApplicationWindow {
     }
 
     function openOverlay() {
-        if (root.startOverlay === "trackmenu") {
+        if (root.startOverlay === "flight") {
+            // 截图：像点播放条封面那样打开正在播放页，记下转场两端的位置，最终帧应当是封面已落地显示
+            // 等初始属性（page 等）都设完再触发，否则 page 的初始值会把刚打开的正在播放页切回去
+            Qt.callLater(() => {
+                root.toggleNowPlaying();
+                flightProbe.start();
+            });
+        } else if (root.startOverlay === "trackmenu") {
             // 截图：在列表第一行右侧打开曲目菜单（与点行尾「更多」的位置相同）
             trackMenu.track = root.openList.tracks[0];
             trackMenu.context = {};
@@ -481,11 +488,72 @@ Kirigami.ApplicationWindow {
         root.history = [];
         root.page = key;
     }
+    // 打开 / 关闭正在播放页都带共享封面转场：封面在播放条与正在播放页之间飞（只在有曲目时）
+    function sceneRect(item) {
+        if (!item || !item.visible)
+            return { x: 0, y: 0, width: 0, height: 0 };
+        const p = item.mapToItem(null, 0, 0);
+        return { x: p.x, y: p.y, width: item.width, height: item.height };
+    }
     function toggleNowPlaying() {
-        if (root.page === "nowplaying")
+        const cover = root.currentTrack ? Source.sized(root.currentTrack.cover, 560) : "";
+        if (root.page === "nowplaying") {
+            const view = root.nowPlayingView();
+            const from = root.sceneRect(view ? view.coverItem : null);
             root.goBack();
-        else
-            root.open("nowplaying");
+            coverFlight.fly(cover, from, root.sceneRect(playerBar.coverItem), null);
+            return;
+        }
+        const from = root.sceneRect(playerBar.coverItem);
+        root.open("nowplaying");
+        // 等页面封面排好版（推入后要过几帧才有位置）再起飞；每次都取当前显示的页面（页面可能被重建），
+        // 10 帧还没位置就不飞，封面直接显示
+        flightWait.source = cover;
+        flightWait.from = from;
+        flightWait.tries = 0;
+        flightWait.restart();
+    }
+    function nowPlayingView() {
+        const page = root.pageStack.currentItem;
+        return root.page === "nowplaying" && page && page.coverItem ? page : null;
+    }
+    // 截图 harness（startOverlay=flight）：转场结束后记下两端位置与封面是否已显示
+    Timer {
+        id: flightProbe
+        interval: 2000
+        onTriggered: {
+            const page = root.nowPlayingView();
+            console.warn(logUi, "cover flight from", JSON.stringify(root.sceneRect(playerBar.coverItem)),
+                         "to", JSON.stringify(root.sceneRect(page ? page.coverItem : null)),
+                         "cover shown:", page !== null && !page.coverHidden,
+                         "tries:", flightWait.tries);
+        }
+    }
+    Timer {
+        id: flightWait
+        property string source
+        property var from
+        property int tries
+        interval: 16
+        repeat: true
+        onTriggered: {
+            const page = root.nowPlayingView();
+            if (!page) {
+                flightWait.stop();
+                return;
+            }
+            page.coverHidden = true;
+            const to = root.sceneRect(page.coverItem);
+            if (to.width > 0 || ++flightWait.tries >= 10) {
+                flightWait.stop();
+                coverFlight.fly(flightWait.source, flightWait.from, to, () => page.coverHidden = false);
+            }
+        }
+    }
+    CoverFlight {
+        id: coverFlight
+        parent: Overlay.overlay
+        anchors.fill: parent
     }
     function openEntry(key) {
         if (key === "charts")
@@ -569,6 +637,7 @@ Kirigami.ApplicationWindow {
     pageStack.columnView.columnResizeMode: Kirigami.ColumnView.SingleColumn
 
     footer: PlayerBar {
+        id: playerBar
         track: root.currentTrack
         playing: playback.engine.playing
         elapsed: playback.engine.position

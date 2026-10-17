@@ -8,6 +8,7 @@ PlaylistsPage PlaylistsPage.qml
 PagingFooter PagingFooter.qml
 PersonAvatar PersonAvatar.qml
 CoverAmbience CoverAmbience.qml
+CoverFlight CoverFlight.qml
 AccentButton AccentButton.qml
 ChartCard ChartCard.qml
 ChartsPage ChartsPage.qml

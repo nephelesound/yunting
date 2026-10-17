@@ -16,6 +16,9 @@ ScreenFrame {
     property var track
     property real elapsed
     property string pane: "lyrics"   // lyrics | comments
+    // 共享封面转场的一端：main 读它的位置，飞行期间 coverHidden
+    property bool coverHidden: false
+    readonly property Item coverItem: pageCover
 
     heading: page.track ? page.track.name : ""
 
@@ -76,10 +79,13 @@ ScreenFrame {
         spacing: Tokens.space4
 
         Cover {
+            id: pageCover
             Layout.preferredWidth: page.coverRows * page.pitch
             Layout.preferredHeight: Layout.preferredWidth
             source: page.track ? Source.sized(page.track.cover, 800) : ""
             pixelSize: 800
+            // 共享封面转场飞行时隐藏，落地后再显示：屏上永远只有一张封面
+            opacity: page.coverHidden ? 0 : 1
         }
         Facts {
             Layout.fillWidth: true

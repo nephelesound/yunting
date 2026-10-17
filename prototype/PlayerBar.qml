@@ -25,6 +25,8 @@ Item {
     property real volume: 0.7
     property bool muted: false
     property string quality: "auto"   // auto · standard · higher · exhigh · lossless · hires
+    // 共享封面转场的一端（另一端是正在播放页的封面）
+    readonly property Item coverItem: coverButton
 
     readonly property var modes: [
         { icon: "media-playlist-repeat-symbolic", text: "列表循环" },
@@ -93,6 +95,7 @@ Item {
             spacing: Tokens.space3
 
             AbstractButton {
+                id: coverButton
                 Layout.preferredWidth: Tokens.height12
                 Layout.preferredHeight: Tokens.height12
                 enabled: bar.active
