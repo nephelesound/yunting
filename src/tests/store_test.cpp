@@ -531,6 +531,41 @@ private slots:
         QCOMPARE(u.value("playlists").toList().first().toMap().value("name").toString(), QStringLiteral("Public"));
     }
 
+    // 关注列表：第二页接在第一页后面；失败按请求时的 key 报，界面的重试才对得上
+    void followsPageAndFailureKeys()
+    {
+        bool failSecond = false;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/user/getfollows/42") {
+                if (req.query.contains("offset=30") && failSecond) {
+                    respond(200, "{\"code\":500}");
+                    return;
+                }
+                const bool second = req.query.contains("offset=30");
+                respond(200, json(QJsonObject{
+                    {"code", 200}, {"more", !second},
+                    {"follow", QJsonArray{QJsonObject{{"userId", second ? 2 : 1}, {"nickname", second ? "B" : "A"},
+                                                      {"mutual", !second}}}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        QSignalSpy failed(m_store, &Store::requestFailed);
+
+        m_store->request(QStringLiteral("userFollows:42"));
+        QVERIFY(waitUntil([&] { return m_store->data().value("userFollows").toMap().value("items").toList().size() == 1; }));
+        m_store->request(QStringLiteral("userFollows:42:30"));
+        QVERIFY(waitUntil([&] { return m_store->data().value("userFollows").toMap().value("items").toList().size() == 2; }));
+        const QVariantList items = m_store->data().value("userFollows").toMap().value("items").toList();
+        QCOMPARE(items.at(0).toMap().value("mutual").toBool(), true);
+        QCOMPARE(items.at(1).toMap().value("name").toString(), QStringLiteral("B"));
+
+        failSecond = true;
+        m_store->request(QStringLiteral("userFollows:42:30"));
+        QVERIFY(waitUntil([&] { return failed.count() == 1; }));
+        QCOMPARE(failed.first().at(0).toString(), QStringLiteral("userFollows:42:30"));
+    }
+
     // 只读信箱：会话与历史都归一化到 data.inbox / data.inboxThread
     void readsInboxAndThread()
     {

@@ -24,6 +24,13 @@ QVariantMap socialUser(const QJsonObject &u)
         {"vipType", u.value("vipType").toDouble()},
     };
 }
+
+// 失败按请求时的 key 报（第一页不带 offset），界面才能对上这一页的重试
+QString pageKey(const QString &kind, double uid, int offset)
+{
+    const QString key = kind + u':' + QString::number(qlonglong(uid));
+    return offset > 0 ? key + u':' + QString::number(offset) : key;
+}
 } // namespace
 
 void Store::requestUserFollows(double uid, int offset)
@@ -35,7 +42,7 @@ void Store::requestUserFollows(double uid, int offset)
                   [this, uid, offset](const QJsonDocument &doc, bool ok) {
         const QJsonObject r = body(doc);
         if (!ok || r.value("code").toInt() != 200) {
-            emit requestFailed(QStringLiteral("userFollows"), QStringLiteral("暂时取不到关注列表"));
+            emit requestFailed(pageKey(QStringLiteral("userFollows"), uid, offset), QStringLiteral("暂时取不到关注列表"));
             return;
         }
         QVariantList items;
@@ -60,7 +67,7 @@ void Store::requestUserFolloweds(double uid, int offset)
                   [this, uid, offset](const QJsonDocument &doc, bool ok) {
         const QJsonObject r = body(doc);
         if (!ok || r.value("code").toInt() != 200) {
-            emit requestFailed(QStringLiteral("userFolloweds"), QStringLiteral("暂时取不到粉丝列表"));
+            emit requestFailed(pageKey(QStringLiteral("userFolloweds"), uid, offset), QStringLiteral("暂时取不到粉丝列表"));
             return;
         }
         QVariantList items;
