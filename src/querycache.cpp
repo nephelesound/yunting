@@ -30,9 +30,10 @@ qint64 QueryCache::freshFor(const QString &key)
 }
 
 // 落盘的只有不涉及隐私又值得留的：歌词与首屏；搜索词不写盘
+// （search: / searchUsers: / searchRadios: 都算搜索）
 bool QueryCache::persistent(const QString &key)
 {
-    return !key.startsWith(QLatin1String("search:"));
+    return !key.startsWith(QLatin1String("search"));
 }
 
 bool QueryCache::isFresh(const QString &key) const
@@ -82,6 +83,12 @@ void QueryCache::remember(const QString &key, const QVariant &value)
 {
     m_entries.insert(key, {value, QDateTime::currentDateTimeUtc()});
     if (persistent(key))
+        scheduleSave();
+}
+
+void QueryCache::forget(const QString &key)
+{
+    if (m_entries.remove(key) > 0 && persistent(key))
         scheduleSave();
 }
 

@@ -44,11 +44,15 @@ inline QByteArray formEncoded(const QUrlQuery &form)
     return parts.join(u'&').toLatin1();
 }
 
+// GET 的 query：QUrlQuery 不编码 '+'，服务端按表单规则会把它解成空格（搜索 "C++" 就错了），
+// 所以 key/value 先各自百分号编码再交给 QUrlQuery——它不会再把 '%' 编成 %25。
 inline QUrlQuery query(std::initializer_list<std::pair<const char *, QString>> pairs)
 {
     QUrlQuery q;
-    for (const auto &p : pairs)
-        q.addQueryItem(QLatin1String(p.first), p.second);
+    for (const auto &p : pairs) {
+        q.addQueryItem(QString::fromLatin1(QUrl::toPercentEncoding(QLatin1String(p.first))),
+                       QString::fromLatin1(QUrl::toPercentEncoding(p.second)));
+    }
     return q;
 }
 } // namespace ncm

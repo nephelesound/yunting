@@ -113,6 +113,12 @@ private:
     void addLikedTrack(double songId);
     void removeLikedTrack(double songId);
     QVariantMap trackById(double songId) const;
+    // 红心的本地写入与服务器请求：同一首歌在途时记住最后一次意图，回包落地后追发
+    void sendLike(double songId, bool liked);
+    void setLikedLocal(double songId, bool liked);
+    bool isLiked(double songId) const;
+    // 首屏快照落盘：只存首屏字段，搜索/评论/详情等按需数据不写进 screen:data
+    void persistScreenData();
     // 歌单写请求的共同部分：登录检查、epoch 防串号、错误消息
     void playlistWrite(const QString &path, const QJsonObject &payload, const QString &action,
                        std::function<void(const QJsonObject &)> onSuccess);
@@ -151,6 +157,14 @@ private:
     bool m_refreshOwed = false;      // 离线期间欠下的恢复刷新；到账后只还一次
     QueryCache m_cache;              // 按需数据与首屏快照的缓存（~/.cache/yunting/queries.json）
     int m_pending = 0;               // 首屏在途请求计数
-    quint64 m_epoch = 0;             // 退出登录时递增，旧账号的回包不再写入
-    QSet<double> m_likePending;      // 同一首歌的红心请求在途时不重复发
+    quint64 m_epoch = 0;             // 退出登录/换账号时递增，旧账号的回包不再写入
+    quint64 m_searchGeneration = 0;   // 每次搜索递增：旧搜索的晚到结果不能覆盖新词
+    double m_accountUid = 0;         // 上次拉到的账号 userId（昵称不可靠，换账号看它）
+    struct LikeState {
+        bool serverState = false;   // 服务器已确认的状态
+        bool desired = false;       // 用户最后一次意图
+    };
+    QHash<double, LikeState> m_likes;   // 同一首歌的红心请求在途时排队最后一次意图
+    quint64 m_likeGeneration = 0;       // 每次红心改动递增：旧的 like/get 快照要与本地合并
+    QSet<double> m_likeTouched;         // 上次快照之后改过的歌
 };

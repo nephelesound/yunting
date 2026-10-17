@@ -140,10 +140,28 @@ private slots:
             QueryCache cache(path);
             cache.remember("lyrics:7", "la la");
             cache.remember("search:secret", "result");
+            cache.remember("searchUsers:someone", "result");
+            cache.remember("searchRadios:station", "result");
         } // 析构时把待写的落盘
         QueryCache reopened(path);
         QCOMPARE(reopened.peek("lyrics:7"), QVariant("la la"));
-        QVERIFY(!reopened.peek("search:secret").isValid());   // 搜索词不写盘
+        // 所有 search* 前缀都不写盘，不只 search:
+        QVERIFY(!reopened.peek("search:secret").isValid());
+        QVERIFY(!reopened.peek("searchUsers:someone").isValid());
+        QVERIFY(!reopened.peek("searchRadios:station").isValid());
+    }
+
+    void forgetMakesTheNextQueryRefetch()
+    {
+        QTemporaryDir dir;
+        QueryCache cache(dir.filePath("q.json"));
+        FakeFetch fetch;
+        int delivered = 0;
+        cache.remember("playlist:1", "old");
+        cache.forget("playlist:1");
+        cache.query("playlist:1", fetch.fn(), [&](const QVariant &) { ++delivered; });
+        QCOMPARE(fetch.calls, 1);      // 失效后不再命中
+        QCOMPARE(delivered, 1);        // 只拿到新值
     }
 };
 

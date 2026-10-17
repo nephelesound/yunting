@@ -135,6 +135,11 @@ int main(int argc, char *argv[])
 
     const bool anonymous = parser.isSet(anonymousOption);
     NcmClient client(nullptr, !anonymous);
+    // 退出登录后的清凭据是异步写（钥匙串）：进程退出前最多等 2 秒把它写完，
+    // 否则下一条匿名 Set-Cookie 之前进程就没了，旧 MUSIC_U 会留在钥匙串里。
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, &client, [&client] {
+        client.flushCredentials(2000);
+    });
 
     // QtKeychain 的读写是异步的：等 jar 从存储读出（钥匙串或后备文件）再继续。
     // 兜底 10 秒防钥匙串守护进程挂死时永远起不来。
