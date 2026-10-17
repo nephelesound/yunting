@@ -146,7 +146,7 @@ var toplists = [
  {
   "id": 12911403728,
   "name": "音乐合伙人推荐榜",
-  "cover": "https://p1.music.126.net/s6ITpmGjKbyDpi7DPkqd2w==/109951170187827373.jpg?param=300y300",
+  "cover": "https://p2.music.126.net/s6ITpmGjKbyDpi7DPkqd2w==/109951170187827373.jpg?param=300y300",
   "update": "每周一更新",
   "count": 100,
   "preview": []
@@ -159,7 +159,7 @@ var playlist = {
  "cover": "https://p1.music.126.net/0SUEG8yDACfx0Bw2MYFv4Q==/109951170048519512.jpg?param=400y400",
  "description": "云音乐热歌榜：云音乐用户一周内收听所有线上歌曲官方TOP排行榜，每日更新。",
  "count": 200,
- "plays": 14191712256
+ "plays": 14191721472
 }
 
 var tracks = [
@@ -222,7 +222,7 @@ var tracks = [
   "album": "失温",
   "dur": 166,
   "fee": 8,
-  "cover": "http://p2.music.126.net/H2DFRdwP2y5SuCAn-Tuikw==/109951172568091306.jpg?param=120y120",
+  "cover": "http://p1.music.126.net/H2DFRdwP2y5SuCAn-Tuikw==/109951172568091306.jpg?param=120y120",
   "alias": "You know that I feel bad",
   "quality": "lossless",
   "mv": 0,
@@ -313,7 +313,7 @@ var tracks = [
   "album": "玻璃",
   "dur": 185,
   "fee": 1,
-  "cover": "http://p2.music.126.net/MSKoQP60up7v3y1P1d3JIQ==/109951173234747322.jpg?param=120y120",
+  "cover": "http://p1.music.126.net/MSKoQP60up7v3y1P1d3JIQ==/109951173234747322.jpg?param=120y120",
   "alias": "",
   "quality": "hires",
   "mv": 34759031,
@@ -404,7 +404,7 @@ var tracks = [
   "album": "两 难",
   "dur": 170,
   "fee": 8,
-  "cover": "http://p2.music.126.net/Qvenb5t_hL37b7hRfscjaw==/109951169686160429.jpg?param=120y120",
+  "cover": "http://p1.music.126.net/Qvenb5t_hL37b7hRfscjaw==/109951169686160429.jpg?param=120y120",
   "alias": "",
   "quality": "hires",
   "mv": 0,
@@ -430,7 +430,7 @@ var tracks = [
   "album": "微加幸福",
   "dur": 308,
   "fee": 1,
-  "cover": "http://p2.music.126.net/ugJH-gpHKX6y6p-6MkIIsQ==/109951163187409545.jpg?param=120y120",
+  "cover": "http://p1.music.126.net/ugJH-gpHKX6y6p-6MkIIsQ==/109951163187409545.jpg?param=120y120",
   "alias": "台湾电视剧《温柔的慈悲》片头曲",
   "quality": "lossless",
   "mv": 10930591,
@@ -456,7 +456,7 @@ var tracks = [
   "album": "左转灯 (1000 Times +1)",
   "dur": 197,
   "fee": 1,
-  "cover": "http://p2.music.126.net/ODlrxB8b_86bDZTuCXGK1w==/109951172153456358.jpg?param=120y120",
+  "cover": "http://p1.music.126.net/ODlrxB8b_86bDZTuCXGK1w==/109951172153456358.jpg?param=120y120",
   "alias": "",
   "quality": "hires",
   "mv": 34756618,
@@ -495,7 +495,7 @@ var tracks = [
   "album": "梦游",
   "dur": 189,
   "fee": 8,
-  "cover": "http://p2.music.126.net/Ws93IUrJGR_lK-QEsdKTWw==/109951168408373477.jpg?param=120y120",
+  "cover": "http://p1.music.126.net/Ws93IUrJGR_lK-QEsdKTWw==/109951168408373477.jpg?param=120y120",
   "alias": "",
   "quality": "hires",
   "mv": 14602856,
@@ -521,7 +521,7 @@ var tracks = [
   "album": "全息恋人",
   "dur": 147,
   "fee": 8,
-  "cover": "http://p2.music.126.net/oxXWRp9IKoKStlYHdx4YkA==/109951173900088235.jpg?param=120y120",
+  "cover": "http://p1.music.126.net/oxXWRp9IKoKStlYHdx4YkA==/109951173900088235.jpg?param=120y120",
   "alias": "喧哗的影像片",
   "quality": "hires",
   "mv": 0,
@@ -586,7 +586,7 @@ var tracks = [
   "album": "埋汰",
   "dur": 170,
   "fee": 8,
-  "cover": "http://p2.music.126.net/VjXYNoGC3lXajZDs0r35XQ==/109951167852652412.jpg?param=120y120",
+  "cover": "http://p1.music.126.net/VjXYNoGC3lXajZDs0r35XQ==/109951167852652412.jpg?param=120y120",
   "alias": "",
   "quality": "hires",
   "mv": 0,
@@ -664,7 +664,7 @@ var tracks = [
   "album": "T.I.M.E.",
   "dur": 253,
   "fee": 1,
-  "cover": "http://p2.music.126.net/aJWtwvdYRXvKUpAE2C6NoA==/109951168919708423.jpg?param=120y120",
+  "cover": "http://p1.music.126.net/aJWtwvdYRXvKUpAE2C6NoA==/109951168919708423.jpg?param=120y120",
   "alias": "",
   "quality": "hires",
   "mv": 0,
@@ -1192,14 +1192,14 @@ var comments = {
    "user": "梨冻紧",
    "avatar": "http://p2.music.126.net/MrHwTNckIsypqatI_PQhhA==/109951167942752240.jpg?param=96y96",
    "content": "希望大家可以看到所有事物美好的一面，不管是生活、爱情、友情。\n[语音]",
-   "likes": 477724,
+   "likes": 477726,
    "time": 1636699882305
   },
   {
    "user": "Wiz_H张子豪",
    "avatar": "http://p2.music.126.net/6NW4JkNt9b73P2nZkkg9kA==/109951172528960503.jpg?param=96y96",
    "content": "这个世界很大很复杂，希望你们就算看惯了世间的罗生门，对待感情还是可以保留那份真诚。\n[语音]",
-   "likes": 213162,
+   "likes": 213164,
    "time": 1636699823167
   },
   {
@@ -1330,12 +1330,12 @@ var search = {
    "reason": ""
   },
   {
-   "id": 5232648,
+   "id": 108507,
    "name": "Cries in a Distance",
    "artist": "林俊杰",
-   "album": "Happy Weekly TUESDAY 2(星期二)",
+   "album": "JJ陆",
    "dur": 225,
-   "fee": 0,
+   "fee": 1,
    "cover": "",
    "alias": "",
    "quality": "",
@@ -1470,11 +1470,11 @@ var search = {
    "creator": "郭慢慢11"
   },
   {
-   "id": 6789564334,
-   "name": "林俊杰（免费版）",
-   "cover": "http://p1.music.126.net/oaXrmE65r9_dO6zqzfNEZw==/109951168083671945.jpg?param=300y300",
-   "count": 61,
-   "creator": "账号已注销"
+   "id": 17530118405,
+   "name": "百万经典｜林俊杰孙燕姿陶喆方大同",
+   "cover": "http://p1.music.126.net/WIhE-v7vLJl8MTRPN7FlBQ==/109951172404000431.jpg?param=300y300",
+   "count": 93,
+   "creator": "小乔的音乐盒呀"
   }
  ],
  "albums": [
@@ -1482,42 +1482,42 @@ var search = {
    "id": 404060139,
    "name": "Rise Without A Sound",
    "artist": "林俊杰",
-   "cover": "http://p1.music.126.net/_jktwb0bnnR_OdXAXPcVzQ==/109951174111387616.jpg?param=300y300",
+   "cover": "http://p2.music.126.net/_jktwb0bnnR_OdXAXPcVzQ==/109951174111387616.jpg?param=300y300",
    "year": 2026
   },
   {
    "id": 95357380,
    "name": "交换余生",
    "artist": "林俊杰",
-   "cover": "http://p1.music.126.net/CTvZ6cIrZ3uZdXbzedrufw==/109951169697336752.jpg?param=300y300",
+   "cover": "http://p2.music.126.net/CTvZ6cIrZ3uZdXbzedrufw==/109951169697336752.jpg?param=300y300",
    "year": 2020
   },
   {
    "id": 36997258,
    "name": "黑夜问白天",
    "artist": "林俊杰",
-   "cover": "http://p1.music.126.net/KuwDoBa5kE_TEDt5l1EnuA==/109951169697339183.jpg?param=300y300",
+   "cover": "http://p2.music.126.net/KuwDoBa5kE_TEDt5l1EnuA==/109951169697339183.jpg?param=300y300",
    "year": 2017
   },
   {
    "id": 3438282,
    "name": "和自己对话",
    "artist": "林俊杰",
-   "cover": "http://p1.music.126.net/JRxqmFNVw9tc6kCGsyvVbA==/109951169682587779.jpg?param=300y300",
+   "cover": "http://p2.music.126.net/JRxqmFNVw9tc6kCGsyvVbA==/109951169682587779.jpg?param=300y300",
    "year": 2015
   },
   {
    "id": 37085119,
    "name": "伟大的渺小",
    "artist": "林俊杰",
-   "cover": "http://p1.music.126.net/577Gt_GgbymKIIpv8XS78Q==/109951169697341100.jpg?param=300y300",
+   "cover": "http://p2.music.126.net/577Gt_GgbymKIIpv8XS78Q==/109951169697341100.jpg?param=300y300",
    "year": 2017
   },
   {
    "id": 163678212,
    "name": "重拾_快乐",
    "artist": "林俊杰",
-   "cover": "http://p1.music.126.net/KoBXh31YzOk_cEhAlBm_BQ==/109951168573329172.jpg?param=300y300",
+   "cover": "http://p2.music.126.net/KoBXh31YzOk_cEhAlBm_BQ==/109951168573329172.jpg?param=300y300",
    "year": 2023
   }
  ]
@@ -1537,7 +1537,7 @@ var hotSearches = [
  {
   "word": "偷心",
   "note": "爆火外网的小众中文歌",
-  "score": 76472
+  "score": 74385
  },
  {
   "word": "琵琶曲",
@@ -1545,44 +1545,34 @@ var hotSearches = [
   "score": 66418
  },
  {
-  "word": "雨爱",
-  "note": "",
-  "score": 57399
- },
- {
-  "word": "全息恋人",
-  "note": "",
-  "score": 53216
- },
- {
-  "word": "不死鸟",
-  "note": "",
-  "score": 49351
- },
- {
   "word": "茶汤",
   "note": "",
   "score": 43917
  },
  {
+  "word": "全息恋人",
+  "note": "",
+  "score": 57400
+ },
+ {
+  "word": "雨爱",
+  "note": "",
+  "score": 57399
+ },
+ {
+  "word": "给未来的自己",
+  "note": "",
+  "score": 49352
+ },
+ {
   "word": "升本后醒来",
   "note": "",
-  "score": 40164
+  "score": 49351
  },
  {
-  "word": "琵琶行",
+  "word": "不死鸟",
   "note": "",
-  "score": 39750
- },
- {
-  "word": "Whatever Happens",
-  "note": "",
-  "score": 36313
- },
- {
-  "word": "你不要那样看着我的眼睛",
-  "note": "",
-  "score": 41137
+  "score": 49351
  },
  {
   "word": "甲乙丙丁",
@@ -1595,33 +1585,43 @@ var hotSearches = [
   "score": 34799
  },
  {
+  "word": "琵琶行",
+  "note": "",
+  "score": 39750
+ },
+ {
+  "word": "你不要那样看着我的眼睛",
+  "note": "",
+  "score": 41137
+ },
+ {
+  "word": "Whatever Happens",
+  "note": "",
+  "score": 36313
+ },
+ {
   "word": "孙燕姿",
   "note": "",
   "score": 22702
  },
  {
-  "word": "失眠",
+  "word": "许嵩",
   "note": "",
-  "score": 25320
+  "score": 22100
  },
  {
-  "word": "不值得",
+  "word": "7 years",
   "note": "",
-  "score": 25789
+  "score": 23122
  },
  {
-  "word": "故里逢春",
+  "word": "泪海",
   "note": "",
-  "score": 33636
+  "score": 27747
  },
  {
-  "word": "我爱你",
+  "word": "金玉良缘",
   "note": "",
-  "score": 32269
- },
- {
-  "word": "情歌",
-  "note": "",
-  "score": 30388
+  "score": 25323
  }
 ]
