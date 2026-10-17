@@ -1,5 +1,5 @@
 // 应用入口：装配 NcmClient / Store / AudioEngine / Session / Mpris，注入 prototype/main.qml。
-// QML 仍来自源码树（原型阶段，界面与后端并行演进），由 PROTOTYPE_DIR 编译定义给出路径。
+// QML 编进可执行文件的 Qt 资源（qrc:/qt/qml/org/sudoskys/yunting/），资源清单见 CMakeLists.txt。
 #include "audioengine.h"
 #include "imagecache.h"
 #include "mpris.h"
@@ -160,7 +160,9 @@ int main(int argc, char *argv[])
     engine.setInitialProperties({{"backend", backend}});
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
                      [] { QCoreApplication::exit(1); }, Qt::QueuedConnection);
-    engine.load(QUrl::fromLocalFile(QStringLiteral(PROTOTYPE_DIR) + QStringLiteral("/main.qml")));
+    // 界面编进资源：单一资源目录（qmldir 的 singleton 声明按同目录解析），
+    // Snapshot.qml 与快照数据不编入，backend 注入后它的创建路径不会走到
+    engine.load(QUrl(QStringLiteral("qrc:/qt/qml/org/sudoskys/yunting/main.qml")));
     if (engine.rootObjects().isEmpty())
         return 1;
 

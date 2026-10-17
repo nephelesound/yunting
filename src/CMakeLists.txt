@@ -8,6 +8,7 @@ set(CMAKE_AUTOMOC ON)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Qml Quick QuickControls2 Network Multimedia DBus)
 find_package(Qt6Keychain REQUIRED)
 find_package(KF6StatusNotifierItem REQUIRED)
+find_package(OpenSSL REQUIRED COMPONENTS Crypto)
 
 qt_add_executable(yunting
     main.cpp
@@ -24,10 +25,22 @@ qt_add_executable(yunting
     tray.h tray.cpp
 )
 
-# 原型阶段：QML 直接从源码树加载（界面与后端并行演进）；装运时再改资源化
-target_compile_definitions(yunting PRIVATE
-    PROTOTYPE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../prototype"
-)
+# 界面 QML/JS 编进可执行文件：整个 prototype/ 目录挂到 qrc:/qt/qml/org/sudoskys/yunting/ 下，
+# qmldir 与组件同目录，singleton 声明照常解析。Snapshot.qml 与它读的 Data.js / Personal.js /
+# Fixtures.js 是原型与截图专用，不编入 —— Personal.js 是账号数据，绝不能进二进制。
+file(GLOB _app_qml RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/../prototype"
+    CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/../prototype/*.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../prototype/*.js"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../prototype/qmldir")
+list(FILTER _app_qml EXCLUDE REGEX "^(Snapshot\\.qml|Data\\.js|Personal\\.js|Fixtures\\.js)$")
+# qt_add_resources 的 FILES 接受绝对路径；RELATIVE 摘出的裸文件名会被qt_add_executable 误当源码解析
+list(TRANSFORM _app_qml REPLACE "^" "${CMAKE_CURRENT_SOURCE_DIR}/../prototype/")
+
+qt_add_resources(yunting "app_qml"
+    PREFIX "/qt/qml/org/sudoskys/yunting"
+    BASE "${CMAKE_CURRENT_SOURCE_DIR}/../prototype"
+    FILES ${_app_qml})
 
 target_compile_options(yunting PRIVATE -Wall -Wextra)
 
@@ -67,3 +80,18 @@ target_link_libraries(yunting PRIVATE
     Qt6Keychain::Qt6Keychain
     KF6::StatusNotifierItem
 )
+
+# 共享 Qt 下插件在运行时按 QML import 从 QML2_IMPORT_PATH/插件目录解析，无需链进可执行文件。
+# 关掉 finalize 阶段的 qmlimportscanner 扫描：它要把每个 QML 模块的插件目标链进来，
+# 而 kirigami/kirigami-addons/prison 的插件目标不在本工程的 CMake 作用域里，只会逐个打 warning。
+set_target_properties(yunting PROPERTIES QT_QML_MODULE_NO_IMPORT_SCAN ON)
+
+# 安装：可执行文件 + 桌面项 + AppStream 元数据 + 图标；测试可执行文件不装
+include(GNUInstallDirs)
+install(TARGETS yunting RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES ../data/io.github.sudoskys.Yunting.desktop
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+install(FILES ../data/io.github.sudoskys.Yunting.metainfo.xml
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
+install(FILES ../data/io.github.sudoskys.Yunting.svg
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
