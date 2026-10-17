@@ -7,7 +7,7 @@ pkgver() {
   printf 'r%s.%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
 }
 pkgrel=1
-pkgdesc='非官方的网易云音乐 Linux 客户端（Qt 6 / KDE）'
+pkgdesc='网易云音乐的 Linux 客户端（Qt 6 / KDE）'
 arch=(x86_64)
 license=('GPL-3.0-or-later')
 # 系统 makepkg.conf 默认开 debug：会把剥过符号的二进制挪进 -debug 子包，主包变空
