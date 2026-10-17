@@ -30,7 +30,15 @@ Kirigami.ApplicationWindow {
 
     property var backend: null      // { store, audio, session }，C++ 应用注入
 
-    readonly property bool loggedIn: root.account !== "anonymous" && Source.account !== null
+    // 界面层的日志分类：失败与异常写 warning（与 C++ 的 yunting.net / yunting.vault 同一套 Qt 日志）
+    LoggingCategory {
+        id: logUi
+        name: "yunting.ui"
+        defaultLogLevel: LoggingCategory.Warning
+    }
+
+    // 账号字段在后端回话前可能是 undefined（不只是 null）：两种都算未登录
+    readonly property bool loggedIn: root.account !== "anonymous" && Source.account != null
     readonly property bool vip: root.loggedIn && Source.account.vip
     readonly property var pivots: [{ key: "home", text: "推荐" }, { key: "mine", text: "我的" }, { key: "search", text: "搜索" }]
 
@@ -55,7 +63,10 @@ Kirigami.ApplicationWindow {
     }
     Connections {
         target: playback.engine
-        function onFailed(reason) { root.showPassiveNotification(reason); }
+        function onFailed(reason) {
+            console.warn(logUi, "playback failed:", root.currentTrack ? root.currentTrack.id : 0, reason);
+            root.showPassiveNotification(reason);
+        }
     }
     // 私人漫游是一个流：放到倒数第二首时续取一批，取回来的接在队尾，不会放完一轮又从头循环
     Connections {
@@ -78,6 +89,7 @@ Kirigami.ApplicationWindow {
         target: root.backend ? root.backend.store : null
         ignoreUnknownSignals: true
         function onLikeFailed(songId, liked, message) {
+            console.warn(logUi, "like failed:", songId, liked ? "on" : "off", message);
             root.showPassiveNotification((liked ? "没能加上红心：" : "没能取消红心：") + message);
         }
     }
@@ -330,6 +342,7 @@ Kirigami.ApplicationWindow {
             root.showPassiveNotification(text);
         }
         function onPlaylistActionFailed(action, message) {
+            console.warn(logUi, "playlist action failed:", action, message);
             root.trackForNewPlaylist = null;
             root.successNotes = {};
             root.showPassiveNotification(message);
@@ -486,7 +499,8 @@ Kirigami.ApplicationWindow {
     }
 
     // 应用里截图与调试：命令行 -- 之后的 key=value 与 qmlshot 同一格式，设到根对象的同名属性上
-    //（例：yunting --screenshot a.png -- page=artist listKey=artist:6452）。只认已有的属性
+    //（例：yunting --screenshot a.png -- page=artist listKey=artist:6452）。
+    // 只认已有的字符串、数字、布尔属性：函数、对象、只读属性都不会被命令行覆盖；认不出的写进日志
     function applyCommandLine() {
         const args = Qt.application.arguments;
         const start = args.indexOf("--");
@@ -496,8 +510,19 @@ Kirigami.ApplicationWindow {
             const eq = pair.indexOf("=");
             const key = pair.slice(0, eq);
             const value = pair.slice(eq + 1);
-            if (eq > 0 && key in root)
-                root[key] = value === "true" ? true : value === "false" ? false : value;
+            const kind = eq > 0 && key in root ? typeof root[key] : "";
+            try {
+                if (kind === "string")
+                    root[key] = value;
+                else if (kind === "boolean")
+                    root[key] = value === "true";
+                else if (kind === "number" && !isNaN(Number(value)))
+                    root[key] = Number(value);
+                else
+                    console.warn(logUi, "ignored command-line argument:", pair);
+            } catch (e) {
+                console.warn(logUi, "cannot set", key, "from command line:", e.message);
+            }
         }
     }
 

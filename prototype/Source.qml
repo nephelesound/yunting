@@ -102,15 +102,16 @@ QtObject {
         return { owner: acc.owner, items: acc.items.concat(fresh), total: page.total,
                  more: page.more && list.length > 0, next: acc.next + list.length, loading: false };
     }
-    // 返回标成「在取」的新 acc 和要请求的 offset；换了 owner 从 start 开始；在取或没有更多时返回 null
+    // 返回标成「在取」的新 acc 和要请求的 offset；换了 owner 从 start 开始；在取或没有更多时返回 null。
+    // Store 请求失败时不回调：「在取」超过 10 秒就当失败，允许再取一次（否则滚到底永远不再加载）
     function nextPage(acc, owner, start, seed) {
         if (!source.live)
             return null;
         if (acc.owner !== owner)
-            acc = { owner: owner, items: seed, total: 0, more: true, next: start, loading: false };
-        if (acc.loading || !acc.more)
+            acc = { owner: owner, items: seed, total: 0, more: true, next: start, loading: false, since: 0 };
+        if ((acc.loading && Date.now() - acc.since < 10000) || !acc.more)
             return null;
-        return Object.assign({}, acc, { loading: true });
+        return Object.assign({}, acc, { loading: true, since: Date.now() });
     }
 
     // 最新评论：打开评论或滚到底时调用 moreComments
