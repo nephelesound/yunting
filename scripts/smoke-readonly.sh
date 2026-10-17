@@ -5,10 +5,26 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 APP=${APP:-"$ROOT/build/app/yunting"}
 APP_CMD=("$APP" --anonymous)
-CACHE=${SMOKE_CACHE:-"$ROOT/build/smoke-readonly-cache"}
 DATA=${SMOKE_DATA:-"$ROOT/build/smoke-readonly-home"}
 OUT=${SMOKE_OUT:-"$ROOT/build/smoke-readonly-last.json"}
-mkdir -p "$CACHE" "$DATA"
+mkdir -p "$DATA"
+
+# 每次都用空缓存：app 先读缓存再刷新，复用旧缓存会让离线运行从上次的数据通过。
+# SMOKE_CACHE 供调试时显式指定；否则在 build/ 下建一次性目录，退出时移进回收站。
+if [ -n "${SMOKE_CACHE:-}" ]; then
+    CACHE=$SMOKE_CACHE
+    mkdir -p "$CACHE"
+else
+    mkdir -p "$ROOT/build"
+    CACHE=$(mktemp -d "$ROOT/build/smoke-readonly-cache.XXXXXX")
+    trap 'gio trash "$CACHE" 2>/dev/null || true' EXIT
+fi
+
+# 空缓存 + 断网时所有请求都会失败；先把原因说清楚
+if ! python3 -c 'import socket; socket.create_connection(("music.163.com", 443), timeout=5)' 2>/dev/null; then
+    echo "FAIL 网络不可达：smoke-readonly 每次都用空缓存，需要真实网络才能通过"
+    exit 1
+fi
 
 export DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent
 export XDG_CACHE_HOME="$CACHE"

@@ -4,7 +4,9 @@
 用法: check_contract.py <dump.json> <Data.js> <Personal.js>
 参照快照与 dump 必须是同一种会话（都带 cookie，或都匿名：snapshot.py --anonymous --out DIR）。
 数据形状的唯一定义是 snapshot.py；这里不另写一份。
-只比键名与类型（列表元素形状 = 首元素），不比任何值；不一致即非零退出。
+只比键名与类型（列表元素形状 = 首元素），不比任何值。
+参照非空而 dump 为空的列表算失配，EMPTY_OK 里按需加载的除外。
+退出码：0 = 全部一致；1 = 形状不一致；2 = dump 离线/无数据，没法比较。
 """
 import json
 import re
@@ -14,6 +16,24 @@ TYPE_NAMES = {
     type(None): "null", bool: "bool", int: "number", float: "number",
     str: "string", list: "list", dict: "map",
 }
+
+# 参照非空、dump 为空仍算合法的列表：
+# - lyrics / 热评 / 搜索：按需数据，dump 只是试探性请求，取不到不算形状错误；
+# - cloud.tracks：新账号的云盘本来就没有上传。
+# 云盘之外的首屏列表（tracks / daily / radar / liked …）不在此列，空了就是请求失败。
+EMPTY_OK = {
+    "data.lyrics",
+    "data.comments.items",
+    "data.search.songs",
+    "data.search.artists",
+    "data.search.playlists",
+    "data.search.albums",
+    "data.search.mvs",
+    "personal.cloud.tracks",
+}
+
+# 首屏必有的列表；全空说明 dump 时没有网络（或请求全部失败），不是形状问题
+FIRST_SCREEN = ("toplists", "tracks", "hotSearches")
 
 
 def kind(value):
@@ -37,9 +57,8 @@ def walk(a, b, path, out):
     elif isinstance(a, list):
         if a and b:
             walk(a[0], b[0], path + "[]", out)
-        elif a and not b:
-            # 空列表是「没有数据」，不是形状错误（云盘为空、按需加载的歌词还没取）；列出来但不算失败
-            print(f"not checked (empty): {path}[]")
+        elif a and not b and path not in EMPTY_OK:
+            out.append(f"{path}: expected non-empty list got empty")
 
 
 def load_js(path):
@@ -69,7 +88,17 @@ def main():
         sys.exit(__doc__)
     dump_path, data_js, personal_js = sys.argv[1:]
     dump = json.load(open(dump_path, encoding="utf-8"))
-    mismatches = report("data", load_js(data_js), dump.get("data", {}))
+    ref = load_js(data_js)
+    # 参照有首屏数据而 dump 首屏全空：这是一次离线的 dump，先报原因而不是形状失配
+    ref_has_data = any(isinstance(ref.get(k), list) and ref[k] for k in FIRST_SCREEN)
+    dump_has_data = any(isinstance(dump.get("data", {}).get(k), list) and dump["data"][k]
+                        for k in FIRST_SCREEN)
+    if ref_has_data and not dump_has_data:
+        print(f"{dump_path}: dump 没有数据（首屏 toplists/tracks/hotSearches 全空）；"
+              "多半是抓取时没有网络，或所有请求都失败了。检查网络后重新生成 dump。",
+              file=sys.stderr)
+        sys.exit(2)
+    mismatches = report("data", ref, dump.get("data", {}))
     mismatches += report("personal", load_js(personal_js), dump.get("personal", {}))
     for line in mismatches:
         print(line)
