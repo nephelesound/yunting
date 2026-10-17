@@ -56,6 +56,13 @@ Kirigami.ApplicationWindow {
         target: playback.engine
         function onFailed(reason) { root.showPassiveNotification(reason); }
     }
+    // 媒体键 / 锁屏 / Plasma 媒体控件的上一首、下一首：同样走 Playback，切歌规则只有一份
+    Connections {
+        target: root.backend ? root.backend.mpris : null
+        ignoreUnknownSignals: true
+        function onNextRequested() { playback.next(); }
+        function onPreviousRequested() { playback.previous(); }
+    }
 
     readonly property var currentTrack: playback.current
     property bool liked: false
