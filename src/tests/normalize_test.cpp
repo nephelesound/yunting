@@ -133,6 +133,27 @@ private slots:
         QCOMPARE(cloud.value("blockedBy").toString(), QString());
     }
 
+    // 评论的楼中楼回复数来自 showFloorComment.replyCount；没有这个对象时为 0，字段始终存在
+    void commentCarriesReplyCount()
+    {
+        const QJsonObject withReplies{
+            {"commentId", 7}, {"content", "hi"}, {"likedCount", 3}, {"time", 10},
+            {"user", QJsonObject{{"userId", 1}, {"nickname", "u"}}},
+            {"showFloorComment", QJsonObject{{"replyCount", 14}, {"comments", QJsonValue::Null}}},
+        };
+        const QVariantMap comment = ncmComment(withReplies);
+        QCOMPARE(comment.value("id").toDouble(), 7.0);
+        QCOMPARE(comment.value("replyCount").toDouble(), 14.0);
+
+        const QVariantMap absent = ncmComment(QJsonObject{{"commentId", 8}});
+        QVERIFY(absent.contains("replyCount"));
+        QCOMPARE(absent.value("replyCount").toDouble(), 0.0);
+
+        const QVariantMap nullFloor =
+            ncmComment(QJsonObject{{"commentId", 9}, {"showFloorComment", QJsonValue::Null}});
+        QCOMPARE(nullFloor.value("replyCount").toDouble(), 0.0);
+    }
+
     void lrcTranslationMatchesTimestamp()
     {
         const QString lrc = QStringLiteral("[00:01.00]hello\n[00:03.50]world\n");

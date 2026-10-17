@@ -39,6 +39,10 @@ FIRST_SCREEN = ("toplists", "tracks", "hotSearches")
 # 所以单独点一次名，避免可播性字段悄悄从某一边消失。
 TRACK_FIELDS = ("playable", "blockedBy")
 
+# 每条归一化评论（有 likes 与 beReplied）都必须带 replyCount。两侧同时漏掉时通用 walk 比不出来，
+# 所以像 TRACK_FIELDS 一样单独点名，避免回复数悄悄从某一边消失。
+COMMENT_FIELDS = ("replyCount",)
+
 
 def kind(value):
     t = type(value)
@@ -53,6 +57,10 @@ def walk(a, b, path, out):
     if isinstance(a, dict):
         if "id" in a and "fee" in a:
             for key in TRACK_FIELDS:
+                if key not in a and key not in b:
+                    out.append(f"{path}.{key}: missing from both sides")
+        if "likes" in a and "beReplied" in a:
+            for key in COMMENT_FIELDS:
                 if key not in a and key not in b:
                     out.append(f"{path}.{key}: missing from both sides")
         for k in sorted(set(a) | set(b)):

@@ -455,12 +455,12 @@ private slots:
     void commentLikeUpdatesThenRollsBack()
     {
         m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
-            if (req.path.startsWith("/api/v1/resource/hotcomments/")) {
-                respond(200, "{\"code\":200,\"hotComments\":["
+            if (req.path == "/api/v2/resource/comments") {
+                respond(200, "{\"code\":200,\"data\":{\"comments\":["
                              "{\"commentId\":500,\"content\":\"a\",\"likedCount\":10,"
                              "\"liked\":false,\"time\":1,\"user\":{\"userId\":7,\"nickname\":\"u\"}},"
                              "{\"commentId\":501,\"content\":\"b\",\"likedCount\":20,"
-                             "\"liked\":true,\"time\":2,\"user\":{\"userId\":8,\"nickname\":\"v\"}}]}");
+                             "\"liked\":true,\"time\":2,\"user\":{\"userId\":8,\"nickname\":\"v\"}}]}}");
                 return;
             }
             if (req.path == "/weapi/v1/comment/like") {
@@ -490,6 +490,123 @@ private slots:
         const QVariantMap second = m_store->data().value("comments").toMap().value("items").toList().at(1).toMap();
         QVERIFY(second.value("liked").toBool());
         QCOMPARE(second.value("likes").toDouble(), 20.0);
+    }
+
+    // 评论走 v2：热评 sortType=2，最新页 sortType=3 带着上一页的 cursor 翻页；replyCount 进归一化结果
+    void commentsUseV2WithCursorAndReplyCounts()
+    {
+        int hotRequests = 0;
+        bool sawSecondPageCursor = false;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path != "/api/v2/resource/comments") {
+                respond(200, "{\"code\":200}");
+                return;
+            }
+            const QUrlQuery q(QString::fromLatin1(req.query));
+            const QString sort = q.queryItemValue(QStringLiteral("sortType"));
+            const QString cursor = q.queryItemValue(QStringLiteral("cursor"));
+            const auto comment = [](double id, double time, int replies) {
+                return QJsonObject{{"commentId", id}, {"content", "c"}, {"likedCount", 1},
+                                   {"time", time}, {"liked", false},
+                                   {"user", QJsonObject{{"userId", 1}, {"nickname", "u"}}},
+                                   {"showFloorComment", QJsonObject{{"replyCount", replies}}}};
+            };
+            if (sort == QLatin1String("2")) {
+                ++hotRequests;
+                respond(200, json(QJsonObject{{"code", 200}, {"data", QJsonObject{
+                    {"comments", QJsonArray{comment(10, 30, 14), comment(11, 29, 0)}},
+                    {"cursor", "normalHot#2"}, {"hasMore", false}, {"totalCount", 2}}}}));
+                return;
+            }
+            if (sort != QLatin1String("3")) {
+                respond(200, "{\"code\":400}");
+                return;
+            }
+            if (cursor.isEmpty()) {
+                respond(200, json(QJsonObject{{"code", 200}, {"data", QJsonObject{
+                    {"comments", QJsonArray{comment(20, 20, 2), comment(21, 19, 0)}},
+                    {"cursor", "19"}, {"hasMore", true}, {"totalCount", 3}}}}));
+                return;
+            }
+            sawSecondPageCursor = cursor == QLatin1String("19");
+            respond(200, json(QJsonObject{{"code", 200}, {"data", QJsonObject{
+                {"comments", QJsonArray{comment(22, 18, 5)}},
+                {"cursor", "18"}, {"hasMore", false}, {"totalCount", 3}}}}));
+        };
+
+        m_store->request(QStringLiteral("comments:77"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("comments").toMap().value("items").toList().size() == 2;
+        }));
+        const QVariantList hot = m_store->data().value("comments").toMap().value("items").toList();
+        QCOMPARE(hot.first().toMap().value("replyCount").toDouble(), 14.0);
+        QCOMPARE(hot.last().toMap().value("replyCount").toDouble(), 0.0);
+        QCOMPARE(hotRequests, 1);
+
+        m_store->request(QStringLiteral("comments:77:0"));
+        QVERIFY(waitUntil([&] {
+            const QVariantMap page = m_store->data().value("commentPage").toMap();
+            return page.value("offset").toInt() == 0 && page.value("items").toList().size() == 2;
+        }));
+        QVariantMap page = m_store->data().value("commentPage").toMap();
+        QCOMPARE(page.value("total").toDouble(), 3.0);
+        QCOMPARE(page.value("more").toBool(), true);
+        QCOMPARE(page.value("items").toList().first().toMap().value("replyCount").toDouble(), 2.0);
+
+        m_store->request(QStringLiteral("comments:77:2"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("commentPage").toMap().value("offset").toInt() == 2;
+        }));
+        page = m_store->data().value("commentPage").toMap();
+        QVERIFY(sawSecondPageCursor);
+        QCOMPARE(page.value("total").toDouble(), 3.0);
+        QCOMPARE(page.value("more").toBool(), false);
+        QCOMPARE(page.value("items").toList().first().toMap().value("id").toDouble(), 22.0);
+        QCOMPARE(page.value("items").toList().first().toMap().value("replyCount").toDouble(), 5.0);
+    }
+
+    // 冷启动直接要第 N 页（CLI / 缓存清空）时没有上一页的 cursor：从头顺序补，不能把第一页当成第 N 页
+    void commentPageAfterColdOffsetWalksCursors()
+    {
+        int requests = 0;
+        bool secondPageGotCursor = false;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path != "/api/v2/resource/comments") {
+                respond(200, "{\"code\":200}");
+                return;
+            }
+            ++requests;
+            const QUrlQuery q(QString::fromLatin1(req.query));
+            QJsonArray comments;
+            if (q.queryItemValue(QStringLiteral("cursor")).isEmpty()) {
+                for (int i = 0; i < 20; ++i) {
+                    comments.append(QJsonObject{
+                        {"commentId", 100 + i}, {"content", "c"}, {"time", 1000 - i},
+                        {"user", QJsonObject{{"userId", 1}, {"nickname", "u"}}},
+                        {"showFloorComment", QJsonObject{{"replyCount", i}}},
+                    });
+                }
+                respond(200, json(QJsonObject{{"code", 200}, {"data", QJsonObject{
+                    {"comments", comments}, {"cursor", "981"}, {"hasMore", true},
+                    {"totalCount", 21}}}}));
+                return;
+            }
+            secondPageGotCursor = q.queryItemValue(QStringLiteral("cursor")) == QLatin1String("981")
+                                  && q.queryItemValue(QStringLiteral("pageNo")) == QLatin1String("2");
+            respond(200, json(QJsonObject{{"code", 200}, {"data", QJsonObject{
+                {"comments", QJsonArray{QJsonObject{{"commentId", 200}, {"content", "c"},
+                                                    {"time", 980}, {"user", QJsonObject{}}}}},
+                {"cursor", "980"}, {"hasMore", false}, {"totalCount", 21}}}}));
+        };
+
+        m_store->request(QStringLiteral("comments:77:20"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("commentPage").toMap().value("offset").toInt() == 20;
+        }));
+        const QVariantMap page = m_store->data().value("commentPage").toMap();
+        QVERIFY(secondPageGotCursor);
+        QCOMPARE(requests, 2);
+        QCOMPARE(page.value("items").toList().first().toMap().value("id").toDouble(), 200.0);
     }
 
     // 用户主页：资料 + 公开歌单都进 data.user
@@ -737,6 +854,22 @@ private slots:
         m_store->request(QStringLiteral("playlist:999"));
         QVERIFY(waitUntil([&] { return failed.count() == 1; }));
         QCOMPARE(failed.first().at(0).toString(), QStringLiteral("playlist:999"));
+    }
+
+    // 楼中楼失败按完整请求 key 报错，界面才能定位到具体评论并重试
+    void commentRepliesFailureUsesFullKey()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/weapi/resource/comment/floor/get") {
+                respond(200, "{\"code\":500}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        QSignalSpy failed(m_store, &Store::requestFailed);
+        m_store->request(QStringLiteral("commentReplies:9:500"));
+        QVERIFY(waitUntil([&] { return failed.count() == 1; }));
+        QCOMPARE(failed.first().at(0).toString(), QStringLiteral("commentReplies:9:500"));
     }
 
     // 301 不只出现在红心/评论：任何个人写路径都必须置 sessionExpired 并给统一的过期句子

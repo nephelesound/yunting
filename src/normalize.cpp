@@ -205,14 +205,17 @@ QVariantMap ncmComment(const QJsonObject &c)
         // 楼中楼：parentId 指向父评论；beReplied 是被引用的那条，前端据此画「回复 @某人」
         {"parentId", c.value("parentCommentId").toDouble()},
         {"beReplied", replied},
+        // 楼中楼回复数只在新版接口的 showFloorComment 里；没有这个对象（旧接口、无回复）归 0
+        {"replyCount", numOr(c.value("showFloorComment").toObject(), "replyCount")},
     };
 }
 
 QVariantMap ncmHotComments(const QJsonObject &resp, double songId)
 {
-    // 实测热评在顶层 hotComments（不在 data 里），保持接口给的顺序，最多 10 条
+    // v2 接口把热评放在 data.comments，保持接口给的顺序，最多 10 条
     QVariantList items;
-    for (const QJsonValue &v : take(resp.value("hotComments").toArray(), 10))
+    const QJsonObject data = resp.value("data").toObject();
+    for (const QJsonValue &v : take(data.value("comments").toArray(), 10))
         items.append(ncmComment(v.toObject()));
     return {{"songId", songId}, {"items", items}};
 }

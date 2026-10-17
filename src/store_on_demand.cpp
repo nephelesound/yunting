@@ -21,6 +21,26 @@ bool businessOk(const QJsonObject &resp)
     const QJsonValue code = resp.value("code");
     return code.isUndefined() || code.toInt() == 200;
 }
+
+constexpr int kCommentPageSize = 20;
+
+// 全部评论按 offset 对外（comments:<id>:<offset>），v2 接口却按 cursor 翻页：cursor 是上一页
+// 最后一条的时间。它单独存进 QueryCache，与页面同寿命，缓存命中时也能接着翻页。
+QString commentCursorKey(double songId, int offset)
+{
+    return QStringLiteral("commentCursor:%1:%2").arg(qlonglong(songId)).arg(offset);
+}
+
+QUrlQuery commentPageQuery(double songId, int offset, const QString &cursor)
+{
+    QUrlQuery q = query({{"threadId", QStringLiteral("R_SO_4_%1").arg(qlonglong(songId))},
+                         {"pageNo", QString::number(offset / kCommentPageSize + 1)},
+                         {"pageSize", QString::number(kCommentPageSize)},
+                         {"sortType", "3"}});
+    if (!cursor.isEmpty())
+        q.addQueryItem(QStringLiteral("cursor"), cursor);
+    return q;
+}
 } // namespace
 
 void Store::maybeFetchSimilar()
@@ -248,39 +268,77 @@ void Store::requestSearch(const QString &key, const QString &raw)
         });
 }
 
-// 全部评论分页：按时间倒序（接口 comments 数组），每页 20 条，10 分钟缓存
+// 全部评论分页：v2 接口按时间倒序（sortType=3），对外仍是每页 20 条的 offset 分页，10 分钟缓存
 void Store::requestCommentPage(const QString &key, double songId, int offset)
 {
     m_cache.query(key,
         [this, songId, offset](QueryCache::Done done) {
-            m_client->get(QStringLiteral("api/v1/resource/comments/R_SO_4_%1").arg(qlonglong(songId)),
-                          query({{"limit", "20"}, {"offset", QString::number(offset)}}), false,
-                          [done, songId, offset](const QJsonDocument &doc, bool ok) {
-                const QJsonObject resp = body(doc);
-                QVariantList items;
-                for (const QJsonValue &v : arr(resp, "comments"))
-                    items.append(ncmComment(v.toObject()));
-                const double total = resp.value("total").toDouble();
-                done(QVariantMap{{"songId", songId},
-                                 {"offset", offset},
-                                 {"total", total},
-                                 {"more", resp.value("more").toBool()
-                                              || (total > 0 && offset + items.size() < total)},
-                                 {"items", items}},
-                     ok && resp.value("code").toInt() == 200);
-            });
+            // 正常翻页时上一页的 cursor 已记录；冷启动直接要第 N 页时从头顺序补游标，
+            // 不能把第一页当成第 N 页。走到目标页之前的回包只用于取 cursor。
+            const auto fetch = std::make_shared<std::function<void(int, const QString &)>>();
+            *fetch = [this, songId, offset, done, fetch](int pageOffset, const QString &cursor) {
+                m_client->get(QStringLiteral("api/v2/resource/comments"),
+                              commentPageQuery(songId, pageOffset, cursor), false,
+                              [this, songId, offset, done, fetch, pageOffset](const QJsonDocument &doc, bool ok) {
+                    const QJsonObject resp = body(doc);
+                    if (!ok || resp.value("code").toInt() != 200) {
+                        done({}, false);
+                        return;
+                    }
+                    const QJsonObject data = resp.value("data").toObject();
+                    const QJsonArray comments = data.value("comments").toArray();
+                    if (pageOffset != offset) {
+                        if (comments.isEmpty()) {
+                            done({}, false);
+                            return;
+                        }
+                        if (offset < pageOffset + int(comments.size())) {
+                            // 目标页在这批评论中间：用前一条的时间当游标
+                            const QJsonObject before = comments.at(offset - pageOffset - 1).toObject();
+                            (*fetch)(offset, QString::number(qlonglong(before.value("time").toDouble())));
+                            return;
+                        }
+                        const QString next = data.value("cursor").toString();
+                        if (next.isEmpty()) {
+                            done({}, false);
+                            return;
+                        }
+                        (*fetch)(pageOffset + int(comments.size()), next);
+                        return;
+                    }
+                    QVariantList items;
+                    for (const QJsonValue &v : comments)
+                        items.append(ncmComment(v.toObject()));
+                    const double total = data.value("totalCount").toDouble();
+                    const bool more = data.value("hasMore").toBool();
+                    const QString next = data.value("cursor").toString();
+                    if (more && !items.isEmpty() && !next.isEmpty())
+                        m_cache.remember(commentCursorKey(songId, offset + int(items.size())), next);
+                    done(QVariantMap{{"songId", songId},
+                                     {"offset", offset},
+                                     {"total", total},
+                                     {"more", more},
+                                     {"items", items}},
+                         true);
+                });
+            };
+            const QString cursor = offset > 0
+                                       ? m_cache.peek(commentCursorKey(songId, offset)).toString()
+                                       : QString();
+            (*fetch)(cursor.isEmpty() ? 0 : offset, cursor);
         },
         [this](const QVariant &page) { put("commentPage", page, false); });
 }
 
-// 热门评论：写回 data.comments（10 分钟新鲜期，落盘）；保持接口顺序，最多 10 条
+// 热门评论：v2 按热度排序，写回 data.comments（10 分钟新鲜期，落盘）；保持接口顺序，最多 10 条
 void Store::requestComments(const QString &key, double songId)
 {
     m_cache.query(key,
         [this, songId](QueryCache::Done done) {
-            const QString path = QStringLiteral("api/v1/resource/hotcomments/R_SO_4_%1")
-                                     .arg(qlonglong(songId));
-            m_client->get(path, query({{"limit", "10"}}), false,
+            m_client->get(QStringLiteral("api/v2/resource/comments"),
+                          query({{"threadId", QStringLiteral("R_SO_4_%1").arg(qlonglong(songId))},
+                                 {"pageNo", "1"}, {"pageSize", "10"}, {"sortType", "2"}}),
+                          false,
                           [done, songId](const QJsonDocument &doc, bool ok) {
                 const QJsonObject resp = body(doc);
                 done(ncmHotComments(resp, songId), ok && businessOk(resp));

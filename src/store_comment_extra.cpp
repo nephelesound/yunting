@@ -24,7 +24,9 @@ void Store::requestCommentReplies(double songId, double commentId, qint64 before
                         [this, songId, commentId, before](const QJsonDocument &doc, bool ok) {
         const QJsonObject root = body(doc);
         if (!ok || root.value("code").toInt() != 200) {
-            emit requestFailed(QStringLiteral("commentReplies"), QStringLiteral("暂时取不到评论回复"));
+            // 按请求 key 报错：界面按 commentReplies:<songId>:<commentId> 找到这一槽并重试
+            emit requestFailed(QStringLiteral("commentReplies:%1:%2").arg(num(songId), num(commentId)),
+                               QStringLiteral("暂时取不到评论回复"));
             return;
         }
         QJsonArray source = root.value("data").toObject().value("comments").toArray();

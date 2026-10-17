@@ -25,9 +25,10 @@ QVariantMap ncmSearchPlaylist(const QJsonObject &p);
 QVariantMap ncmSearchAlbum(const QJsonObject &a);
 QVariantMap ncmSearchMv(const QJsonObject &m);
 QVariantList ncmTracks(const QJsonArray &items, const QJsonArray &privileges = QJsonArray());
-// 热门评论：data.comments 的取数形状（snapshot.py 的 hot_comments）
+// 热门评论：v2 接口 data.comments 的取数形状（snapshot.py 的 hot_comments）
 QVariantMap ncmHotComments(const QJsonObject &resp, double songId);
-// 单条评论：热评、分页、楼中楼共用同一套字段，避免三个地方各写一份、字段漂移
+// 单条评论：热评、分页、楼中楼共用同一套字段，避免三个地方各写一份、字段漂移。
+// replyCount 来自 showFloorComment.replyCount，缺失为 0。
 QVariantMap ncmComment(const QJsonObject &c);
 // 账户与用户主页共用的 profile 映射：avatar/background 尺寸由调用方决定
 QVariantMap ncmProfile(const QJsonObject &p, int avatarPx, int backgroundPx);
