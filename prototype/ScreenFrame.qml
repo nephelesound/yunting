@@ -38,8 +38,10 @@ Kirigami.Page {
 
             PageTitle {
                 id: title
+                // 宽度：想要 naturalWidth，空间不够时被压缩（最后一项省略）；不读子项宽度，避免绑定环
                 Layout.fillWidth: true
-                Layout.maximumWidth: implicitWidth
+                Layout.preferredWidth: naturalWidth
+                Layout.maximumWidth: naturalWidth
                 onPivotActivated: key => screen.pivotActivated(key)
                 onParentActivated: screen.leaveRequested()
             }
@@ -83,6 +85,8 @@ Kirigami.Page {
                 implicitHeight: Tokens.height7
                 name: screen.loggedIn ? Source.account.name : ""
                 source: screen.loggedIn ? Source.sized(Source.account.avatar, 96) : ""
+                // 没有图片时用通用人像图标：中文名取首字母会显示成乱码
+                initialsMode: Components.Avatar.InitialsMode.UseIcon
             }
             Label {
                 text: Source.sessionExpired ? "登录已过期" : screen.loggedIn ? Source.account.name : "未登录"

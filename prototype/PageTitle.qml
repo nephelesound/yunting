@@ -2,6 +2,7 @@
 //   顶层页：各枢轴并排，当前实色、其余淡出，点淡出的切换；
 //   子页：「上级  本页」面包屑，上级淡出、点它返回（代替返回箭头，标题不因返回键而右移）；
 //   否则：只有页名。
+// 宽度由所在的布局给定；放不下时最后一项（本页名，常是很长的歌名）省略，绝不越过右侧的账号区。
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -22,15 +23,36 @@ Row {
         ? [{ key: "..", text: title.parentText }, { key: "", text: title.text }]
         : title.pivots.length > 0 ? title.pivots : [{ key: "", text: title.text }]
 
+    // 不省略时需要的宽度：由一排不可见、不省略、同样式的标签量出来（字体与可见标签完全一致），
+    // 不读可见标签的宽度，避免与省略形成绑定环；布局用它做首选与最大宽度
+    readonly property real naturalWidth: probe.implicitWidth
+    Row {
+        id: probe
+        visible: false   // Row 定位器跳过不可见的子项，不占位
+        spacing: title.spacing
+        Repeater {
+            model: title.items
+            delegate: Label {
+                required property var modelData
+                text: modelData.text
+                font.pixelSize: Tokens.text4xl
+                font.weight: Font.Light
+            }
+        }
+    }
+
     spacing: Tokens.space6
+    clip: true
 
     Repeater {
         model: title.items
         delegate: Label {
             id: item
             required property var modelData
+            required property int index
             readonly property bool active: modelData.key === title.current || modelData.key === ""
 
+            width: Math.max(0, Math.min(implicitWidth, title.width - item.x))
             text: modelData.text
             font.pixelSize: Tokens.text4xl
             font.weight: Font.Light

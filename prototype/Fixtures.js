@@ -9,29 +9,44 @@ var C1 = "http://p1.music.126.net/H2DFRdwP2y5SuCAn-Tuikw==/109951172568091306.jp
 var C2 = "https://p1.music.126.net/urByD_AmfBDBrs7fA9-O8A==/109951167976973225.jpg?param=300y300";
 var BROKEN = "https://p1.music.126.net/does-not-exist/0.jpg?param=120y120";
 
-function t(id, name, artist, album, dur, fee, cover) {
-    return { id: id, name: name, artist: artist, album: album, dur: dur, fee: fee, cover: cover };
+// x：可选的新字段（alias 别名 / quality 音质 / reason 推荐理由 / mv）
+function t(id, name, artist, album, dur, fee, cover, x) {
+    x = x || {};
+    return { id: id, name: name, artist: artist, album: album, dur: dur, fee: fee, cover: cover,
+             alias: x.alias || "", quality: x.quality || "", reason: x.reason || "", mv: x.mv || 0 };
 }
 
 // 前几行各带一种失败，像真实数据那样混在一起
 var worstTracks = [
-    t(901, "我想要两颗西柚（Live）- 2023 网易云音乐年度盛典现场版", "茄子蛋", "2023 网易云音乐年度盛典 Live 合辑", 251, 1, C1),
-    t(902, "Pretender", "Official髭男dism / Aimer / LiSA / 藤井風 / 米津玄師 / King Gnu", "Traveler", 326, 4, C2),
-    t(903, "雨", "A", "", 61, 0, ""),
+    t(901, "我想要两颗西柚（Live）- 2023 网易云音乐年度盛典现场版", "茄子蛋", "2023 网易云音乐年度盛典 Live 合辑", 251, 1, C1,
+      { alias: "电视剧《我的人间烟火》片尾曲·特别企划合唱版", quality: "hires", reason: "根据你喜欢的单曲《浪子回头》以及最近常听的台语独立音乐推荐" }),
+    t(902, "Pretender", "Official髭男dism / Aimer / LiSA / 藤井風 / 米津玄師 / King Gnu", "Traveler", 326, 4, C2,
+      { alias: "伪装者", quality: "lossless", reason: "猜你喜欢" }),
+    t(903, "雨", "A", "", 61, 0, "", { quality: "lossless" }),
     t(904, "Lo-fi Hip Hop Radio - beats to relax/study to (3 Hour Mix)", "Lofi Girl", "Lofi Girl Mixes Vol. 12: Late Night Study Session", 10835, 8, BROKEN),
-    t(905, "Supercalifragilisticexpialidocious (From \"Mary Poppins\" / Soundtrack Version)", "Julie Andrews / Dick Van Dyke / The Pearlies", "Mary Poppins (Original Motion Picture Soundtrack / 50th Anniversary Edition)", 0, 1, C1),
+    t(905, "Supercalifragilisticexpialidocious (From \"Mary Poppins\" / Soundtrack Version)", "Julie Andrews / Dick Van Dyke / The Pearlies", "Mary Poppins (Original Motion Picture Soundtrack / 50th Anniversary Edition)", 0, 1, C1,
+      { quality: "hires", alias: "欢乐满人间" }),
     t(906, "😭😭😭", "🌙", "🌙", 199, 8, C2),
 ];
 for (var i = 7; i <= 1200; i++)
-    worstTracks.push(t(900 + i, "第 " + i + " 首：平凡的一天", "毛不易", "平凡的一天", 240, i % 3 === 0 ? 1 : 8, i % 7 === 0 ? "" : C1));
+    worstTracks.push(t(900 + i, "第 " + i + " 首：平凡的一天", "毛不易", "平凡的一天", 240, i % 3 === 0 ? 1 : 8, i % 7 === 0 ? "" : C1,
+                       { quality: i % 2 ? "lossless" : "", reason: i % 5 === 0 ? "最近常听" : "" }));
 
 var worstLyrics = [
-    { t: 0, text: "作词 : Official髭男dism　作曲 : Official髭男dism　编曲 : Official髭男dism / 蔦谷好位置" },
-    { t: 10, text: "もっと違う設定で もっと違う関係で 出会える世界線 選べたらよかった（更长的一句日文歌词，看它在半屏宽度里会不会被截断）" },
-    { t: 20, text: "纯音乐，请欣赏" },
-    { t: 30, text: "" },
-    { t: 40, text: "最后一句" },
+    { t: 0, text: "作词 : Official髭男dism　作曲 : Official髭男dism　编曲 : Official髭男dism / 蔦谷好位置", tr: "" },
+    { t: 10, text: "もっと違う設定で もっと違う関係で 出会える世界線 選べたらよかった（更长的一句日文歌词，看它在半屏宽度里会不会被截断）",
+      tr: "如果能选择一个以不同的设定、不同的关系相遇的世界线就好了（同样很长的一句译文，看它会不会被截断）" },
+    { t: 20, text: "纯音乐，请欣赏", tr: "" },
+    { t: 30, text: "", tr: "" },
+    { t: 40, text: "最后一句", tr: "the last line" },
 ];
+
+var worstComments = { songId: 903, items: [
+    { user: "一只想要变成猫但是没有成功的柴犬Official", avatar: C2, likes: 1284567, time: 1700000000000,
+      content: "第一次听这首歌是在高三晚自习结束后回家的路上，耳机里放着它，路灯一盏一盏往后退。那时候觉得未来很远，现在回头看，原来那就是最好的时候。这条评论写得很长，用来看评论在半屏宽度里最多显示几行、省略号落在哪里。还要再长一点，再长一点，再长一点。" },
+    { user: "A", avatar: "", likes: 1, time: 1700000000000, content: "好" },
+    { user: "🌙", avatar: BROKEN, likes: 99999, time: 1700000000000, content: "😭😭😭" },
+] };
 
 var worstHot = [];
 for (var h = 1; h <= 20; h++)
@@ -63,8 +78,9 @@ var worst = {
         ],
         playlist: { id: 3778678, name: "网易云音乐 2026 年度听歌报告：你最常在深夜循环的 200 首歌", cover: "", description: "这是一段非常长的歌单简介，包含换行。\n第二段说明它是怎么生成的，以及更新频率、数据口径、收录规则和版权说明，足够把三行占满还溢出。", count: 12345, plays: 99999999999 },
         tracks: worstTracks.slice(0, 200),
-        lyricsTrackId: 902,
+        lyricsTrackId: 903,   // 原型的「正在播放」是热歌榜第 3 首
         lyrics: worstLyrics,
+        comments: worstComments,
     },
     personal: {
         account: { name: "一只想要变成猫但是没有成功的柴犬Official", vip: false, avatar: "" },
@@ -73,6 +89,7 @@ var worst = {
         radar: { id: 3136952023, name: "私人雷达", description: "今天《我想要两颗西柚（Live）- 2023 网易云音乐年度盛典现场版》爱不释耳", cover: BROKEN, tracks: worstTracks.slice(0, 30) },
         similar: { seed: worstTracks[0], tracks: [] },
         liked: { id: 1, count: 12345, tracks: worstTracks },
+        likedIds: [901, 902, 905, 906],
         recent: { total: 99999, tracks: worstTracks.slice(0, 30) },
         cloud: { count: 1284, size: 64315222016, maxSize: 64424509440, tracks: worstTracks.slice(0, 30) },
         mine: [

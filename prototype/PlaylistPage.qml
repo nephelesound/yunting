@@ -105,6 +105,7 @@ ScreenFrame {
                 width: tracks.width - tracks.rightMargin
                 ranked: page.list.ranked || false
                 current: modelData.id === page.currentId
+                showReason: page.list.showReason || false
                 locked: modelData.fee === 4 || (!page.vip && modelData.fee === 1)
                 onActivated: index => page.activated(index)
             }

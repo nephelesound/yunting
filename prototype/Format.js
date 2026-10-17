@@ -23,3 +23,8 @@ function elapsed(seconds) {
 function restriction(fee) {
     return fee === 1 ? "VIP" : fee === 4 ? "付费" : "";
 }
+
+// 音质标签：Hi-Res / 无损；极高及以下不标（几乎所有歌都有，标了没信息量）
+function quality(q) {
+    return q === "hires" ? "Hi-Res" : q === "lossless" ? "无损" : "";
+}

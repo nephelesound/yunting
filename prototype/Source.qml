@@ -52,6 +52,24 @@ QtObject {
         playlistDetails: source.p.playlistDetails || {},
     })
 
+    // ── 红心：id → true 的查找表（一千多首，逐行查要 O(1)）──
+    readonly property var likedSet: {
+        const set = {};
+        for (const id of (source.p.likedIds || []))
+            set[id] = true;
+        return set;
+    }
+    function isLiked(id) { return source.likedSet[id] === true; }
+
+    // ── 热门评论：只有 live 按需取；快照里带的是歌词那首的 ──
+    function comments(songId) {
+        const c = source.d.comments;
+        if (c && c.songId === songId)
+            return c.items;
+        source.need("comments:" + songId);
+        return [];
+    }
+
     // ── 账号 ──
     readonly property var account: source.p.account   // null = 没有登录快照
 
@@ -146,6 +164,7 @@ QtObject {
         switch (key) {
         case "daily": return {
             heading: "每日推荐", cover: source.sized(source.firstCover(p.daily.tracks), 560), tracks: p.daily.tracks,
+            showReason: true,
             facts: [{ label: p.daily.date }, source.songs(p.daily.tracks.length)],
             description: "根据你的口味生成，每天 6:00 更新", emptyText: "今天的推荐还在生成，稍后再来" };
         case "heart": return {

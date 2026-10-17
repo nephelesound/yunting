@@ -49,7 +49,7 @@ build/dark/kdeglobals:
 SHOTS = home:page=home home-anon:account=anonymous,page=home charts:page=charts \
         daily:listKey=daily,page=list hot:listKey=hot,page=list nowplaying:page=nowplaying mine-anon:account=anonymous,page=mine \
         worst-home:fixture=worst,page=home worst-daily:fixture=worst,listKey=daily,page=list worst-charts:fixture=worst,page=charts \
-        worst-nowplaying:fixture=worst,page=nowplaying empty-home:fixture=empty,page=home empty-daily:fixture=empty,listKey=daily,page=list \
+        worst-nowplaying:fixture=worst,page=nowplaying worst-comments:fixture=worst,nowPlayingPane=comments,page=nowplaying empty-home:fixture=empty,page=home empty-daily:fixture=empty,listKey=daily,page=list \
         one-home:fixture=one,page=home one-daily:fixture=one,listKey=daily,page=list \
         queue:page=home,startOverlay=queue empty-queue:fixture=empty,page=home,startOverlay=queue \
         login:account=anonymous,page=home,startOverlay=login login-scanned:account=anonymous,page=home,loginState=scanned,startOverlay=login \

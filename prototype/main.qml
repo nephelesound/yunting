@@ -92,7 +92,6 @@ Kirigami.ApplicationWindow {
     }
 
     readonly property var currentTrack: playback.current
-    property bool liked: false
 
     // 关掉再打开回到原样（只在应用里；原型与截图不读不写）
     Loader {
@@ -103,7 +102,8 @@ Kirigami.ApplicationWindow {
         }
     }
 
-    // 截图 harness 用：模拟离线 / 登录过期
+    // 截图 harness 用：正在播放页右栏（lyrics | comments）、模拟离线 / 登录过期
+    property string nowPlayingPane: "lyrics"
     property bool simulateOffline: false
     property bool simulateExpired: false
     onSimulateOfflineChanged: Source.simulateOffline = root.simulateOffline
@@ -116,7 +116,7 @@ Kirigami.ApplicationWindow {
         if (root.backend)
             return;
         playback.restore(Source.hotChart.tracks, 2);
-        simEngine.position = Math.min(83, simEngine.duration);
+        simEngine.position = Math.min(83, Math.floor(simEngine.duration / 2));   // 短歌也停在中段，不会一启动就播完跳走
         simEngine.playing = true;
     }
 
@@ -247,14 +247,15 @@ Kirigami.ApplicationWindow {
             playback.engine.muted = false;
         }
         onMuteToggled: playback.engine.muted = !playback.engine.muted
-        liked: root.liked
+        liked: root.currentTrack !== null && Source.isLiked(root.currentTrack.id)
         nowPlayingShown: root.page === "nowplaying"
         onPlayPauseRequested: playback.engine.toggle()
         onNextRequested: playback.next()
         onPreviousRequested: playback.previous()
         onModeRequested: m => playback.mode = m
         onSeekRequested: seconds => playback.engine.seek(seconds)
-        onLikeToggled: root.liked = !root.liked
+        // 红心的写操作（weapi 加密接口）还没接：先如实告知，不做会骗人的本地假状态
+        onLikeToggled: root.showPassiveNotification("红心与取消红心即将支持，目前显示的是你在网易云里的红心状态")
         onNowPlayingToggled: root.toggleNowPlaying()
         onQueueRequested: queuePanel.drawerOpen ? queuePanel.close() : queuePanel.open()
     }
@@ -303,6 +304,7 @@ Kirigami.ApplicationWindow {
     Component {
         id: nowPlayingPage
         NowPlayingPage {
+            pane: root.nowPlayingPane
             track: root.currentTrack
             elapsed: playback.engine.position
             loggedIn: root.loggedIn

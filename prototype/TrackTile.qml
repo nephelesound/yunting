@@ -1,7 +1,7 @@
 // 曲目行：高 48 = 封面边长。静止时无底色（重复元素保持 Level 0），悬停才出现淡色调。
 // ranked 时左侧是 32 宽的名次列；正在播放把名次换成强调色播放图标，标题加粗。
 // 不排名时，正在播放用悬挂在对齐线外侧的强调色竖条 + 加粗标题标出。
-// 购买限制（VIP / 付费专辑）是标题后的淡色调小标签；时长未知时留空。
+// 标题后依次是：别名（弱化括注）· 红心 · 购买限制（VIP / 付费）· 音质（Hi-Res / 无损）；时长未知时留空。
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -19,6 +19,9 @@ AbstractButton {
     property bool locked // 匿名会话下的 VIP 曲：可见，点击时提示登录
 
     property bool removable  // 播放队列：悬停时显示「移出」
+    readonly property bool liked: Source.isLiked(tile.modelData.id)   // 在红心歌单里：标题后一颗小红心
+    property bool showReason // 每日推荐：右侧细节列优先显示推荐理由，没有理由再显示专辑
+    readonly property string alias: tile.modelData.alias || ""
     property bool hangingMarker: true  // 左侧没有留白（紧挨别的元素）时关掉悬挂竖条
 
     signal activated(int index)
@@ -97,31 +100,40 @@ AbstractButton {
                 Layout.fillWidth: true
                 implicitHeight: title.implicitHeight
 
+                // 标题（别名作弱化括注跟在后面，先于标题被省略）+ 标记：红心、购买限制、音质。
+                // 标题先省略，标记始终完整地紧跟其后
                 Label {
                     id: title
-                    width: Math.min(implicitWidth, titleRow.width - (tag.visible ? tag.width + Tokens.space2 : 0))
-                    text: tile.modelData.name
+                    width: Math.min(implicitWidth, titleRow.width - (marks.width > 0 ? marks.width + Tokens.space2 : 0))
+                    text: tile.alias.length > 0
+                        ? tile.modelData.name + "<font color='" + Qt.alpha(Kirigami.Theme.textColor, Tokens.muted) + "'>（" + tile.alias + "）</font>"
+                        : tile.modelData.name
+                    textFormat: tile.alias.length > 0 ? Text.StyledText : Text.PlainText
                     font.pixelSize: Tokens.textBase
                     // 正在播放靠字重 + 强调色标记区分，标题本身不用强调色（Breeze 亮色下强调色文字对比度只有 2.5:1）
                     font.weight: tile.current ? Font.DemiBold : Font.Normal
                     elide: Text.ElideRight
                 }
-                Rectangle {
-                    id: tag
-                    visible: vip.text.length > 0
+                Row {
+                    id: marks
                     x: title.width + Tokens.space2
                     anchors.verticalCenter: title.verticalCenter
-                    width: vip.implicitWidth + 2 * Tokens.space1
-                    height: vip.implicitHeight
-                    radius: Tokens.radiusSm
-                    color: Qt.alpha(tile.locked ? Kirigami.Theme.textColor : Kirigami.Theme.highlightColor, Tokens.tonal)
-                    Label {
-                        id: vip
-                        anchors.centerIn: parent
+                    spacing: Tokens.space1
+                    Kirigami.Icon {
+                        visible: tile.liked
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Tokens.iconSm
+                        height: Tokens.iconSm
+                        source: "emblem-favorite-symbolic"
+                        color: Kirigami.Theme.negativeTextColor
+                        isMask: true
+                    }
+                    Tag {
                         text: Format.restriction(tile.modelData.fee)
-                        font.pixelSize: Tokens.textXs
-                        font.weight: Font.Medium
-                        color: tile.locked ? Kirigami.Theme.disabledTextColor : Kirigami.Theme.highlightColor
+                        muted: tile.locked
+                    }
+                    Tag {
+                        text: Format.quality(tile.modelData.quality || "")
                     }
                 }
             }
@@ -137,8 +149,10 @@ AbstractButton {
         Label {
             Layout.preferredWidth: Tokens.albumColumn
             visible: tile.width >= Tokens.wideRow
-            // 单曲的专辑名常与曲名相同，重复就留空（列仍占位，保证时长列对齐）
-            text: tile.modelData.album === tile.modelData.name ? "" : tile.modelData.album
+            // 细节列：每日推荐里「为什么推荐」比专辑名更有用；单曲的专辑名常与曲名相同，重复就留空
+            //（列仍占位，保证时长列对齐）
+            text: tile.showReason && tile.modelData.reason ? tile.modelData.reason
+                : tile.modelData.album === tile.modelData.name ? "" : tile.modelData.album
             font.pixelSize: Tokens.textSm
             color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             elide: Text.ElideRight
