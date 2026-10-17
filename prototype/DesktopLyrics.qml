@@ -72,34 +72,33 @@ Window {
     readonly property int screenWidth: lyricsWindow.screen ? lyricsWindow.screen.width : 1920
     readonly property int screenHeight: lyricsWindow.screen ? lyricsWindow.screen.height : 1080
 
-    // 平时的窗口大小：歌词框外留一圈给底板的阴影
+    // 窗口大小：歌词框外留一圈给底板的阴影。拖动时也不变（overlay 改尺寸会有一帧错位）
     readonly property int pad: Tokens.space4
-    readonly property int normalWidth: Math.min(2 * Tokens.trackColumn + Tokens.measureMax, lyricsWindow.screenWidth - 2 * Tokens.space6)   // 至多 960
-    readonly property int normalHeight: box.implicitHeight + 2 * lyricsWindow.pad
+    readonly property int maxLeft: Math.max(0, lyricsWindow.screenWidth - lyricsWindow.width)
+    readonly property int maxBottomGap: Math.max(0, lyricsWindow.screenHeight - lyricsWindow.height)
 
-    // 拖动中：窗口铺满屏幕，歌词框在窗口里按 (left, bottomGap) 摆
-    property bool expanded: false
-    property bool expandedReady: false   // 铺满已生效（之前的指针事件还是相对小窗口的，不用）
-    property point grab                  // 按下点在平时窗口里的位置：拖动时它始终跟着指针
+    // 拖动中的位置不取整：指针的相对位移常常只有零点几像素，逐次取整会让慢拖动不动
+    property bool dragging: false
+    property real dragLeft
+    property real dragBottomGap
 
     title: "云听 · 桌面歌词"
     color: "transparent"
-    width: lyricsWindow.expanded ? lyricsWindow.screenWidth : lyricsWindow.normalWidth
-    height: lyricsWindow.expanded ? lyricsWindow.screenHeight : lyricsWindow.normalHeight
+    width: Math.min(2 * Tokens.trackColumn + Tokens.measureMax, lyricsWindow.screenWidth - 2 * Tokens.space6)   // 至多 960
+    height: box.implicitHeight + 2 * lyricsWindow.pad
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
            | (lyricsWindow.locked ? Qt.WindowTransparentForInput : 0)
 
-    // 放到 (left, bottomGap)，夹在屏幕内；拖动中只挪窗口里的歌词框，不打扰合成器
+    // 放到 (left, bottomGap)，夹在屏幕内
     function place(left, bottomGap) {
-        const maxLeft = Math.max(0, lyricsWindow.screenWidth - lyricsWindow.normalWidth);
-        lyricsWindow.left = Math.round(Math.max(0, Math.min(maxLeft, left)));
-        lyricsWindow.bottomGap = Math.round(Math.max(0, Math.min(lyricsWindow.screenHeight - lyricsWindow.normalHeight, bottomGap)));
-        if (lyricsWindow.layerShell && !lyricsWindow.expanded)
+        lyricsWindow.left = Math.round(Math.max(0, Math.min(lyricsWindow.maxLeft, left)));
+        lyricsWindow.bottomGap = Math.round(Math.max(0, Math.min(lyricsWindow.maxBottomGap, bottomGap)));
+        if (lyricsWindow.layerShell)
             lyricsWindow.layerShell.placeOverlay(lyricsWindow, 2 | 4 /* bottom | left */, lyricsWindow.left, 0, 0, lyricsWindow.bottomGap);
     }
     // 默认位置：水平居中、离下边两行高
     function placeDefault() {
-        lyricsWindow.place((lyricsWindow.screenWidth - lyricsWindow.normalWidth) / 2, 2 * Tokens.height12);
+        lyricsWindow.place((lyricsWindow.screenWidth - lyricsWindow.width) / 2, 2 * Tokens.height12);
     }
     // 存下的位置；还没放过（left 为 -1）时用默认位置
     function placeSaved() {
@@ -109,22 +108,33 @@ Window {
             lyricsWindow.place(lyricsWindow.left, lyricsWindow.bottomGap);
     }
 
-    function beginDrag(press) {
-        lyricsWindow.grab = press;
-        lyricsWindow.expandedReady = false;
-        lyricsWindow.expanded = true;   // 尺寸绑定跟着变；锚定四边与尺寸在同一次提交里生效
-        lyricsWindow.layerShell.placeOverlay(lyricsWindow, 1 | 2 | 4 | 8, 0, 0, 0, 0);
+    // overlay 不能交给合成器拖动：按住期间订阅指针的相对位移，按位移改边距。
+    // moved 是拖动生效前（越过拖动阈值）已经走过的距离，窗口那时还没动，补上它
+    function beginDrag(moved) {
+        if (!lyricsWindow.layerShell || !lyricsWindow.layerShell.beginRelativeDrag())
+            return false;
+        lyricsWindow.dragging = true;
+        lyricsWindow.dragLeft = lyricsWindow.left;
+        lyricsWindow.dragBottomGap = lyricsWindow.bottomGap;
+        lyricsWindow.dragBy(moved.x, moved.y);
+        return true;
     }
-    function dragTo(p) {
-        lyricsWindow.place(p.x - lyricsWindow.grab.x,
-                           lyricsWindow.screenHeight - (p.y - lyricsWindow.grab.y) - lyricsWindow.normalHeight);
+    function dragBy(dx, dy) {
+        lyricsWindow.dragLeft = Math.max(0, Math.min(lyricsWindow.maxLeft, lyricsWindow.dragLeft + dx));
+        lyricsWindow.dragBottomGap = Math.max(0, Math.min(lyricsWindow.maxBottomGap, lyricsWindow.dragBottomGap - dy));
+        lyricsWindow.place(lyricsWindow.dragLeft, lyricsWindow.dragBottomGap);
     }
     function endDrag() {
-        lyricsWindow.expanded = false;
-        lyricsWindow.expandedReady = false;
-        lyricsWindow.place(lyricsWindow.left, lyricsWindow.bottomGap);
+        if (!lyricsWindow.dragging)
+            return;
+        lyricsWindow.dragging = false;
+        lyricsWindow.layerShell.endRelativeDrag();
     }
-    onFrameSwapped: if (lyricsWindow.expanded && lyricsWindow.width === lyricsWindow.screenWidth) lyricsWindow.expandedReady = true
+    Connections {
+        target: lyricsWindow.layerShell
+        enabled: lyricsWindow.dragging
+        function onRelativeMotion(dx, dy) { lyricsWindow.dragBy(dx, dy); }
+    }
 
     onVisibleChanged: {
         if (lyricsWindow.visible && lyricsWindow.layerShell) {
@@ -133,11 +143,11 @@ Window {
         }
         if (!lyricsWindow.visible) {
             lyricsWindow.locked = false;
-            lyricsWindow.expanded = false;
+            lyricsWindow.endDrag();
         }
     }
     // 字号变了窗口变高：位置按下边距保持，重新夹一次
-    onNormalHeightChanged: if (lyricsWindow.visible && !lyricsWindow.expanded) lyricsWindow.placeSaved()
+    onHeightChanged: if (lyricsWindow.visible) lyricsWindow.placeSaved()
 
     // 与 SessionState 同一做法：先读存档，读完再开始回写（不让默认值覆盖存档）
     Loader {
@@ -165,20 +175,20 @@ Window {
             Binding { when: persisted.restored; target: saved; property: "sizeStep"; value: lyricsWindow.sizeStep }
             Binding { when: persisted.restored; target: saved; property: "colorIndex"; value: lyricsWindow.colorIndex }
             Binding { when: persisted.restored; target: saved; property: "showSecond"; value: lyricsWindow.showSecond }
-            Binding { when: persisted.restored && !lyricsWindow.expanded; target: saved; property: "left"; value: lyricsWindow.left }
-            Binding { when: persisted.restored && !lyricsWindow.expanded; target: saved; property: "bottomGap"; value: lyricsWindow.bottomGap }
+            Binding { when: persisted.restored; target: saved; property: "left"; value: lyricsWindow.left }
+            Binding { when: persisted.restored; target: saved; property: "bottomGap"; value: lyricsWindow.bottomGap }
         }
     }
 
-    // 歌词框：平时贴着窗口（四周留阴影的位置），拖动时在铺满的窗口里按位置摆。
+    // 歌词框：贴着窗口，四周留阴影的位置。
     // 字与底板不跟配色方案：浅色方案里 Complementary 也是浅的，白底黑字压在深色壁纸上就看不见了。
     // 与 Plasma 桌面图标的文字同一做法：始终白字 + 柔和的深色阴影；悬停底板是深色半透明
     Item {
         id: box
         readonly property color ink: "white"
-        x:lyricsWindow.pad + (lyricsWindow.expanded ? lyricsWindow.left : 0)
-        y: lyricsWindow.pad + (lyricsWindow.expanded ? lyricsWindow.screenHeight - lyricsWindow.bottomGap - lyricsWindow.normalHeight : 0)
-        width: lyricsWindow.normalWidth - 2 * lyricsWindow.pad
+        x: lyricsWindow.pad
+        y: lyricsWindow.pad
+        width: lyricsWindow.width - 2 * lyricsWindow.pad
         height: implicitHeight
         implicitHeight: column.implicitHeight + 2 * Tokens.space3
 
@@ -189,18 +199,14 @@ Window {
             id: drag
             enabled: !lyricsWindow.locked
             target: null
+            // 普通窗口（X11、没有 layer-shell）交给合成器拖
             onActiveChanged: {
-                if (drag.active) {
-                    if (!lyricsWindow.layerShell) {
-                        lyricsWindow.startSystemMove();
-                        return;
-                    }
-                    lyricsWindow.beginDrag(drag.centroid.scenePressPosition);
-                } else if (lyricsWindow.expanded) {
+                if (!drag.active)
                     lyricsWindow.endDrag();
-                }
+                else if (!lyricsWindow.beginDrag(Qt.point(drag.centroid.scenePosition.x - drag.centroid.scenePressPosition.x,
+                                                          drag.centroid.scenePosition.y - drag.centroid.scenePressPosition.y)))
+                    lyricsWindow.startSystemMove();
             }
-            onCentroidChanged: if (drag.active && lyricsWindow.expandedReady) lyricsWindow.dragTo(drag.centroid.scenePosition)
         }
 
         // 悬停底板：深色半透明面 + 系统阴影（真的浮在一切之上，阴影是对的）

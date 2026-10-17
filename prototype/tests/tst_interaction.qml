@@ -60,18 +60,20 @@ Item {
         }
     }
     Component { id: lyricsComponent; DesktopLyrics {} }
-    // 假的 layer-shell：只记下最后一次设的锚定边与边距，并数一共请求了几次
+    // 假的 layer-shell：记下最后一次设的锚定边与边距；相对拖动由测试直接发 relativeMotion
     QtObject {
         id: fakeLayerShell
         property var margins: null
         property int anchors: 0
-        property int placements: 0
+        property bool relativeDrag: false
+        signal relativeMotion(real dx, real dy)
         function makeOverlay(window, anchors, margin, keyboard, scope) {}
         function placeOverlay(window, anchors, left, top, right, bottom) {
             fakeLayerShell.anchors = anchors;
             fakeLayerShell.margins = [left, top, right, bottom];
-            fakeLayerShell.placements++;
         }
+        function beginRelativeDrag() { fakeLayerShell.relativeDrag = true; return true; }
+        function endRelativeDrag() { fakeLayerShell.relativeDrag = false; }
     }
     TextEdit { id: pasteTarget; visible: false }
 
@@ -203,26 +205,28 @@ Item {
             compare(fakeLayerShell.margins, [0, 0, 0, w.screenHeight - w.height]);
         }
 
-        // 拖动：按下时窗口铺满屏幕（一次请求），拖动中只在窗口里挪歌词、不再打扰合成器，松手时缩回并落到新位置（一次请求）
-        function test_desktopLyricsDragDoesNotMoveTheSurface() {
+        // 拖动：窗口尺寸始终不变，边距按指针的相对位移走（零点几像素的慢拖动也累积起来），松手停止订阅
+        function test_desktopLyricsDragFollowsRelativeMotion() {
             const w = desktopLyrics({});
             w.visible = true;
-            w.placeDefault();
-            const normalWidth = w.width;
-            w.beginDrag(Qt.point(10, 10));
-            compare(w.width, w.screenWidth);
-            compare(fakeLayerShell.anchors, 1 | 2 | 4 | 8);
-            tryVerify(() => w.expandedReady);
-            const before = fakeLayerShell.placements;
-            const target = Math.floor((w.screenWidth - normalWidth) / 2);   // 屏幕内的一个横向位置
-            for (let x = 10; x <= 10 + target; x += 4)
-                w.dragTo(Qt.point(x, 200));
-            compare(fakeLayerShell.placements, before, "拖动中不请求合成器挪窗口");
-            compare(w.left, target);
-            w.endDrag();
-            compare(w.width, normalWidth);
+            verify(w.maxLeft >= 16 && w.maxBottomGap >= 214);
+            w.place(0, 200);
+            const size = Qt.size(w.width, w.height);
+            verify(w.beginDrag(Qt.point(6, -4)));   // 越过拖动阈值前走过的距离
+            verify(fakeLayerShell.relativeDrag);
+            compare(fakeLayerShell.margins, [6, 0, 0, 204]);
+            for (let i = 0; i < 40; ++i)
+                fakeLayerShell.relativeMotion(0.25, -0.25);
+            compare(fakeLayerShell.margins, [16, 0, 0, 214]);
+            fakeLayerShell.relativeMotion(-99999, 0);   // 推出屏幕左缘再拉回：从边上立刻往回走
+            fakeLayerShell.relativeMotion(3, 0);
+            compare(w.left, 3);
+            compare(Qt.size(w.width, w.height), size, "拖动中窗口不改尺寸");
             compare(fakeLayerShell.anchors, 2 | 4);
-            compare(fakeLayerShell.margins, [target, 0, 0, w.screenHeight - (200 - 10) - w.height]);
+            w.endDrag();
+            verify(!fakeLayerShell.relativeDrag);
+            fakeLayerShell.relativeMotion(50, 0);       // 松手后的位移不再挪窗口
+            compare(w.left, 3);
         }
 
         // 滚到底续取下一页：位置不跳回顶部，已有的行不重建；状态变化（同样内容的新数组）不动；换内容才重建

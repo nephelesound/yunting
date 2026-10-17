@@ -137,6 +137,15 @@ target_link_libraries(yunting PRIVATE
 if (LayerShellQt_FOUND)
     target_compile_definitions(yunting PRIVATE YUNTING_LAYERSHELL=1)
     target_link_libraries(yunting PRIVATE LayerShellQt::Interface)
+    # 拖动 overlay 用相对指针协议（协议 XML 原样取自 wayland-protocols，MIT）
+    find_package(Qt6 QUIET COMPONENTS WaylandClient)
+    if (Qt6WaylandClient_FOUND)
+        enable_language(C)
+        qt_generate_wayland_protocol_client_sources(yunting PRIVATE_CODE
+            FILES ${CMAKE_CURRENT_SOURCE_DIR}/wayland/relative-pointer-unstable-v1.xml)
+        target_compile_definitions(yunting PRIVATE YUNTING_RELATIVE_POINTER=1)
+        target_link_libraries(yunting PRIVATE Qt6::WaylandClient)
+    endif()
 endif()
 if (YUNTING_EXPERIMENTAL_EQ)
     target_compile_definitions(yunting PRIVATE YUNTING_EXPERIMENTAL_EQ=1)
