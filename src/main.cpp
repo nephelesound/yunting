@@ -77,6 +77,9 @@ int main(int argc, char *argv[])
                                   "file");
     QCommandLineOption smokeOption("smoke-audio", "Resolve a song's play URL and play it for a few seconds",
                                    "songId");
+    QCommandLineOption audioQualityOption("audio-quality",
+                                          "Set playback quality: auto|standard|higher|exhigh|lossless|hires",
+                                          "level");
     QCommandLineOption importOption("import-gtk4-cookies",
                                     "Import MUSIC_U/__csrf/NMTID from netease-cloud-music-gtk4 once");
     QCommandLineOption writeOption("allow-write", "Allow explicit write commands (like / playlist selftests)");
@@ -104,6 +107,7 @@ int main(int argc, char *argv[])
     QCommandLineOption shotOption("screenshot", "Load the UI, wait for live data, save a PNG of the window and exit", "file");
     parser.addOption(dumpOption);
     parser.addOption(smokeOption);
+    parser.addOption(audioQualityOption);
     parser.addOption(importOption);
     parser.addOption(writeOption);
     parser.addOption(likeOption);
@@ -486,6 +490,8 @@ int main(int argc, char *argv[])
 
     if (parser.isSet(smokeOption)) {
         // 无窗口：事件循环跑在 QCoreApplication 节奏上，AudioEngine 自己打印状态
+        if (parser.isSet(audioQualityOption))
+            audio.setQuality(parser.value(audioQualityOption));
         const int rc = audio.smokeTest(parser.value(smokeOption).toDouble(), 6);
         if (rc != 0)
             return rc;

@@ -24,6 +24,8 @@ class AudioEngine : public QObject {
     Q_PROPERTY(double duration READ duration NOTIFY durationChanged)
     Q_PROPERTY(double volume READ volume WRITE setVolume NOTIFY volumeChanged)
     Q_PROPERTY(bool muted READ muted WRITE setMuted NOTIFY mutedChanged)
+    // auto / standard / higher / exhigh / lossless / hires
+    Q_PROPERTY(QString quality READ quality WRITE setQuality NOTIFY qualityChanged)
 public:
     explicit AudioEngine(NcmClient *client, QObject *parent = nullptr);
 
@@ -35,11 +37,13 @@ public:
 
     double volume() const { return m_volume; }
     bool muted() const { return m_muted; }
+    QString quality() const { return m_quality; }
 
     void setTrack(const QVariantMap &track);
     void setPlaying(bool playing);
     void setVolume(double volume);
     void setMuted(bool muted);
+    void setQuality(const QString &quality);
 
     Q_INVOKABLE void toggle();
     Q_INVOKABLE void seek(double seconds);
@@ -54,6 +58,7 @@ signals:
     void durationChanged();
     void volumeChanged();
     void mutedChanged();
+    void qualityChanged();
     void seeked();   // 跳转生效（MPRIS 据此发 Seeked）
     // 自然播完
     void finished();
@@ -63,9 +68,10 @@ signals:
     void scrobbled(const QVariantMap &track);
 
 private:
-    // fee=8 免费曲匿名也能拿 320k；data[0].url 为空即 failed
+    // 地址取不到即 failed；quality=auto 时按曲目元数据选档
     void resolveUrl(double songId);
     void startSource(const QString &url);
+    QString effectiveLevel() const;
     // 听歌打卡：startplay 写「最近播放」，play 写「听歌排行」；每首歌各一次
     void scrobbleStart();
     void scrobbleFinish();
@@ -75,7 +81,7 @@ private:
         QString url;
         QDateTime expires;
     };
-    QHash<double, CachedUrl> m_urls;   // 播放地址缓存，到 expi 前复用
+    QHash<QString, CachedUrl> m_urls;   // songId:level → 地址，到 expi 前复用
 
     NcmClient *m_client;
     QMediaPlayer *m_player;
@@ -86,6 +92,7 @@ private:
     // 滑条刻度（对数感知）；写入 QAudioOutput 前经 convertVolume 转线性
     double m_volume = 0.7;
     bool m_muted = false;
+    QString m_quality = QStringLiteral("auto");
     double m_pendingSeek = -1;
     bool m_scrobbleStarted = false;
     bool m_scrobbleFinished = false;

@@ -123,6 +123,31 @@ void AudioEngine::setMuted(bool muted)
     emit mutedChanged();
 }
 
+void AudioEngine::setQuality(const QString &quality)
+{
+    static const QStringList levels{
+        QStringLiteral("auto"), QStringLiteral("standard"), QStringLiteral("higher"),
+        QStringLiteral("exhigh"), QStringLiteral("lossless"), QStringLiteral("hires"),
+    };
+    const QString normalized = levels.contains(quality) ? quality : QStringLiteral("auto");
+    if (normalized == m_quality)
+        return;
+    m_quality = normalized;
+    emit qualityChanged();
+}
+
+QString AudioEngine::effectiveLevel() const
+{
+    if (m_quality != QLatin1String("auto"))
+        return m_quality;
+    const QString quality = m_track.value("quality").toString();
+    if (quality == QLatin1String("hires"))
+        return QStringLiteral("hires");
+    if (quality == QLatin1String("lossless"))
+        return QStringLiteral("lossless");
+    return QStringLiteral("exhigh");
+}
+
 void AudioEngine::toggle()
 {
     setPlaying(!m_playing);
@@ -140,28 +165,33 @@ void AudioEngine::seek(double seconds)
     }
 }
 
-// 播放地址有时效（接口给 expi 秒数，通常 20 分钟）：时效内重播、切回同一首都直接用缓存
+// 播放地址有时效（接口给 expi 秒数，通常 20 分钟）：时效内重播、切回同一首都直接用缓存。
+// 用 v1 的 level 而不是旧的 br：旧接口最高只到 lossless，v1 才能请求 hires。
 void AudioEngine::resolveUrl(double songId)
 {
-    const auto cached = m_urls.constFind(songId);
+    const QString level = effectiveLevel();
+    const QString cacheKey = QStringLiteral("%1:%2").arg(num(songId), level);
+    const auto cached = m_urls.constFind(cacheKey);
     if (cached != m_urls.constEnd() && QDateTime::currentDateTimeUtc() < cached->expires) {
         startSource(cached->url);
         return;
     }
-    // 曲目元数据带 lossless / hires 时直接要 999k（flac）；服务器没有更高档会自行回落到 320k。
-    // 元数据缺失（云盘、旧结构）仍用 320k，避免为普通曲目多发一次高码率请求。
-    const QString quality = m_track.value("quality").toString();
-    const QString br = quality == QLatin1String("lossless") || quality == QLatin1String("hires")
-        ? QStringLiteral("999000") : QStringLiteral("320000");
-    m_client->get("api/song/enhance/player/url",
-                  query({{"ids", QStringLiteral("[%1]").arg(num(songId))}, {"br", br}}), true,
-                  [this, songId](const QJsonDocument &doc, bool ok) {
-        const QJsonObject item = ok ? arr(body(doc), "data").at(0).toObject() : QJsonObject();
+
+    const bool lossless = level == QLatin1String("lossless") || level == QLatin1String("hires");
+    m_client->postWeapi("song/enhance/player/url/v1",
+                        QJsonObject{{"ids", QStringLiteral("[%1]").arg(num(songId))},
+                                    {"level", level},
+                                    {"encodeType", lossless ? QStringLiteral("flac") : QStringLiteral("mp3")}},
+                        true,
+                        [this, songId, cacheKey](const QJsonDocument &doc, bool ok) {
+        const QJsonObject resp = body(doc);
+        const QJsonObject item = ok && resp.value("code").toInt() == 200
+            ? arr(resp, "data").at(0).toObject() : QJsonObject();
         const QString url = item.value("url").toString();
         if (!url.isEmpty()) {
             // 留一分钟余量，避免拿到即将失效的地址
             const int expi = item.value("expi").toInt(1200);
-            m_urls.insert(songId, {url, QDateTime::currentDateTimeUtc().addSecs(std::max(0, expi - 60))});
+            m_urls.insert(cacheKey, {url, QDateTime::currentDateTimeUtc().addSecs(std::max(0, expi - 60))});
         }
         // 用户可能已经切到别的歌：迟到的地址只进缓存，不播
         if (m_track.value("id").toDouble() != songId)
