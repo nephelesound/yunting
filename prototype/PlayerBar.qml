@@ -20,6 +20,8 @@ Item {
     property bool liked
     property bool nowPlayingShown
     property int mode: 0 // 0 列表循环 · 1 单曲循环 · 2 随机
+    property real volume: 0.7
+    property bool muted: false
 
     readonly property var modes: [
         { icon: "media-playlist-repeat-symbolic", text: "列表循环" },
@@ -35,6 +37,8 @@ Item {
     signal nowPlayingToggled()
     signal queueRequested()
     signal modeRequested(int mode)
+    signal volumeRequested(real volume)
+    signal muteToggled()
 
     // 没有曲目或时长未知时进度为 0、不能拖动，传输控件整体禁用
     readonly property real duration: bar.track ? bar.track.dur : 0
@@ -192,7 +196,53 @@ Item {
                 checked: bar.nowPlayingShown
                 onClicked: bar.nowPlayingToggled()
             }
-            IconButton { icon.name: "audio-volume-high"; text: "音量" }
+            // 音量：点开一个小浮层（滑块 + 静音）；在按钮上滚滚轮直接调，每格 5%
+            IconButton {
+                id: volumeButton
+                icon.name: bar.muted || bar.volume === 0 ? "audio-volume-muted"
+                         : bar.volume < 0.34 ? "audio-volume-low"
+                         : bar.volume < 0.67 ? "audio-volume-medium" : "audio-volume-high"
+                text: bar.muted ? "音量（已静音）" : "音量 " + Math.round(bar.volume * 100) + "%"
+                checkable: true
+                checked: volumePopup.visible
+                onClicked: volumePopup.visible ? volumePopup.close() : volumePopup.open()
+                WheelHandler {
+                    onWheel: event => bar.volumeRequested(Math.max(0, Math.min(1, bar.volume + (event.angleDelta.y > 0 ? 0.05 : -0.05))))
+                }
+
+                Popup {
+                    id: volumePopup
+                    // 浮在按钮正上方，右缘与按钮右缘对齐；Popup 是真正浮起的一层，用样式自带的面与投影
+                    x: volumeButton.width - width
+                    y: -height - Tokens.space2
+                    padding: Tokens.space2
+                    contentItem: RowLayout {
+                        spacing: Tokens.space2
+                        IconButton {
+                            icon.name: bar.muted ? "audio-volume-muted" : "audio-volume-high"
+                            text: bar.muted ? "取消静音" : "静音"
+                            checkable: true
+                            checked: bar.muted
+                            onClicked: bar.muteToggled()
+                        }
+                        Slider {
+                            Layout.preferredWidth: Tokens.tileLg
+                            from: 0
+                            to: 1
+                            value: bar.muted ? 0 : bar.volume
+                            onMoved: bar.volumeRequested(value)
+                        }
+                        Label {
+                            Layout.preferredWidth: Tokens.height10
+                            horizontalAlignment: Text.AlignRight
+                            text: bar.muted ? "静音" : Math.round(bar.volume * 100) + "%"
+                            font.pixelSize: Tokens.textSm
+                            font.features: { "tnum": 1 }
+                            color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                        }
+                    }
+                }
+            }
         }
     }
 }

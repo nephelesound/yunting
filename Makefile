@@ -54,6 +54,7 @@ SHOTS = home:page=home home-anon:account=anonymous,page=home charts:page=charts 
         queue:page=home,startOverlay=queue empty-queue:fixture=empty,page=home,startOverlay=queue \
         login:account=anonymous,page=home,startOverlay=login login-scanned:account=anonymous,page=home,loginState=scanned,startOverlay=login \
         login-expired:account=anonymous,page=home,loginState=expired,startOverlay=login \
+        offline:simulateOffline=true,page=home session-expired:account=anonymous,simulateExpired=true,page=home \
         mine:page=mine worst-mine:fixture=worst,page=mine empty-mine:fixture=empty,page=mine \
         search:page=search search-results:searchQuery=林俊杰,page=search worst-search:fixture=worst,searchQuery=x,page=search \
         empty-search:fixture=empty,searchQuery=x,page=search

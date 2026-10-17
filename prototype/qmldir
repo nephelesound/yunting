@@ -20,6 +20,7 @@ Playback Playback.qml
 PlaylistPage PlaylistPage.qml
 ScreenFrame ScreenFrame.qml
 SearchPage SearchPage.qml
+SessionState SessionState.qml
 SimEngine SimEngine.qml
 SimSession SimSession.qml
 TrackTile TrackTile.qml

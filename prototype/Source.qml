@@ -25,6 +25,16 @@ QtObject {
         if (source.live)
             Qt.callLater(() => source.live.request(key));
     }
+    // 连接与会话状态（live 才有；原型里可由截图 harness 用 simulate* 模拟）
+    property bool simulateOffline: false
+    property bool simulateExpired: false
+    readonly property bool online: source.live ? source.live.online : !source.simulateOffline
+    readonly property bool sessionExpired: source.live ? source.live.sessionExpired : source.simulateExpired
+    function retry() {
+        if (source.live)
+            source.live.refresh();
+    }
+
     function search(query) {
         if (query.length > 0)
             source.need("search:" + query);

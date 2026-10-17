@@ -1,5 +1,5 @@
 // 音频引擎的原型实现：用计时器模拟播放进度。接口与 C++ AudioEngine 相同（见 DESIGN.md「后端接口」）：
-//   track（由 Playback 设置）· playing · position / duration（秒）· toggle() · seek(s)
+//   track（由 Playback 设置）· playing · position / duration（秒）· volume（0–1）· muted · toggle() · seek(s)
 //   finished()：自然播完；failed(reason)：取不到播放地址等
 import QtQuick
 
@@ -9,6 +9,8 @@ Item {
     property var track: null
     property bool playing: false
     property real position: 0
+    property real volume: 0.7      // 0–1，滑块刻度
+    property bool muted: false
     readonly property real duration: engine.track ? engine.track.dur : 0
 
     signal finished()

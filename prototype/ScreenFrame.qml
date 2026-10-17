@@ -43,20 +43,52 @@ Kirigami.Page {
                 onParentActivated: screen.leaveRequested()
             }
             Item { Layout.fillWidth: true }
+
+            // 状态挨着它的处理办法放：离线 → 重试；登录过期 → 重新登录。都不另起横幅
+            RowLayout {
+                visible: !Source.online
+                spacing: Tokens.space1
+                Kirigami.Icon {
+                    implicitWidth: Tokens.iconSm
+                    implicitHeight: Tokens.iconSm
+                    source: "network-offline-symbolic"
+                    color: Kirigami.Theme.neutralTextColor
+                    isMask: true
+                }
+                Label {
+                    text: "离线，显示的是上次的内容"
+                    font.pixelSize: Tokens.textSm
+                    color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                }
+                Button {
+                    implicitHeight: Tokens.height8
+                    flat: true
+                    text: "重试"
+                    font.pixelSize: Tokens.textSm
+                    onClicked: Source.retry()
+                }
+            }
+            Kirigami.Separator {
+                visible: !Source.online
+                Layout.preferredHeight: Tokens.iconSm
+                Layout.leftMargin: Tokens.space2
+                Layout.rightMargin: Tokens.space2
+            }
+
             Label {
-                text: screen.loggedIn ? Source.account.name : "未登录"
+                text: Source.sessionExpired ? "登录已过期" : screen.loggedIn ? Source.account.name : "未登录"
                 font.pixelSize: Tokens.textSm
-                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                color: Source.sessionExpired ? Kirigami.Theme.neutralTextColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             }
             Button {
                 Layout.rightMargin: -Tokens.space2
-                visible: !screen.loggedIn
+                visible: !screen.loggedIn || Source.sessionExpired
                 implicitHeight: Tokens.height8
                 flat: true
                 icon.name: "view-barcode-qr"
                 icon.width: Tokens.iconSm
                 icon.height: Tokens.iconSm
-                text: "扫码登录"
+                text: Source.sessionExpired ? "重新登录" : "扫码登录"
                 font.pixelSize: Tokens.textSm
                 onClicked: screen.loginRequested()
             }

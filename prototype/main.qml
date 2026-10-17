@@ -67,6 +67,21 @@ Kirigami.ApplicationWindow {
     readonly property var currentTrack: playback.current
     property bool liked: false
 
+    // 关掉再打开回到原样（只在应用里；原型与截图不读不写）
+    Loader {
+        active: root.backend !== null
+        sourceComponent: SessionState {
+            window: root
+            player: playback
+        }
+    }
+
+    // 截图 harness 用：模拟离线 / 登录过期
+    property bool simulateOffline: false
+    property bool simulateExpired: false
+    onSimulateOfflineChanged: Source.simulateOffline = root.simulateOffline
+    onSimulateExpiredChanged: Source.simulateExpired = root.simulateExpired
+
     // 换数据源。原型（没有 backend）的「正在播放」从热歌榜第 3 首开始、停在 1:23，截图才有内容可看
     function applyFixture() {
         Source.live = root.backend ? root.backend.store : null;
@@ -198,6 +213,13 @@ Kirigami.ApplicationWindow {
         playing: playback.engine.playing
         elapsed: playback.engine.position
         mode: playback.mode
+        volume: playback.engine.volume
+        muted: playback.engine.muted
+        onVolumeRequested: v => {
+            playback.engine.volume = v;
+            playback.engine.muted = false;
+        }
+        onMuteToggled: playback.engine.muted = !playback.engine.muted
         liked: root.liked
         nowPlayingShown: root.page === "nowplaying"
         onPlayPauseRequested: playback.engine.toggle()
