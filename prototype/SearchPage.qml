@@ -39,11 +39,16 @@ ScreenFrame {
     readonly property int tileWidth: Math.floor((page.rightWidth - (page.tileColumns - 1) * Tokens.space2) / page.tileColumns)
     readonly property int rightWidth: body.width - page.half - Tokens.space6
     readonly property int tileHeight: page.tileWidth + Tokens.space2 + Tokens.height12
+    function count(n) {
+        return n >= 10000 ? (n / 10000).toFixed(n >= 100000 ? 0 : 1) + " 万" : String(n);
+    }
     function caption(item) {
         if (page.collection === "artists")
             return item.albums > 0 ? item.albums + " 张专辑" : "";
         if (page.collection === "albums")
             return item.artist || "";
+        if (page.collection === "mvs")
+            return item.playCount > 0 ? page.count(item.playCount) + " 次播放" : "";
         return item.count > 0 ? item.count + " 首" : "";
     }
 
@@ -184,7 +189,8 @@ ScreenFrame {
 
                 Pivot {
                     Layout.bottomMargin: Tokens.space3
-                    items: [{ key: "artists", text: "歌手" }, { key: "albums", text: "专辑" }, { key: "playlists", text: "歌单" }]
+                    items: [{ key: "artists", text: "歌手" }, { key: "albums", text: "专辑" },
+                            { key: "playlists", text: "歌单" }, { key: "mvs", text: "MV" }]
                     current: page.collection
                     onActivated: key => page.collection = key
                 }
@@ -201,6 +207,7 @@ ScreenFrame {
                     boundsBehavior: Flickable.StopAtBounds
                     model: page.collectionItems
                     ScrollBar.vertical: ScrollBar {}
+                    WheelScroll { flickable: collections }
                     delegate: MediaTile {
                         required property var modelData
                         width: page.tileWidth
@@ -210,6 +217,7 @@ ScreenFrame {
                         round: page.collection === "artists"
                         onClicked: page.collection === "artists" ? Actions.openArtist(modelData.id)
                                  : page.collection === "albums" ? Actions.openAlbum(modelData.id)
+                                 : page.collection === "mvs" ? Actions.openMv(modelData.id)
                                  : Actions.openPlaylist(modelData.id)
                         // 歌单在哪里出现都是同一个菜单（这里能收藏）；歌手、专辑没有菜单
                         onMenuRequested: if (page.collection === "playlists") Actions.playlistMenuRequested(modelData)
@@ -218,7 +226,9 @@ ScreenFrame {
                 Label {
                     visible: page.collectionItems.length === 0
                     text: page.result.pending ? "正在搜索…"
-                        : page.collection === "artists" ? "没有找到相关歌手" : page.collection === "albums" ? "没有找到相关专辑" : "没有找到相关歌单"
+                        : page.collection === "artists" ? "没有找到相关歌手"
+                        : page.collection === "albums" ? "没有找到相关专辑"
+                        : page.collection === "mvs" ? "没有找到相关 MV" : "没有找到相关歌单"
                     font.pixelSize: Tokens.textSm
                     color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                 }

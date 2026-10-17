@@ -23,22 +23,18 @@ Row {
         ? [{ key: "..", text: title.parentText }, { key: "", text: title.text }]
         : title.pivots.length > 0 ? title.pivots : [{ key: "", text: title.text }]
 
-    // 不省略时需要的宽度：由一排不可见、不省略、同样式的标签量出来（字体与可见标签完全一致），
-    // 不读可见标签的宽度，避免与省略形成绑定环；布局用它做首选与最大宽度
-    readonly property real naturalWidth: probe.implicitWidth
-    Row {
-        id: probe
-        visible: false   // Row 定位器跳过不可见的子项，不占位
-        spacing: title.spacing
-        Repeater {
-            model: title.items
-            delegate: Label {
-                required property var modelData
-                text: modelData.text
-                font.pixelSize: Tokens.text4xl
-                font.weight: Font.Light
-            }
-        }
+    // 不省略时需要的宽度：按字体直接量文字（不读可见标签的宽度，避免与省略形成绑定环）。
+    // 不用一排不可见的标签去量：不可见的定位器不重新排版，异步到达的页名（歌手名）会按旧宽度被省略
+    //（advanceWidth 是方法调用，不建立依赖：先读一次 metrics.font，字体定下来后才会重算）
+    readonly property real naturalWidth: {
+        void metrics.font;
+        return title.items.reduce((w, it) => w + Math.ceil(metrics.advanceWidth(it.text)), 0)
+            + title.spacing * (title.items.length - 1);
+    }
+    FontMetrics {
+        id: metrics
+        font.pixelSize: Tokens.text4xl
+        font.weight: Font.Light
     }
 
     spacing: Tokens.space6
@@ -53,6 +49,9 @@ Row {
             readonly property bool active: modelData.key === title.current || modelData.key === ""
 
             width: Math.max(0, Math.min(implicitWidth, title.width - item.x))
+            // 各项按同一条基线排：含回退字体（日文汉字等）的页名行高更大，按顶对齐会比上级低一截
+            anchors.baseline: title.top
+            anchors.baselineOffset: metrics.ascent
             text: modelData.text
             font.pixelSize: Tokens.text4xl
             font.weight: Font.Light

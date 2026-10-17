@@ -144,6 +144,7 @@ Kirigami.OverlayDrawer {
             boundsBehavior: Flickable.StopAtBounds
             model: order
             ScrollBar.vertical: ScrollBar {}
+            WheelScroll { flickable: list }
             moveDisplaced: Transition {
                 NumberAnimation { property: "y"; duration: Tokens.motionFast; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut }
             }

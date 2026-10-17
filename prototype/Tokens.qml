@@ -41,6 +41,10 @@ QtObject {
     readonly property real navHover: 0.75
     // 正在播放页封面氛围底上的系统底色遮罩：只透出 15% 的封面色调，文字对比度保持
     readonly property real ambienceScrim: 0.85
+    // 悬停在可点的封面上：系统底色淡底，衬出说明去向的图标
+    readonly property real coverScrim: 0.6
+    // 桌面歌词悬停时的深色底：压在任意壁纸上，白字仍可读，又不挡住桌面
+    readonly property real desktopBacking: 0.45
 
     // 动效：时长一律取 Kirigami.Units，桌面平台插件会按 Plasma「动画速度」(AnimationDurationFactor) 缩放，
     // 用户关掉动画时它们就是 0，减弱动效不用另写分支。

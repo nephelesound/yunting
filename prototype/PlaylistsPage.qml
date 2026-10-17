@@ -58,6 +58,7 @@ ScreenFrame {
             boundsBehavior: Flickable.StopAtBounds
             model: page.shown
             ScrollBar.vertical: ScrollBar {}
+            WheelScroll { flickable: grid }
 
             delegate: MediaTile {
                 required property var modelData

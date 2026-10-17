@@ -5,16 +5,22 @@
 // 否则滑条前半段几乎听不出变化。muted 与音量互相独立，不互相改写。
 // 队列与「下一首」不在这里：自然播完只发 finished()，切歌规则只有 Playback 那一份。
 #include <QDateTime>
+#include <QElapsedTimer>
 #include <QHash>
 #include <QJsonObject>
 #include <QObject>
 #include <QSet>
 #include <QString>
+#include <QVariantList>
 #include <QVariantMap>
 
 class NcmClient;
 class QAudioOutput;
 class QMediaPlayer;
+#ifdef YUNTING_EXPERIMENTAL_EQ
+class QAudioBufferOutput;
+class EqAudioSink;
+#endif
 
 class AudioEngine : public QObject {
     Q_OBJECT
@@ -27,6 +33,14 @@ class AudioEngine : public QObject {
     Q_PROPERTY(bool muted READ muted WRITE setMuted NOTIFY mutedChanged)
     // auto / standard / higher / exhigh / lossless / hires
     Q_PROPERTY(QString quality READ quality WRITE setQuality NOTIFY qualityChanged)
+    // DSP 链路默认启用；-DYUNTING_EXPERIMENTAL_EQ=OFF 时为 false，隐藏 EQ UI
+    Q_PROPERTY(bool eqAvailable READ eqAvailable CONSTANT)
+    // 10 段增益（dB），band 0..9 = 31Hz..16kHz
+    Q_PROPERTY(QVariantList eqGains READ eqGains NOTIFY eqGainsChanged)
+    Q_PROPERTY(double bassBoost READ bassBoost WRITE setBassBoost NOTIFY bassBoostChanged)
+    Q_PROPERTY(double stereoWidth READ stereoWidth WRITE setStereoWidth NOTIFY stereoWidthChanged)
+    // 空串 = 系统默认输出
+    Q_PROPERTY(QString outputDevice READ outputDevice NOTIFY outputDeviceChanged)
 public:
     explicit AudioEngine(NcmClient *client, QObject *parent = nullptr);
 
@@ -39,6 +53,20 @@ public:
     double volume() const { return m_volume; }
     bool muted() const { return m_muted; }
     QString quality() const { return m_quality; }
+    bool eqAvailable() const
+    {
+#ifdef YUNTING_EXPERIMENTAL_EQ
+        return true;
+#else
+        return false;
+#endif
+    }
+    QVariantList eqGains() const { return m_eqGains; }
+    double bassBoost() const { return m_bassBoost; }
+    double stereoWidth() const { return m_stereoWidth; }
+    void setBassBoost(double db);
+    void setStereoWidth(double width);
+    QString outputDevice() const { return m_outputDeviceId; }
 
     void setTrack(const QVariantMap &track);
     void setPlaying(bool playing);
@@ -48,6 +76,14 @@ public:
 
     Q_INVOKABLE void toggle();
     Q_INVOKABLE void seek(double seconds);
+    // DSP：未启用 YUNTING_EXPERIMENTAL_EQ 时 no-op
+    Q_INVOKABLE void setEqGain(int band, double db);
+    Q_INVOKABLE void resetEq();
+    // flat / pop / rock / bass / vocal / live / spatial
+    Q_INVOKABLE void applyEqPreset(const QString &preset);
+    // 输出设备：返回 [{id, description}]；id 传回 setOutputDevice
+    Q_INVOKABLE QVariantList audioOutputs() const;
+    Q_INVOKABLE void setOutputDevice(const QString &id);
 
     // --smoke-audio：无窗口地取地址并播放 seconds 秒，打印状态变化
     int smokeTest(double songId, int seconds);
@@ -60,6 +96,10 @@ signals:
     void volumeChanged();
     void mutedChanged();
     void qualityChanged();
+    void eqGainsChanged();
+    void bassBoostChanged();
+    void stereoWidthChanged();
+    void outputDeviceChanged();
     void seeked();   // 跳转生效（MPRIS 据此发 Seeked）
     // 自然播完
     void finished();
@@ -87,7 +127,11 @@ private:
 
     NcmClient *m_client;
     QMediaPlayer *m_player;
-    QAudioOutput *m_audio;
+    QAudioOutput *m_audio = nullptr;
+#ifdef YUNTING_EXPERIMENTAL_EQ
+    QAudioBufferOutput *m_bufferOutput = nullptr;
+    EqAudioSink *m_eqSink = nullptr;
+#endif
     QVariantMap m_track;
     bool m_playing = false;
     bool m_failed = false;
@@ -95,7 +139,13 @@ private:
     double m_volume = 0.7;
     bool m_muted = false;
     QString m_quality = QStringLiteral("auto");
+    QString m_outputDeviceId;
+    QVariantList m_eqGains = QVariantList(10, 0.0);
+    double m_bassBoost = 0;
+    double m_stereoWidth = 1;
     double m_pendingSeek = -1;
     bool m_scrobbleStarted = false;
     bool m_scrobbleFinished = false;
+    QElapsedTimer m_trackClock;
+    bool m_firstAudioLogged = false;
 };

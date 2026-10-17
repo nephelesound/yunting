@@ -1,11 +1,18 @@
 #include "audioengine.h"
 #include "json_util.h"
 #include "ncmclient.h"
+#include "perf.h"
+#ifdef YUNTING_EXPERIMENTAL_EQ
+#include "eqaudiosink.h"
+#include <QAudioBufferOutput>
+#endif
 
 #include <QAudioOutput>
 #include <QCoreApplication>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QAudioDevice>
+#include <QMediaDevices>
 #include <QMediaPlayer>
 #include <QTimer>
 #include <QUrlQuery>
@@ -25,10 +32,29 @@ double applyVolumeScale(double slider)
 AudioEngine::AudioEngine(NcmClient *client, QObject *parent)
     : QObject(parent), m_client(client)
 {
-    m_audio = new QAudioOutput(this);
     m_player = new QMediaPlayer(this);
+#ifdef YUNTING_EXPERIMENTAL_EQ
+    // DSP 链路：解码后的 PCM 由 QAudioBufferOutput 交给 EqAudioSink（默认启用）。
+    m_eqSink = new EqAudioSink(this);
+    m_bufferOutput = new QAudioBufferOutput(this);
+    m_player->setAudioBufferOutput(m_bufferOutput);
+    connect(m_bufferOutput, &QAudioBufferOutput::audioBufferReceived,
+            m_eqSink, &EqAudioSink::bufferReceived);
+    connect(m_eqSink, &EqAudioSink::unavailable, this, [this](const QString &reason) {
+        if (m_audio)
+            return;
+        qWarning() << "eq unavailable, falling back to QAudioOutput:" << reason;
+        m_player->setAudioBufferOutput(nullptr);
+        m_audio = new QAudioOutput(this);
+        m_player->setAudioOutput(m_audio);
+        m_audio->setVolume(applyVolumeScale(m_volume));
+        m_audio->setMuted(m_muted);
+    });
+#else
+    m_audio = new QAudioOutput(this);
     m_player->setAudioOutput(m_audio);
     m_audio->setVolume(applyVolumeScale(m_volume));
+#endif
 
     connect(m_player, &QMediaPlayer::positionChanged, this, [this] {
         emit positionChanged();
@@ -45,8 +71,15 @@ AudioEngine::AudioEngine(NcmClient *client, QObject *parent)
     });
     // 真正开始出声才打卡：地址还在解析时不算听过
     connect(m_player, &QMediaPlayer::playbackStateChanged, this, [this](QMediaPlayer::PlaybackState state) {
-        if (state == QMediaPlayer::PlayingState)
+        if (state == QMediaPlayer::PlayingState) {
+            if (!m_firstAudioLogged && !m_track.isEmpty()) {
+                m_firstAudioLogged = true;
+                qCDebug(lcPerf).nospace() << "audio first track="
+                                          << qlonglong(m_track.value("id").toDouble())
+                                          << " ms=" << m_trackClock.elapsed();
+            }
             scrobbleStart();
+        }
     });
     connect(m_player, &QMediaPlayer::errorOccurred, this, [this](QMediaPlayer::Error, const QString &errorString) {
         if (m_failed)
@@ -79,6 +112,8 @@ void AudioEngine::setTrack(const QVariantMap &track)
     m_failed = false;
     m_scrobbleStarted = false;
     m_scrobbleFinished = false;
+    m_firstAudioLogged = false;
+    m_trackClock.start();
     m_player->stop();
     m_player->setSource(QUrl());
     emit trackChanged();
@@ -111,7 +146,12 @@ void AudioEngine::setVolume(double volume)
     if (clamped == m_volume)
         return;
     m_volume = clamped;
-    m_audio->setVolume(applyVolumeScale(clamped));
+#ifdef YUNTING_EXPERIMENTAL_EQ
+    if (m_eqSink)
+        m_eqSink->setVolume(clamped);
+#endif
+    if (m_audio)
+        m_audio->setVolume(applyVolumeScale(clamped));
     emit volumeChanged();
 }
 
@@ -120,7 +160,12 @@ void AudioEngine::setMuted(bool muted)
     if (muted == m_muted)
         return;
     m_muted = muted;
-    m_audio->setMuted(muted);
+#ifdef YUNTING_EXPERIMENTAL_EQ
+    if (m_eqSink)
+        m_eqSink->setMuted(muted);
+#endif
+    if (m_audio)
+        m_audio->setMuted(muted);
     emit mutedChanged();
 }
 
@@ -149,6 +194,117 @@ QString AudioEngine::effectiveLevel() const
     return QStringLiteral("exhigh");
 }
 
+void AudioEngine::setEqGain(int band, double db)
+{
+    if (band < 0 || band >= m_eqGains.size())
+        return;
+    const double clamped = std::clamp(db, -12.0, 12.0);
+    if (qFuzzyCompare(m_eqGains.at(band).toDouble(), clamped))
+        return;
+    m_eqGains[band] = clamped;
+#ifdef YUNTING_EXPERIMENTAL_EQ
+    if (m_eqSink)
+        m_eqSink->setGain(band, clamped);
+#endif
+    emit eqGainsChanged();
+}
+
+void AudioEngine::resetEq()
+{
+    for (int band = 0; band < m_eqGains.size(); ++band)
+        setEqGain(band, 0.0);
+    setBassBoost(0);
+    setStereoWidth(1);
+}
+
+void AudioEngine::setBassBoost(double db)
+{
+    const double clamped = std::clamp(db, -12.0, 12.0);
+    if (qFuzzyCompare(m_bassBoost, clamped))
+        return;
+    m_bassBoost = clamped;
+#ifdef YUNTING_EXPERIMENTAL_EQ
+    if (m_eqSink)
+        m_eqSink->setBassBoost(clamped);
+#endif
+    emit bassBoostChanged();
+}
+
+void AudioEngine::setStereoWidth(double width)
+{
+    const double clamped = std::clamp(width, 0.0, 2.0);
+    if (qFuzzyCompare(m_stereoWidth, clamped))
+        return;
+    m_stereoWidth = clamped;
+#ifdef YUNTING_EXPERIMENTAL_EQ
+    if (m_eqSink)
+        m_eqSink->setStereoWidth(clamped);
+#endif
+    emit stereoWidthChanged();
+}
+
+void AudioEngine::applyEqPreset(const QString &preset)
+{
+    static const QHash<QString, QPair<QVariantList, QPair<double, double>>> presets = {
+        {QStringLiteral("flat"),    {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 1.0}}},
+        {QStringLiteral("pop"),     {{-1, 0, 1, 2, 3, 2, 1, 0, -1, -1}, {2, 1.05}}},
+        {QStringLiteral("rock"),    {{4, 3, 1, -1, -2, 0, 2, 3, 3, 2}, {3, 1.1}}},
+        {QStringLiteral("bass"),    {{7, 6, 4, 2, 0, 0, 0, 0, 0, 0}, {6, 1.0}}},
+        {QStringLiteral("vocal"),   {{-2, -1, 0, 1, 2, 3, 2, 1, 0, -1}, {-1, 0.95}}},
+        {QStringLiteral("live"),    {{2, 2, 1, 0, 0, -1, -1, 0, 1, 2}, {2, 1.2}}},
+        {QStringLiteral("spatial"), {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 1.6}}},
+    };
+    const auto it = presets.constFind(preset);
+    if (it == presets.constEnd())
+        return;
+    for (int band = 0; band < it->first.size(); ++band)
+        setEqGain(band, it->first.at(band).toDouble());
+    setBassBoost(it->second.first);
+    setStereoWidth(it->second.second);
+}
+
+QVariantList AudioEngine::audioOutputs() const
+{
+    QVariantList out;
+    for (const QAudioDevice &device : QMediaDevices::audioOutputs()) {
+        out.append(QVariantMap{{"id", QString::fromUtf8(device.id())},
+                               {"description", device.description()}});
+    }
+    return out;
+}
+
+void AudioEngine::setOutputDevice(const QString &id)
+{
+    if (id.isEmpty()) {
+        if (m_outputDeviceId.isEmpty())
+            return;
+        m_outputDeviceId.clear();
+        if (m_audio)
+            m_audio->setDevice(QMediaDevices::defaultAudioOutput());
+#ifdef YUNTING_EXPERIMENTAL_EQ
+        if (m_eqSink)
+            m_eqSink->setDevice(QAudioDevice());
+#endif
+        emit outputDeviceChanged();
+        return;
+    }
+    for (const QAudioDevice &device : QMediaDevices::audioOutputs()) {
+        if (QString::fromUtf8(device.id()) != id)
+            continue;
+        if (m_outputDeviceId == id)
+            return;
+        m_outputDeviceId = id;
+        if (m_audio)
+            m_audio->setDevice(device);
+#ifdef YUNTING_EXPERIMENTAL_EQ
+        if (m_eqSink)
+            m_eqSink->setDevice(device);
+#endif
+        emit outputDeviceChanged();
+        return;
+    }
+}
+
 void AudioEngine::toggle()
 {
     setPlaying(!m_playing);
@@ -174,6 +330,7 @@ void AudioEngine::resolveUrl(double songId)
     const QString cacheKey = QStringLiteral("%1:%2").arg(num(songId), level);
     const auto cached = m_urls.constFind(cacheKey);
     if (cached != m_urls.constEnd() && QDateTime::currentDateTimeUtc() < cached->expires) {
+        qCDebug(lcPerf).nospace() << "audio url cache track=" << songId << " level=" << level;
         startSource(cached->url);
         return;
     }
@@ -213,6 +370,9 @@ void AudioEngine::resolveUrl(double songId)
 
 void AudioEngine::startSource(const QString &url)
 {
+    qCDebug(lcPerf).nospace() << "audio url ready track="
+                              << qlonglong(m_track.value("id").toDouble())
+                              << " level=" << effectiveLevel() << " ms=" << m_trackClock.elapsed();
     m_player->setSource(url);
     if (m_pendingSeek >= 0) {
         m_player->setPosition(m_pendingSeek);

@@ -15,6 +15,8 @@ ScreenFrame {
     property var list
     property int currentId   // 正在播放的曲目 id；不在本列表里就没有高亮
     property bool vip
+    // 自己的歌单可以进入排序模式：每行固定显示上移 / 下移，提交一次后退出
+    property bool reordering: false
 
     signal activated(int index)
     signal playAllRequested()
@@ -22,9 +24,12 @@ ScreenFrame {
     signal renameRequested(real id, string name)
     signal deleteRequested(real id, string name)
     signal subscribeToggled(real id, string name, bool subscribed)
+    signal albumSubscriptionToggled(real id, bool subscribed)
 
     // 歌单才有操作：自己建的（「我喜欢的音乐」除外）改名/删除，别人的收藏/取消收藏
     readonly property bool hasListActions: (page.list.listId || 0) > 0 && page.loggedIn
+    readonly property bool canReorder: page.loggedIn && (page.list.owned || false)
+        && (page.list.listId || 0) > 0 && (page.list.tracks || []).length > 1
 
     heading: page.list.heading
 
@@ -75,15 +80,32 @@ ScreenFrame {
                     text: "播放全部"
                     onClicked: page.playAllRequested()
                 }
-                Button {
+                // 与歌手页同一排：随机播放只留图标（悬停有提示），窗格 280 宽放得下其余带状态的动作
+                IconButton {
                     enabled: page.list.tracks.length > 1
-                    implicitHeight: Tokens.height8
-                    flat: true
                     icon.name: "media-playlist-shuffle"
-                    icon.width: Tokens.iconSm
-                    icon.height: Tokens.iconSm
                     text: "随机播放"
                     onClicked: page.shuffleRequested()
+                }
+                Button {
+                    visible: page.list.isAlbum || false
+                    implicitHeight: Tokens.height8
+                    flat: true
+                    icon.name: page.list.subscribed ? "bookmark-remove" : "bookmark-new"
+                    icon.width: Tokens.iconSm
+                    icon.height: Tokens.iconSm
+                    text: page.list.subscribed ? "已收藏" : "收藏专辑"
+                    onClicked: page.albumSubscriptionToggled(page.list.albumId, !page.list.subscribed)
+                }
+                Button {
+                    visible: page.canReorder
+                    implicitHeight: Tokens.height8
+                    flat: true
+                    icon.name: page.reordering ? "dialog-ok" : "view-sort-ascending"
+                    icon.width: Tokens.iconSm
+                    icon.height: Tokens.iconSm
+                    text: page.reordering ? "完成" : "排序"
+                    onClicked: page.reordering = !page.reordering
                 }
                 IconButton {
                     visible: page.hasListActions
@@ -132,6 +154,7 @@ ScreenFrame {
             model: page.list.tracks
             currentIndex: -1
             ScrollBar.vertical: ScrollBar {}
+            WheelScroll { flickable: tracks }
 
             delegate: TrackTile {
                 width: tracks.width - tracks.rightMargin
@@ -141,7 +164,10 @@ ScreenFrame {
                 showAlbum: !(page.list.isAlbum || false)
                 locked: modelData.fee === 4 || (!page.vip && modelData.fee === 1)
                 menuContext: ({ playlistId: page.list.playlistId || 0 })
+                reordering: page.reordering
+                canMoveDown: index < (page.list.tracks || []).length - 1
                 onActivated: index => page.activated(index)
+                onMoveRequested: (index, delta) => page.moveTrack(index, delta)
             }
 
             // 空列表：说明为什么空，而不是留一片空白
@@ -153,5 +179,18 @@ ScreenFrame {
                 text: page.list.emptyText || "这里还没有歌"
             }
         }
+    }
+
+    // 上移 / 下移一次就提交完整顺序；Store 成功后会重建列表，所以一次只挪一步
+    function moveTrack(index, delta) {
+        const target = index + delta;
+        const source = page.list.tracks || [];
+        if (target < 0 || target >= source.length)
+            return;
+        const ordered = source.slice();
+        const moved = ordered.splice(index, 1)[0];
+        ordered.splice(target, 0, moved);
+        page.reordering = false;
+        Source.reorderPlaylistTracks(page.list.listId, ordered.map(t => t.id));
     }
 }

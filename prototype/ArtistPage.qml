@@ -19,8 +19,10 @@ ScreenFrame {
     signal activated(int index)
     signal playAllRequested()
     signal shuffleRequested()
+    signal followToggled(real id, bool followed)
 
     readonly property var artist: Source.artist(page.artistId)
+    readonly property bool followed: page.artist.followed === true
     // 歌曲列：先是热门 50 首，滚到底按热度接着往后取（与热门不重复）；点播、播放都用这份
     readonly property var songs: Source.artistSongs.owner === page.artistId ? Source.artistSongs.items : page.artist.tracks
     readonly property var paging: Source.artistSongs.owner === page.artistId ? Source.artistSongs : null
@@ -84,15 +86,22 @@ ScreenFrame {
                     text: "播放全部"
                     onClicked: page.playAllRequested()
                 }
-                Button {
+                // 窗格只有 280 宽：随机播放只留图标（悬停有提示），把位置让给有状态的「关注」
+                IconButton {
                     enabled: page.songs.length > 1
-                    implicitHeight: Tokens.height8
-                    flat: true
                     icon.name: "media-playlist-shuffle"
-                    icon.width: Tokens.iconSm
-                    icon.height: Tokens.iconSm
                     text: "随机播放"
                     onClicked: page.shuffleRequested()
+                }
+                Button {
+                    enabled: page.artistId > 0
+                    implicitHeight: Tokens.height8
+                    flat: true
+                    icon.name: page.followed ? "bookmark-remove" : "bookmark-new"
+                    icon.width: Tokens.iconSm
+                    icon.height: Tokens.iconSm
+                    text: page.followed ? "已关注" : "关注"
+                    onClicked: page.followToggled(page.artistId, !page.followed)
                 }
             }
         }
@@ -123,6 +132,7 @@ ScreenFrame {
                 model: page.songs
                 currentIndex: -1
                 ScrollBar.vertical: ScrollBar {}
+                WheelScroll { flickable: tracks }
                 onAtYEndChanged: if (atYEnd && page.artist.tracks.length > 0) Source.moreArtistSongs(page.artistId, page.artist.tracks)
 
                 footer: PagingFooter {
@@ -166,6 +176,7 @@ ScreenFrame {
                 boundsBehavior: Flickable.StopAtBounds
                 model: page.artist.albums
                 ScrollBar.vertical: ScrollBar {}
+                WheelScroll { flickable: albums }
 
                 delegate: MediaTile {
                     required property var modelData

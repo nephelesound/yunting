@@ -54,6 +54,11 @@ public:
     Q_INVOKABLE void renamePlaylist(double id, const QString &name);
     Q_INVOKABLE void deletePlaylist(double id);
     Q_INVOKABLE void reorderPlaylists(const QVariantList &ids);
+    // 歌单内曲目排序：pid + 完整的新顺序 trackIds
+    Q_INVOKABLE void reorderPlaylistTracks(double playlistId, const QVariantList &trackIds);
+    // 关注歌手 / 收藏专辑：成功只发对应 changed，失败发 followFailed
+    Q_INVOKABLE void setArtistSubscribed(double id, bool subscribed);
+    Q_INVOKABLE void setAlbumSubscribed(double id, bool subscribed);
 
 public slots:
     // AudioEngine 打卡成功后调用：本地「最近播放」立刻反映刚听的歌，不必等下次 refresh
@@ -75,6 +80,9 @@ signals:
     void playlistCreated(double id, const QString &name);
     void playlistChanged(double id);
     void playlistActionFailed(const QString &action, const QString &message);
+    void artistChanged(double id, bool subscribed);
+    void albumChanged(double id, bool subscribed);
+    void followFailed(const QString &action, const QString &message);
 
 private slots:
     // NcmClient 每个请求的落地真相：收敛 online / sessionExpired 与欠账刷新
@@ -122,6 +130,8 @@ private:
     // 歌单写请求的共同部分：登录检查、epoch 防串号、错误消息
     void playlistWrite(const QString &path, const QJsonObject &payload, const QString &action,
                        std::function<void(const QJsonObject &)> onSuccess);
+    void followWrite(const QString &path, const QJsonObject &payload, const QString &action,
+                     std::function<void()> onSuccess);
     void requestLyrics(const QString &key, double songId);
     void requestPlaylist(const QString &key, double playlistId);
     void requestSearch(const QString &key, const QString &raw);

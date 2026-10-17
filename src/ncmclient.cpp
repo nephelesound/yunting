@@ -3,8 +3,10 @@
 #include "cookievault.h"
 #include "crypto.h"
 #include "json_util.h"
+#include "perf.h"
 
 #include <QDir>
+#include <QElapsedTimer>
 #include <QEventLoop>
 #include <QFile>
 #include <QJsonArray>
@@ -215,8 +217,10 @@ void NcmClient::postRaw(const QUrl &url, const QByteArray &body, const QString &
         req.setRawHeader("Cookie", cookie.toUtf8());
 
     qCDebug(lcNet).noquote() << "POST" << url.path();
+    QElapsedTimer timer;
+    timer.start();
     QNetworkReply *reply = m_nam->post(req, body);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, callback, keepCookies] {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, callback, keepCookies, timer, url] {
         reply->deleteLater();
         const bool networkError = isNetworkError(*reply);
         QJsonDocument doc;
@@ -233,6 +237,9 @@ void NcmClient::postRaw(const QUrl &url, const QByteArray &body, const QString &
             qWarning() << "write failed:" << reply->error()
                        << reply->url().toString(QUrl::RemoveQuery);
         }
+        qCDebug(lcPerf).nospace() << "http method=POST path=" << url.path()
+                                  << " status=" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
+                                  << " ms=" << timer.elapsed() << " network=" << networkError;
         if (keepCookies)
             keepSetCookies(reply);
         emit requestFinished(ok, networkError);
@@ -338,8 +345,10 @@ void NcmClient::startGet(const QString &path, const QUrlQuery &query, bool perso
     }
     // 请求计数用（--verbose）：只记路径，不记 query（可能含搜索词）和请求头
     qCDebug(lcNet).noquote() << "GET" << url.path() << (retrying ? QStringLiteral("(retry %1)").arg(attempt) : QStringLiteral(""));
+    QElapsedTimer timer;
+    timer.start();
     QNetworkReply *reply = m_nam->get(req);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, callback, path, query, personal, attempt]
+    connect(reply, &QNetworkReply::finished, this, [this, reply, callback, path, query, personal, attempt, timer]
     {
         reply->deleteLater();
         const bool networkError = isNetworkError(*reply);

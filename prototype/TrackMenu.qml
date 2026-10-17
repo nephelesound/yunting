@@ -47,7 +47,7 @@ Menu {
     MenuItem {
         icon.name: trackMenu.liked ? "emblem-favorite-symbolic" : "love"
         text: trackMenu.liked ? "取消喜欢" : "喜欢"
-        onTriggered: trackMenu.loggedIn ? Source.setLiked(trackMenu.track.id, !trackMenu.liked) : trackMenu.loginRequested()
+        onTriggered: Actions.toggleLike(trackMenu.track)
     }
     Menu {
         id: addTo
@@ -108,13 +108,8 @@ Menu {
         icon.name: "edit-copy"
         text: "复制歌曲链接"
         onTriggered: {
-            trackMenu.clipboard.text = "https://music.163.com/song?id=" + trackMenu.track.id;
-            trackMenu.clipboard.selectAll();
-            trackMenu.clipboard.copy();
+            Clipboard.copy("https://music.163.com/song?id=" + trackMenu.track.id);
             trackMenu.copied();
         }
     }
-
-    // QML 没有剪贴板 API：用一个不可见的文本框走系统复制。用属性持有，不进菜单的条目列表
-    readonly property TextEdit clipboard: TextEdit { visible: false }
 }

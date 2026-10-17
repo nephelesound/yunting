@@ -64,6 +64,24 @@ private slots:
         QCOMPARE(mutedSpy.count(), 2);
         QVERIFY(!audio->muted());
     }
+
+    void equalizerGainsAreClampedAndReset()
+    {
+        QTemporaryDir dir;
+        AudioEngine *audio = engine(dir);
+        QCOMPARE(audio->eqGains().size(), 10);
+        QSignalSpy gainsSpy(audio, &AudioEngine::eqGainsChanged);
+        audio->setEqGain(0, 99);
+        QCOMPARE(audio->eqGains().at(0).toDouble(), 12.0);
+        QCOMPARE(gainsSpy.count(), 1);
+        audio->setEqGain(0, 12.0);
+        QCOMPARE(gainsSpy.count(), 1);   // 同值不发
+        audio->setEqGain(10, -3);         // 越界 band 忽略
+        QCOMPARE(gainsSpy.count(), 1);
+        audio->resetEq();
+        QCOMPARE(audio->eqGains().at(0).toDouble(), 0.0);
+        QCOMPARE(gainsSpy.count(), 2);
+    }
 };
 
 QTEST_GUILESS_MAIN(AudioEngineTest)

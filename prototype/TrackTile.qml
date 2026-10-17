@@ -1,7 +1,8 @@
 // 曲目行：高 48 = 封面边长。静止时无底色（重复元素保持 Level 0），悬停才出现淡色调。
 // ranked 时左侧是 32 宽的名次列；正在播放把名次换成强调色播放图标，标题加粗。
 // 不排名时，正在播放用悬挂在对齐线外侧的强调色竖条 + 加粗标题标出。
-// 标题后依次是：别名（弱化括注）· 红心 · 购买限制（VIP / 付费）· 音质（Hi-Res / 无损）；时长未知时留空。
+// 列：名次 · 封面 · 标题（别名弱化括注 · 购买限制 · 音质 · 推荐理由）/ 歌手 · 专辑 · 喜欢 · 时长。
+// 歌手、专辑是文字链接；喜欢列已喜欢时常驻实心红心，未喜欢时悬停才出现空心，点一下切换。时长未知时留空。
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -19,8 +20,10 @@ AbstractButton {
     property bool locked // 匿名会话下的 VIP 曲：可见，点击时提示登录
 
     property bool removable  // 播放队列：悬停时显示「移出」
-    readonly property bool liked: Source.isLiked(tile.modelData.id)   // 在红心歌单里：标题后一颗小红心
-    property bool showReason // 每日推荐：右侧细节列优先显示推荐理由，没有理由再显示专辑
+    property bool reordering // 歌单编辑顺序：行尾固定显示上移 / 下移
+    property bool canMoveDown: true
+    readonly property bool liked: Source.isLiked(tile.modelData.id)
+    property bool showReason // 每日推荐：标题后多一个推荐理由标签（「超 76% 人收藏」）
     property bool showAlbum: true  // 专辑页里每行的专辑都相同：细节列留空（列仍占位，时长列对齐）
     readonly property string alias: tile.modelData.alias || ""
     property bool hangingMarker: true  // 左侧没有留白（紧挨别的元素）时关掉悬挂竖条
@@ -28,6 +31,7 @@ AbstractButton {
 
     signal activated(int index)
     signal removeRequested(int index)
+    signal moveRequested(int index, int delta)
 
     implicitHeight: Tokens.trackRow
     hoverEnabled: true
@@ -114,8 +118,8 @@ AbstractButton {
                 Layout.fillWidth: true
                 implicitHeight: title.implicitHeight
 
-                // 标题（别名作弱化括注跟在后面，先于标题被省略）+ 标记：红心、购买限制、音质。
-                // 标题先省略，标记始终完整地紧跟其后
+                // 标题（别名作弱化括注跟在后面，先于标题被省略）+ 标记：购买限制、音质、推荐理由。
+                // 标题先省略，标记始终紧跟其后（推荐理由过长时自己省略）
                 Label {
                     id: title
                     width: Math.min(implicitWidth, titleRow.width - (marks.width > 0 ? marks.width + Tokens.space2 : 0))
@@ -133,43 +137,64 @@ AbstractButton {
                     x: title.width + Tokens.space2
                     anchors.verticalCenter: title.verticalCenter
                     spacing: Tokens.space1
-                    Kirigami.Icon {
-                        visible: tile.liked
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: Tokens.iconSm
-                        height: Tokens.iconSm
-                        source: "emblem-favorite-symbolic"
-                        color: Kirigami.Theme.negativeTextColor
-                        isMask: true
-                    }
                     Tag {
+                        id: restrictionTag
                         text: Format.restriction(tile.modelData.fee)
                         muted: tile.locked
                     }
                     Tag {
+                        id: qualityTag
                         text: Format.quality(tile.modelData.quality || "")
+                    }
+                    // 推荐理由说的是「为什么推给你」，不是曲目属性：用中性底，与强调色的属性标签分开。
+                    // 它最先让位：只用标题完整显示后剩下的宽度，剩得太少就不显示，不把标题挤成一个字
+                    Tag {
+                        readonly property real room: titleRow.width - title.implicitWidth - Tokens.space2
+                            - (restrictionTag.visible ? restrictionTag.width + Tokens.space1 : 0)
+                            - (qualityTag.visible ? qualityTag.width + Tokens.space1 : 0)
+                        text: tile.showReason && room >= Tokens.space6 * 2 ? tile.modelData.reason || "" : ""
+                        muted: true
+                        maximumWidth: Math.min(Tokens.albumColumn, room)
                     }
                 }
             }
-            Label {
+            LinkText {
+                objectName: "artistLinks"
                 Layout.fillWidth: true
-                text: tile.modelData.artist
+                parts: Format.artistLinks(tile.modelData)
                 font.pixelSize: Tokens.textSm
                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
-                elide: Text.ElideRight
             }
         }
 
-        Label {
+        // 专辑列：单曲的专辑名常与曲名相同，重复就留空（列仍占位，保证右侧各列对齐）
+        Item {
             Layout.preferredWidth: Tokens.albumColumn
+            Layout.fillHeight: true
             visible: tile.width >= Tokens.wideRow
-            // 细节列：每日推荐里「为什么推荐」比专辑名更有用；单曲的专辑名常与曲名相同，重复就留空
-            //（列仍占位，保证时长列对齐）
-            text: tile.showReason && tile.modelData.reason ? tile.modelData.reason
-                : !tile.showAlbum || tile.modelData.album === tile.modelData.name ? "" : tile.modelData.album
-            font.pixelSize: Tokens.textSm
-            color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
-            elide: Text.ElideRight
+            LinkText {
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.min(implicitWidth, parent.width)
+                parts: !tile.showAlbum || !tile.modelData.album || tile.modelData.album === tile.modelData.name ? []
+                    : [{ text: tile.modelData.album, albumId: tile.modelData.albumId }]
+                font.pixelSize: Tokens.textSm
+                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+            }
+        }
+
+        // 喜欢列：高频操作，一点即切换（未登录时由 main.qml 引向登录）
+        Item {
+            Layout.preferredWidth: Tokens.height8
+            Layout.fillHeight: true
+            IconButton {
+                objectName: "likeButton"
+                anchors.centerIn: parent
+                visible: tile.liked || tile.hovered || tile.visualFocus || hovered
+                icon.name: tile.liked ? "emblem-favorite-symbolic" : "love-symbolic"
+                icon.color: tile.liked ? Kirigami.Theme.negativeTextColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                text: tile.liked ? "取消喜欢" : "喜欢"
+                onClicked: Actions.toggleLike(tile.modelData)
+            }
         }
 
         // 时长列；悬停/聚焦时把时长换成行内动作，列宽不变、行不跳动：
@@ -177,9 +202,10 @@ AbstractButton {
         // 右缘贴页边线（与左边的封面贴页边线对称，和页头、播放条的右缘同一条线）
         Item {
             id: endColumn
-            Layout.preferredWidth: Math.max(durationLabel.implicitWidth, Tokens.height8)
+            Layout.preferredWidth: tile.reordering ? Tokens.height8 * 2 + Tokens.space1
+                                                   : Math.max(durationLabel.implicitWidth, Tokens.height8)
             Layout.fillHeight: true
-            readonly property bool showAction: tile.hovered || tile.visualFocus
+            readonly property bool showAction: (tile.hovered || tile.visualFocus) && !tile.reordering
 
             Label {
                 id: durationLabel
@@ -190,6 +216,25 @@ AbstractButton {
                 font.pixelSize: Tokens.textSm
                 font.features: { "tnum": 1 }
                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+            }
+            Row {
+                anchors.right: parent.right
+                anchors.rightMargin: -Tokens.space2
+                anchors.verticalCenter: parent.verticalCenter
+                visible: tile.reordering
+                spacing: 0
+                IconButton {
+                    enabled: tile.index > 0
+                    icon.name: "go-up-symbolic"
+                    text: "上移"
+                    onClicked: tile.moveRequested(tile.index, -1)
+                }
+                IconButton {
+                    enabled: tile.canMoveDown
+                    icon.name: "go-down-symbolic"
+                    text: "下移"
+                    onClicked: tile.moveRequested(tile.index, 1)
+                }
             }
             IconButton {
                 anchors.right: parent.right

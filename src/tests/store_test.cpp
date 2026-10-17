@@ -391,6 +391,62 @@ private slots:
         QCOMPARE(detail.value("count").toDouble(), 1.0);
         QCOMPARE(detail.value("tracks").toList().size(), 1);
     }
+
+    // 歌单内排序：服务器成功后，本地详情按提交的完整顺序重排；列表不丢曲目
+    void reorderTracksUpdatesLocalOrder()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/v6/playlist/detail") {
+                QJsonArray tracks;
+                QJsonArray ids;
+                for (int id : {1, 2, 3}) {
+                    tracks.append(QJsonObject{{"id", id}, {"name", QStringLiteral("song%1").arg(id)},
+                                              {"ar", QJsonArray{}}, {"al", QJsonObject{}}, {"dt", 1000}});
+                    ids.append(QJsonObject{{"id", id}});
+                }
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"playlist", QJsonObject{{"id", 501}, {"name", "P"}, {"trackCount", 3},
+                                             {"tracks", tracks}, {"trackIds", ids}}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("playlist:501"));
+        QVERIFY(waitUntil([&] {
+            return m_store->personal().value("playlistDetails").toMap()
+                .value(QStringLiteral("501")).toMap().value("tracks").toList().size() == 3;
+        }));
+
+        QSignalSpy changed(m_store, &Store::playlistChanged);
+        m_store->reorderPlaylistTracks(501, {3, 1, 2});
+        QVERIFY(waitUntil([&] { return changed.count() > 0; }));
+
+        const QVariantList tracks = m_store->personal().value("playlistDetails").toMap()
+            .value(QStringLiteral("501")).toMap().value("tracks").toList();
+        QCOMPARE(tracks.size(), 3);
+        QCOMPARE(tracks.at(0).toMap().value("id").toDouble(), 3.0);
+        QCOMPARE(tracks.at(1).toMap().value("id").toDouble(), 1.0);
+        QCOMPARE(tracks.at(2).toMap().value("id").toDouble(), 2.0);
+    }
+
+    // 关注歌手 / 收藏专辑：成功后发对应 changed，不依赖当前详情是否已加载
+    void followAndAlbumSubscribeEmitChanges()
+    {
+        m_api->handler = [](const FakeApi::Request &, const FakeApi::Responder &respond) {
+            respond(200, "{\"code\":200}");
+        };
+        QSignalSpy artist(m_store, &Store::artistChanged);
+        QSignalSpy album(m_store, &Store::albumChanged);
+        m_store->setArtistSubscribed(6452, true);
+        m_store->setAlbumSubscribed(32311, true);
+        QVERIFY(waitUntil([&] { return artist.count() == 1 && album.count() == 1; }));
+        QCOMPARE(artist.first().at(0).toDouble(), 6452.0);
+        QCOMPARE(artist.first().at(1).toBool(), true);
+        QCOMPARE(album.first().at(0).toDouble(), 32311.0);
+        QCOMPARE(album.first().at(1).toBool(), true);
+    }
 };
 
 QTEST_GUILESS_MAIN(StoreTest)

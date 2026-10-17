@@ -16,6 +16,8 @@ ScreenFrame {
     property var track
     property real elapsed
     property string pane: "lyrics"   // lyrics | comments
+
+    signal seekRequested(real seconds)   // 点了某句歌词：跳到这句开始
     // 共享封面转场的一端：main 读它的位置，飞行期间 coverHidden
     property bool coverHidden: false
     readonly property Item coverItem: pageCover
@@ -59,12 +61,7 @@ ScreenFrame {
     onPaneChanged: page.startComments()
     onTrackChanged: page.startComments()
     Component.onCompleted: page.startComments()
-    readonly property int lyricIndex: {
-        let i = 0;
-        while (i + 1 < page.lines.length && page.lines[i + 1].t <= page.elapsed)
-            i++;
-        return i;
-    }
+    readonly property int lyricIndex: Source.lyricIndex(page.lines, page.elapsed)
 
     function count(n) {
         return n >= 10000 ? (n / 10000).toFixed(n >= 100000 ? 0 : 1) + "万" : String(n);
@@ -90,7 +87,7 @@ ScreenFrame {
         Facts {
             Layout.fillWidth: true
             // 歌手、专辑都可点：去歌手页 / 专辑页
-            items: page.track ? [{ label: page.track.artist, artistId: page.track.artistId || 0 },
+            items: page.track ? [{ artists: Format.artistLinks(page.track) },
                                  { label: page.track.album, albumId: page.track.albumId || 0 }] : []
         }
     }
@@ -110,22 +107,108 @@ ScreenFrame {
             onActivated: key => page.pane = key
         }
 
-        // 歌词
+        // 歌词：自动跟随当前句（当前句停在封面中线那一行）；用户滚动时暂停跟随，3 秒不动后平滑回到当前句。
+        // 点一句跳到那里播放；右键可复制这句 / 全部歌词。
+        // 跟随不用 StrictlyEnforceRange（它会把当前句钉死，用户滚不动），而是自己算目标位置再缓动过去
         ListView {
             id: lyrics
+            objectName: "lyrics"
             visible: page.pane === "lyrics"
             y: page.pitch
             width: parent.width
             height: (page.rows - 1) * page.pitch
             clip: true
             model: page.lines
-            currentIndex: page.lyricIndex
-            highlightRangeMode: ListView.StrictlyEnforceRange
-            preferredHighlightBegin: (page.focusRow - 1) * page.pitch
-            preferredHighlightEnd: page.focusRow * page.pitch
-            // 换句时列表平滑上移（屏上移动 → ease-in-out）；歌词是被动观看的环境运动，所以用最慢的一档
-            highlightMoveDuration: Tokens.motionSlow
-            highlightMoveVelocity: -1
+            // 上下留出余量，第一句和最后一句也能停在中线那一行
+            readonly property real focusOffset: (page.focusRow - 1) * page.pitch
+            topMargin: lyrics.focusOffset
+            bottomMargin: lyrics.height - lyrics.focusOffset - page.pitch
+            boundsBehavior: Flickable.StopAtBounds
+
+            property bool browsing: false      // 用户在手动看别处
+
+            // 目标位置：让第 i 句的顶边落在中线那一行（借 positionViewAtIndex 量，再还原，交给动画）
+            function follow(animated) {
+                if (lyrics.browsing || lyrics.count === 0 || !lyrics.visible)
+                    return;
+                const from = lyrics.contentY;
+                lyrics.positionViewAtIndex(page.lyricIndex, ListView.Beginning);
+                const to = lyrics.contentY - lyrics.focusOffset;
+                lyrics.contentY = from;
+                followAnimation.stop();
+                if (!animated) {
+                    lyrics.contentY = to;
+                    return;
+                }
+                followAnimation.to = to;
+                followAnimation.start();
+            }
+            NumberAnimation {
+                id: followAnimation
+                target: lyrics
+                property: "contentY"
+                // 换句时列表平滑上移（屏上移动 → ease-in-out）；歌词是被动观看的环境运动，所以用最慢的一档
+                duration: Tokens.motionSlow
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Tokens.easeInOut
+            }
+            // 只认真实的输入算「用户在看别处」：滚轮 / 触控板（下面 WheelScroll 的 wheel）、触屏拖动（moving）。
+            // 不能用 contentY 变化来判断：留白、排版、窗口尺寸变化都会挪动它
+            function userScrolled() {
+                followAnimation.stop();
+                lyrics.browsing = true;
+                resumeTimer.restart();
+            }
+            onMovingChanged: if (moving) lyrics.userScrolled()
+            Timer {
+                id: resumeTimer
+                interval: 3000
+                onTriggered: lyrics.resume()
+            }
+            function resume() {
+                resumeTimer.stop();
+                lyrics.browsing = false;
+                lyrics.follow(true);
+            }
+            Connections {
+                target: page
+                function onLyricIndexChanged() { lyrics.follow(true); }
+                function onLinesChanged() {
+                    lyrics.browsing = false;
+                    Qt.callLater(() => lyrics.follow(false));
+                }
+            }
+            onVisibleChanged: if (visible) Qt.callLater(() => lyrics.follow(false))
+            onHeightChanged: Qt.callLater(() => lyrics.follow(false))
+            Component.onCompleted: Qt.callLater(() => lyrics.follow(false))
+
+            WheelScroll {
+                flickable: lyrics
+                onWheel: lyrics.userScrolled()
+            }
+
+            // 右键菜单：一个实例，打开时记下是哪一句
+            Menu {
+                id: lyricMenu
+                property var line: null
+                MenuItem {
+                    icon.name: "media-playback-start"
+                    text: "从这句开始播放"
+                    onTriggered: page.seekRequested(lyricMenu.line.t)
+                }
+                MenuSeparator {}
+                MenuItem {
+                    objectName: "copyLine"
+                    icon.name: "edit-copy"
+                    text: "复制这句"
+                    onTriggered: Clipboard.copy(lyricMenu.line.tr ? lyricMenu.line.text + "\n" + lyricMenu.line.tr : lyricMenu.line.text)
+                }
+                MenuItem {
+                    icon.name: "edit-copy"
+                    text: "复制全部歌词"
+                    onTriggered: Clipboard.copy(page.lines.map(l => l.tr ? l.text + "\n" + l.tr : l.text).join("\n"))
+                }
+            }
 
             delegate: Item {
                 id: line
@@ -136,6 +219,39 @@ ScreenFrame {
                 width: ListView.view.width
                 // 有译文的句子占两行网格：原文贴第一行底边，译文贴第二行顶边，读起来是一组
                 height: line.translation.length > 0 ? 2 * page.pitch : page.pitch
+
+                // 可点：悬停时整行淡色调 + 右侧这句的时间；点击跳到这句，右键出菜单
+                HoverHandler { id: lineHover; cursorShape: Qt.PointingHandCursor }
+                TapHandler {
+                    onTapped: {
+                        page.seekRequested(line.modelData.t);
+                        lyrics.resume();
+                    }
+                }
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    onTapped: {
+                        lyricMenu.line = line.modelData;
+                        lyricMenu.popup();
+                    }
+                }
+                Rectangle {
+                    anchors.fill: parent
+                    anchors.leftMargin: -Tokens.space2
+                    radius: Tokens.radius
+                    color: Qt.alpha(Kirigami.Theme.highlightColor, lineHover.hovered ? Tokens.tintHover : 0)
+                    Behavior on color { ColorAnimation { duration: Tokens.motionFast } }
+                }
+                Label {
+                    anchors.right: parent.right
+                    anchors.rightMargin: Tokens.space2
+                    y: (page.pitch - height) / 2
+                    visible: lineHover.hovered
+                    text: Format.duration(Math.max(1, line.modelData.t))
+                    font.pixelSize: Tokens.textSm
+                    font.features: { "tnum": 1 }
+                    color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                }
 
                 // 每句都按展示字号排版，非当前句用 scale 缩到 24/36：换句时只动 transform 与颜色，不重排文字
                 Label {
@@ -168,6 +284,21 @@ ScreenFrame {
             }
         }
 
+        // 手动滚动时：立刻回到当前句（否则 3 秒后自动回去）
+        Button {
+            anchors.right: parent.right
+            y: page.rows * page.pitch - height
+            visible: page.pane === "lyrics" && lyrics.browsing
+            implicitHeight: Tokens.height8
+            flat: true
+            icon.name: "go-jump"
+            icon.width: Tokens.iconSm
+            icon.height: Tokens.iconSm
+            text: "回到当前句"
+            font.pixelSize: Tokens.textSm
+            onClicked: lyrics.resume()
+        }
+
         Label {
             y: page.focusRow * page.pitch
             height: page.pitch
@@ -192,6 +323,7 @@ ScreenFrame {
             boundsBehavior: Flickable.StopAtBounds
             model: page.commentRows
             ScrollBar.vertical: ScrollBar {}
+            WheelScroll { flickable: commentList }
             onAtYEndChanged: if (atYEnd && page.track && page.pane === "comments") Source.moreComments(page.track.id)
 
             footer: PagingFooter {

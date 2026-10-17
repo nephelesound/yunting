@@ -9,13 +9,17 @@ QtObject {
     signal trackMenuRequested(var track, var context)
     signal artistRequested(real id)
     signal albumRequested(real id)
+    signal mvRequested(real id)
     signal playlistRequested(real id)
     signal logoutRequested()
     signal playlistMenuRequested(var playlist)   // 「我的」里的歌单磁贴：{ id, name, owned }
     signal newPlaylistRequested()
+    signal likeToggleRequested(var track)        // 曲目行、播放条、曲目菜单的红心都走这一处（未登录时引向登录）
 
     function trackMenu(track, context) { trackMenuRequested(track, context || {}); }
+    function toggleLike(track) { if (track) likeToggleRequested(track); }
     function openArtist(id) { if (id > 0) artistRequested(id); }
     function openAlbum(id) { if (id > 0) albumRequested(id); }
+    function openMv(id) { if (id > 0) mvRequested(id); }
     function openPlaylist(id) { if (id > 0) playlistRequested(id); }
 }

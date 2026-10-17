@@ -213,6 +213,16 @@ QtObject {
         return { id: id, name: "", artist: "", artistId: 0, cover: "", description: "", company: "", publishTime: 0, tracks: [] };
     }
 
+    // MV：data 里只放最近取回的一个，id 对上才用；没对上就向 live 要
+    function mv(id) {
+        const m = source.d.mv;
+        if (m && (m.id === id || !source.live))
+            return m;
+        source.need("mv:" + id);
+        return { id: id, name: "", cover: "", artist: "", artistId: 0, duration: 0, url: "",
+                 playCount: 0, subscribed: false, description: "" };
+    }
+
     // 写操作：都交给 live（Store），结果经 Store 的信号回来；原型里不写任何地方
     // 「加到歌单」的候选：自己创建的歌单，去掉「我喜欢的音乐」（往里加就是点红心）
     readonly property var addableLists: source.myPlaylists.filter(pl => pl.owned && pl.id !== (source.pe.liked.id || 0))
@@ -222,7 +232,19 @@ QtObject {
     function renamePlaylist(id, name) { if (source.live) source.live.renamePlaylist(id, name); }
     function deletePlaylist(id) { if (source.live) source.live.deletePlaylist(id); }
     function setPlaylistSubscribed(id, subscribed) { if (source.live) source.live.setPlaylistSubscribed(id, subscribed); }
+    // 歌单内曲目排序：ids 是完整的新顺序；原型只读，不写
+    function reorderPlaylistTracks(id, ids) { if (source.live) source.live.reorderPlaylistTracks(id, ids); }
+    function setArtistSubscribed(id, subscribed) { if (source.live) source.live.setArtistSubscribed(id, subscribed); }
+    function setAlbumSubscribed(id, subscribed) { if (source.live) source.live.setAlbumSubscribed(id, subscribed); }
     function logout() { if (source.live) source.live.logout(); }
+
+    // 当前句：最后一个开始时间不晚于 elapsed 的句子（正在播放页与桌面歌词共用这一条规则）
+    function lyricIndex(lines, elapsed) {
+        let i = 0;
+        while (i + 1 < lines.length && lines[i + 1].t <= elapsed)
+            i++;
+        return i;
+    }
 
     function lyrics(trackId) {
         if (trackId === source.d.lyricsTrackId)
@@ -360,6 +382,7 @@ QtObject {
                 if (al.tracks.length > 0)
                     facts.push(source.songs(al.tracks.length));
                 return { heading: al.name, cover: source.sized(al.cover, 560), tracks: al.tracks, facts: facts, isAlbum: true,
+                         albumId: al.id, subscribed: al.subscribed === true,
                          description: source.unindent(al.description) || (al.company ? "发行：" + al.company : ""),
                          emptyText: source.live ? "正在取回曲目…" : "这张专辑的曲目还没取到" };
             }

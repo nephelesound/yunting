@@ -6,7 +6,7 @@ QML       ?= /usr/lib/qt6/bin/qml
 QMLLINT   ?= /usr/lib/qt6/bin/qmllint
 QMLFORMAT ?= /usr/lib/qt6/bin/qmlformat
 
-.PHONY: run lint fmt refs shots data app app-build contract test smoke-readonly
+.PHONY: run lint fmt refs shots data app app-build contract test qmltest smoke-readonly
 
 # 应用（C++ 后端 + QML 界面，QML 编进可执行文件的资源）
 app-build:
@@ -15,6 +15,9 @@ app-build:
 
 test: app-build ## 后端单元测试
 	ctest --test-dir build/app --output-on-failure
+
+qmltest: ## 界面交互测试（悬停、点击、滚轮；用快照数据）
+	QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME=kde /usr/lib/qt6/bin/qmltestrunner -input prototype/tests
 
 app: app-build ## 运行应用（实时接口 + 真实播放；登录态见 README）
 	$(APP)
@@ -86,7 +89,7 @@ run: ## 运行界面原型
 	$(QML) prototype/main.qml
 
 lint: ## 静态检查（QML）
-	$(QMLLINT) -I prototype prototype/*.qml
+	$(QMLLINT) -I $(CURDIR)/prototype $(CURDIR)/prototype/*.qml # 相对路径下 qmllint 会误报 qmldir 里的单例未声明
 
 fmt: ## 格式化（QML）
 	$(QMLFORMAT) -i prototype/*.qml

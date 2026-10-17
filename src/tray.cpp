@@ -24,6 +24,9 @@ Tray::Tray(AudioEngine *audio, QObject *parent)
 {
     m_item->setTitle(QGuiApplication::applicationDisplayName());
     m_item->setCategory(KStatusNotifierItem::ApplicationStatus);
+    // 默认是 Passive，Plasma 会把它收进托盘的隐藏区：关窗口后看不到图标，像是程序退出了。
+    // 关窗口只是隐藏到托盘，托盘图标是回到窗口的唯一入口，所以始终 Active
+    m_item->setStatus(KStatusNotifierItem::Active);
     m_item->setIconByName(iconName());
 
     // KStatusNotifierItem 自带默认菜单只有一行应用名；

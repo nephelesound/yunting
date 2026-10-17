@@ -13,9 +13,11 @@ var BROKEN = "https://p1.music.126.net/does-not-exist/0.jpg?param=120y120";
 // 没有专辑名的曲目也没有专辑 id（曲目菜单里「专辑」项随之不可点）
 function t(id, name, artist, album, dur, fee, cover, x) {
     x = x || {};
+    const artistId = x.artistId !== undefined ? x.artistId : 1;
     return { id: id, name: name, artist: artist, album: album, dur: dur, fee: fee, cover: cover,
              alias: x.alias || "", quality: x.quality || "", reason: x.reason || "", mv: x.mv || 0,
-             artistId: x.artistId !== undefined ? x.artistId : 1, albumId: x.albumId !== undefined ? x.albumId : (album ? 1 : 0) };
+             artistId: artistId, albumId: x.albumId !== undefined ? x.albumId : (album ? 1 : 0),
+             artists: artist.split(" / ").map((n, i) => ({ id: artistId > 0 ? artistId + i : 0, name: n })) };
 }
 
 // 前几行各带一种失败，像真实数据那样混在一起

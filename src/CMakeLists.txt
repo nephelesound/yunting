@@ -9,12 +9,14 @@ find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Qml Quick QuickControls2 N
 find_package(Qt6Keychain REQUIRED)
 find_package(KF6StatusNotifierItem REQUIRED)
 find_package(OpenSSL REQUIRED COMPONENTS Crypto)
+find_package(LayerShellQt QUIET)
+option(YUNTING_EXPERIMENTAL_EQ "Build QAudioBufferOutput + biquad EQ path" ON)
 
 qt_add_executable(yunting
     main.cpp
     ncmclient.h ncmclient.cpp
     cookievault.h cookievault.cpp
-    store.h store.cpp store_on_demand.cpp
+    store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_on_demand.cpp
     querycache.h querycache.cpp
     imagecache.h
     json_util.h
@@ -24,7 +26,11 @@ qt_add_executable(yunting
     mpris.h mpris.cpp
     tray.h tray.cpp
     crypto.h crypto.cpp
+    perf.h perf.cpp
+    layershellhelper.h layershellhelper.cpp
     apicli.h apicli.cpp
+    eqprocessor.h eqprocessor.cpp
+    eqaudiosink.h eqaudiosink.cpp
 )
 
 # 界面 QML/JS 编进可执行文件：整个 prototype/ 目录挂到 qrc:/qt/qml/org/sudoskys/yunting/ 下，
@@ -44,17 +50,28 @@ qt_add_resources(yunting "app_qml"
     BASE "${CMAKE_CURRENT_SOURCE_DIR}/../prototype"
     FILES ${_app_qml})
 
+# 窗口/任务栏图标：运行时优先取主题里的已安装图标；源码运行时回退到内嵌 SVG
+set_source_files_properties("../data/io.github.sudoskys.Yunting.svg"
+    PROPERTIES QT_RESOURCE_ALIAS "io.github.sudoskys.Yunting.svg")
+qt_add_resources(yunting "app_icon"
+    PREFIX "/"
+    FILES "${CMAKE_CURRENT_SOURCE_DIR}/../data/io.github.sudoskys.Yunting.svg")
+
 target_compile_options(yunting PRIVATE -Wall -Wextra)
 
 # 测试：只测有策略的深模块（QueryCache 的缓存与去重规则、AudioEngine 的音量刻度与钳制、
 # NcmClient 的重试、CookieVault 的后备文件规则）
 find_package(Qt6 REQUIRED COMPONENTS Test)
 enable_testing()
-qt_add_executable(querycache_test tests/querycache_test.cpp querycache.h querycache.cpp)
+qt_add_executable(querycache_test tests/querycache_test.cpp querycache.h querycache.cpp perf.h perf.cpp)
 target_link_libraries(querycache_test PRIVATE Qt6::Core Qt6::Test Qt6::Network)
 add_test(NAME querycache COMMAND querycache_test)
 
 # 归一化形状：曲目导航字段、MV、云盘后备、LRC 译文
+qt_add_executable(eqprocessor_test tests/eqprocessor_test.cpp eqprocessor.h eqprocessor.cpp)
+target_link_libraries(eqprocessor_test PRIVATE Qt6::Core Qt6::Test)
+add_test(NAME eqprocessor COMMAND eqprocessor_test)
+
 qt_add_executable(form_test tests/form_test.cpp json_util.h)
 target_link_libraries(form_test PRIVATE Qt6::Core Qt6::Test)
 add_test(NAME form COMMAND form_test)
@@ -65,13 +82,14 @@ add_test(NAME normalize COMMAND normalize_test)
 
 # 音量/静音走 QAudioOutput，测试要能构造真实引擎（无窗口、无网络）
 qt_add_executable(audioengine_test tests/audioengine_test.cpp audioengine.h audioengine.cpp
-    ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp json_util.h crypto.h crypto.cpp)
+    ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp json_util.h crypto.h crypto.cpp
+    perf.h perf.cpp)
 target_compile_options(audioengine_test PRIVATE -Wall -Wextra)
 target_link_libraries(audioengine_test PRIVATE Qt6::Core Qt6::Test Qt6::Network Qt6::Multimedia Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
 add_test(NAME audioengine COMMAND audioengine_test)
 
 # 重试策略：seam 是本地 QTcpServer（I/O 边界），不 mock NcmClient 内部
-qt_add_executable(retry_test tests/retry_test.cpp ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp crypto.h crypto.cpp)
+qt_add_executable(retry_test tests/retry_test.cpp ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp crypto.h crypto.cpp perf.h perf.cpp)
 target_compile_options(retry_test PRIVATE -Wall -Wextra)
 target_link_libraries(retry_test PRIVATE Qt6::Core Qt6::Network Qt6::Test Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
 add_test(NAME retry COMMAND retry_test)
@@ -83,10 +101,10 @@ add_test(NAME cookievault COMMAND cookievault_test)
 
 # Store 的缓存/写操作行为：本地假接口，不碰外网
 qt_add_executable(store_test tests/store_test.cpp
-    store.h store.cpp store_on_demand.cpp
+    store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_on_demand.cpp
     querycache.h querycache.cpp
     ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp
-    normalize.h normalize.cpp json_util.h crypto.h crypto.cpp)
+    normalize.h normalize.cpp json_util.h crypto.h crypto.cpp perf.h perf.cpp)
 target_compile_options(store_test PRIVATE -Wall -Wextra)
 target_link_libraries(store_test PRIVATE Qt6::Core Qt6::Network Qt6::Test Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
 add_test(NAME store COMMAND store_test)
@@ -94,13 +112,13 @@ add_test(NAME store COMMAND store_test)
 # 切歌时挂起的 seek 不能落到下一首：本地假接口 + 本地 WAV
 qt_add_executable(audioengine_seek_test tests/audioengine_seek_test.cpp
     audioengine.h audioengine.cpp ncmclient.h ncmclient.cpp
-    cookievault.h cookievault.cpp json_util.h crypto.h crypto.cpp)
+    cookievault.h cookievault.cpp json_util.h crypto.h crypto.cpp perf.h perf.cpp)
 target_compile_options(audioengine_seek_test PRIVATE -Wall -Wextra)
 target_link_libraries(audioengine_seek_test PRIVATE Qt6::Core Qt6::Test Qt6::Network Qt6::Multimedia Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
 add_test(NAME audioengine_seek COMMAND audioengine_seek_test)
 
 # 任何测试都碰不到用户的真实凭据与缓存：会话总线不可达（钥匙串因此走后备文件），数据与缓存目录在构建目录里
-set_tests_properties(querycache normalize form audioengine audioengine_seek retry cookievault store PROPERTIES ENVIRONMENT
+set_tests_properties(querycache normalize form eqprocessor audioengine audioengine_seek retry cookievault store PROPERTIES ENVIRONMENT
     "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent;XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/data;XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/cache;YUNTING_KEYCHAIN_SERVICE=yunting-test")
 
 target_link_libraries(yunting PRIVATE
@@ -110,6 +128,13 @@ target_link_libraries(yunting PRIVATE
     KF6::StatusNotifierItem
     OpenSSL::Crypto
 )
+if (LayerShellQt_FOUND)
+    target_compile_definitions(yunting PRIVATE YUNTING_LAYERSHELL=1)
+    target_link_libraries(yunting PRIVATE LayerShellQt::Interface)
+endif()
+if (YUNTING_EXPERIMENTAL_EQ)
+    target_compile_definitions(yunting PRIVATE YUNTING_EXPERIMENTAL_EQ=1)
+endif()
 
 qt_add_executable(crypto_test tests/crypto_test.cpp crypto.h crypto.cpp)
 target_link_libraries(crypto_test PRIVATE Qt6::Core Qt6::Test OpenSSL::Crypto)
@@ -131,3 +156,5 @@ install(FILES ../data/io.github.sudoskys.Yunting.metainfo.xml
         DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
 install(FILES ../data/io.github.sudoskys.Yunting.svg
         DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
+install(FILES ../data/ICON-LICENSE
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/yunting)

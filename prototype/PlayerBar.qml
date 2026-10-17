@@ -25,6 +25,7 @@ Item {
     property real volume: 0.7
     property bool muted: false
     property string quality: "auto"   // auto · standard · higher · exhigh · lossless · hires
+    property var audio: null          // AudioEngine：音质之外还要取输出设备与 EQ
     // 共享封面转场的一端（另一端是正在播放页的封面）
     readonly property Item coverItem: coverButton
 
@@ -45,6 +46,14 @@ Item {
     signal volumeRequested(real volume)
     signal muteToggled()
     signal qualityRequested(string quality)
+    signal desktopLyricsToggled()
+    signal miniRequested()
+    signal fullscreenRequested()
+
+    property bool desktopLyricsShown
+
+    function openEqualizer() { eqPanel.showAt(bar); }
+    function openQualityMenu() { qualityMenu.popup(qualityButton, 0, -qualityMenu.implicitHeight - Tokens.space2); }
 
     // 没有曲目或时长未知时进度为 0、不能拖动，传输控件整体禁用
     readonly property real duration: bar.track ? bar.track.dur : 0
@@ -80,6 +89,7 @@ Item {
     }
 
     Item {
+        id: hud
         anchors.top: progressTrack.bottom
         anchors.left: parent.left
         anchors.right: parent.right
@@ -94,40 +104,33 @@ Item {
             width: Math.min(Tokens.trackColumn, transport.x - Tokens.space6)
             spacing: Tokens.space3
 
-            AbstractButton {
+            CoverButton {
                 id: coverButton
-                Layout.preferredWidth: Tokens.height12
-                Layout.preferredHeight: Tokens.height12
                 enabled: bar.active
-                hoverEnabled: true
+                source: bar.track ? bar.track.cover : ""
+                hintIcon: bar.nowPlayingShown ? "go-down-symbolic" : "go-up-symbolic"
+                hint: bar.nowPlayingShown ? "收起正在播放" : "正在播放与歌词"
                 onClicked: bar.nowPlayingToggled()
-                contentItem: Cover {
-                    source: bar.track ? bar.track.cover : ""
-                    pixelSize: 96
-                }
-                ToolTip.text: "正在播放与歌词"
-                ToolTip.visible: hovered
-                ToolTip.delay: 600
             }
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.preferredWidth: 0
                 spacing: 0
-                Label {
+                // 歌名与封面去同一处（正在播放页）；歌手去歌手页
+                LinkText {
                     Layout.fillWidth: true
-                    text: bar.active ? bar.track.name : "未在播放"
+                    parts: [{ text: bar.active ? bar.track.name : "未在播放", link: bar.active }]
                     font.pixelSize: Tokens.textBase
                     font.weight: bar.active ? Font.Medium : Font.Normal
                     color: bar.active ? Kirigami.Theme.textColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
-                    elide: Text.ElideRight
+                    onActivated: bar.nowPlayingToggled()
                 }
-                Label {
+                LinkText {
                     Layout.fillWidth: true
                     visible: bar.active
-                    text: bar.active ? bar.track.artist : ""
+                    parts: Format.artistLinks(bar.track)
                     font.pixelSize: Tokens.textSm
                     color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
-                    elide: Text.ElideRight
                 }
             }
             IconButton {
@@ -192,7 +195,11 @@ Item {
             IconButton { icon.name: "view-media-playlist"; text: "播放队列"; onClicked: bar.queueRequested() }
         }
 
-        // 右：时间与视图
+        // 右：时间与视图。放不下时（与中段传输控件之间不足 24）音质、桌面歌词、迷你播放器收进「更多」：
+        // 时间、正在播放、音量最常用，始终在外面。按各项的固有宽度判断，与是否显示无关，不会绑定成环
+        readonly property real fullRightWidth: qualityButton.implicitWidth + timeLabel.implicitWidth + Tokens.space3
+                                               + 4 * Tokens.height8 + 5 * Tokens.space1
+        readonly property bool compact: fullRightWidth > (width - transport.width) / 2 - Tokens.space6
         RowLayout {
             anchors.right: parent.right
             anchors.rightMargin: -Tokens.space2 // 图形右缘落在页边线上
@@ -202,6 +209,7 @@ Item {
             // 音质：当前档位的小字按钮，点开是单选菜单（「这首歌怎么在播」与时间放在一起）
             Button {
                 id: qualityButton
+                visible: !hud.compact
                 implicitHeight: Tokens.height8
                 flat: true
                 text: Format.qualityLevel(bar.quality)
@@ -213,21 +221,16 @@ Item {
                 ToolTip.delay: 600
                 onClicked: qualityMenu.popup(qualityButton, 0, -qualityMenu.implicitHeight - Tokens.space2)
 
-                Menu {
+                QualityMenu {
                     id: qualityMenu
-                    Repeater {
-                        model: ["auto", "standard", "higher", "exhigh", "lossless", "hires"]
-                        delegate: MenuItem {
-                            required property string modelData
-                            text: Format.qualityLevel(modelData) + (modelData === "auto" ? "（按曲目最高可用）" : "")
-                            checkable: true
-                            checked: bar.quality === modelData
-                            onTriggered: bar.qualityRequested(modelData)
-                        }
-                    }
+                    quality: bar.quality
+                    audio: bar.audio
+                    onQualityRequested: q => bar.qualityRequested(q)
+                    onEqualizerRequested: eqPanel.showAt(bar)
                 }
             }
             Label {
+                id: timeLabel
                 Layout.rightMargin: Tokens.space3
                 visible: bar.duration > 0
                 text: Format.elapsed(bar.elapsed) + " / " + Format.duration(bar.duration)
@@ -241,6 +244,54 @@ Item {
                 checkable: true
                 checked: bar.nowPlayingShown
                 onClicked: bar.nowPlayingToggled()
+            }
+            IconButton {
+                visible: !hud.compact
+                icon.name: "draw-text"
+                text: bar.desktopLyricsShown ? "关闭桌面歌词" : "桌面歌词"
+                checkable: true
+                checked: bar.desktopLyricsShown
+                onClicked: bar.desktopLyricsToggled()
+            }
+            IconButton {
+                visible: !hud.compact
+                icon.name: "window-minimize-pip"
+                text: "迷你播放器"
+                onClicked: bar.miniRequested()
+            }
+            // 窄窗口：收起的三项
+            IconButton {
+                id: moreButton
+                visible: hud.compact
+                icon.name: "overflow-menu"
+                text: "更多"
+                onClicked: moreMenu.popup(moreButton, 0, -moreMenu.implicitHeight - Tokens.space2)
+                Menu {
+                    id: moreMenu
+                    QualityMenu {
+                        quality: bar.quality
+                        audio: bar.audio
+                        onQualityRequested: q => bar.qualityRequested(q)
+                        onEqualizerRequested: eqPanel.showAt(bar)
+                    }
+                    MenuItem {
+                        icon.name: "draw-text"
+                        text: "桌面歌词"
+                        checkable: true
+                        checked: bar.desktopLyricsShown
+                        onTriggered: bar.desktopLyricsToggled()
+                    }
+                    MenuItem {
+                        icon.name: "window-minimize-pip"
+                        text: "迷你播放器"
+                        onTriggered: bar.miniRequested()
+                    }
+                    MenuItem {
+                        icon.name: "view-fullscreen"
+                        text: "全屏封面"
+                        onTriggered: bar.fullscreenRequested()
+                    }
+                }
             }
             // 音量：点开一个小浮层（滑块 + 静音）；在按钮上滚滚轮直接调，每格 5%
             IconButton {
@@ -290,5 +341,10 @@ Item {
                 }
             }
         }
+    }
+
+    EqualizerPanel {
+        id: eqPanel
+        audio: bar.audio
     }
 }

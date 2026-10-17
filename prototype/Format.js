@@ -46,3 +46,12 @@ function qualityLevel(level) {
 function quality(q) {
     return q === "hires" ? "Hi-Res" : q === "lossless" ? "无损" : "";
 }
+
+// 曲目的歌手，交给 LinkText：每位各自可点。旧数据没有 artists 时只有第一位带 id
+function artistLinks(track) {
+    if (!track)
+        return [];
+    if (track.artists && track.artists.length > 0)
+        return track.artists.map(a => ({ text: a.name, artistId: a.id }));
+    return track.artist ? track.artist.split(" / ").map((n, i) => ({ text: n, artistId: i === 0 ? track.artistId : 0 })) : [];
+}

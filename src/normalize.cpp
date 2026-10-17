@@ -46,8 +46,12 @@ QVariantMap ncmTrack(const QJsonObject &s, const QString &reason)
     const QJsonObject album = s.value("al").isObject() ? s.value("al").toObject()
                                                        : s.value("album").toObject();
     QStringList names;
-    for (const QJsonValue &a : artists)
-        names.append(a.toObject().value("name").toString());
+    QVariantList artistList; // 每位歌手各自可点：{ id, name }
+    for (const QJsonValue &a : artists) {
+        const QJsonObject o = a.toObject();
+        names.append(o.value("name").toString());
+        artistList.append(QVariantMap{{"id", o.value("id").toDouble()}, {"name", o.value("name").toString()}});
+    }
     const double dt = numOr(s, "dt") != 0 ? numOr(s, "dt") : numOr(s, "duration");
     // 别名/译名取第一项（新结构 alia，旧结构 alias，再退 tns/transNames）；quality 看有没有更高一档音频
     QString alias;
@@ -67,6 +71,7 @@ QVariantMap ncmTrack(const QJsonObject &s, const QString &reason)
         {"name", textOr(s, "name")},
         {"artist", names.join(QStringLiteral(" / "))},
         {"artistId", firstArtist.value("id").toDouble()},
+        {"artists", artistList},
         {"albumId", album.value("id").toDouble()},
         {"album", textOr(album, "name")},
         {"dur", std::floor(dt / 1000)}, // Python 的 // 1000
@@ -89,6 +94,7 @@ QVariantMap ncmCloudTrack(const QJsonObject &item)
         {"name", textOr(item, "songName", textOr(item, "fileName"))},
         {"artist", textOr(item, "artist")},
         {"artistId", 0.0},
+        {"artists", QVariantList{}},
         {"albumId", 0.0},
         {"album", textOr(item, "album")},
         {"dur", 0},

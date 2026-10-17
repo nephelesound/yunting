@@ -57,6 +57,8 @@ def track(s, reason=""):
         "name": s["name"],
         "artist": " / ".join(a["name"] for a in artists),
         "artistId": artists[0].get("id") or 0 if artists else 0,
+        # 每位歌手各自可点
+        "artists": [{"id": a.get("id") or 0, "name": a["name"]} for a in artists],
         "albumId": album.get("id") or 0,
         "album": album.get("name") or "",
         "dur": (s.get("dt") or s.get("duration") or 0) // 1000,
@@ -93,7 +95,7 @@ def cloud_track(item):
     if item.get("simpleSong"):
         return track(item["simpleSong"])
     return {"id": item.get("songId") or 0, "name": item.get("songName") or item.get("fileName") or "",
-            "artist": item.get("artist") or "", "artistId": 0, "albumId": 0,
+            "artist": item.get("artist") or "", "artistId": 0, "artists": [], "albumId": 0,
             "album": item.get("album") or "", "dur": 0, "fee": 0,
             "cover": "", "alias": "", "quality": "", "mv": 0, "reason": ""}
 

@@ -1,6 +1,8 @@
 #include "querycache.h"
+#include "perf.h"
 
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
@@ -47,8 +49,12 @@ bool QueryCache::isFresh(const QString &key) const
 
 void QueryCache::query(const QString &key, const Fetcher &fetch, const Deliver &deliver)
 {
+    const QString kind = key.section(u':', 0, 0);
     const auto cached = m_entries.constFind(key);
-    if (cached != m_entries.constEnd())
+    const bool haveCache = cached != m_entries.constEnd();
+    qCDebug(lcPerf).nospace() << "cache kind=" << kind << " hit=" << haveCache
+                              << " fresh=" << isFresh(key);
+    if (haveCache)
         deliver(cached->value);          // 先给缓存（新鲜或过期都给）
     if (isFresh(key))
         return;                          // 新鲜：不发请求
@@ -60,13 +66,17 @@ void QueryCache::query(const QString &key, const Fetcher &fetch, const Deliver &
     }
     m_waiting.insert(key, {deliver});
     const quint64 generation = m_generation;
-    fetch([this, key, generation](const QVariant &value, bool ok) {
+    QElapsedTimer timer;
+    timer.start();
+    fetch([this, key, generation, kind, timer](const QVariant &value, bool ok) {
         if (generation != m_generation)
             return;                      // 期间退出登录：旧请求的结果属于上一个账号
         const QList<Deliver> waiters = m_waiting.take(key);
         if (!ok)
             return;                      // 失败：保留旧值（已经给过了）
         m_entries.insert(key, {value, QDateTime::currentDateTimeUtc()});
+        qCDebug(lcPerf).nospace() << "cache fetch kind=" << kind << " ok=" << ok
+                                  << " ms=" << timer.elapsed();
         if (persistent(key))
             scheduleSave();
         for (const Deliver &d : waiters)

@@ -3,6 +3,7 @@
 #include "apicli.h"
 #include "audioengine.h"
 #include "imagecache.h"
+#include "layershellhelper.h"
 #include "mpris.h"
 #include "ncmclient.h"
 #include "session.h"
@@ -16,6 +17,7 @@
 #include <QDateTime>
 #include <QFile>
 #include <QFileInfo>
+#include <QIcon>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -69,6 +71,11 @@ int main(int argc, char *argv[])
     app.setApplicationName(QStringLiteral("yunting"));
     app.setApplicationDisplayName(QStringLiteral("云听"));
     app.setDesktopFileName(QStringLiteral("io.github.sudoskys.Yunting"));
+    // 任务栏/窗口图标：装好后走主题；从源码运行时用内嵌 SVG，避免显示通用占位图标
+    QIcon appIcon = QIcon::fromTheme(QStringLiteral("io.github.sudoskys.Yunting"));
+    if (appIcon.isNull())
+        appIcon = QIcon(QStringLiteral(":/io.github.sudoskys.Yunting.svg"));
+    app.setWindowIcon(appIcon);
 
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("NetEase Cloud Music client"));
@@ -105,6 +112,11 @@ int main(int argc, char *argv[])
     QCommandLineOption anonymousOption("anonymous", "Skip keychain/cookies (read-only debugging)");
     QCommandLineOption verboseOption("verbose", "Print Qt/QML warnings to stderr (this machine's logging config may hide them)");
     QCommandLineOption shotOption("screenshot", "Load the UI, wait for live data, save a PNG of the window and exit", "file");
+    QCommandLineOption eqPresetOption("eq-preset",
+                                      "Experimental EQ preset: flat/pop/rock/bass/vocal/live/spatial", "preset");
+    QCommandLineOption soakOption("soak-audio",
+                                  "Headless playback soak: cycle tracks/seek/EQ/device for N seconds",
+                                  "seconds");
     parser.addOption(dumpOption);
     parser.addOption(smokeOption);
     parser.addOption(audioQualityOption);
@@ -124,6 +136,8 @@ int main(int argc, char *argv[])
     parser.addOption(anonymousOption);
     parser.addOption(verboseOption);
     parser.addOption(shotOption);
+    parser.addOption(eqPresetOption);
+    parser.addOption(soakOption);
     parser.process(app);
 
     if (parser.isSet(verboseOption) || parser.isSet(shotOption)) {
@@ -172,6 +186,8 @@ int main(int argc, char *argv[])
 
     Store store(&client);
     AudioEngine audio(&client);
+    if (parser.isSet(eqPresetOption))
+        audio.applyEqPreset(parser.value(eqPresetOption));
     Session session(&client, &store);
     Mpris mpris(&audio);
     // 打卡成功后本地「最近播放」立即更新；服务端数据仍是权威，下次 refresh 会覆盖
@@ -493,6 +509,62 @@ int main(int argc, char *argv[])
         return rc;
     }
 
+    if (parser.isSet(soakOption)) {
+        if (parser.isSet(audioQualityOption))
+            audio.setQuality(parser.value(audioQualityOption));
+        const int seconds = std::max(10, parser.value(soakOption).toInt());
+        const QList<double> ids{1973665667, 287398, 108485, 347230, 1330348068};
+        const QStringList presets{QStringLiteral("flat"), QStringLiteral("pop"), QStringLiteral("rock"),
+                                  QStringLiteral("bass"), QStringLiteral("vocal"), QStringLiteral("live"),
+                                  QStringLiteral("spatial")};
+        auto *step = new int(0);
+        auto *failures = new int(0);
+        QObject::connect(&audio, &AudioEngine::failed, &audio, [failures](const QString &reason) {
+            ++*failures;
+            std::fprintf(stderr, "[soak] failure: %s\n", qPrintable(reason));
+        });
+        auto rssKb = [] {
+            QFile status(QStringLiteral("/proc/self/status"));
+            if (!status.open(QIODevice::ReadOnly))
+                return qint64(0);
+            for (const QByteArray &line : status.readAll().split('\n'))
+                if (line.startsWith("VmRSS:"))
+                    return line.mid(6).trimmed().split(' ').value(0).toLongLong();
+            return qint64(0);
+        };
+        audio.setVolume(0.55);
+        auto *cycle = new QTimer(&audio);
+        QObject::connect(cycle, &QTimer::timeout, &audio, [&audio, ids, presets, step, failures, rssKb] {
+            const int i = (*step)++;
+            audio.applyEqPreset(presets.at(i % presets.size()));
+            audio.setVolume(0.35 + 0.05 * (i % 10));
+            audio.setMuted(i % 12 == 6);
+            audio.setTrack(QVariantMap{{"id", ids.at(i % ids.size())}, {"dur", 0}});
+            audio.setPlaying(true);
+            if (i % 2 == 0)
+                audio.seek(12);
+            if (i % 7 == 0) {
+                const QVariantList outputs = audio.audioOutputs();
+                if (outputs.size() > 1) {
+                    const QString id = outputs.at((i / 7) % outputs.size()).toMap().value("id").toString();
+                    audio.setOutputDevice(id);
+                }
+            }
+            std::printf("[soak] step=%d track=%lld rss=%lldkB failures=%d\n", i,
+                        qlonglong(ids.at(i % ids.size())), rssKb(), *failures);
+            std::fflush(stdout);
+        });
+        cycle->start(20 * 1000);
+        QTimer::singleShot(seconds * 1000, &app, [&audio, cycle, failures] {
+            audio.setPlaying(false);
+            audio.setMuted(false);
+            cycle->stop();
+            std::printf("[soak] done failures=%d\n", *failures);
+            QCoreApplication::quit();
+        });
+        return app.exec();
+    }
+
     if (parser.isSet(smokeOption)) {
         // 无窗口：事件循环跑在 QCoreApplication 节奏上，AudioEngine 自己打印状态
         if (parser.isSet(audioQualityOption))
@@ -522,11 +594,13 @@ int main(int argc, char *argv[])
     ImageCacheFactory imageCache(imageCacheDir);
     engine.setNetworkAccessManagerFactory(&imageCache);
     // main.qml 用 root.backend.{store,audio,session,mpris,tray} 取后端；QVariantMap 的 key 就是属性名
+    LayerShellHelper layerShell;
     QVariantMap backend{{"store", QVariant::fromValue<QObject *>(&store)},
                         {"audio", QVariant::fromValue<QObject *>(&audio)},
                         {"session", QVariant::fromValue<QObject *>(&session)},
                         {"mpris", QVariant::fromValue<QObject *>(&mpris)},
-                        {"tray", QVariant::fromValue<QObject *>(&tray)}};
+                        {"tray", QVariant::fromValue<QObject *>(&tray)},
+                        {"layerShell", QVariant::fromValue<QObject *>(&layerShell)}};
     engine.setInitialProperties({{"backend", backend}});
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
                      [] { QCoreApplication::exit(1); }, Qt::QueuedConnection);

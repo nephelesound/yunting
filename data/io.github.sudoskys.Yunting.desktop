@@ -10,3 +10,4 @@ Categories=AudioVideo;Audio;Player;Qt;
 Keywords=music;netease;网易云;
 StartupNotify=true
 SingleMainWindow=true
+StartupWMClass=yunting
