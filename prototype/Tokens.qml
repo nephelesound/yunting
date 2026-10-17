@@ -92,6 +92,8 @@ QtObject {
     readonly property url queueIcon: Qt.resolvedUrl("icons/text-bullet-list-16-regular.svg")
     // 迷你播放器：Breeze 的 window-minimize-pip 是个方框带箭头，看不出是「画中画」
     readonly property url miniIcon: Qt.resolvedUrl("icons/picture-in-picture-16-regular.svg")
+    // 关于：Breeze 的 help-about 是一个实心的粗「i」，在页头里太重；Fluent 的圆圈线条与旁边的文字同一份量
+    readonly property url aboutIcon: Qt.resolvedUrl("icons/info-16-regular.svg")
 
     // 线宽：只有 1 与 2。播放条顶边那条进度线就是 2，同时充当内容区与播放条的分界
     readonly property int line: 1

@@ -133,7 +133,7 @@ Kirigami.Page {
             // 关于：应用信息与反馈用的诊断信息（KDE 应用没有菜单栏时的惯常位置：页头最右）
             IconButton {
                 Layout.rightMargin: -Tokens.space2   // 平铺按钮的图标与页边线对齐
-                icon.name: "help-about-symbolic"
+                icon.source: Tokens.aboutIcon
                 text: "关于云听"
                 onClicked: Actions.openAbout()
             }
