@@ -30,6 +30,7 @@ void Session::setState(const QString &state)
 void Session::start()
 {
     const quint64 generation = ++m_generation;
+    m_polling = false;
     m_timer->stop();
     m_unikey.clear();
     // 先清码再通知：否则 QML 会短暂绑定到上一次的二维码
@@ -58,6 +59,7 @@ void Session::start()
 void Session::cancel()
 {
     ++m_generation;
+    m_polling = false;
     m_timer->stop();
     m_unikey.clear();
     setState(QStringLiteral("idle"));
@@ -65,15 +67,19 @@ void Session::cancel()
 
 void Session::poll()
 {
+    if (m_polling)
+        return;
     if (m_unikey.isEmpty()) {
         m_timer->stop();
         return;
     }
     const quint64 generation = m_generation;
     const QString unikey = m_unikey;
+    m_polling = true;
     m_client->get("api/login/qrcode/client/login",
                   QUrlQuery{{QStringLiteral("key"), unikey}, {QStringLiteral("type"), QStringLiteral("1")}},
                   false, [this, generation, unikey](const QJsonDocument &doc, bool ok) {
+        m_polling = false;
         // 取消/重开过，或回包属于上一张二维码：不能改状态，更不能在 cancel 后把用户登进去
         if (generation != m_generation || unikey != m_unikey)
             return;
@@ -103,6 +109,11 @@ void Session::poll()
                     jar.append(QJsonObject{{name, pair.mid(name.length() + 1)}});
             }
             m_client->adoptCookies(QJsonDocument(jar));
+            if (!m_client->hasMusicU()) {
+                qWarning() << "login succeeded without MUSIC_U";
+                setState(QStringLiteral("expired"));
+                break;
+            }
             setState(QStringLiteral("done"));
             m_store->refresh();
             break;

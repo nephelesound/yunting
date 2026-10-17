@@ -58,7 +58,8 @@ void Store::createPlaylist(const QString &name, bool privatePlaylist)
 void Store::setPlaylistSubscribed(double id, bool subscribed)
 {
     const QString action = subscribed ? QStringLiteral("收藏歌单") : QStringLiteral("取消收藏歌单");
-    playlistWrite(subscribed ? QStringLiteral("playlist/subscribe") : QStringLiteral("playlist/unsubscribe"),
+    debounceWrite(QStringLiteral("subscribe:playlist:") + num(id), [this, id, subscribed, action] {
+        playlistWrite(subscribed ? QStringLiteral("playlist/subscribe") : QStringLiteral("playlist/unsubscribe"),
                   QJsonObject{{"id", num(id)}}, action,
                   [this, id, subscribed](const QJsonObject &) {
         const auto findCard = [this, id]() -> QVariantMap {
@@ -106,6 +107,7 @@ void Store::setPlaylistSubscribed(double id, bool subscribed)
         put("subscribed", lists, true);
         m_cache.forget(QStringLiteral("playlist:") + num(id));
         emit playlistChanged(id);
+    });
     });
 }
 

@@ -37,14 +37,18 @@ void Store::requestUserFollows(double uid, int offset)
 {
     if (uid <= 0)
         return;
+    const quint64 epoch = m_epoch;
     m_client->get(QStringLiteral("api/user/getfollows/%1").arg(qlonglong(uid)),
                   query({{"offset", QString::number(offset)}, {"limit", "30"}, {"order", "true"}}), true,
-                  [this, uid, offset](const QJsonDocument &doc, bool ok) {
-        const QJsonObject r = body(doc);
-        if (!ok || r.value("code").toInt() != 200) {
-            emit requestFailed(pageKey(QStringLiteral("userFollows"), uid, offset), QStringLiteral("暂时取不到关注列表"));
+                  [this, uid, offset, epoch](const QJsonDocument &doc, bool ok) {
+        if (epoch != m_epoch)
+            return;
+        const QString failure = requestFailure(doc, ok);
+        if (!failure.isEmpty()) {
+            emit requestFailed(pageKey(QStringLiteral("userFollows"), uid, offset), failure);
             return;
         }
+        const QJsonObject r = body(doc);
         QVariantList items;
         if (offset > 0) {
             const QVariant old = m_data.value("userFollows");
@@ -62,14 +66,18 @@ void Store::requestUserFolloweds(double uid, int offset)
 {
     if (uid <= 0)
         return;
+    const quint64 epoch = m_epoch;
     m_client->get(QStringLiteral("api/user/getfolloweds/%1").arg(qlonglong(uid)),
                   query({{"offset", QString::number(offset)}, {"limit", "30"}}), true,
-                  [this, uid, offset](const QJsonDocument &doc, bool ok) {
-        const QJsonObject r = body(doc);
-        if (!ok || r.value("code").toInt() != 200) {
-            emit requestFailed(pageKey(QStringLiteral("userFolloweds"), uid, offset), QStringLiteral("暂时取不到粉丝列表"));
+                  [this, uid, offset, epoch](const QJsonDocument &doc, bool ok) {
+        if (epoch != m_epoch)
+            return;
+        const QString failure = requestFailure(doc, ok);
+        if (!failure.isEmpty()) {
+            emit requestFailed(pageKey(QStringLiteral("userFolloweds"), uid, offset), failure);
             return;
         }
+        const QJsonObject r = body(doc);
         QVariantList items;
         if (offset > 0) {
             const QVariant old = m_data.value("userFolloweds");
@@ -87,10 +95,18 @@ void Store::requestUserLevel()
 {
     if (!m_client->hasMusicU())
         return;
+    const quint64 epoch = m_epoch;
     m_client->get(QStringLiteral("api/user/level"), {}, true,
-                  [this](const QJsonDocument &doc, bool ok) {
+                  [this, epoch](const QJsonDocument &doc, bool ok) {
+        if (epoch != m_epoch)
+            return;
+        const QString failure = requestFailure(doc, ok);
+        if (!failure.isEmpty()) {
+            emit requestFailed(QStringLiteral("userLevel"), failure);
+            return;
+        }
         const QJsonObject d = body(doc).value("data").toObject();
-        if (!ok || d.isEmpty()) {
+        if (d.isEmpty()) {
             emit requestFailed(QStringLiteral("userLevel"), QStringLiteral("暂时取不到等级信息"));
             return;
         }
@@ -110,13 +126,17 @@ void Store::requestUserSubcount()
 {
     if (!m_client->hasMusicU())
         return;
+    const quint64 epoch = m_epoch;
     m_client->get(QStringLiteral("api/subcount"), {}, true,
-                  [this](const QJsonDocument &doc, bool ok) {
-        const QJsonObject r = body(doc);
-        if (!ok || r.value("code").toInt() != 200) {
-            emit requestFailed(QStringLiteral("userSubcount"), QStringLiteral("暂时取不到收藏计数"));
+                  [this, epoch](const QJsonDocument &doc, bool ok) {
+        if (epoch != m_epoch)
+            return;
+        const QString failure = requestFailure(doc, ok);
+        if (!failure.isEmpty()) {
+            emit requestFailed(QStringLiteral("userSubcount"), failure);
             return;
         }
+        const QJsonObject r = body(doc);
         put("userSubcount", QVariantMap{
             {"artistCount", r.value("artistCount").toInt()},
             {"createdPlaylistCount", r.value("createdPlaylistCount").toInt()},

@@ -13,10 +13,18 @@ void Store::requestNotifications()
 {
     if (!m_client->hasMusicU())
         return;
+    const quint64 epoch = m_epoch;
     m_client->get(QStringLiteral("api/pl/count"), {}, true,
-                  [this](const QJsonDocument &doc, bool ok) {
+                  [this, epoch](const QJsonDocument &doc, bool ok) {
+        if (epoch != m_epoch)
+            return;
+        const QString failure = requestFailure(doc, ok);
+        if (!failure.isEmpty()) {
+            emit requestFailed(QStringLiteral("notifications"), failure);
+            return;
+        }
         const QJsonObject r = body(doc);
-        if (!ok || r.isEmpty()) {
+        if (r.isEmpty()) {
             emit requestFailed(QStringLiteral("notifications"), QStringLiteral("暂时取不到通知计数"));
             return;
         }

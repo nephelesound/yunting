@@ -161,7 +161,8 @@ ScreenFrame {
             spacing: Tokens.space2
             clip: true
             boundsBehavior: Flickable.StopAtBounds
-            model: page.list.tracks
+            // 与歌手页 / 评论区同一种模型：列表更新只增量追加，滚回顶部不会发生
+            model: GrowingModel { values: page.list.tracks }
             currentIndex: -1
             ScrollBar.vertical: ScrollBar {}
             WheelScroll { flickable: tracks }
@@ -172,6 +173,7 @@ ScreenFrame {
             }
 
             delegate: TrackTile {
+                modelData: page.list.tracks[index] || ({ id: 0, name: "", artist: "", dur: 0, fee: 0, cover: "" })
                 width: tracks.width - tracks.rightMargin
                 ranked: page.list.ranked || false
                 current: modelData.id === page.currentId

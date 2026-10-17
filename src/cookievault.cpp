@@ -7,6 +7,11 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#ifdef Q_OS_UNIX
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 #include <QLoggingCategory>
 #include <QStandardPaths>
 #include <utility>
@@ -198,7 +203,25 @@ void CookieVault::writeMigrated(const QByteArray &json)
 
 void CookieVault::writeFile(const QByteArray &json) const
 {
-    QDir().mkpath(QFileInfo(m_fallbackPath).path());
+    const QString dirPath = QFileInfo(m_fallbackPath).path();
+    QDir().mkpath(dirPath);
+    QFile::setPermissions(dirPath, QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                                      | QFileDevice::ExeOwner);
+#ifdef Q_OS_UNIX
+    // 用 open(0600) 创建，而不是先 open 再 chmod：中间不存在一个其他用户可读的窗口。
+    const QByteArray path = QFile::encodeName(m_fallbackPath);
+    const int fd = ::open(path.constData(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+    if (fd >= 0) {
+        QFile f;
+        if (f.open(fd, QIODevice::WriteOnly, QFileDevice::AutoCloseHandle)) {
+            if (f.write(json) == json.size())
+                return;
+            qCWarning(lcVault) << "cannot write cookie file:" << m_fallbackPath << f.errorString();
+            return;
+        }
+        ::close(fd);
+    }
+#endif
     QFile f(m_fallbackPath);
     if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         f.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);   // 登录凭据：只给本人读写

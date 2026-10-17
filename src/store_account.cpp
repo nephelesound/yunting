@@ -95,10 +95,12 @@ void Store::fetchAccount()
 
         // 换账号只认 userId（昵称会重复）。请求失败（ok=false）时不清：失败保留已有的值。
         const bool accountChanged = ok && uid > 0 && m_accountUid > 0 && uid != m_accountUid;
+        // 匿名 -> 登录：匿名期间缓存里的评论 liked 全是 false，不能继续喂给已登录的界面。
+        const bool accountAppeared = ok && uid > 0 && m_accountUid <= 0;
         const bool accountGone = ok && uid <= 0
             && (m_accountUid > 0
                 || (m_personal.value("account").isValid() && !m_personal.value("account").isNull()));
-        if (accountChanged || accountGone) {
+        if (accountChanged || accountAppeared || accountGone) {
             // 旧账号的首屏、按需缓存与在途回包一起作废：它们可能带着私人标记（followed/subscribed）
             ++m_epoch;
             m_cache.clear();

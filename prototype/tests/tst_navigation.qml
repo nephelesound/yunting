@@ -1,0 +1,67 @@
+// 导航状态机的核心约束：同一路由重复打开不能增长历史；切换路由后返回只退一层。
+import QtQuick
+import QtTest
+import ".."
+
+Item {
+    id: root
+    width: 800
+    height: 600
+
+    Component { id: snapshotComponent; Snapshot {} }
+
+    TestCase {
+        name: "Navigation"
+        when: windowShown
+
+        function initTestCase() {
+            Source.snapshot = snapshotComponent.createObject(root);
+        }
+
+        function makeWindow() {
+            const component = Qt.createComponent("../main.qml");
+            verify(component.status === Component.Ready, component.errorString());
+            const window = component.createObject(root, { backend: null });
+            verify(window !== null);
+            return window;
+        }
+
+        function test_repeated_same_route_does_not_grow_history() {
+            const window = makeWindow();
+            window.history = [];
+            window.page = "user";
+            window.userId = 42;
+            window.open("user", "", { userId: 42 });
+            window.open("user", "", { userId: 42 });
+            window.open("user", "", { userId: 42 });
+            compare(window.history.length, 0);
+            compare(window.page, "user");
+            compare(window.userId, 42);
+            window.close();
+        }
+
+
+        function test_history_is_capped() {
+            const window = makeWindow();
+            window.page = "list";
+            window.listKey = "route:0";
+            for (let i = 1; i <= 100; i++)
+                window.open("list", "route:" + i);
+            compare(window.history.length, window.maxHistory);
+            compare(window.listKey, "route:100");
+            window.close();
+        }
+
+        function test_switching_user_replaces_content_not_history_depth() {
+            const window = makeWindow();
+            window.history = [];
+            window.page = "user";
+            window.userId = 42;
+            window.open("user", "", { userId: 7 });
+            compare(window.userId, 7);
+            compare(window.page, "user");
+            compare(window.history.length, 1, "换用户只压入一层来路");
+            window.close();
+        }
+    }
+}

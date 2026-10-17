@@ -40,4 +40,5 @@ private:
     QString m_qrContent;
     QString m_unikey;
     quint64 m_generation = 0;   // start()/cancel() 递增；旧二维码的回包一律丢弃
+    bool m_polling = false;     // 同一时间只允许一个轮询请求在途
 };

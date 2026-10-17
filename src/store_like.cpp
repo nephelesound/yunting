@@ -24,6 +24,9 @@ void Store::setLiked(double songId, bool liked)
         ++m_likeGeneration;
         m_likeTouched.insert(songId);
         setLikedLocal(songId, liked);
+        if (!pending->inFlight)
+            debounceWrite(QStringLiteral("like:") + num(songId),
+                          [this, songId] { flushLike(songId); });
         return;
     }
 
@@ -33,11 +36,12 @@ void Store::setLiked(double songId, bool liked)
         return;
     }
 
-    m_likes.insert(songId, LikeState{currentlyLiked, liked});
+    m_likes.insert(songId, LikeState{currentlyLiked, liked, false});
     ++m_likeGeneration;
     m_likeTouched.insert(songId);
     setLikedLocal(songId, liked);
-    sendLike(songId, liked);
+    debounceWrite(QStringLiteral("like:") + num(songId),
+                  [this, songId] { flushLike(songId); });
 }
 
 void Store::sendLike(double songId, bool liked)
@@ -61,8 +65,10 @@ void Store::sendLike(double songId, bool liked)
         const QString failure = requestFailure(response);
         if (failure.isEmpty()) {
             pending->serverState = liked;
+            pending->inFlight = false;
             if (pending->desired != liked) {
-                sendLike(songId, pending->desired);   // 用户在回包前又点了一次
+                debounceWrite(QStringLiteral("like:") + num(songId),
+                              [this, songId] { flushLike(songId); });
                 return;
             }
             const bool finalState = pending->desired;
@@ -84,6 +90,21 @@ void Store::sendLike(double songId, bool liked)
         qWarning() << "like failed:" << songId
                    << response.doc.object().value("code").toInt();
     });
+}
+
+void Store::flushLike(double songId)
+{
+    auto it = m_likes.find(songId);
+    if (it == m_likes.end() || it->inFlight)
+        return;
+    if (it->desired == it->serverState) {
+        const bool state = it->desired;
+        m_likes.erase(it);
+        emit likeSucceeded(songId, state);
+        return;
+    }
+    it->inFlight = true;
+    sendLike(songId, it->desired);
 }
 
 // 乐观写入：保持原有顺序，过滤掉这首歌，目标为喜欢时追加到末尾。

@@ -31,6 +31,10 @@ QString failureMessage(NcmClient::Failure failure, const QJsonObject &body)
         return QStringLiteral("网络不可用，请稍后再试");
     case NcmClient::Failure::SessionExpired:
         return QStringLiteral("登录已过期，请重新登录");
+    case NcmClient::Failure::DeviceRisk: {
+        const QString message = body.value("message").toString();
+        return message.isEmpty() ? QStringLiteral("设备被网易云风控，请更换设备或稍后再试") : message;
+    }
     case NcmClient::Failure::RateLimited:
         return QStringLiteral("操作太频繁，请稍后再试");
     case NcmClient::Failure::Rejected:
@@ -114,6 +118,9 @@ Store::Store(NcmClient *client, QObject *parent)
         m_accountUid = m_cache.peek(QStringLiteral("screen:uid")).toDouble();
 
     connect(m_client, &NcmClient::requestFinished, this, &Store::requestFinished);
+    m_writeDebounce.setSingleShot(true);
+    m_writeDebounce.setInterval(300);
+    connect(&m_writeDebounce, &QTimer::timeout, this, &Store::flushDebouncedWrites);
     // 系统说网络恢复（离线→在线沿）：还上离线期间欠的那次刷新
     if (QNetworkInformation::loadDefaultBackend()) {
         m_netInfo = QNetworkInformation::instance();
@@ -209,8 +216,46 @@ void Store::refresh()
         fetchAnonymousPlaylists();
 }
 
+void Store::debounceWrite(const QString &key, std::function<void()> action)
+{
+    m_debouncedWrites.insert(key, std::move(action));
+    m_writeDebounce.start();
+}
+void Store::flushDebouncedWrites()
+{
+    const auto actions = std::exchange(m_debouncedWrites, {});
+    for (const auto &action : actions)
+        action();
+}
+
+std::optional<bool> Store::commentLiked(double songId, double commentId) const
+{
+    const auto find = [commentId](const QVariantList &items) -> std::optional<bool> {
+        for (const QVariant &v : items) {
+            const QVariantMap c = v.toMap();
+            if (c.value("id").toDouble() == commentId)
+                return c.value("liked").toBool();
+        }
+        return std::nullopt;
+    };
+    const QVariantMap hot = m_data.value("comments").toMap();
+    if (hot.value("songId").toDouble() == songId) {
+        if (const auto found = find(hot.value("items").toList()))
+            return *found;
+    }
+    const QVariantMap page = m_data.value("commentPage").toMap();
+    if (page.value("songId").toDouble() == songId) {
+        if (const auto found = find(page.value("items").toList()))
+            return *found;
+    }
+    return std::nullopt;
+}
+
 void Store::resetPersonal()
 {
+    m_debouncedWrites.clear();
+    m_writeDebounce.stop();
+    m_commentLikes.clear();
     // 私信与账号绑定：退出 / 换账号时不能留在内存里
     put("inbox", nullVariant(), false);
     put("inboxThread", nullVariant(), false);
@@ -239,6 +284,7 @@ void Store::logout()
     m_cache.clear();
     setSessionExpired(false);
     m_likes.clear();
+    m_commentLikes.clear();
     m_likeTouched.clear();
     m_accountUid = 0;
     m_similarFired = false;
@@ -282,6 +328,16 @@ void Store::setSessionExpired(bool expired)
 
 // 个人请求（写操作与信箱）失败的唯一收尾。放在这里而不是各调用点，301 才不会在某个
 // 写路径被忘掉；句子也只有一个来源。
+QString Store::requestFailure(const QJsonDocument &doc, bool ok)
+{
+    NcmClient::Response response;
+    response.doc = doc;
+    response.parsed = !doc.isNull();
+    response.ok = ok;
+    response.httpStatus = ok ? 200 : 400;
+    return requestFailure(response);
+}
+
 QString Store::requestFailure(const NcmClient::Response &response)
 {
     const NcmClient::Failure failure = NcmClient::failureOf(response);

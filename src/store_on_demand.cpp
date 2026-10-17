@@ -271,14 +271,17 @@ void Store::requestSearch(const QString &key, const QString &raw)
 // 全部评论分页：v2 接口按时间倒序（sortType=3），对外仍是每页 20 条的 offset 分页，10 分钟缓存
 void Store::requestCommentPage(const QString &key, double songId, int offset)
 {
-    m_cache.query(key,
-        [this, songId, offset](QueryCache::Done done) {
+    // 登录后评论带「我」的 liked；缓存不能作为点赞状态的权威（写过之后旧行会
+    // 立刻过时）。因此登录态走 refresh：每次都取网络，匿名态仍走 query 缓存。
+    auto fetch = [this, songId, offset](QueryCache::Done done) {
             // 正常翻页时上一页的 cursor 已记录；冷启动直接要第 N 页时从头顺序补游标，
             // 不能把第一页当成第 N 页。走到目标页之前的回包只用于取 cursor。
             const auto fetch = std::make_shared<std::function<void(int, const QString &)>>();
             *fetch = [this, songId, offset, done, fetch](int pageOffset, const QString &cursor) {
+                // 登录后带上 cookie：评论的 liked 是「我」的状态，匿名请求永远是 false。
+                // 匿名时 hasMusicU() 仍为 false，不改变公开数据的请求形状。
                 m_client->get(QStringLiteral("api/v2/resource/comments"),
-                              commentPageQuery(songId, pageOffset, cursor), false,
+                              commentPageQuery(songId, pageOffset, cursor), m_client->hasMusicU(),
                               [this, songId, offset, done, fetch, pageOffset](const QJsonDocument &doc, bool ok) {
                     const QJsonObject resp = body(doc);
                     if (!ok || resp.value("code").toInt() != 200) {
@@ -326,25 +329,32 @@ void Store::requestCommentPage(const QString &key, double songId, int offset)
                                        ? m_cache.peek(commentCursorKey(songId, offset)).toString()
                                        : QString();
             (*fetch)(cursor.isEmpty() ? 0 : offset, cursor);
-        },
-        [this](const QVariant &page) { put("commentPage", page, false); });
+    };
+    auto deliver = [this](const QVariant &page) { put("commentPage", page, false); };
+    if (m_client->hasMusicU())
+        m_cache.refresh(key, fetch, deliver);
+    else
+        m_cache.query(key, fetch, deliver);
 }
 
 // 热门评论：v2 按热度排序，写回 data.comments（10 分钟新鲜期，落盘）；保持接口顺序，最多 10 条
 void Store::requestComments(const QString &key, double songId)
 {
-    m_cache.query(key,
-        [this, songId](QueryCache::Done done) {
+    auto fetch = [this, songId](QueryCache::Done done) {
             m_client->get(QStringLiteral("api/v2/resource/comments"),
                           query({{"threadId", QStringLiteral("R_SO_4_%1").arg(qlonglong(songId))},
                                  {"pageNo", "1"}, {"pageSize", "10"}, {"sortType", "2"}}),
-                          false,
+                          m_client->hasMusicU(),
                           [done, songId](const QJsonDocument &doc, bool ok) {
                 const QJsonObject resp = body(doc);
                 done(ncmHotComments(resp, songId), ok && businessOk(resp));
             });
-        },
-        [this](const QVariant &comments) { put("comments", comments, false); });
+    };
+    auto deliver = [this](const QVariant &comments) { put("comments", comments, false); };
+    if (m_client->hasMusicU())
+        m_cache.refresh(key, fetch, deliver);
+    else
+        m_cache.query(key, fetch, deliver);
 }
 
 

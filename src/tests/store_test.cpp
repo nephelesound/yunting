@@ -28,6 +28,7 @@ public:
         QByteArray path;
         QByteArray query;
         QByteArray body;
+        QByteArray headers;
     };
     using Responder = std::function<void(int status, const QByteArray &body)>;
 
@@ -62,6 +63,7 @@ public:
                     req.path = q < 0 ? target : target.left(q);
                     req.query = q < 0 ? QByteArray() : target.mid(q + 1);
                     req.body = rest.left(contentLength);
+                    req.headers = head;
                     requests.append(req);
 
                     QPointer<QTcpSocket> guard(sock);
@@ -494,6 +496,75 @@ private slots:
         const QVariantMap second = m_store->data().value("comments").toMap().value("items").toList().at(1).toMap();
         QVERIFY(second.value("liked").toBool());
         QCOMPARE(second.value("likes").toDouble(), 20.0);
+    }
+
+
+
+
+    // 风控码可能藏在 HTTP 4xx 的响应体里：仍要解析、回滚并显示服务端原因，不能当断网
+    void deviceRiskInHttpErrorBodyRollsBack()
+    {
+        m_api->handler = [](const FakeApi::Request &, const FakeApi::Responder &respond) {
+            respond(400, "{\"code\":250,\"message\":\"系统检测到您的设备存在安全风险\"}");
+        };
+        QSignalSpy failed(m_store, &Store::commentLikeFailed);
+        m_store->setCommentLiked(1, 888, true);
+        QVERIFY(waitUntil([&] { return failed.count() == 1; }));
+        QCOMPARE(failed.first().at(2).toString(),
+                 QStringLiteral("系统检测到您的设备存在安全风险"));
+    }
+
+    // 设备风控是独立分类：不能当成限流或断网，更不能自动重试
+    void deviceRiskIsItsOwnFailureClass()
+    {
+        NcmClient::Response response;
+        response.ok = true;
+        response.doc = QJsonDocument(QJsonObject{{"code", 250},
+                                                 {"message", "系统检测到您的设备存在安全风险"}});
+        QCOMPARE(NcmClient::failureOf(response), NcmClient::Failure::DeviceRisk);
+    }
+
+
+    // 防抖：一次快速的双击回到原状态，不应产生任何写请求
+    void rapidCommentToggleCoalescesToNoRequest()
+    {
+        m_api->requests.clear();
+        m_api->handler = [](const FakeApi::Request &, const FakeApi::Responder &respond) {
+            respond(200, "{\"code\":200}");
+        };
+        m_store->setCommentLiked(1, 999, true);
+        m_store->setCommentLiked(1, 999, false);
+        QTest::qWait(500);
+        int writes = 0;
+        for (const FakeApi::Request &req : std::as_const(m_api->requests))
+            if (req.path == "/weapi/v1/comment/like" || req.path == "/weapi/v1/comment/unlike")
+                ++writes;
+        QCOMPARE(writes, 0);
+    }
+
+    // 评论写入要带完整客户端身份；截断的 appver 会被服务端按设备风险拒绝
+    void commentLikeUsesCompleteClientContext()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            Q_UNUSED(req);
+            respond(200, "{\"code\":200}");
+        };
+        m_api->requests.clear();
+        m_store->setCommentLiked(1, 777, true);
+        QVERIFY(waitUntil([&] {
+            for (const FakeApi::Request &req : std::as_const(m_api->requests))
+                if (req.path == "/weapi/v1/comment/like")
+                    return true;
+            return false;
+        }));
+        QByteArray headers;
+        for (const FakeApi::Request &req : std::as_const(m_api->requests))
+            if (req.path == "/weapi/v1/comment/like")
+                headers = req.headers;
+        QVERIFY(headers.contains("os=linux"));
+        QVERIFY(headers.contains("appver=1.2.1.0428"));
+        QVERIFY(headers.contains("channel=netease"));
+        QVERIFY(!headers.contains("appver=3.1.17;"));
     }
 
     // 评论走 v2：热评 sortType=2，最新页 sortType=3 带着上一页的 cursor 翻页；replyCount 进归一化结果

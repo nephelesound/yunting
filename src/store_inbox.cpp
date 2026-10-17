@@ -126,12 +126,15 @@ void Store::requestInbox(int offset)
 {
     if (!m_client->hasMusicU())
         return;
+    const quint64 epoch = m_epoch;
     m_client->postWeapi(QStringLiteral("msg/private/users"),
                         QJsonObject{{"offset", offset},
                                     {"limit", 30},
                                     {"total", QStringLiteral("true")}},
                         true,
-                        [this, offset](const NcmClient::Response &response) {
+                        [this, offset, epoch](const NcmClient::Response &response) {
+        if (epoch != m_epoch)
+            return;
         const QString failure = requestFailure(response);
         if (!failure.isEmpty()) {
             emit requestFailed(offset > 0 ? QStringLiteral("inbox:%1").arg(offset) : QStringLiteral("inbox"), failure);
@@ -159,13 +162,16 @@ void Store::requestInboxThread(double userId, qint64 before)
 {
     if (!m_client->hasMusicU() || userId <= 0)
         return;
+    const quint64 epoch = m_epoch;
     m_client->postWeapi(QStringLiteral("msg/private/history"),
                         QJsonObject{{"userId", num(userId)},
                                     {"limit", 30},
                                     {"time", QString::number(before)},
                                     {"total", QStringLiteral("true")}},
                         true,
-                        [this, userId, before](const NcmClient::Response &response) {
+                        [this, userId, before, epoch](const NcmClient::Response &response) {
+        if (epoch != m_epoch)
+            return;
         const QString failure = requestFailure(response);
         if (!failure.isEmpty()) {
             // 按请求时的 key 报：界面按会话（与翻页位置）给重试

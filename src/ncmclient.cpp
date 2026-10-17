@@ -1,5 +1,6 @@
 #include "ncmclient.h"
 
+#include "clientidentity.h"
 #include "cookievault.h"
 #include "crypto.h"
 #include "json_util.h"
@@ -25,7 +26,6 @@ Q_LOGGING_CATEGORY(lcNet, "yunting.net", QtWarningMsg)
 
 namespace {
 constexpr auto Referer = "https://music.163.com";
-constexpr auto UserAgent = "Mozilla/5.0 (X11; Linux x86_64) Chrome/140.0";
 
 // jar（MUSIC_U / __csrf / NMTID）与钥匙串条目之间的唯一序列化形式：紧凑 JSON 对象
 QByteArray jarToJson(const QMap<QString, QString> &jar)
@@ -147,23 +147,36 @@ void NcmClient::persistJar()
 }
 
 // 响应里的 Set-Cookie 只保留我们用的三个（登录成功、令牌续期都走这里）；删除型 cookie（空值）忽略
-void NcmClient::keepSetCookies(QNetworkReply *reply)
+void NcmClient::keepSetCookies(QNetworkReply *reply, quint64 generation)
 {
     // 存储还没读出（钥匙串慢、在等用户解锁）时发出的请求都是匿名的：这时落盘会排在读之后，
-    // 用匿名 jar 盖掉存储里的登录凭据
-    if (!m_ready)
+    // 用匿名 jar 盖掉存储里的登录凭据。
+    // generation：请求发出后若登录/退出/换号，迟到的 Set-Cookie 一律丢弃。
+    if (!m_ready || generation != m_authGeneration)
         return;
     const auto cookies = reply->header(QNetworkRequest::SetCookieHeader).value<QList<QNetworkCookie>>();
     bool changed = false;
-    for (const QNetworkCookie &c : cookies) {
-        const QString name = QString::fromLatin1(c.name());
-        if ((name == "MUSIC_U" || name == "__csrf" || name == "NMTID") && !c.value().isEmpty()
-            && m_jar.value(name) != QString::fromLatin1(c.value())) {
-            // 匿名请求也会下发 NMTID；只有已登录时才换，避免把匿名设备号写进登录会话
-            if (name == "NMTID" && hasMusicU())
+    // 两遍：先落地 MUSIC_U/__csrf，再决定 NMTID。登录响应可能一次带 MUSIC_U 和 NMTID，
+    // 不能因为检查顺序把新的设备号丢掉。
+    for (const char *wanted : {"MUSIC_U", "__csrf"}) {
+        for (const QNetworkCookie &c : cookies) {
+            const QString name = QString::fromLatin1(c.name());
+            if (name == QLatin1String(wanted) && !c.value().isEmpty()
+                && m_jar.value(name) != QString::fromLatin1(c.value())) {
+                m_jar.insert(name, QString::fromLatin1(c.value()));
+                changed = true;
+            }
+        }
+    }
+    if (hasMusicU()) {
+        for (const QNetworkCookie &c : cookies) {
+            if (c.name() != "NMTID" || c.value().isEmpty())
                 continue;
-            m_jar.insert(name, QString::fromLatin1(c.value()));
-            changed = true;
+            const QString value = QString::fromLatin1(c.value());
+            if (m_jar.value(QStringLiteral("NMTID")) != value) {
+                m_jar.insert(QStringLiteral("NMTID"), value);
+                changed = true;
+            }
         }
     }
     if (changed)
@@ -182,6 +195,7 @@ bool NcmClient::hasMusicU() const
 
 void NcmClient::adoptCookies(const QJsonDocument &jarDoc)
 {
+    ++m_authGeneration;
     for (const QJsonValue &v : jarDoc.array()) {
         const QJsonObject o = v.toObject();
         for (auto it = o.constBegin(); it != o.constEnd(); ++it)
@@ -192,6 +206,7 @@ void NcmClient::adoptCookies(const QJsonDocument &jarDoc)
 
 void NcmClient::clearAuthCookies()
 {
+    ++m_authGeneration;
     for (const char *name : {"MUSIC_U", "__csrf", "NMTID"})
         m_jar.remove(QLatin1String(name));
     persistJar();
@@ -208,10 +223,13 @@ void NcmClient::postRaw(const QUrl &url, const QByteArray &body, const QString &
 {
     QNetworkRequest req(url);
     req.setRawHeader("Referer", Referer);
-    req.setRawHeader("User-Agent", UserAgent);
+    req.setRawHeader("User-Agent", ncm::client::userAgent().toUtf8());
     req.setHeader(QNetworkRequest::ContentTypeHeader,
                   QStringLiteral("application/x-www-form-urlencoded"));
     req.setTransferTimeout(15 * 1000);
+    // 手动 Cookie 头不受 Qt cookie jar 的同源规则保护：禁止跨源重定向，避免把凭据带给别的 host。
+    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                     QNetworkRequest::SameOriginRedirectPolicy);
     req.setAttribute(QNetworkRequest::CookieLoadControlAttribute, QNetworkRequest::Manual);
     req.setAttribute(QNetworkRequest::CookieSaveControlAttribute, QNetworkRequest::Manual);
     if (!cookie.isEmpty())
@@ -220,28 +238,47 @@ void NcmClient::postRaw(const QUrl &url, const QByteArray &body, const QString &
     qCDebug(lcNet).noquote() << "POST" << url.path();
     QElapsedTimer timer;
     timer.start();
+    const quint64 authGeneration = m_authGeneration;
     QNetworkReply *reply = m_nam->post(req, body);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, callback, keepCookies, timer, url] {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, callback, keepCookies, timer, url, authGeneration] {
         reply->deleteLater();
         Response response;
         response.networkFailure = isNetworkError(*reply);
-        if (reply->error() == QNetworkReply::NoError) {
-            QJsonParseError parseError;
-            const QByteArray raw = reply->readAll();
-            response.doc = QJsonDocument::fromJson(raw, &parseError);
-            response.ok = parseError.error == QJsonParseError::NoError;
-            if (!response.ok)
-                qWarning() << "bad JSON from" << reply->url().toString(QUrl::RemoveQuery)
-                           << raw.left(200);
-        } else {
+        response.httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const QByteArray raw = reply->readAll();
+        QJsonParseError parseError;
+        response.doc = QJsonDocument::fromJson(raw, &parseError);
+        response.parsed = parseError.error == QJsonParseError::NoError;
+        response.ok = response.parsed && response.httpStatus > 0 && response.httpStatus < 400;
+        if (reply->error() != QNetworkReply::NoError)
             qWarning() << "write failed:" << reply->error()
                        << reply->url().toString(QUrl::RemoveQuery);
-        }
+        else if (!response.parsed)
+            qWarning() << "bad JSON from" << reply->url().toString(QUrl::RemoveQuery)
+                       << raw.left(200);
+        const int httpStatus = response.httpStatus;
         qCDebug(lcPerf).nospace() << "http method=POST path=" << url.path()
-                                  << " status=" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
+                                  << " status=" << httpStatus
                                   << " ms=" << timer.elapsed() << " network=" << response.networkFailure;
+        // 业务码不是 200 时一定要进日志：HTTP 200 + code=-460 等风控/拒绝在传输层看起来是完全成功的，
+        // 只打 status 会把「设备存在风险」这类原因吞掉。只记录服务端 message，不记录 params/cookie。
+        if (response.parsed) {
+            const QJsonObject object = response.doc.object();
+            const int code = object.value("code").toInt(200);
+            if (code != 200) {
+                const QString message = object.value("message").toString(
+                    object.value("msg").toString());
+                qCWarning(lcNet).noquote() << "POST rejected path=" << url.path()
+                                           << "code=" << code
+                                           << "message=" << message
+                                           << "status=" << httpStatus;
+            } else {
+                qCDebug(lcNet).noquote() << "POST ok path=" << url.path()
+                                          << "code=" << code;
+            }
+        }
         if (keepCookies)
-            keepSetCookies(reply);
+            keepSetCookies(reply, authGeneration);
         emit requestFinished(response.ok, response.networkFailure);
         if (callback && callbackContextAlive())
             callback(response);
@@ -270,10 +307,8 @@ void NcmClient::postWeapi(const QString &path, const QJsonObject &payload, bool 
     if (!csrf.isEmpty())
         url.setQuery(ncm::query({{"csrf_token", csrf}}));
 
-    // 写接口除了登录 cookie 还要带客户端标识：缺 os/appver 时服务器回 -460「网络环境风险」。
+    // cookieHeader 统一带登录 cookie 与完整客户端上下文；不要在这里另拼一遍。
     QString cookie = cookieHeader(personal);
-    cookie += (cookie.isEmpty() ? QString() : QStringLiteral("; "))
-        + QStringLiteral("os=pc; appver=3.1.17; osver=10");
 
     const QByteArray form = ncm::weapiForm(body).toLatin1();
     if (form.isEmpty()) {
@@ -288,12 +323,9 @@ void NcmClient::postWeapi(const QString &path, const QJsonObject &payload, bool 
 void NcmClient::postForm(const QString &path, const QUrlQuery &form, bool personal,
                          GetCallback callback)
 {
-    // 鉴权上下文是 Web cookie（MUSIC_U）：只能走 /api 明文或 /weapi，统一用 os=pc，
-    // 不混用 macOS/Android 客户端专有标识或 /eapi 接口。
-    QString cookie = cookieHeader(personal);
-    if (personal)
-        cookie += (cookie.isEmpty() ? QString() : QStringLiteral("; "))
-            + QStringLiteral("os=pc; appver=3.1.17; osver=10");
+    // 鉴权上下文是 Web cookie（MUSIC_U）：只走 /api 明文或 /weapi；客户端身份统一由
+    // clientidentity.h 提供，不在这里混用 macOS/Android 专有标识或 /eapi。
+    const QString cookie = cookieHeader(personal);
     postRaw(QUrl(m_apiBase + path), ncm::formEncoded(form), cookie,
             [callback](const Response &response) {
         if (callback)
@@ -303,15 +335,20 @@ void NcmClient::postForm(const QString &path, const QUrlQuery &form, bool person
 
 QString NcmClient::cookieHeader(bool personal) const
 {
-    if (!personal)
-        return {};
+    // 客户端身份对匿名请求也要带上（登录二维码也走同一客户端栈）；认证 cookie 只在
+    // personal 时发送。评论写入会校验完整 appver，截断版本会回 250「设备存在安全风险」。
     QString header;
-    for (const char *name : {"MUSIC_U", "__csrf", "NMTID"}) {
-        const QString value = m_jar.value(QLatin1String(name));
-        if (!value.isEmpty())
-            header += (header.isEmpty() ? QString() : QLatin1String("; "))
-                + QLatin1String(name) + u'=' + value;
+    if (personal) {
+        for (const char *name : {"MUSIC_U", "__csrf", "NMTID"}) {
+            const QString value = m_jar.value(QLatin1String(name));
+            if (!value.isEmpty())
+                header += (header.isEmpty() ? QString() : QLatin1String("; "))
+                    + QLatin1String(name) + u'=' + value;
+        }
     }
+    const QString context = ncm::client::cookieContext();
+    if (!context.isEmpty())
+        header += (header.isEmpty() ? QString() : QStringLiteral("; ")) + context;
     return header;
 }
 
@@ -336,6 +373,7 @@ void NcmClient::postClientLogAttempt(const QByteArray &multipart, const QString 
     request.setRawHeader("Accept-Encoding", "identity");
     request.setRawHeader("Accept-Language", "zh-CN,zh;q=0.8");
     request.setRawHeader("Cookie", cookie.toUtf8());
+    request.setTransferTimeout(15 * 1000);
     QNetworkReply *reply = m_nam->post(request, multipart);
     connect(reply, &QNetworkReply::finished, this, [this, reply, callback, multipart, boundary,
                                                        cookie, attempt] {
@@ -347,7 +385,8 @@ void NcmClient::postClientLogAttempt(const QByteArray &multipart, const QString 
             reply->deleteLater();
             QTimer::singleShot(200 * (attempt + 1), this, [this, multipart, boundary, cookie,
                                                              callback, attempt] {
-                postClientLogAttempt(multipart, boundary, cookie, callback, attempt + 1);
+                if (callbackContextAlive())
+                    postClientLogAttempt(multipart, boundary, cookie, callback, attempt + 1);
             });
             return;
         }
@@ -383,19 +422,26 @@ NcmClient::Failure NcmClient::failureOf(const Response &response)
 {
     if (response.networkFailure)
         return Failure::Offline;
-    if (!response.ok)
-        return Failure::Rejected;
-    switch (response.doc.object().value("code").toInt()) {
-    case 200:
-        return Failure::None;
-    case 301:
-        return Failure::SessionExpired;
-    case -460:
-    case 405:
-        return Failure::RateLimited;
-    default:
-        return Failure::Rejected;
+    const QJsonObject object = response.doc.object();
+    if (object.contains(QStringLiteral("code"))) {
+        switch (object.value(QStringLiteral("code")).toInt()) {
+        case 200:
+            return response.ok ? Failure::None : Failure::Rejected;
+        case 301:
+            return Failure::SessionExpired;
+        case 250:
+            return Failure::DeviceRisk;
+        case -460:
+        case 405:
+            return Failure::RateLimited;
+        default:
+            return Failure::Rejected;
+        }
     }
+    // 没有业务码：坏 JSON 或 HTTP 错误都按服务器拒绝处理
+    if (!response.ok || response.httpStatus >= 400)
+        return Failure::Rejected;
+    return Failure::None;
 }
 
 namespace {
@@ -425,8 +471,10 @@ void NcmClient::startGet(const QString &path, const QUrlQuery &query, bool perso
 
     QNetworkRequest req(url);
     req.setRawHeader("Referer", Referer);
-    req.setRawHeader("User-Agent", UserAgent);
+    req.setRawHeader("User-Agent", ncm::client::userAgent().toUtf8());
     req.setTransferTimeout(15 * 1000);
+    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                     QNetworkRequest::SameOriginRedirectPolicy);
     // 关掉 QNetworkAccessManager 的自动 cookie：否则匿名请求收到的 Set-Cookie（MUSIC_A 等匿名令牌）
     // 会混进之后的个人请求，网易就按匿名处理、回 301。cookie 只由 m_jar 管理（见 keepSetCookies）
     req.setAttribute(QNetworkRequest::CookieLoadControlAttribute, QNetworkRequest::Manual);
@@ -439,36 +487,52 @@ void NcmClient::startGet(const QString &path, const QUrlQuery &query, bool perso
     qCDebug(lcNet).noquote() << "GET" << url.path() << (retrying ? QStringLiteral("(retry %1)").arg(attempt) : QStringLiteral(""));
     QElapsedTimer timer;
     timer.start();
+    const quint64 authGeneration = m_authGeneration;
     QNetworkReply *reply = m_nam->get(req);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, callback, path, query, personal, attempt, timer]
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, callback, path, query, personal, attempt, timer, authGeneration]
     {
         reply->deleteLater();
         const bool networkError = isNetworkError(*reply);
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        // 重试：网络原因（无 HTTP 状态）或服务器端 5xx；4xx 与业务码不重试
-        const bool retryable = networkError || status >= 500;
-        if (retryable && attempt < MaxRetries) {
+        const QByteArray raw = reply->readAll();
+        QJsonParseError parseError;
+        const QJsonDocument doc = QJsonDocument::fromJson(raw, &parseError);
+        const bool parsed = parseError.error == QJsonParseError::NoError;
+        const QJsonObject object = doc.object();
+        const bool hasCode = parsed && object.contains(QStringLiteral("code"));
+        const int code = hasCode ? object.value(QStringLiteral("code")).toInt() : 200;
+        const bool businessReject = hasCode && code != 200;
+        // 网络失败或 5xx 可以重试；但如果响应体明确给了非 200 的业务码（例如 250 设备风控），
+        // 重试只会放大风控，必须按业务失败直接交给调用方。
+        const bool retryable = (networkError || status >= 500) && !businessReject;
+        if (retryable && attempt < MaxRetries && callbackContextAlive()) {
             QTimer::singleShot(RetryDelaysMs[attempt], this, [this, path, query, personal, attempt, callback] {
+                if (!callbackContextAlive())
+                    return;
                 startGet(path, query, personal, attempt + 1, true, std::move(callback));
             });
             return;
         }
-        QJsonDocument doc;
-        bool ok = false;
-        if (reply->error() == QNetworkReply::NoError) {
-            QJsonParseError parseError;
-            doc = QJsonDocument::fromJson(reply->readAll(), &parseError);
-            ok = parseError.error == QJsonParseError::NoError;
-            if (!ok)
-                qWarning() << "bad JSON from" << reply->url().toString(QUrl::RemoveQuery);
-        } else {
+        if (reply->error() != QNetworkReply::NoError) {
             // 只记错误种类与 URL（不含 query，可能带搜索词），请求头一律不打
             qWarning() << "request failed:" << reply->error()
                        << reply->url().toString(QUrl::RemoveQuery);
+        } else if (!parsed) {
+            qWarning() << "bad JSON from" << reply->url().toString(QUrl::RemoveQuery)
+                       << raw.left(200);
+        } else if (businessReject) {
+            const QString message = object.value(QStringLiteral("message")).toString(
+                object.value(QStringLiteral("msg")).toString());
+            qCWarning(lcNet).noquote() << "GET rejected path=" << path
+                                       << "code=" << code
+                                       << "message=" << message
+                                       << "status=" << status;
         }
-        keepSetCookies(reply);
+        const bool ok = parsed && status > 0 && status < 400;
+        keepSetCookies(reply, authGeneration);
         emit requestFinished(ok, networkError);
-        if (callback)
+        if (callback && callbackContextAlive())
             callback(doc, ok);
     });
 }

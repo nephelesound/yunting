@@ -11,6 +11,7 @@
 #include <QHostAddress>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QPointer>
 #include <QQueue>
 #include <QTcpServer>
 #include <QTcpSocket>
@@ -37,6 +38,11 @@ class RetryTest : public QObject {
                         if (!buf.contains("\r\n\r\n"))
                             return;
                         buf.clear();   // 连接被复用时还要服务下一个请求
+                        if (hold) {
+                            held = sock;
+                            hold = false;
+                            return;
+                        }
                         const int status = script.isEmpty() ? 200 : script.takeFirst();
                         const QByteArray body = "{\"code\":200}\n";
                         sock->write("HTTP/1.1 " + QByteArray::number(status)
@@ -52,6 +58,24 @@ class RetryTest : public QObject {
         }
         QQueue<int> script;
         QByteArray setCookie;   // 非空时每个响应都带这个 Set-Cookie
+        bool hold = false;      // 下一个请求挂起，由 release() 回包
+        QPointer<QTcpSocket> held;
+
+        bool release(const QByteArray &body = "{\"code\":200}",
+                     const QByteArray &cookie = {})
+        {
+            if (!held)
+                return false;
+            QByteArray response = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: "
+                + QByteArray::number(body.size()) + "\r\nConnection: close\r\n"
+                + (cookie.isEmpty() ? QByteArray() : "Set-Cookie: " + cookie + "\r\n")
+                + "\r\n" + body;
+            held->write(response);
+            held->flush();
+            held->disconnectFromHost();
+            held.clear();
+            return true;
+        }
 
     private:
         QHash<QTcpSocket *, QByteArray> m_buf;
@@ -83,7 +107,7 @@ private slots:
     {
         FakeApi api;
         QVERIFY(api.listen(QHostAddress::LocalHost));
-        api.setCookie = "NMTID=anonymous-test-value; Path=/";
+        api.setCookie = "__csrf=normal-test-value; Path=/";
         const auto requestOnce = [&](NcmClient &client) {
             client.setApiBase(baseUrl(&api));
             Outcome out;
@@ -104,6 +128,29 @@ private slots:
         requestOnce(normal);
         QVERIFY(normal.flushCredentials(3000));
         QVERIFY2(QFile::exists(store), "对照失败：正常客户端没有写凭据，测试证明不了什么");
+    }
+
+
+    // 退出登录后，旧请求迟到的 Set-Cookie 不能把账号写回来
+    void lateSetCookieAfterLogoutIsIgnored()
+    {
+        FakeApi api;
+        QVERIFY(api.listen(QHostAddress::LocalHost));
+        api.hold = true;
+        NcmClient client;
+        QTRY_VERIFY(client.isReady());
+        client.setApiBase(baseUrl(&api));
+        client.adoptCookies(QJsonDocument(QJsonArray{QJsonObject{{"MUSIC_U", "old"}}}));
+        QVERIFY(client.hasMusicU());
+
+        int callbacks = 0;
+        client.get("api/x", {}, true, [&](const QJsonDocument &, bool) { ++callbacks; });
+        QTRY_VERIFY(api.held != nullptr);
+        client.clearAuthCookies();
+        QVERIFY(!client.hasMusicU());
+        QVERIFY(api.release("{\"code\":200}", "MUSIC_U=late; Path=/"));
+        QTRY_COMPARE(callbacks, 1);
+        QVERIFY2(!client.hasMusicU(), "迟到的 Set-Cookie 在退出登录后复活了账号");
     }
 
     void serverErrorThenSuccessRetries()
@@ -140,7 +187,9 @@ private slots:
         clock.start();
         client.get("api/x", {}, false, [&](const QJsonDocument &doc, bool ok) {
             out.record(ok, false);
-            QVERIFY(doc.isNull());
+            // HTTP 4xx/5xx 的 JSON 也要交出来，错误原因在 body 里
+            QVERIFY(!doc.isNull());
+            QCOMPARE(doc.object().value("code").toInt(), 200);
         });
         QVERIFY(wait(out));
         QCOMPARE(out.calls, 1);
@@ -164,7 +213,9 @@ private slots:
         clock.start();
         client.get("api/x", {}, false, [&](const QJsonDocument &doc, bool ok) {
             out.record(ok, false);
-            QVERIFY(doc.isNull());
+            // HTTP 4xx/5xx 的 JSON 也要交出来，错误原因在 body 里
+            QVERIFY(!doc.isNull());
+            QCOMPARE(doc.object().value("code").toInt(), 200);
         });
         QVERIFY(wait(out));
         QCOMPARE(out.calls, 1);

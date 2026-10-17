@@ -61,6 +61,7 @@ Item {
     }
     Component { id: lyricsComponent; DesktopLyrics {} }
     Component { id: trackMenuComponent; TrackMenu {} }
+    Component { id: shareTargetsComponent; ShareTargets {} }
     Component { id: commentRowComponent; CommentRow { width: 600 } }
     Component { id: signalSpyComponent; SignalSpy {} }
     // 假的 layer-shell：记下最后一次设的锚定边与边距；相对拖动由测试直接发 relativeMotion
@@ -289,6 +290,23 @@ Item {
             fuzzyCompare(Source.lineFill({ t: 10, text: "x" }, { t: 20 }, 0, 15), 0.5, 0.001);
         }
 
+        // 评论点赞从页面转发到后端时，参数不能丢（songId, commentId, 目标状态）。
+        function test_commentLikeForwardsToLive() {
+            const calls = [];
+            const saved = Source.live;
+            Source.live = {
+                setCommentLiked: function(songId, commentId, liked) {
+                    calls.push([songId, commentId, liked]);
+                }
+            };
+            Source.setCommentLiked(1456890009, 9667509659, true);
+            Source.live = saved;
+            compare(calls.length, 1);
+            compare(calls[0][0], 1456890009);
+            compare(calls[0][1], 9667509659);
+            compare(calls[0][2], true);
+        }
+
         // 评论行：「N 条回复」展开楼中楼；楼中楼里回复的正是父评论时不再引一遍；长评论折起后可展开
         function test_commentRowRepliesQuoteAndExpand() {
             const quoteOfParent = [{ id: 1, user: "甲", userId: 5, content: "原话" }];
@@ -322,6 +340,22 @@ Item {
         }
 
         // 曲目菜单：每位歌手各一项、按署名顺序排在专辑前；复制的链接与分享用同一个地址
+
+        // 分享链接不能走 Purpose Export 的 urls（那会把 https 当本地文件给 Telegram）；
+        // 这里锁定链接 scheme 与 URL 编码。
+        function test_shareTargetsUseLinkSchemes() {
+            const targets = createTemporaryObject(shareTargetsComponent, root, {
+                url: "https://music.163.com/song?id=42",
+                title: "歌 & 名",
+                text: "分享歌曲"
+            });
+            const telegram = targets.telegramUrl();
+            verify(telegram.startsWith("https://t.me/share/url?url=https%3A%2F%2Fmusic.163.com%2Fsong%3Fid%3D42"));
+            verify(telegram.indexOf("text=%E5%88%86%E4%BA%AB%E6%AD%8C%E6%9B%B2") > 0);
+            verify(targets.mailUrl().startsWith("mailto:?subject="));
+            verify(targets.mailUrl().indexOf("https%3A%2F%2Fmusic.163.com%2Fsong%3Fid%3D42") > 0);
+        }
+
         function test_trackMenuOffersEveryArtist() {
             const m = createTemporaryObject(trackMenuComponent, root, { player: ({}) });
             m.show(root.track, {});

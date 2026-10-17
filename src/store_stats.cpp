@@ -14,10 +14,18 @@ void Store::requestListenTotal()
 {
     if (!m_client->hasMusicU())
         return;
+    const quint64 epoch = m_epoch;
     m_client->get(QStringLiteral("api/content/activity/listen/data/total"), {}, true,
-                  [this](const QJsonDocument &doc, bool ok) {
+                  [this, epoch](const QJsonDocument &doc, bool ok) {
+        if (epoch != m_epoch)
+            return;
+        const QString failure = requestFailure(doc, ok);
+        if (!failure.isEmpty()) {
+            emit requestFailed(QStringLiteral("listen:total"), failure);
+            return;
+        }
         const QJsonObject data = body(doc).value("data").toObject();
-        if (!ok || data.isEmpty()) {
+        if (data.isEmpty()) {
             emit requestFailed(QStringLiteral("listen:total"), QStringLiteral("暂时取不到听歌统计"));
             return;
         }
@@ -31,11 +39,19 @@ void Store::requestListenRealtime(const QString &type)
         return;
     const QString kind = (type == QLatin1String("month")) ? QStringLiteral("month")
                                                           : QStringLiteral("week");
+    const quint64 epoch = m_epoch;
     m_client->get(QStringLiteral("api/content/activity/listen/data/realtime/report"),
                   query({{"type", kind}}), true,
-                  [this, kind](const QJsonDocument &doc, bool ok) {
+                  [this, kind, epoch](const QJsonDocument &doc, bool ok) {
+        if (epoch != m_epoch)
+            return;
+        const QString failure = requestFailure(doc, ok);
+        if (!failure.isEmpty()) {
+            emit requestFailed(QStringLiteral("listen:") + kind, failure);
+            return;
+        }
         const QJsonObject data = body(doc).value("data").toObject();
-        if (!ok || data.isEmpty()) {
+        if (data.isEmpty()) {
             emit requestFailed(QStringLiteral("listen:") + kind, QStringLiteral("暂时取不到听歌统计"));
             return;
         }
@@ -57,11 +73,19 @@ void Store::requestListenRank(const QString &type)
         return;
     const QString kind = (type == QLatin1String("week")) ? QStringLiteral("week")
                                                          : QStringLiteral("month");
+    const quint64 epoch = m_epoch;
     m_client->get(QStringLiteral("api/content/activity/listen/data/song/play/rank"),
                   query({{"type", kind}}), true,
-                  [this, kind](const QJsonDocument &doc, bool ok) {
+                  [this, kind, epoch](const QJsonDocument &doc, bool ok) {
+        if (epoch != m_epoch)
+            return;
+        const QString failure = requestFailure(doc, ok);
+        if (!failure.isEmpty()) {
+            emit requestFailed(QStringLiteral("listenRank:") + kind, failure);
+            return;
+        }
         const QJsonObject data = body(doc).value("data").toObject();
-        if (!ok || data.isEmpty()) {
+        if (data.isEmpty()) {
             emit requestFailed(QStringLiteral("listenRank:") + kind, QStringLiteral("暂时取不到播放排行"));
             return;
         }

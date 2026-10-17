@@ -28,8 +28,10 @@ void Store::followWrite(const QString &path, const QJsonObject &payload, const Q
 
 void Store::setArtistSubscribed(double id, bool subscribed)
 {
+    // 快速防抖：连续点关注/取消只发最后一次意图，避免连点触发风控。
     const QString action = subscribed ? QStringLiteral("关注歌手") : QStringLiteral("取消关注歌手");
-    followWrite(subscribed ? QStringLiteral("artist/sub") : QStringLiteral("artist/unsub"),
+    debounceWrite(QStringLiteral("follow:artist:") + num(id), [this, id, subscribed, action] {
+        followWrite(subscribed ? QStringLiteral("artist/sub") : QStringLiteral("artist/unsub"),
                 QJsonObject{{"artistId", num(id)},
                             {"artistIds", QStringLiteral("[%1]").arg(num(id))}},
                 action, [this, id, subscribed] {
@@ -41,12 +43,14 @@ void Store::setArtistSubscribed(double id, bool subscribed)
         m_cache.forget(QStringLiteral("artist:") + num(id));
         emit artistChanged(id, subscribed);
     });
+    });
 }
 
 void Store::setAlbumSubscribed(double id, bool subscribed)
 {
     const QString action = subscribed ? QStringLiteral("收藏专辑") : QStringLiteral("取消收藏专辑");
-    followWrite(subscribed ? QStringLiteral("album/sub") : QStringLiteral("album/unsub"),
+    debounceWrite(QStringLiteral("follow:album:") + num(id), [this, id, subscribed, action] {
+        followWrite(subscribed ? QStringLiteral("album/sub") : QStringLiteral("album/unsub"),
                 QJsonObject{{"id", num(id)}}, action, [this, id, subscribed] {
         QVariantMap album = m_data.value("album").toMap();
         if (album.value("id").toDouble() == id) {
@@ -55,5 +59,6 @@ void Store::setAlbumSubscribed(double id, bool subscribed)
         }
         m_cache.forget(QStringLiteral("album:") + num(id));
         emit albumChanged(id, subscribed);
+    });
     });
 }

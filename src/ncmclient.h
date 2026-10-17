@@ -27,14 +27,16 @@ public:
     // （没有 HTTP 状态码）时为 true —— 服务器回的 4xx/5xx 说明网络是通的。
     struct Response {
         QJsonDocument doc;
-        bool ok = false;
+        bool parsed = false;      // 响应体是 JSON（HTTP 4xx/5xx 也解析，供风控/会话码分类）
+        bool ok = false;          // HTTP 成功（<400）且 JSON 可解析
         bool networkFailure = false;
+        int httpStatus = 0;
     };
     using ResponseCallback = std::function<void(const Response &response)>;
 
     // 请求失败的唯一分类：只由传输结果与网易云业务码判定，绝不看 message 文本。
-    // 301 是会话过期，-460 与 405 是风控/限流，其余都是服务器拒绝了这次操作。
-    enum class Failure { None, Offline, SessionExpired, RateLimited, Rejected };
+    // 301 是会话过期，250 是设备风控，-460 与 405 是限流，其余是服务器拒绝。
+    enum class Failure { None, Offline, SessionExpired, DeviceRisk, RateLimited, Rejected };
     static Failure failureOf(const Response &response);
 
     // loadCookies=false 用于 --anonymous / 只读调试：不碰钥匙串，立即 ready
@@ -78,7 +80,7 @@ explicit NcmClient(QObject *parent = nullptr, bool loadCookies = true);
     void postForm(const QString &path, const QUrlQuery &form, bool personal, GetCallback callback);
 
     // 客户端日志（NCBL）上传：multipart 已由 Ncbl::multipart 组好，cookie 是完整设备上下文。
-    // 不参与 Store 的 online 计数；失败只回调一次，不重试。
+    // 不参与 Store 的 online 计数；网络/5xx 最多重试 2 次（日志上传非幂等，服务端可能重复记录）。
     void postClientLog(const QByteArray &multipart, const QString &boundary,
                        const QString &cookie, GetCallback callback);
     void postClientLogAttempt(const QByteArray &multipart, const QString &boundary,
@@ -116,7 +118,7 @@ private:
     void postRaw(const QUrl &url, const QByteArray &body, const QString &cookie, ResponseCallback callback,
                  bool keepCookies = true);
     void persistJar();
-    void keepSetCookies(class QNetworkReply *reply);
+    void keepSetCookies(class QNetworkReply *reply, quint64 generation);
     // 同 snapshot.py 的 cookie_header()：只带这三个；空 value 跳过
     QString cookieHeader(bool personal) const;
 
@@ -126,6 +128,8 @@ private:
     QMap<QString, QString> m_jar;
     bool m_ready = false;
     bool m_contextSet = false;
+    // 登录状态每次改变时递增：迟到的 Set-Cookie 不能把刚退出的账号写回来
+    quint64 m_authGeneration = 0;
     QPointer<QObject> m_callbackContext;     // 存储已读出：可以发请求
     bool m_persist = true;    // jar 变了写回存储；匿名调试（不读存储）时绝不写，否则匿名 jar 会盖掉登录凭据
 };

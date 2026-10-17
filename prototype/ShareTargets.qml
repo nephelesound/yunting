@@ -1,23 +1,40 @@
-// 分享对话框里的「发送到」：KDE 的原生分享（Purpose），与 Dolphin、Spectacle 的分享菜单是同一套。
-// 单独成文件、由 ShareDialog 按需加载：系统没装 Purpose 时加载失败，这一节就不出现。
-// 去掉与对话框重复的（剪贴板、二维码）和不适合链接的（上传文件类）目标；
-// 有的目标需要先选一下（KDE Connect 选设备）：Purpose 自己的界面接在列表位置上，完成后回到列表并说明结果。
+// 分享链接的去处。这里刻意不走 Purpose 的 Export 插件：Export 的 inputData 语义是
+// 本地文件列表（例如 Telegram 会用 -sendpath 打开），把 https URL 塞进 urls 会被
+// 当成一个未知文件。链接分享改用各服务自己的 URL scheme。
 pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
-import org.kde.purpose as Purpose
 
 ColumnLayout {
     id: targets
 
     property string url
     property string title
-    readonly property var shareData: ({ urls: [targets.url], title: targets.title, mimeType: "text/x-uri" })
+    property string text
+    property string resultText
+    property bool resultOk: true
 
     spacing: Tokens.space2
+
+    function telegramUrl() {
+        return "https://t.me/share/url?url=" + encodeURIComponent(targets.url)
+            + "&text=" + encodeURIComponent(targets.text || targets.title);
+    }
+    function mailUrl() {
+        return "mailto:?subject=" + encodeURIComponent(targets.title)
+            + "&body=" + encodeURIComponent((targets.text || targets.title) + "\n" + targets.url);
+    }
+    function launch(kind) {
+        const target = kind === "telegram" ? targets.telegramUrl() : targets.mailUrl();
+        targets.resultText = "";
+        if (!Qt.openUrlExternally(target)) {
+            targets.resultOk = false;
+            targets.resultText = kind === "telegram" ? "没有可用的 Telegram 处理器" : "没有可用的邮件程序";
+        }
+    }
 
     Label {
         text: "发送到"
@@ -25,37 +42,25 @@ ColumnLayout {
         color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
     }
 
-    Purpose.AlternativesView {
-        id: view
-        Layout.fillWidth: true
-        Layout.preferredHeight: implicitHeight
-        pluginType: "Export"
-        inputData: targets.shareData
-        disabledPlugins: ["clipboardplugin", "barcodeplugin", "nextcloudplugin", "imgurplugin", "saveasplugin",
-                          "phabricatorplugin", "reviewboardplugin", "youtubeplugin"]
-        onFinished: (output, error, message) => {
-            result.text = error === 0 ? "已发送" : (message || "没有发送成功");
-            result.ok = error === 0;
-            view.reset();
-        }
-        // 一行一个目标：块状可点（悬停淡色调），与曲目行同一套
+    Repeater {
+        model: [
+            { key: "telegram", title: "通过 Telegram 发送", icon: "org.telegram.desktop" },
+            { key: "email", title: "通过邮件发送", icon: "mail-send-symbolic" },
+        ]
         delegate: AbstractButton {
             id: row
-            required property int index
-            required property var model   // Purpose 的角色：display、iconName（display 与按钮自身属性同名，经 model 取）
-            width: ListView.view.width
+            required property var modelData
+            Layout.fillWidth: true
             implicitHeight: Tokens.height10
             hoverEnabled: true
             leftPadding: Tokens.space2
             rightPadding: Tokens.space2
-            Accessible.name: row.model.display
-            onClicked: {
-                result.text = "";
-                view.createJob(row.index);
-            }
+            Accessible.name: row.modelData.title
+            onClicked: targets.launch(row.modelData.key)
             background: Rectangle {
                 radius: Tokens.radius
-                color: Qt.alpha(Kirigami.Theme.highlightColor, row.down ? Tokens.tintPressed : row.hovered ? Tokens.tintHover : 0)
+                color: Qt.alpha(Kirigami.Theme.highlightColor,
+                                row.down ? Tokens.tintPressed : row.hovered ? Tokens.tintHover : 0)
                 border.width: row.visualFocus ? Tokens.lineStrong : 0
                 border.color: Kirigami.Theme.highlightColor
                 Behavior on color { ColorAnimation { duration: Tokens.motionFast } }
@@ -65,11 +70,11 @@ ColumnLayout {
                 Kirigami.Icon {
                     implicitWidth: Tokens.iconMd
                     implicitHeight: Tokens.iconMd
-                    source: row.model.iconName
+                    source: row.modelData.icon
                 }
                 Label {
                     Layout.fillWidth: true
-                    text: row.model.display
+                    text: row.modelData.title
                     font.pixelSize: Tokens.textBase
                     elide: Text.ElideRight
                 }
@@ -85,10 +90,9 @@ ColumnLayout {
     }
 
     Label {
-        id: result
-        property bool ok
         visible: text.length > 0
+        text: targets.resultText
         font.pixelSize: Tokens.textSm
-        color: result.ok ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.negativeTextColor
+        color: targets.resultOk ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.negativeTextColor
     }
 }

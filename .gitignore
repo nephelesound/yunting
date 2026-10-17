@@ -17,4 +17,5 @@ prototype/Personal.js
 # 参考库也在 docs/ 下，用 `make refs` 按 SHA 复原
 *.md
 !README.md
+!AGENTS.md
 docs/

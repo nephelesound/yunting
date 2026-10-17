@@ -11,8 +11,15 @@ Item {
     property real position: 0
     property real volume: 0.7      // 0–1，滑块刻度
     property bool muted: false
-    property string quality: "auto"   // 与 AudioEngine 同名同义；原型里只记住，不影响模拟播放
+    property string quality: "auto"
     readonly property var qualities: ["auto", "standard", "higher", "exhigh", "lossless", "hires"]   // 与 AudioEngine.qualities 同义
+    property string scrobbleMode: "legacy"   // 与 AudioEngine 同名同义；原型里只记住，不影响模拟播放
+    // 原型没有真实 DSP；这些属性让均衡器面板和播放条按同一接口求值（面板里 eqAvailable=false 隐藏）
+    property bool eqAvailable: false
+    property var eqGains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    property real bassBoost: 0
+    property real stereoWidth: 1
+    property string outputDevice: ""
     readonly property real duration: engine.track ? engine.track.dur : 0
 
     signal finished()

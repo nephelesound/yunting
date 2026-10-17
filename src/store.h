@@ -11,13 +11,16 @@
 #include <QObject>
 #include <QSet>
 #include <QString>
+#include <QTimer>
 #include <QVariant>
 #include <memory>
+#include <optional>
 #include <QVariantMap>
 #include <functional>
 
 class NcmClient;
 class QNetworkInformation;
+class QTimer;
 
 class Store : public QObject {
     Q_OBJECT
@@ -86,6 +89,7 @@ signals:
     void albumChanged(double id, bool subscribed);
     void followFailed(const QString &action, const QString &message);
     void commentLikeFailed(double songId, double commentId, const QString &message);
+    void commentLikeSucceeded(double songId, double commentId, bool liked);
     // 按需请求失败（含信箱与私信对话）：请求时的 key 与给用户看的一句话；成功走 dataChanged
     void requestFailed(const QString &key, const QString &message);
 
@@ -129,12 +133,22 @@ private:
     // 红心的本地写入与服务器请求：同一首歌在途时记住最后一次意图，回包落地后追发
     void sendLike(double songId, bool liked);
     void setLikedLocal(double songId, bool liked);
+    // 用户连续点击时先攒 300ms，只发最后一次意图；同一个 key 的后一次覆盖前一次
+    void debounceWrite(const QString &key, std::function<void()> action);
+    void flushDebouncedWrites();
+    void flushLike(double songId);
+    void flushCommentLike(const QString &key);
+    void sendCommentLike(const QString &key, double songId, double commentId, bool liked);
+    void applyCommentLike(double songId, double commentId, bool liked, int delta);
+    std::optional<bool> commentLiked(double songId, double commentId) const;
     bool isLiked(double songId) const;
     // 首屏快照落盘：只存首屏字段，搜索/评论/详情等按需数据不写进 screen:data
     void persistScreenData();
     // 个人请求失败的唯一收尾：分类、会话过期置位、每种失败固定一句给用户的话。
     // 返回空串表示服务器已接受（业务码 200）；分类只看传输结果与业务码，不看 message 文本。
     QString requestFailure(const NcmClient::Response &response);
+    // GET 回调只有 doc/ok；构造同样的 Response，让 250/301 也走统一分类
+    QString requestFailure(const QJsonDocument &doc, bool ok);
     // 歌单写请求的共同部分：登录检查、epoch 防串号、错误消息
     void playlistWrite(const QString &path, const QJsonObject &payload, const QString &action,
                        std::function<void(const QJsonObject &)> onSuccess);
@@ -200,9 +214,17 @@ private:
     struct LikeState {
         bool serverState = false;   // 服务器已确认的状态
         bool desired = false;       // 用户最后一次意图
+        bool inFlight = false;      // 请求已发出；期间的点击只改 desired
     };
-    QHash<double, LikeState> m_likes;   // 同一首歌的红心请求在途时排队最后一次意图
+    QHash<double, LikeState> m_likes;   // 同一首歌的红心请求在途/防抖中排队最后一次意图
     quint64 m_likeGeneration = 0;       // 每次红心改动递增：旧的 like/get 快照要与本地合并
     QSet<double> m_likeTouched;         // 上次快照之后改过的歌
-    QSet<QString> m_commentLikePending; // songId:commentId 在途，防连点重复发
+    struct CommentLikeState {
+        bool serverState = false;
+        bool desired = false;
+        bool inFlight = false;
+    };
+    QHash<QString, CommentLikeState> m_commentLikes; // songId:commentId 的防抖/在途意图
+    QTimer m_writeDebounce;
+    QHash<QString, std::function<void()>> m_debouncedWrites;
 };

@@ -23,7 +23,7 @@ Item {
 
     CoverAmbience {
         anchors.fill: parent
-        cover: coverPage.track ? coverPage.track.cover : ""
+        cover: coverPage.visible && coverPage.track ? coverPage.track.cover : ""
     }
 
     // 右上角关闭：不抢封面的视觉焦点
@@ -83,7 +83,7 @@ Item {
             Layout.alignment: Qt.AlignVCenter
             Layout.preferredWidth: Math.min(parent.height - 2 * Tokens.space6, parent.width * 0.55)
             Layout.preferredHeight: Layout.preferredWidth
-            source: coverPage.track ? Source.sized(coverPage.track.cover, 800) : ""
+            source: coverPage.visible && coverPage.track ? Source.sized(coverPage.track.cover, 800) : ""
             pixelSize: 800
         }
 

@@ -28,7 +28,8 @@ public:
     // 落盘数据的格式版本（存在 SQLite 的 PRAGMA user_version 里）。缓存里存的是解析好的结果
     // （normalize.cpp 的输出），解析规则或数据形状一变，旧值就不对了（歌词永不过期，
     // 会一直用下去）。改了解析就把它加一：版本不符的库清空。
-    static constexpr int diskFormat = 2;
+    // 2 -> 3：评论缓存从匿名结果（liked 恒为 false）改为登录态本人结果，旧行不能再用。
+    static constexpr int diskFormat = 3;
 
     explicit QueryCache(const QString &diskPath, QObject *parent = nullptr);
     ~QueryCache() override;

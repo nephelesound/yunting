@@ -51,6 +51,7 @@ void printInventory()
     }
     std::fputs("\n写操作不走通用 GET：\n"
                "  --like <songId> on|off\n"
+               "  --comment-like <songId>:<commentId> on|off\n"
                "  --playlist-selftest\n\n"
                "示例：\n"
                "  yunting --api get api/v1/artist/6452\n"

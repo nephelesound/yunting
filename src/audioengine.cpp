@@ -440,13 +440,16 @@ void AudioEngine::resolveUrl(double songId)
     m_urlRequests.insert(cacheKey);
 
     const bool lossless = level == QLatin1String("lossless") || level == QLatin1String("hires");
+    QPointer<AudioEngine> self(this);
     m_client->postWeapi("song/enhance/player/url/v1",
                         QJsonObject{{"ids", QStringLiteral("[%1]").arg(num(songId))},
                                     {"level", level},
                                     {"encodeType", lossless ? QStringLiteral("flac") : QStringLiteral("mp3")}},
                         true,
-                        [this, songId, cacheKey, level](const QJsonDocument &doc, bool ok) {
-        m_urlRequests.remove(cacheKey);
+                        [self, songId, cacheKey, level](const QJsonDocument &doc, bool ok) {
+        if (!self)
+            return;
+        self->m_urlRequests.remove(cacheKey);
         const QJsonObject resp = body(doc);
         const QJsonObject item = ok && resp.value("code").toInt() == 200
             ? arr(resp, "data").at(0).toObject() : QJsonObject();
@@ -456,18 +459,18 @@ void AudioEngine::resolveUrl(double songId)
         if (!url.isEmpty()) {
             // 留一分钟余量，避免拿到即将失效的地址
             const int expi = item.value("expi").toInt(1200);
-            m_urls.insert(cacheKey, {url, played.level, played.bitrate,
-                                     QDateTime::currentDateTimeUtc().addSecs(std::max(0, expi - 60))});
+            self->m_urls.insert(cacheKey, {url, played.level, played.bitrate,
+                                           QDateTime::currentDateTimeUtc().addSecs(std::max(0, expi - 60))});
         }
         // 用户可能已经切到别的歌：迟到的地址只进缓存，不播
-        if (m_track.value("id").toDouble() != songId)
+        if (self->m_track.value("id").toDouble() != songId)
             return;
         if (url.isEmpty()) {
-            m_failed = true;
-            emit failed(QStringLiteral("暂时无法播放这首歌"));
+            self->m_failed = true;
+            emit self->failed(QStringLiteral("暂时无法播放这首歌"));
             return;
         }
-        startSource(url, played.level, played.bitrate);
+        self->startSource(url, played.level, played.bitrate);
     });
 }
 
