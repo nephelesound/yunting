@@ -3,8 +3,6 @@
 
 #include "json_util.h"
 
-#include <QJsonDocument>
-
 #include <algorithm>
 
 using namespace ncm;
@@ -51,7 +49,7 @@ void Store::sendLike(double songId, bool liked)
                                     {"like", liked ? QStringLiteral("true") : QStringLiteral("false")},
                                     {"time", QStringLiteral("25")}},
                         true,
-                        [this, songId, liked, epoch](const QJsonDocument &doc, bool ok) {
+                        [this, songId, liked, epoch](const NcmClient::Response &response) {
         const auto pending = m_likes.find(songId);
         if (epoch != m_epoch) {   // 期间退出登录：不要把回包写到新会话
             if (pending != m_likes.end())
@@ -60,8 +58,8 @@ void Store::sendLike(double songId, bool liked)
         }
         if (pending == m_likes.end())
             return;
-        const int code = doc.object().value("code").toInt();
-        if (ok && code == 200) {
+        const QString failure = requestFailure(response);
+        if (failure.isEmpty()) {
             pending->serverState = liked;
             if (pending->desired != liked) {
                 sendLike(songId, pending->desired);   // 用户在回包前又点了一次
@@ -82,18 +80,9 @@ void Store::sendLike(double songId, bool liked)
         const bool desired = pending->desired;
         m_likes.erase(pending);
         setLikedLocal(songId, serverState);
-        if (code == 301)
-            setSessionExpired(true);
-
-        // 接口的 message 已经是给用户看的中文（例如「操作频繁，请稍候再试」），优先用它。
-        const QString serverMessage = doc.object().value("message").toString();
-        const QString reason = !ok ? QStringLiteral("网络不可用，请稍后再试")
-            : !serverMessage.isEmpty() ? serverMessage
-            : code == 301 ? QStringLiteral("登录已过期，请重新登录")
-            : code == 250 ? QStringLiteral("这首歌暂时不能收藏")
-                          : QStringLiteral("服务器没有接受这次操作");
-        emit likeFailed(songId, desired, reason);
-        qWarning() << "like failed:" << songId << code;
+        emit likeFailed(songId, desired, failure);
+        qWarning() << "like failed:" << songId
+                   << response.doc.object().value("code").toInt();
     });
 }
 

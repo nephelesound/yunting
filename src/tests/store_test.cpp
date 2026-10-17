@@ -61,14 +61,17 @@ public:
                     requests.append(req);
 
                     QPointer<QTcpSocket> guard(sock);
+                    // status <= 0 表示不回包直接断开：客户端看到的是连接层失败，而不是 HTTP 错误
                     const Responder respond = [guard](int status, const QByteArray &body) {
                         if (!guard)
                             return;
-                        guard->write("HTTP/1.1 " + QByteArray::number(status) + " x\r\n"
-                                     "Content-Type: application/json\r\nContent-Length: "
-                                     + QByteArray::number(body.size()) + "\r\nConnection: close\r\n\r\n"
-                                     + body);
-                        guard->flush();
+                        if (status > 0) {
+                            guard->write("HTTP/1.1 " + QByteArray::number(status) + " x\r\n"
+                                         "Content-Type: application/json\r\nContent-Length: "
+                                         + QByteArray::number(body.size()) + "\r\nConnection: close\r\n\r\n"
+                                         + body);
+                            guard->flush();
+                        }
                         guard->disconnectFromHost();
                     };
                     if (handler)
@@ -645,6 +648,98 @@ private slots:
         m_store->request(QStringLiteral("playlist:999"));
         QVERIFY(waitUntil([&] { return failed.count() == 1; }));
         QCOMPARE(failed.first().at(0).toString(), QStringLiteral("playlist:999"));
+    }
+
+    // 301 不只出现在红心/评论：任何个人写路径都必须置 sessionExpired 并给统一的过期句子
+    void playlistWrite301SetsSessionExpired()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/weapi/playlist/create") {
+                respond(200, "{\"code\":301,\"message\":\"需要登录\"}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        QSignalSpy failed(m_store, &Store::playlistActionFailed);
+        QSignalSpy expired(m_store, &Store::sessionExpiredChanged);
+        QCOMPARE(m_store->sessionExpired(), false);
+
+        m_store->createPlaylist(QStringLiteral("travel"));
+        QVERIFY(waitUntil([&] { return failed.count() == 1; }));
+        QCOMPARE(m_store->sessionExpired(), true);
+        QCOMPARE(expired.count(), 1);
+        QCOMPARE(failed.first().at(0).toString(), QStringLiteral("创建歌单"));
+        QCOMPARE(failed.first().at(1).toString(), QStringLiteral("登录已过期，请重新登录"));
+    }
+
+    // 风控/限流码（-460 与 405）走同一句话，且不能被当成断网或会话过期
+    void rateLimitedWriteHasItsOwnSentence()
+    {
+        int replies = 0;
+        m_api->handler = [&replies](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/weapi/playlist/create") {
+                respond(200, replies++ == 0 ? "{\"code\":-460,\"message\":\"请求过于频繁\"}"
+                                            : "{\"code\":405}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        QSignalSpy failed(m_store, &Store::playlistActionFailed);
+
+        m_store->createPlaylist(QStringLiteral("a"));
+        QVERIFY(waitUntil([&] { return failed.count() == 1; }));
+        QCOMPARE(failed.first().at(1).toString(), QStringLiteral("操作太频繁，请稍后再试"));
+
+        m_store->createPlaylist(QStringLiteral("b"));
+        QVERIFY(waitUntil([&] { return failed.count() == 2; }));
+        QCOMPARE(failed.at(1).at(1).toString(), QStringLiteral("操作太频繁，请稍后再试"));
+        QCOMPARE(m_store->sessionExpired(), false);
+    }
+
+    // 连接被断开（没有 HTTP 状态码）才是「网络不可用」；服务器回了 HTTP 错误不算断网
+    void droppedConnectionIsOffline()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/weapi/playlist/create") {
+                respond(0, {});   // 不回包，直接断开
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        QSignalSpy failed(m_store, &Store::playlistActionFailed);
+
+        m_store->createPlaylist(QStringLiteral("travel"));
+        QVERIFY(waitUntil([&] { return failed.count() == 1; }));
+        QCOMPARE(failed.first().at(1).toString(), QStringLiteral("网络不可用，请稍后再试"));
+        QCOMPARE(m_store->sessionExpired(), false);
+        QCOMPARE(m_store->online(), false);
+    }
+
+    // 分类不看 message 文本：服务器自己的措辞不能冒充限流/过期
+    // 拒绝的原因只有网易云知道：用它的 message；没有 message 时才用通用的一句
+    void rejectionUsesServerMessage()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/weapi/playlist/create") {
+                respond(200, "{\"code\":500,\"message\":\"歌单名称重复\"}");
+                return;
+            }
+            if (req.path == "/weapi/playlist/remove") {
+                respond(200, "{\"code\":500}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        QSignalSpy failed(m_store, &Store::playlistActionFailed);
+
+        m_store->createPlaylist(QStringLiteral("travel"));
+        QVERIFY(waitUntil([&] { return failed.count() == 1; }));
+        QCOMPARE(failed.at(0).at(1).toString(), QStringLiteral("歌单名称重复"));
+        QCOMPARE(m_store->sessionExpired(), false);
+
+        m_store->deletePlaylist(42);
+        QVERIFY(waitUntil([&] { return failed.count() == 2; }));
+        QCOMPARE(failed.at(1).at(1).toString(), QStringLiteral("网易云没有接受这次操作"));
     }
 };
 

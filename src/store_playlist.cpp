@@ -20,21 +20,15 @@ void Store::playlistWrite(const QString &path, const QJsonObject &payload, const
     }
     const quint64 epoch = m_epoch;
     m_client->postWeapi(path, payload, true,
-                        [this, epoch, action, onSuccess](const QJsonDocument &doc, bool ok) {
+                        [this, epoch, action, onSuccess](const NcmClient::Response &response) {
         if (epoch != m_epoch)   // 期间退出登录：不要改新会话的数据
             return;
-        const QJsonObject resp = doc.object();
-        if (ok && resp.value("code").toInt() == 200) {
-            onSuccess(resp);
+        const QString failure = requestFailure(response);
+        if (failure.isEmpty()) {
+            onSuccess(response.doc.object());
             return;
         }
-        QString message = resp.value("message").toString();
-        if (message.isEmpty())
-            message = resp.value("msg").toString();
-        if (message.isEmpty())
-            message = ok ? QStringLiteral("服务器没有接受这次操作")
-                         : QStringLiteral("网络不可用，请稍后再试");
-        emit playlistActionFailed(action, message);
+        emit playlistActionFailed(action, failure);
     });
 }
 

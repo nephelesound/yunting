@@ -23,6 +23,20 @@ class NcmClient : public QObject {
 public:
     using GetCallback = std::function<void(const QJsonDocument &doc, bool ok)>;
 
+    // 一次请求的落地结果。ok = 传输成功且 JSON 可解析；networkFailure 只在连接层失败
+    // （没有 HTTP 状态码）时为 true —— 服务器回的 4xx/5xx 说明网络是通的。
+    struct Response {
+        QJsonDocument doc;
+        bool ok = false;
+        bool networkFailure = false;
+    };
+    using ResponseCallback = std::function<void(const Response &response)>;
+
+    // 请求失败的唯一分类：只由传输结果与网易云业务码判定，绝不看 message 文本。
+    // 301 是会话过期，-460 与 405 是风控/限流，其余都是服务器拒绝了这次操作。
+    enum class Failure { None, Offline, SessionExpired, RateLimited, Rejected };
+    static Failure failureOf(const Response &response);
+
     // loadCookies=false 用于 --anonymous / 只读调试：不碰钥匙串，立即 ready
 explicit NcmClient(QObject *parent = nullptr, bool loadCookies = true);
 
@@ -56,6 +70,10 @@ explicit NcmClient(QObject *parent = nullptr, bool loadCookies = true);
     // 写操作不重试：重复提交红心/建歌单并不幂等。失败时 doc 为空、ok=false。
     void postWeapi(const QString &path, const QJsonObject &payload, bool personal, GetCallback callback,
                    bool keepCookies = true);
+    // 同上，但把传输结果一起交出来：写操作要区分「连不上」与「服务器回了话但拒绝」，
+    // 不能把 HTTP 错误当成断网。
+    void postWeapi(const QString &path, const QJsonObject &payload, bool personal,
+                   ResponseCallback callback, bool keepCookies = true);
     // 明文 /api/ 表单 POST（听歌打卡 /api/feedback/weblog 用），同样不重试。
     void postForm(const QString &path, const QUrlQuery &form, bool personal, GetCallback callback);
 
@@ -95,7 +113,7 @@ private:
     void startGet(const QString &path, const QUrlQuery &query, bool personal,
                   int attempt, bool retrying, GetCallback callback);
     static bool isNetworkError(const QNetworkReply &reply);
-    void postRaw(const QUrl &url, const QByteArray &body, const QString &cookie, GetCallback callback,
+    void postRaw(const QUrl &url, const QByteArray &body, const QString &cookie, ResponseCallback callback,
                  bool keepCookies = true);
     void persistJar();
     void keepSetCookies(class QNetworkReply *reply);

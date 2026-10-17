@@ -3,8 +3,6 @@
 
 #include "json_util.h"
 
-#include <QJsonDocument>
-
 using namespace ncm;
 
 void Store::followWrite(const QString &path, const QJsonObject &payload, const QString &action,
@@ -16,21 +14,15 @@ void Store::followWrite(const QString &path, const QJsonObject &payload, const Q
     }
     const quint64 epoch = m_epoch;
     m_client->postWeapi(path, payload, true,
-                        [this, epoch, action, onSuccess](const QJsonDocument &doc, bool ok) {
+                        [this, epoch, action, onSuccess](const NcmClient::Response &response) {
         if (epoch != m_epoch)
             return;
-        const QJsonObject resp = doc.object();
-        if (ok && resp.value("code").toInt() == 200) {
+        const QString failure = requestFailure(response);
+        if (failure.isEmpty()) {
             onSuccess();
             return;
         }
-        QString message = resp.value("message").toString();
-        if (message.isEmpty())
-            message = resp.value("msg").toString();
-        if (message.isEmpty())
-            message = ok ? QStringLiteral("服务器没有接受这次操作")
-                         : QStringLiteral("网络不可用，请稍后再试");
-        emit followFailed(action, message);
+        emit followFailed(action, failure);
     });
 }
 

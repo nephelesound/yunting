@@ -3,8 +3,6 @@
 
 #include "json_util.h"
 
-#include <QJsonDocument>
-
 #include <algorithm>
 
 using namespace ncm;
@@ -66,21 +64,15 @@ void Store::setCommentLiked(double songId, double commentId, bool liked)
     m_client->postWeapi(liked ? QStringLiteral("v1/comment/like") : QStringLiteral("v1/comment/unlike"),
                         QJsonObject{{"threadId", thread}, {"commentId", num(commentId)}},
                         true,
-                        [this, songId, commentId, liked, epoch, pendingKey, apply](const QJsonDocument &doc, bool ok) {
+                        [this, songId, commentId, liked, epoch, pendingKey, apply](const NcmClient::Response &response) {
         m_commentLikePending.remove(pendingKey);
         if (epoch != m_epoch)
             return;
-        const QJsonObject resp = doc.object();
-        if (ok && resp.value("code").toInt() == 200)
+        const QString failure = requestFailure(response);
+        if (failure.isEmpty())
             return;
         // 失败：把刚才的乐观改动静默改回，并让界面说明原因
         apply(!liked, liked ? -1 : 1);
-        if (resp.value("code").toInt() == 301)
-            setSessionExpired(true);
-        QString message = resp.value("message").toString();
-        if (message.isEmpty())
-            message = ok ? QStringLiteral("服务器没有接受这次操作")
-                         : QStringLiteral("网络不可用，请稍后再试");
-        emit commentLikeFailed(songId, commentId, message);
+        emit commentLikeFailed(songId, commentId, failure);
     });
 }

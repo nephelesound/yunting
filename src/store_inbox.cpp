@@ -131,13 +131,13 @@ void Store::requestInbox(int offset)
                                     {"limit", 30},
                                     {"total", QStringLiteral("true")}},
                         true,
-                        [this, offset](const QJsonDocument &doc, bool ok) {
-        const QJsonObject resp = doc.object();
-        if (!ok || resp.value("code").toInt() != 200) {
-            emit inboxFailed(ok ? QStringLiteral("信箱暂时不可用")
-                                : QStringLiteral("网络不可用，请稍后再试"));
+                        [this, offset](const NcmClient::Response &response) {
+        const QString failure = requestFailure(response);
+        if (!failure.isEmpty()) {
+            emit inboxFailed(failure);
             return;
         }
+        const QJsonObject resp = response.doc.object();
         QVariantList items;
         if (offset > 0) {
             const QVariant raw = m_data.value("inbox");
@@ -165,13 +165,13 @@ void Store::requestInboxThread(double userId, qint64 before)
                                     {"time", QString::number(before)},
                                     {"total", QStringLiteral("true")}},
                         true,
-                        [this, userId, before](const QJsonDocument &doc, bool ok) {
-        const QJsonObject resp = doc.object();
-        if (!ok || resp.value("code").toInt() != 200) {
-            emit inboxFailed(ok ? QStringLiteral("私信暂时不可用")
-                                : QStringLiteral("网络不可用，请稍后再试"));
+                        [this, userId, before](const NcmClient::Response &response) {
+        const QString failure = requestFailure(response);
+        if (!failure.isEmpty()) {
+            emit inboxFailed(failure);
             return;
         }
+        const QJsonObject resp = response.doc.object();
         QVariantList items;
         if (before > 0) {
             const QVariant raw = m_data.value("inboxThread");

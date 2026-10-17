@@ -204,7 +204,7 @@ bool NcmClient::flushCredentials(int timeoutMs)
 
 // POST 的共同部分：写请求不重试，重复发送会产生副作用（红心、打卡、改歌单）。
 void NcmClient::postRaw(const QUrl &url, const QByteArray &body, const QString &cookie,
-                        GetCallback callback, bool keepCookies)
+                        ResponseCallback callback, bool keepCookies)
 {
     QNetworkRequest req(url);
     req.setRawHeader("Referer", Referer);
@@ -223,15 +223,14 @@ void NcmClient::postRaw(const QUrl &url, const QByteArray &body, const QString &
     QNetworkReply *reply = m_nam->post(req, body);
     connect(reply, &QNetworkReply::finished, this, [this, reply, callback, keepCookies, timer, url] {
         reply->deleteLater();
-        const bool networkError = isNetworkError(*reply);
-        QJsonDocument doc;
-        bool ok = false;
+        Response response;
+        response.networkFailure = isNetworkError(*reply);
         if (reply->error() == QNetworkReply::NoError) {
             QJsonParseError parseError;
             const QByteArray raw = reply->readAll();
-            doc = QJsonDocument::fromJson(raw, &parseError);
-            ok = parseError.error == QJsonParseError::NoError;
-            if (!ok)
+            response.doc = QJsonDocument::fromJson(raw, &parseError);
+            response.ok = parseError.error == QJsonParseError::NoError;
+            if (!response.ok)
                 qWarning() << "bad JSON from" << reply->url().toString(QUrl::RemoveQuery)
                            << raw.left(200);
         } else {
@@ -240,17 +239,27 @@ void NcmClient::postRaw(const QUrl &url, const QByteArray &body, const QString &
         }
         qCDebug(lcPerf).nospace() << "http method=POST path=" << url.path()
                                   << " status=" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
-                                  << " ms=" << timer.elapsed() << " network=" << networkError;
+                                  << " ms=" << timer.elapsed() << " network=" << response.networkFailure;
         if (keepCookies)
             keepSetCookies(reply);
-        emit requestFinished(ok, networkError);
+        emit requestFinished(response.ok, response.networkFailure);
         if (callback && callbackContextAlive())
-            callback(doc, ok);
+            callback(response);
     });
 }
 
 void NcmClient::postWeapi(const QString &path, const QJsonObject &payload, bool personal,
                           GetCallback callback, bool keepCookies)
+{
+    postWeapi(path, payload, personal,
+              [callback](const Response &response) {
+        if (callback)
+            callback(response.doc, response.ok);
+    }, keepCookies);
+}
+
+void NcmClient::postWeapi(const QString &path, const QJsonObject &payload, bool personal,
+                          ResponseCallback callback, bool keepCookies)
 {
     const QString csrf = m_jar.value(QStringLiteral("__csrf"));
     QJsonObject body = payload;
@@ -270,7 +279,7 @@ void NcmClient::postWeapi(const QString &path, const QJsonObject &payload, bool 
     if (form.isEmpty()) {
         // 加密失败属于本机错误：不发请求，交给调用方显示可读原因
         if (callback && callbackContextAlive())
-            callback({}, false);
+            callback(Response{});
         return;
     }
     postRaw(url, form, cookie, callback, keepCookies);
@@ -285,7 +294,11 @@ void NcmClient::postForm(const QString &path, const QUrlQuery &form, bool person
     if (personal)
         cookie += (cookie.isEmpty() ? QString() : QStringLiteral("; "))
             + QStringLiteral("os=pc; appver=3.1.17; osver=10");
-    postRaw(QUrl(m_apiBase + path), ncm::formEncoded(form), cookie, callback);
+    postRaw(QUrl(m_apiBase + path), ncm::formEncoded(form), cookie,
+            [callback](const Response &response) {
+        if (callback)
+            callback(response.doc, response.ok);
+    });
 }
 
 QString NcmClient::cookieHeader(bool personal) const
@@ -364,6 +377,25 @@ bool NcmClient::callbackContextAlive() const
 void NcmClient::setApiBase(const QString &base)
 {
     m_apiBase = base;
+}
+
+NcmClient::Failure NcmClient::failureOf(const Response &response)
+{
+    if (response.networkFailure)
+        return Failure::Offline;
+    if (!response.ok)
+        return Failure::Rejected;
+    switch (response.doc.object().value("code").toInt()) {
+    case 200:
+        return Failure::None;
+    case 301:
+        return Failure::SessionExpired;
+    case -460:
+    case 405:
+        return Failure::RateLimited;
+    default:
+        return Failure::Rejected;
+    }
 }
 
 namespace {

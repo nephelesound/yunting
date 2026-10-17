@@ -134,6 +134,9 @@ private:
     bool isLiked(double songId) const;
     // 首屏快照落盘：只存首屏字段，搜索/评论/详情等按需数据不写进 screen:data
     void persistScreenData();
+    // 个人请求失败的唯一收尾：分类、会话过期置位、每种失败固定一句给用户的话。
+    // 返回空串表示服务器已接受（业务码 200）；分类只看传输结果与业务码，不看 message 文本。
+    QString requestFailure(const NcmClient::Response &response);
     // 歌单写请求的共同部分：登录检查、epoch 防串号、错误消息
     void playlistWrite(const QString &path, const QJsonObject &payload, const QString &action,
                        std::function<void(const QJsonObject &)> onSuccess);

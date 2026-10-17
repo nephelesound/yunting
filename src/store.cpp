@@ -19,6 +19,30 @@ using namespace ncm;
 
 namespace {
 QVariant nullVariant() { return QVariant::fromValue(nullptr); }
+
+// 每种失败一句话：发生了什么 + 该做什么。只有「拒绝」用网易云自己的 message：
+// 它本来就是给用户看的中文，而且是唯一知道具体原因的一方（歌单重名、这首歌不能收藏…）
+QString failureMessage(NcmClient::Failure failure, const QJsonObject &body)
+{
+    switch (failure) {
+    case NcmClient::Failure::None:
+        return {};
+    case NcmClient::Failure::Offline:
+        return QStringLiteral("网络不可用，请稍后再试");
+    case NcmClient::Failure::SessionExpired:
+        return QStringLiteral("登录已过期，请重新登录");
+    case NcmClient::Failure::RateLimited:
+        return QStringLiteral("操作太频繁，请稍后再试");
+    case NcmClient::Failure::Rejected:
+        break;
+    }
+    for (const char *key : {"message", "msg"}) {
+        const QString message = body.value(QLatin1String(key)).toString();
+        if (!message.isEmpty())
+            return message;
+    }
+    return QStringLiteral("网易云没有接受这次操作");
+}
 } // namespace
 
 Store::Store(NcmClient *client, QObject *parent)
@@ -208,7 +232,7 @@ void Store::logout()
     // 先发出 logout（请求头在调用时已带上旧 cookie），随后立刻清本地。
     // 不在这里等服务器回包：等 15 秒会让旧数据留在界面上，也会让旧请求有机会写回。
     if (m_client->hasMusicU())
-        m_client->postWeapi("logout", {}, true, nullptr, /*keepCookies=*/false);
+        m_client->postWeapi("logout", {}, true, NcmClient::GetCallback{}, /*keepCookies=*/false);
     ++m_epoch;
     m_client->clearAuthCookies();
     resetPersonal();
@@ -254,6 +278,18 @@ void Store::setSessionExpired(bool expired)
         return;
     m_sessionExpired = expired;
     emit sessionExpiredChanged();
+}
+
+// 个人请求（写操作与信箱）失败的唯一收尾。放在这里而不是各调用点，301 才不会在某个
+// 写路径被忘掉；句子也只有一个来源。
+QString Store::requestFailure(const NcmClient::Response &response)
+{
+    const NcmClient::Failure failure = NcmClient::failureOf(response);
+    if (failure == NcmClient::Failure::None)
+        return {};
+    if (failure == NcmClient::Failure::SessionExpired)
+        setSessionExpired(true);
+    return failureMessage(failure, response.doc.object());
 }
 
 void Store::fetchAlways(const QString &path, const QUrlQuery &q, bool personal,
