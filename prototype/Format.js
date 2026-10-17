@@ -2,7 +2,7 @@
 
 // 显示格式：全应用只有这一份，组件里不各写一遍
 
-// 时长：m:ss；一小时以上 h:mm:ss；未知（0 或缺失）返回空串——缺失不显示成 0:00
+// 时长：m:ss；一小时以上 h:mm:ss；未知（0 或缺失）返回空串，缺失不显示成 0:00
 function duration(seconds) {
     const total = Math.floor(seconds || 0);
     if (total <= 0)

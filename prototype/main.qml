@@ -14,7 +14,7 @@ Kirigami.ApplicationWindow {
     id: root
 
     visible: true
-    title: root.currentTrack ? root.currentTrack.name + " — " + root.currentTrack.artist : "NCM Player"
+    title: root.currentTrack ? root.currentTrack.name + " — " + root.currentTrack.artist : "云听"
     width: 1280
     height: 800
     minimumWidth: 800
@@ -36,7 +36,7 @@ Kirigami.ApplicationWindow {
 
     readonly property var openList: Source.list(root.listKey)
 
-    // ── 播放：队列与规则在 Playback，声音在 engine。队列为空时 currentTrack 为 null ──
+    // 播放：队列与规则在 Playback，声音在 engine。队列为空时 currentTrack 为 null
     SimEngine { id: simEngine }
     SimSession { id: simSession }
 
@@ -138,7 +138,7 @@ Kirigami.ApplicationWindow {
     function play(tracks, i) { playback.play(tracks, i); }
     function requestLogin() { loginDialog.open(); }
 
-    // ── 浮层：播放队列（右侧抽屉）与扫码登录（对话框）──
+    // 浮层：播放队列（右侧抽屉）与扫码登录（对话框）
     // 截图 harness 可用 startOverlay = queue | login，以及 loginState = waiting | scanned | expired
     // （不能叫 overlay：会遮住 ApplicationWindow.overlay，Kirigami 的对话框就挂不上去了）
     property string startOverlay: ""
@@ -153,6 +153,7 @@ Kirigami.ApplicationWindow {
         onActivated: index => playback.play(playback.queue, index)
         onRemoveRequested: index => playback.remove(index)
         onClearRequested: playback.clearUpcoming()
+        onMoveRequested: (from, to) => playback.move(from, to)
     }
 
     LoginDialog {
@@ -160,7 +161,7 @@ Kirigami.ApplicationWindow {
         session: root.backend ? root.backend.session : simSession
     }
 
-    // ── 曲目菜单与歌单写操作 ──
+    // 曲目菜单与歌单写操作
     TrackMenu {
         id: trackMenu
         player: playback
@@ -333,9 +334,9 @@ Kirigami.ApplicationWindow {
         }
     }
 
-    // ── 导航：推荐/我的/搜索 是顶层枢轴；排行榜、列表、正在播放压在其上，history 记录来路 ──
+    // 导航：推荐/我的/搜索 是顶层枢轴；排行榜、列表、歌手、正在播放压在其上，history 记录来路
     property var history: []
-    readonly property var pageNames: ({ home: "推荐", mine: "我的", search: "搜索", charts: "排行榜" })
+    readonly property var pageNames: ({ home: "推荐", mine: "我的", search: "搜索", charts: "排行榜", playlists: "全部歌单" })
     readonly property string parentName: {
         const prev = root.history.length > 0 ? root.history[root.history.length - 1] : { page: "home" };
         if (prev.page === "list")
@@ -356,6 +357,48 @@ Kirigami.ApplicationWindow {
         }
         function onTrackMenuRequested(track, context) { trackMenu.show(track, context); }
         function onLogoutRequested() { logoutDialog.open(); }
+        function onPlaylistMenuRequested(playlist) {
+            playlistMenu.playlist = playlist;
+            playlistMenu.popup();
+        }
+        function onNewPlaylistRequested() { playlistNameDialog.ask(0, "", null); }
+    }
+
+    // 歌单磁贴的菜单（「我的」与「全部歌单」）：自己建的可改名/删除（「我喜欢的音乐」除外），收藏的可取消收藏
+    Menu {
+        id: playlistMenu
+        property var playlist: ({ id: 0, name: "", owned: false })
+        readonly property bool editable: playlistMenu.playlist.owned && playlistMenu.playlist.id !== (Source.pe.liked.id || 0)
+        MenuItem {
+            icon.name: "view-media-playlist"
+            text: "打开"
+            onTriggered: Actions.openPlaylist(playlistMenu.playlist.id)
+        }
+        MenuSeparator {}
+        MenuItem {
+            visible: playlistMenu.editable
+            height: visible ? implicitHeight : 0
+            icon.name: "edit-rename"
+            text: "重命名…"
+            onTriggered: playlistNameDialog.ask(playlistMenu.playlist.id, playlistMenu.playlist.name, null)
+        }
+        MenuItem {
+            visible: playlistMenu.editable
+            height: visible ? implicitHeight : 0
+            icon.name: "edit-delete"
+            text: "删除歌单…"
+            onTriggered: deleteDialog.ask(playlistMenu.playlist.id, playlistMenu.playlist.name)
+        }
+        MenuItem {
+            visible: !playlistMenu.playlist.owned
+            height: visible ? implicitHeight : 0
+            icon.name: "bookmark-remove"
+            text: "取消收藏"
+            onTriggered: {
+                root.noteOnSuccess(playlistMenu.playlist.id, "已取消收藏「" + playlistMenu.playlist.name + "」");
+                Source.setPlaylistSubscribed(playlistMenu.playlist.id, false);
+            }
+        }
     }
 
     function open(page, listKey) {
@@ -396,7 +439,7 @@ Kirigami.ApplicationWindow {
             root.open("list", key);
     }
 
-    // ── 键盘与鼠标侧键：每个常用动作都不必离开键盘 ──
+    // 键盘与鼠标侧键：每个常用动作都不必离开键盘
     Shortcut { sequence: "Space"; onActivated: playback.engine.toggle() }
     Shortcut { sequence: "Left"; onActivated: playback.engine.seek(playback.engine.position - 5) }
     Shortcut { sequence: "Right"; onActivated: playback.engine.seek(playback.engine.position + 5) }
@@ -413,15 +456,33 @@ Kirigami.ApplicationWindow {
     // 「我的」未登录时是登录引导；搜索词由 harness 的 searchQuery 预填（空 = 热门搜索）
     property string searchQuery: ""
     readonly property var pages: ({ home: homePage, mine: root.loggedIn ? minePage : placeholderPage, search: searchPage,
-                                    charts: chartsPage, list: listPage, artist: artistPage, nowplaying: nowPlayingPage })
+                                    charts: chartsPage, list: listPage, artist: artistPage, playlists: playlistsPage,
+                                    nowplaying: nowPlayingPage })
     onPageChanged: {
         pageStack.clear();
         pageStack.push(root.pages[root.page]);
     }
     Component.onCompleted: {
+        root.applyCommandLine();
         // 先换好数据源与队列，再推首页
         root.applyFixture();
         root.pageChanged();
+    }
+
+    // 应用里截图与调试：命令行 -- 之后的 key=value 与 qmlshot 同一格式，设到根对象的同名属性上
+    //（例：yunting --screenshot a.png -- page=artist listKey=artist:6452）。只认已有的属性
+    function applyCommandLine() {
+        const args = Qt.application.arguments;
+        const start = args.indexOf("--");
+        if (start < 0)
+            return;
+        for (const pair of args.slice(start + 1)) {
+            const eq = pair.indexOf("=");
+            const key = pair.slice(0, eq);
+            const value = pair.slice(eq + 1);
+            if (eq > 0 && key in root)
+                root[key] = value === "true" ? true : value === "false" ? false : value;
+        }
     }
 
     Kirigami.Theme.colorSet: Kirigami.Theme.View
@@ -518,7 +579,7 @@ Kirigami.ApplicationWindow {
             vip: root.vip
             parentText: root.parentName
             currentId: root.currentTrack ? root.currentTrack.id : 0
-            onActivated: index => root.play(artistView.artist.tracks, index)
+            onActivated: index => root.play(artistView.songs, index)
             onPlayAllRequested: root.play(artistView.artist.tracks, 0)
             onShuffleRequested: root.play(artistView.artist.tracks, Math.floor(Math.random() * artistView.artist.tracks.length))
             onLeaveRequested: root.goBack()
@@ -550,6 +611,17 @@ Kirigami.ApplicationWindow {
             onEntryOpened: key => root.open("list", key)
             onPlaylistOpened: index => root.open("list", "playlist:" + Source.myPlaylists[index].id)
             onRecentActivated: index => root.play(Source.recent.tracks, index)
+            onAllPlaylistsRequested: root.open("playlists")
+        }
+    }
+
+    Component {
+        id: playlistsPage
+        PlaylistsPage {
+            loggedIn: root.loggedIn
+            parentText: root.parentName
+            onLeaveRequested: root.goBack()
+            onLoginRequested: root.requestLogin()
         }
     }
 

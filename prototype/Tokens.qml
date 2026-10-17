@@ -36,7 +36,7 @@ QtObject {
     readonly property real faded: 0.25        // 非当前枢轴 / 面包屑上级
     readonly property real fadedHover: 0.5
 
-    // 动效：时长一律取 Kirigami.Units——桌面平台插件会按 Plasma「动画速度」(AnimationDurationFactor) 缩放，
+    // 动效：时长一律取 Kirigami.Units，桌面平台插件会按 Plasma「动画速度」(AnimationDurationFactor) 缩放，
     // 用户关掉动画时它们就是 0，减弱动效不用另写分支。
     readonly property int motionFast: Kirigami.Units.shortDuration      // 100：按下、悬停
     readonly property int motionBase: Kirigami.Units.longDuration       // 200：页面进入、封面淡入、焦点变化

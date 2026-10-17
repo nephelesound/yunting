@@ -56,7 +56,7 @@ QtObject {
         playlistDetails: source.p.playlistDetails || {},
     })
 
-    // ── 红心：id → true 的查找表（一千多首，逐行查要 O(1)）──
+    // 红心：id → true 的查找表（一千多首，逐行查要 O(1)）
     // live：Store 先改 likedIds（乐观），失败时改回并发 likeFailed。
     // 原型：点红心只改这份内存里的覆盖，不写任何地方
     property var likedOverride: ({})
@@ -79,7 +79,7 @@ QtObject {
         source.likedOverride = o;
     }
 
-    // ── 热门评论：只有 live 按需取；快照里带的是歌词那首的 ──
+    // 热门评论：只有 live 按需取；快照里带的是歌词那首的
     function comments(songId) {
         const c = source.d.comments;
         if (c && c.songId === songId)
@@ -88,40 +88,101 @@ QtObject {
         return [];
     }
 
-    // ── 账号 ──
+    // 最新评论：分页按需取（comments:<songId>:<offset>，每页 20），data 里只放最近一页，
+    // 这里按歌累积；只接「正好是下一页」的那页，迟到或重复的页不会打乱顺序
+    // 分页累积（评论、歌手的全部歌曲共用）：acc = { owner, items, total, more, next, loading }。
+    // 只接 owner 对得上、offset 正好等于 next 的那页；items 按 id 去重（与已有的热门曲目不重复）
+    function appendPage(acc, owner, page, list) {
+        if (!page || owner !== acc.owner || page.offset !== acc.next)
+            return acc;
+        const seen = {};
+        for (const item of acc.items)
+            seen[item.id] = true;
+        const fresh = list.filter(item => item.id === undefined || !seen[item.id]);
+        return { owner: acc.owner, items: acc.items.concat(fresh), total: page.total,
+                 more: page.more && list.length > 0, next: acc.next + list.length, loading: false };
+    }
+    // 返回标成「在取」的新 acc 和要请求的 offset；换了 owner 从 start 开始；在取或没有更多时返回 null
+    function nextPage(acc, owner, start, seed) {
+        if (!source.live)
+            return null;
+        if (acc.owner !== owner)
+            acc = { owner: owner, items: seed, total: 0, more: true, next: start, loading: false };
+        if (acc.loading || !acc.more)
+            return null;
+        return Object.assign({}, acc, { loading: true });
+    }
+
+    // 最新评论：打开评论或滚到底时调用 moreComments
+    property var latestComments: ({ owner: 0, items: [], total: 0, more: false, next: 0, loading: false })
+    readonly property var commentPageRaw: source.d.commentPage || null
+    onCommentPageRawChanged: {
+        const page = source.commentPageRaw;
+        if (page)
+            source.latestComments = source.appendPage(source.latestComments, page.songId, page, page.items);
+    }
+    function moreComments(songId) {
+        const acc = source.nextPage(source.latestComments, songId, 0, []);
+        if (acc === null)
+            return;
+        source.latestComments = acc;
+        source.need("comments:" + songId + ":" + acc.next);
+    }
+
+    // 歌手的全部歌曲：先是 artist:<id> 带的热门 50 首，滚到底再按热度从第 50 首往后取（artistSongs:<id>:<offset>）
+    property var artistSongs: ({ owner: 0, items: [], total: 0, more: false, next: 0, loading: false })
+    readonly property var artistSongsRaw: source.d.artistSongs || null
+    onArtistSongsRawChanged: {
+        const page = source.artistSongsRaw;
+        if (page)
+            source.artistSongs = source.appendPage(source.artistSongs, page.artistId, page, page.tracks);
+    }
+    function moreArtistSongs(artistId, hotTracks) {
+        const acc = source.nextPage(source.artistSongs, artistId, hotTracks.length, hotTracks);
+        if (acc === null)
+            return;
+        source.artistSongs = acc;
+        source.need("artistSongs:" + artistId + ":" + acc.next);
+    }
+
+    // 账号
     readonly property var account: source.p.account   // null = 没有登录快照
 
-    // ── 榜单 ──
+    // 榜单
     readonly property var toplists: source.d.toplists
     readonly property string chartsCaption: source.toplists.length > 0 ? source.toplists.length + " 个官方与特色榜单" : "暂时没有榜单"
     readonly property var hotChart: ({ name: source.d.playlist.name, count: source.d.playlist.count, tracks: source.d.tracks })
 
-    // ── 推荐歌单（首页第二排）──
+    // 推荐歌单（首页第二排）
     readonly property var playlists: source.p.playlists
 
-    // ── 私人漫游：一个流，直接播放 ──
+    // 私人漫游：一个流，直接播放
     readonly property var fmTracks: source.pe.fm.tracks
 
-    // ── 我的：最近播放、云盘、创建与收藏的歌单（缺字段时给稳定的空形状）──
+    // 我的：最近播放、云盘、创建与收藏的歌单（缺字段时给稳定的空形状）
     readonly property var recent: source.p.recent || { total: 0, tracks: [] }
     readonly property var cloud: source.p.cloud || { count: 0, size: 0, maxSize: 0, tracks: [] }
     readonly property var myPlaylists: (source.p.mine || []).map(pl => Object.assign({ owned: true }, pl))
         .concat((source.p.subscribed || []).map(pl => Object.assign({ owned: false }, pl)))
 
-    // ── 搜索：快照只有一个查询词的结果；热门搜索是匿名可得的 ──
+    // 搜索：快照只有一个查询词的结果；热门搜索是匿名可得的
     readonly property var hotSearches: source.d.hotSearches || []
     readonly property var searchResult: source.d.search || { query: "", songs: [], artists: [], playlists: [], albums: [] }
 
-    // 一位小数且去掉多余的 .0：59.9 GB / 60 GB——取整会把将满显示成「60 / 60」
+    // 一位小数且去掉多余的 .0：59.9 GB / 60 GB。取整会把将满显示成「60 / 60」
     function gigabytes(bytes) {
         return Number((bytes / 1073741824).toFixed(1)) + " GB";
     }
 
-    // ── 歌手 / 专辑：data 里只放最近取回的一个，id 对上才用；没对上就向 live 要，先给同形的空值 ──
+    // 歌手 / 专辑：data 里只放最近取回的一个，id 对上才用；没对上就向 live 要，先给同形的空值
+    // 简介常带全角空格的段首缩进：去掉，每行都从窗格左缘开始（对齐页边线）
+    function unindent(text) {
+        return (text || "").replace(/^[\s　]+/gm, "");
+    }
     function artist(id) {
         const a = source.d.artist;
         if (a && (a.id === id || !source.live))
-            return a;
+            return Object.assign({}, a, { description: source.unindent(a.description) });
         source.need("artist:" + id);
         return { id: id, name: "", cover: "", alias: "", description: "", musicSize: 0, albumSize: 0, tracks: [], albums: [] };
     }
@@ -133,7 +194,7 @@ QtObject {
         return { id: id, name: "", artist: "", artistId: 0, cover: "", description: "", company: "", publishTime: 0, tracks: [] };
     }
 
-    // ── 写操作：都交给 live（Store），结果经 Store 的信号回来；原型里不写任何地方 ──
+    // 写操作：都交给 live（Store），结果经 Store 的信号回来；原型里不写任何地方
     // 「加到歌单」的候选：自己创建的歌单，去掉「我喜欢的音乐」（往里加就是点红心）
     readonly property var addableLists: source.myPlaylists.filter(pl => pl.owned && pl.id !== (source.pe.liked.id || 0))
     function addToPlaylist(playlistId, songId) { if (source.live) source.live.addSongToPlaylist(playlistId, songId); }
@@ -159,7 +220,7 @@ QtObject {
     function firstCover(tracks) { return tracks.length > 0 ? tracks[0].cover : ""; }
     function songs(n) { return { value: String(n), label: "首" }; }
 
-    // ── 首页第一排：为你推荐的入口。每项 { key, title, caption, cover | symbol, locked } ──
+    // 首页第一排：为你推荐的入口。每项 { key, title, caption, cover | symbol, locked }
     function homeEntries(loggedIn) {
         const p = source.pe;
         const fm = p.fm.tracks;
@@ -203,7 +264,7 @@ QtObject {
         ];
     }
 
-    // ── 列表页：{ heading, cover, facts, description, tracks, ranked, emptyText } ──
+    // 列表页：{ heading, cover, facts, description, tracks, ranked, emptyText, ... }
     function list(key) {
         const p = source.pe;
         switch (key) {
@@ -272,7 +333,7 @@ QtObject {
                 if (al.tracks.length > 0)
                     facts.push(source.songs(al.tracks.length));
                 return { heading: al.name, cover: source.sized(al.cover, 560), tracks: al.tracks, facts: facts, isAlbum: true,
-                         description: al.description || (al.company ? "发行：" + al.company : ""),
+                         description: source.unindent(al.description) || (al.company ? "发行：" + al.company : ""),
                          emptyText: source.live ? "正在取回曲目…" : "这张专辑的曲目还没取到" };
             }
             const pl = source.d.playlist;

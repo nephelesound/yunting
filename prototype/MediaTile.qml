@@ -25,6 +25,19 @@ AbstractButton {
     focusPolicy: Qt.StrongFocus
     Accessible.name: tile.title
 
+    // 右键（或菜单键 / Shift+F10）：由使用方决定有没有菜单
+    signal menuRequested()
+    TapHandler {
+        acceptedButtons: Qt.RightButton
+        onTapped: tile.menuRequested()
+    }
+    Keys.onPressed: event => {
+        if (event.key === Qt.Key_Menu || (event.key === Qt.Key_F10 && (event.modifiers & Qt.ShiftModifier))) {
+            tile.menuRequested();
+            event.accepted = true;
+        }
+    }
+
     contentItem: ColumnLayout {
         spacing: Tokens.space2
 

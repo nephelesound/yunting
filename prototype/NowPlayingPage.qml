@@ -29,6 +29,18 @@ ScreenFrame {
 
     readonly property var lines: page.track ? Source.lyrics(page.track.id) : []
     readonly property var comments: page.track && page.pane === "comments" ? Source.comments(page.track.id) : []
+    // 最新评论（分页累积）：只认这首歌的；打开评论或换歌时从第一页开始取
+    readonly property var latest: page.track && page.pane === "comments" && Source.latestComments.owner === page.track.id
+        ? Source.latestComments : null
+    readonly property var commentRows: page.comments.map(c => Object.assign({ group: "hot" }, c))
+        .concat((page.latest ? page.latest.items : []).map(c => Object.assign({ group: "latest" }, c)))
+    function startComments() {
+        if (page.track && page.pane === "comments" && Source.latestComments.owner !== page.track.id)
+            Source.moreComments(page.track.id);
+    }
+    onPaneChanged: page.startComments()
+    onTrackChanged: page.startComments()
+    Component.onCompleted: page.startComments()
     readonly property int lyricIndex: {
         let i = 0;
         while (i + 1 < page.lines.length && page.lines[i + 1].t <= page.elapsed)
@@ -40,7 +52,7 @@ ScreenFrame {
         return n >= 10000 ? (n / 10000).toFixed(n >= 100000 ? 0 : 1) + "万" : String(n);
     }
 
-    // ── 左半：封面与事实 ──
+    // 左半：封面与事实
     ColumnLayout {
         x: Math.round((parent.width / 2 - width) / 2)
         y: page.coverTopRow * page.pitch
@@ -59,7 +71,7 @@ ScreenFrame {
         }
     }
 
-    // ── 右半 ──
+    // 右半
     Item {
         id: right
         x: parent.width / 2
@@ -74,7 +86,7 @@ ScreenFrame {
             onActivated: key => page.pane = key
         }
 
-        // ── 歌词 ──
+        // 歌词
         ListView {
             id: lyrics
             visible: page.pane === "lyrics"
@@ -142,7 +154,7 @@ ScreenFrame {
             color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
         }
 
-        // ── 评论：阅读模式，头像 · 名字 · 内容 · 赞数 ──
+        // 评论：阅读模式，头像、名字、内容、赞数。先精彩评论，再最新评论（滚到底取下一页）
         ListView {
             id: commentList
             visible: page.pane === "comments"
@@ -152,14 +164,42 @@ ScreenFrame {
             clip: true
             spacing: Tokens.space4
             topMargin: Tokens.space3
+            bottomMargin: Tokens.space6
             boundsBehavior: Flickable.StopAtBounds
-            model: page.comments
+            model: page.commentRows
             ScrollBar.vertical: ScrollBar {}
+            onAtYEndChanged: if (atYEnd && page.track && page.pane === "comments") Source.moreComments(page.track.id)
 
-            delegate: RowLayout {
+            footer: Label {
+                width: ListView.view.width
+                height: visible ? Tokens.height10 : 0
+                visible: page.latest !== null && (page.latest.loading || !page.latest.more) && page.latest.items.length > 0
+                verticalAlignment: Text.AlignVCenter
+                text: page.latest && page.latest.loading ? "正在取回更多评论…" : "没有更多评论了"
+                font.pixelSize: Tokens.textSm
+                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+            }
+
+            delegate: ColumnLayout {
                 id: comment
                 required property var modelData
+                required property int index
                 width: ListView.view.width - Tokens.space4
+                spacing: Tokens.space3
+
+                // 分组标题：每组第一条之前（精彩评论 / 最新评论 N）
+                Label {
+                    visible: comment.index === 0 || page.commentRows[comment.index - 1].group !== comment.modelData.group
+                    Layout.topMargin: comment.index === 0 ? 0 : Tokens.space4
+                    text: comment.modelData.group === "hot" ? "精彩评论"
+                        : "最新评论" + (page.latest && page.latest.total > 0 ? " " + page.count(page.latest.total) : "")
+                    font.pixelSize: Tokens.textSm
+                    font.weight: Font.DemiBold
+                    color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                }
+
+                RowLayout {
+                Layout.fillWidth: true
                 spacing: Tokens.space3
 
                 Components.Avatar {
@@ -198,13 +238,14 @@ ScreenFrame {
                         elide: Text.ElideRight
                     }
                 }
+                }
             }
         }
 
         Label {
             y: page.focusRow * page.pitch
             height: page.pitch
-            visible: page.pane === "comments" && page.comments.length === 0
+            visible: page.pane === "comments" && page.commentRows.length === 0
             verticalAlignment: Text.AlignVCenter
             text: Source.live ? "正在取回评论…" : "暂无评论"
             font.pixelSize: Tokens.text2xl

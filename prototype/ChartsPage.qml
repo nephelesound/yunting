@@ -39,7 +39,7 @@ ScreenFrame {
         anchors.bottomMargin: Tokens.space6
         spacing: Tokens.space6
 
-        // ── 上带 ──
+        // 上带
         RowLayout {
             Layout.fillWidth: true
             Layout.preferredHeight: page.headerHeight + page.bandHeight
@@ -95,7 +95,7 @@ ScreenFrame {
             }
         }
 
-        // ── 下带：热歌榜 ──
+        // 下带：热歌榜
         ColumnLayout {
             Layout.fillWidth: true
             Layout.alignment: Qt.AlignTop

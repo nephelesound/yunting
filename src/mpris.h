@@ -1,7 +1,7 @@
 #pragma once
 // Mpris：媒体键 / 锁屏 / Plasma 媒体控件。在会话总线注册 org.mpris.MediaPlayer2.<应用名>。
 // 状态读自 AudioEngine；Play/Pause/PlayPause/Seek/SetPosition 直接作用于它，
-// Next/Previous 只发信号——切歌规则只有 Playback 那一份，QML 接 nextRequested/previousRequested。
+// Next/Previous 只发信号：切歌规则只有 Playback 那一份，QML 接 nextRequested/previousRequested。
 #include <QVariantMap>
 #include <QObject>
 

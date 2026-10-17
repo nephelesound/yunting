@@ -1,7 +1,7 @@
 // 我的（已登录）：回到自己的歌。一屏放完，与首页共用同一套列网格。
 //   第一排：「我的音乐」两块入口（我喜欢的音乐 · 音乐云盘）| 「最近播放」直接列出最近的歌（识别而非回忆），
 //          行数取刚好与磁贴（含下方两行字）同高的条数，两组上下边缘对齐；
-//   第二排：「歌单」，创建的在前、收藏的在后。
+//   第二排：「歌单」，创建的在前、收藏的在后；放不下的在「全部歌单」页，右键磁贴有歌单菜单。
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -17,6 +17,7 @@ ScreenFrame {
     signal entryOpened(string key)
     signal playlistOpened(int index)
     signal recentActivated(int index)
+    signal allPlaylistsRequested()
 
     currentPivot: "mine"
 
@@ -50,7 +51,7 @@ ScreenFrame {
             Layout.fillWidth: true
             spacing: Tokens.space2
 
-            // ── 我的音乐 ──
+            // 我的音乐
             ColumnLayout {
                 readonly property int gridWidth: page.entries.length * (page.tile + Tokens.space2) - Tokens.space2
                 Layout.alignment: Qt.AlignTop
@@ -77,7 +78,7 @@ ScreenFrame {
                 }
             }
 
-            // ── 最近播放：占剩余列，左缘正好落在第三列上（与下一排第三块磁贴对齐）──
+            // 最近播放：占剩余列，左缘正好落在第三列上（与下一排第三块磁贴对齐）
             ColumnLayout {
                 Layout.alignment: Qt.AlignTop
                 Layout.fillWidth: true
@@ -107,12 +108,14 @@ ScreenFrame {
             }
         }
 
-        // ── 歌单：创建的在前，收藏的在后 ──
+        // 歌单：创建的在前，收藏的在后
         ColumnLayout {
             spacing: 0
+            // 有歌单时进「全部歌单」（那里也能新建）；一个都没有时直接新建
             GroupHeader {
                 text: "歌单"
-                actionText: Source.myPlaylists.length > page.columns ? "全部 " + Source.myPlaylists.length + " 个" : ""
+                actionText: Source.myPlaylists.length > 0 ? "全部 " + Source.myPlaylists.length + " 个" : "新建歌单"
+                onActionTriggered: Source.myPlaylists.length > 0 ? page.allPlaylistsRequested() : Actions.newPlaylistRequested()
             }
             Row {
                 spacing: Tokens.space2
@@ -126,6 +129,7 @@ ScreenFrame {
                         caption: modelData.owned ? (modelData.count > 0 ? modelData.count + " 首" : "空歌单") : "收藏的歌单"
                         cover: modelData.cover
                         onClicked: page.playlistOpened(index)
+                        onMenuRequested: Actions.playlistMenuRequested(modelData)
                     }
                 }
             }

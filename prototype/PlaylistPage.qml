@@ -33,7 +33,7 @@ ScreenFrame {
         anchors.leftMargin: Tokens.pageMargin
         spacing: Tokens.space6
 
-        // ── 左：固定窗格 ──
+        // 左：固定窗格
         ColumnLayout {
             Layout.alignment: Qt.AlignTop
             Layout.preferredWidth: Tokens.trackColumn
@@ -118,7 +118,7 @@ ScreenFrame {
             }
         }
 
-        // ── 右：曲目列表 ──
+        // 右：曲目列表
         ListView {
             id: tracks
             Layout.fillWidth: true

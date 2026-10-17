@@ -5,12 +5,14 @@ pragma Singleton
 import QtQuick
 
 QtObject {
-    // context：{ playlistId }——曲目在自己创建的歌单里时，菜单多一项「从歌单中移除」
+    // context：{ playlistId }。曲目在自己创建的歌单里时，菜单多一项「从歌单中移除」
     signal trackMenuRequested(var track, var context)
     signal artistRequested(real id)
     signal albumRequested(real id)
     signal playlistRequested(real id)
     signal logoutRequested()
+    signal playlistMenuRequested(var playlist)   // 「我的」里的歌单磁贴：{ id, name, owned }
+    signal newPlaylistRequested()
 
     function trackMenu(track, context) { trackMenuRequested(track, context || {}); }
     function openArtist(id) { if (id > 0) artistRequested(id); }

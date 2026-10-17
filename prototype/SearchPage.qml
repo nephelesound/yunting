@@ -60,7 +60,7 @@ ScreenFrame {
             onAccepted: page.query = text
         }
 
-        // ── 没有输入：热门搜索 ──
+        // 没有输入：热门搜索
         ColumnLayout {
             visible: page.query.length === 0
             Layout.fillWidth: true
@@ -121,7 +121,7 @@ ScreenFrame {
             }
         }
 
-        // ── 有结果 ──
+        // 有结果
         RowLayout {
             visible: page.query.length > 0
             Layout.fillWidth: true

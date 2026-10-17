@@ -1,4 +1,4 @@
-# 云听 —— 从本目录所在仓库的已提交内容构建（无网络源）
+# 云听：从本目录所在仓库的已提交内容构建（无网络源）
 pkgname=yunting-git
 # 占位版本：makepkg 入口的 lint 要求静态 pkgver，pkgver() 成功后会被就地改写
 pkgver=0.1

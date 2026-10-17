@@ -15,7 +15,7 @@ QString serviceName()
 }
 } // namespace
 
-// ── org.mpris.MediaPlayer2 ──
+// org.mpris.MediaPlayer2
 class MprisBaseAdaptor : public QDBusAbstractAdaptor {
     Q_OBJECT
     Q_CLASSINFO("D-Bus Interface", "org.mpris.MediaPlayer2")
@@ -49,7 +49,7 @@ private:
     Mpris *m_mpris;
 };
 
-// ── org.mpris.MediaPlayer2.Player ──
+// org.mpris.MediaPlayer2.Player
 class MprisPlayerAdaptor : public QDBusAbstractAdaptor {
     Q_OBJECT
     Q_CLASSINFO("D-Bus Interface", "org.mpris.MediaPlayer2.Player")

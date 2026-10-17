@@ -4,6 +4,7 @@ singleton Actions Actions.qml
 Pivot Pivot.qml
 TrackMenu TrackMenu.qml
 ArtistPage ArtistPage.qml
+PlaylistsPage PlaylistsPage.qml
 AccentButton AccentButton.qml
 ChartCard ChartCard.qml
 ChartsPage ChartsPage.qml

@@ -1,6 +1,6 @@
 // 歌手页：与列表页同一个辅助窗格布局，左缘、窗格宽度、主动作位置都对齐。
-// 左＝固定窗格（圆形照片 280——人物用圆形，事实、简介、主动作）；
-// 右＝枢轴「热门歌曲 | 专辑」，下面是对应内容：曲目列（同列表页）或专辑磁贴网格。
+// 左＝固定窗格（圆形照片 280，人物用圆形；事实、简介、主动作）；
+// 右＝枢轴「歌曲 | 专辑」，下面是对应内容：曲目列（同列表页，按热度、滚到底续取）或专辑磁贴网格。
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -21,6 +21,9 @@ ScreenFrame {
     signal shuffleRequested()
 
     readonly property var artist: Source.artist(page.artistId)
+    // 歌曲列：先是热门 50 首，滚到底按热度接着往后取（与热门不重复）；点播、播放都用这份
+    readonly property var songs: Source.artistSongs.owner === page.artistId ? Source.artistSongs.items : page.artist.tracks
+    readonly property var paging: Source.artistSongs.owner === page.artistId ? Source.artistSongs : null
     heading: page.artist.name
 
     RowLayout {
@@ -28,7 +31,7 @@ ScreenFrame {
         anchors.leftMargin: Tokens.pageMargin
         spacing: Tokens.space6
 
-        // ── 左：固定窗格 ──
+        // 左：固定窗格
         ColumnLayout {
             Layout.alignment: Qt.AlignTop
             Layout.preferredWidth: Tokens.trackColumn
@@ -60,7 +63,9 @@ ScreenFrame {
                 Layout.fillWidth: true
                 Layout.topMargin: Tokens.space2
                 visible: text.length > 0
-                text: page.artist.alias ? page.artist.alias + "。" + page.artist.description : page.artist.description
+                // 别名放在简介前；简介里已经写了别名就不重复
+                text: page.artist.alias && !page.artist.description.includes(page.artist.alias)
+                    ? page.artist.alias + "。" + page.artist.description : page.artist.description
                 font.pixelSize: Tokens.textSm
                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                 wrapMode: Text.Wrap
@@ -91,14 +96,14 @@ ScreenFrame {
             }
         }
 
-        // ── 右：枢轴 + 内容 ──
+        // 右：枢轴 + 内容
         ColumnLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
             spacing: Tokens.space3
 
             Pivot {
-                items: [{ key: "songs", text: "热门歌曲" },
+                items: [{ key: "songs", text: page.artist.musicSize > 0 ? "歌曲 " + page.artist.musicSize : "歌曲" },
                         { key: "albums", text: page.artist.albums.length > 0 ? "专辑 " + page.artist.albums.length : "专辑" }]
                 current: page.pane
                 onActivated: key => page.pane = key
@@ -114,9 +119,21 @@ ScreenFrame {
                 spacing: Tokens.space2
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
-                model: page.artist.tracks
+                model: page.songs
                 currentIndex: -1
                 ScrollBar.vertical: ScrollBar {}
+                onAtYEndChanged: if (atYEnd && page.artist.tracks.length > 0) Source.moreArtistSongs(page.artistId, page.artist.tracks)
+
+                footer: Label {
+                    width: ListView.view.width - ListView.view.rightMargin
+                    height: visible ? Tokens.height10 : 0
+                    visible: page.paging !== null && (page.paging.loading || !page.paging.more)
+                    verticalAlignment: Text.AlignVCenter
+                    horizontalAlignment: Text.AlignHCenter
+                    text: page.paging && page.paging.loading ? "正在取回更多歌曲…" : "已经是全部 " + page.songs.length + " 首"
+                    font.pixelSize: Tokens.textSm
+                    color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                }
 
                 delegate: TrackTile {
                     width: tracks.width - tracks.rightMargin

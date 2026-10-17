@@ -46,7 +46,7 @@ Item {
 
     implicitHeight: Tokens.lineStrong + Tokens.hudHeight
 
-    // ── 顶边：通栏进度线 ──
+    // 顶边：通栏进度线
     Rectangle {
         id: progressTrack
         anchors.top: parent.top
@@ -81,7 +81,7 @@ Item {
         anchors.leftMargin: Tokens.pageMargin
         anchors.rightMargin: Tokens.pageMargin
 
-        // ── 左：当前曲目 ──
+        // 左：当前曲目
         RowLayout {
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
@@ -133,7 +133,7 @@ Item {
             }
         }
 
-        // ── 中：传输控制（对称）──
+        // 中：传输控制（对称）
         RowLayout {
             id: transport
             enabled: bar.active
@@ -176,7 +176,7 @@ Item {
             IconButton { icon.name: "view-media-playlist"; text: "播放队列"; onClicked: bar.queueRequested() }
         }
 
-        // ── 右：时间与视图 ──
+        // 右：时间与视图
         RowLayout {
             anchors.right: parent.right
             anchors.rightMargin: -Tokens.space2 // 图形右缘落在页边线上

@@ -9,7 +9,7 @@ Item {
     property int pixelSize: 300
     property int radius: Tokens.radius
 
-    // 占位：加载中、没有封面、链接失效时都一样——淡底 + 专辑图标，不留一个看起来像渲染出错的空方块
+    // 占位：加载中、没有封面、链接失效时都一样，是淡底 + 专辑图标，不留一个看起来像渲染出错的空方块
     Rectangle {
         anchors.fill: parent
         radius: cover.radius
