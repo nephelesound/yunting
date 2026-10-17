@@ -19,6 +19,12 @@ ScreenFrame {
     signal activated(int index)
     signal playAllRequested()
     signal shuffleRequested()
+    signal renameRequested(real id, string name)
+    signal deleteRequested(real id, string name)
+    signal subscribeToggled(real id, string name, bool subscribed)
+
+    // 歌单才有操作：自己建的（「我喜欢的音乐」除外）改名/删除，别人的收藏/取消收藏
+    readonly property bool hasListActions: (page.list.listId || 0) > 0 && page.loggedIn
 
     heading: page.list.heading
 
@@ -80,8 +86,34 @@ ScreenFrame {
                     onClicked: page.shuffleRequested()
                 }
                 IconButton {
+                    visible: page.hasListActions
                     icon.name: "overflow-menu"
                     text: "更多"
+                    onClicked: listMenu.popup(this, 0, height)
+                }
+                Menu {
+                    id: listMenu
+                    MenuItem {
+                        visible: page.list.owned || false
+                        height: visible ? implicitHeight : 0
+                        icon.name: "edit-rename"
+                        text: "重命名…"
+                        onTriggered: page.renameRequested(page.list.listId, page.list.heading)
+                    }
+                    MenuItem {
+                        visible: page.list.owned || false
+                        height: visible ? implicitHeight : 0
+                        icon.name: "edit-delete"
+                        text: "删除歌单…"
+                        onTriggered: page.deleteRequested(page.list.listId, page.list.heading)
+                    }
+                    MenuItem {
+                        visible: !(page.list.owned || false)
+                        height: visible ? implicitHeight : 0
+                        icon.name: page.list.subscribed ? "bookmark-remove" : "bookmark-new"
+                        text: page.list.subscribed ? "取消收藏" : "收藏歌单"
+                        onTriggered: page.subscribeToggled(page.list.listId, page.list.heading, !page.list.subscribed)
+                    }
                 }
             }
         }
@@ -106,7 +138,9 @@ ScreenFrame {
                 ranked: page.list.ranked || false
                 current: modelData.id === page.currentId
                 showReason: page.list.showReason || false
+                showAlbum: !(page.list.isAlbum || false)
                 locked: modelData.fee === 4 || (!page.vip && modelData.fee === 1)
+                menuContext: ({ playlistId: page.list.playlistId || 0 })
                 onActivated: index => page.activated(index)
             }
 

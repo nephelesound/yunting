@@ -6,7 +6,7 @@ import org.kde.kirigami as Kirigami
 Flow {
     id: facts
 
-    property var items: [] // [{ value, label }]，value 可省略
+    property var items: [] // [{ value, label, artistId }]，value、artistId 可省略
 
     spacing: Tokens.space4
 
@@ -23,11 +23,18 @@ Flow {
                 font.weight: Font.Medium
                 font.features: { "tnum": 1 }
             }
+            // 带 artistId 的事实（专辑页的歌手）可点：正文色 + 悬停下划线，进歌手页
             Label {
+                id: label
+                readonly property bool link: (fact.modelData.artistId || 0) > 0
                 visible: text.length > 0
                 text: fact.modelData.label || ""
                 font.pixelSize: Tokens.textBase
-                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                font.underline: label.link && linkHover.hovered
+                color: label.link ? Kirigami.Theme.textColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                Accessible.role: label.link ? Accessible.Link : Accessible.StaticText
+                HoverHandler { id: linkHover; enabled: label.link; cursorShape: Qt.PointingHandCursor }
+                TapHandler { enabled: label.link; onTapped: Actions.openArtist(fact.modelData.artistId) }
             }
         }
     }

@@ -67,26 +67,11 @@ ScreenFrame {
         height: page.rows * page.pitch
 
         // 第 0 行：枢轴，与页头枢轴同一种语言（淡出的可点）
-        Row {
-            height: page.pitch
-            spacing: Tokens.space6
-            Repeater {
-                model: [{ key: "lyrics", text: "歌词" }, { key: "comments", text: "评论" }]
-                delegate: Label {
-                    id: tab
-                    required property var modelData
-                    readonly property bool active: modelData.key === page.pane
-                    height: page.pitch
-                    verticalAlignment: Text.AlignVCenter
-                    text: modelData.text
-                    font.pixelSize: Tokens.text2xl
-                    font.weight: Font.Light
-                    opacity: active ? 1 : tabHover.hovered ? Tokens.fadedHover : Tokens.faded
-                    Behavior on opacity { NumberAnimation { duration: Tokens.motionFast } }
-                    HoverHandler { id: tabHover; enabled: !tab.active; cursorShape: Qt.PointingHandCursor }
-                    TapHandler { enabled: !tab.active; onTapped: page.pane = tab.modelData.key }
-                }
-            }
+        Pivot {
+            rowHeight: page.pitch
+            items: [{ key: "lyrics", text: "歌词" }, { key: "comments", text: "评论" }]
+            current: page.pane
+            onActivated: key => page.pane = key
         }
 
         // ── 歌词 ──

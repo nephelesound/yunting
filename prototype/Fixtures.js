@@ -9,11 +9,13 @@ var C1 = "http://p1.music.126.net/H2DFRdwP2y5SuCAn-Tuikw==/109951172568091306.jp
 var C2 = "https://p1.music.126.net/urByD_AmfBDBrs7fA9-O8A==/109951167976973225.jpg?param=300y300";
 var BROKEN = "https://p1.music.126.net/does-not-exist/0.jpg?param=120y120";
 
-// x：可选的新字段（alias 别名 / quality 音质 / reason 推荐理由 / mv）
+// x：可选的新字段（alias 别名 / quality 音质 / reason 推荐理由 / mv / artistId / albumId）。
+// 没有专辑名的曲目也没有专辑 id（曲目菜单里「专辑」项随之不可点）
 function t(id, name, artist, album, dur, fee, cover, x) {
     x = x || {};
     return { id: id, name: name, artist: artist, album: album, dur: dur, fee: fee, cover: cover,
-             alias: x.alias || "", quality: x.quality || "", reason: x.reason || "", mv: x.mv || 0 };
+             alias: x.alias || "", quality: x.quality || "", reason: x.reason || "", mv: x.mv || 0,
+             artistId: x.artistId !== undefined ? x.artistId : 1, albumId: x.albumId !== undefined ? x.albumId : (album ? 1 : 0) };
 }
 
 // 前几行各带一种失败，像真实数据那样混在一起
@@ -64,7 +66,30 @@ var worstSearch = {
         { id: 1, name: "【温柔女声】在深夜被治愈：适合一个人听的 100 首华语民谣与独立音乐", cover: C2, count: 12345, creator: "一只想要变成猫但是没有成功的柴犬Official" },
         { id: 2, name: "x", cover: "", count: 0, creator: "" },
     ],
-    albums: [],
+    albums: [
+        { id: 1, name: "2023 网易云音乐年度盛典 Live 合辑（Deluxe Edition / 含未公开彩排录音与幕后访谈）", artist: "群星", cover: C2, year: 2023 },
+        { id: 2, name: "1", artist: "", cover: "", year: 0 },
+        { id: 3, name: "🌙", artist: "🌙", cover: BROKEN, year: 1999 },
+    ],
+};
+
+// 歌手页：长名 + 长别名 + 长简介；单曲与专辑数到五位；专辑里混着缺封面、坏链接、没有年份的
+var worstArtist = {
+    id: 1, name: "Official髭男dism（ヒゲダン）Japanese Pop Band", cover: C2, alias: "官方髭男 / 胡子男 / Higedan",
+    description: "日本四人乐队，2012 年在岛根县组建。成员为藤原聪（主唱、键盘）、小笹大辅（吉他）、楢崎诚（贝斯、萨克斯）与松浦匡希（鼓）。代表作《Pretender》《I LOVE...》《Subtitle》，多次登上公信榜年度榜首。",
+    musicSize: 12345, albumSize: 1284, followed: false, tracks: worstTracks.slice(0, 50),
+    albums: [
+        { id: 1, name: "Traveler（初回限定盘 / 附 Blu-ray 演唱会实录与纪录片）", cover: C2, year: 2019, count: 14 },
+        { id: 2, name: "Editorial", cover: "", year: 2021, count: 0 },
+        { id: 3, name: "🌙", cover: BROKEN, year: 0, count: 1 },
+        { id: 4, name: "Rejoice", cover: C1, year: 2024, count: 12 },
+        { id: 5, name: "Subtitle", cover: C2, year: 2022, count: 2 },
+    ],
+};
+var worstAlbum = {
+    id: 1, name: "2023 网易云音乐年度盛典 Live 合辑（Deluxe Edition / 含未公开彩排录音与幕后访谈）", artist: "群星", artistId: 1,
+    cover: C2, description: "收录 2023 年度盛典全部现场演出。\n第二段说明录音与混音的出处、版权方，以及数字版与实体版的曲目差异，足够把三行占满还溢出。",
+    company: "网易云音乐（杭州）文化传媒有限公司", publishTime: 1700000000000, tracks: worstTracks.slice(0, 40),
 };
 
 var worst = {
@@ -81,6 +106,8 @@ var worst = {
         lyricsTrackId: 903,   // 原型的「正在播放」是热歌榜第 3 首
         lyrics: worstLyrics,
         comments: worstComments,
+        artist: worstArtist,
+        album: worstAlbum,
     },
     personal: {
         account: { name: "一只想要变成猫但是没有成功的柴犬Official", vip: false, avatar: "" },

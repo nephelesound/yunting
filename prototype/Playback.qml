@@ -60,6 +60,34 @@ QtObject {
     function next() { playback.step(1); }
     function previous() { playback.step(-1); }
 
+    // 下一首播放 / 加入队列：队列里已有这首就先挪走（不重复）；队列空着就直接开始放
+    function insert(track, at) {
+        if (playback.current === null) {
+            playback.play([track], 0);
+            return;
+        }
+        if (playback.current.id === track.id)
+            return;
+        const q = playback.queue.filter(t => t.id !== track.id);
+        const index = q.findIndex(t => t.id === playback.current.id);
+        q.splice(at === "next" ? index + 1 : q.length, 0, track);
+        playback.queue = q;
+        playback.index = index;
+    }
+    function playNext(track) { playback.insert(track, "next"); }
+    function enqueue(track) { playback.insert(track, "end"); }
+
+    // 拖动排序：把第 from 首挪到第 to 首的位置，正在播放的那首跟着它的新位置走
+    function move(from, to) {
+        if (from === to || from < 0 || to < 0 || from >= playback.queue.length || to >= playback.queue.length)
+            return;
+        const q = playback.queue.slice();
+        const playingId = playback.current ? playback.current.id : null;
+        q.splice(to, 0, q.splice(from, 1)[0]);
+        playback.queue = q;
+        playback.index = q.findIndex(t => t.id === playingId);
+    }
+
     function remove(i) {
         const q = playback.queue.slice();
         q.splice(i, 1);

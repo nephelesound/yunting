@@ -29,6 +29,20 @@ ScreenFrame {
     readonly property int songRows: Math.max(1, Math.floor((page.listHeight + Tokens.space2) / page.pitch))
     readonly property int hotRows: Math.ceil(Math.min(20, Source.hotSearches.length) / 2)
 
+    // 右栏：一类结果铺满可用的行列，不滚动
+    property string collection: "artists"
+    readonly property var collectionItems: page.result[page.collection] || []
+    readonly property int tileColumns: Math.max(1, Math.floor((page.half + Tokens.space2) / (Tokens.tileSm + Tokens.space2)))
+    readonly property int tileHeight: Tokens.tileSm + Tokens.space2 + Tokens.height12
+    readonly property int tileRows: Math.max(1, Math.floor((page.listHeight + Tokens.space4) / (page.tileHeight + Tokens.space4)))
+    function caption(item) {
+        if (page.collection === "artists")
+            return item.albums > 0 ? item.albums + " 张专辑" : "";
+        if (page.collection === "albums")
+            return item.artist || "";
+        return item.count > 0 ? item.count + " 首" : "";
+    }
+
     ColumnLayout {
         id: body
         anchors.fill: parent
@@ -138,44 +152,43 @@ ScreenFrame {
                 }
             }
 
-            // 右：歌手 + 歌单
+            // 右：歌手 / 专辑 / 歌单，一次看一类（枢轴与左列的分组标题同高同字号），磁贴铺满整栏
             ColumnLayout {
                 Layout.alignment: Qt.AlignTop
                 Layout.fillWidth: true
                 spacing: 0
 
-                GroupHeader { text: "歌手" }
-                Row {
+                Pivot {
+                    Layout.bottomMargin: Tokens.space3
+                    items: [{ key: "artists", text: "歌手" }, { key: "albums", text: "专辑" }, { key: "playlists", text: "歌单" }]
+                    current: page.collection
+                    onActivated: key => page.collection = key
+                }
+                Grid {
+                    id: collections
+                    columns: page.tileColumns
                     spacing: Tokens.space2
+                    rowSpacing: Tokens.space4
                     Repeater {
-                        model: page.result.artists.slice(0, Math.floor((page.half + Tokens.space2) / (Tokens.tileSm + Tokens.space2)))
+                        model: page.collectionItems.slice(0, page.tileColumns * page.tileRows)
                         delegate: MediaTile {
                             required property var modelData
                             width: Tokens.tileSm
                             title: modelData.name
-                            caption: modelData.albums > 0 ? modelData.albums + " 张专辑" : ""
+                            caption: page.caption(modelData)
                             cover: modelData.cover
-                            round: true
+                            round: page.collection === "artists"
+                            onClicked: page.collection === "artists" ? Actions.openArtist(modelData.id)
+                                     : page.collection === "albums" ? Actions.openAlbum(modelData.id)
+                                     : Actions.openPlaylist(modelData.id)
                         }
                     }
                 }
-
-                GroupHeader {
-                    Layout.topMargin: Tokens.space6
-                    text: "歌单"
-                }
-                Row {
-                    spacing: Tokens.space2
-                    Repeater {
-                        model: page.result.playlists.slice(0, Math.floor((page.half + Tokens.space2) / (Tokens.tileSm + Tokens.space2)))
-                        delegate: MediaTile {
-                            required property var modelData
-                            width: Tokens.tileSm
-                            title: modelData.name
-                            caption: modelData.count > 0 ? modelData.count + " 首" : ""
-                            cover: modelData.cover
-                        }
-                    }
+                Label {
+                    visible: page.collectionItems.length === 0
+                    text: page.collection === "artists" ? "没有找到相关歌手" : page.collection === "albums" ? "没有找到相关专辑" : "没有找到相关歌单"
+                    font.pixelSize: Tokens.textSm
+                    color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                 }
             }
         }

@@ -117,6 +117,33 @@ QtObject {
         return Number((bytes / 1073741824).toFixed(1)) + " GB";
     }
 
+    // ── 歌手 / 专辑：data 里只放最近取回的一个，id 对上才用；没对上就向 live 要，先给同形的空值 ──
+    function artist(id) {
+        const a = source.d.artist;
+        if (a && (a.id === id || !source.live))
+            return a;
+        source.need("artist:" + id);
+        return { id: id, name: "", cover: "", alias: "", description: "", musicSize: 0, albumSize: 0, tracks: [], albums: [] };
+    }
+    function album(id) {
+        const a = source.d.album;
+        if (a && (a.id === id || !source.live))
+            return a;
+        source.need("album:" + id);
+        return { id: id, name: "", artist: "", artistId: 0, cover: "", description: "", company: "", publishTime: 0, tracks: [] };
+    }
+
+    // ── 写操作：都交给 live（Store），结果经 Store 的信号回来；原型里不写任何地方 ──
+    // 「加到歌单」的候选：自己创建的歌单，去掉「我喜欢的音乐」（往里加就是点红心）
+    readonly property var addableLists: source.myPlaylists.filter(pl => pl.owned && pl.id !== (source.pe.liked.id || 0))
+    function addToPlaylist(playlistId, songId) { if (source.live) source.live.addSongToPlaylist(playlistId, songId); }
+    function removeFromPlaylist(playlistId, songId) { if (source.live) source.live.removeSongFromPlaylist(playlistId, songId); }
+    function createPlaylist(name) { if (source.live) source.live.createPlaylist(name, false); }
+    function renamePlaylist(id, name) { if (source.live) source.live.renamePlaylist(id, name); }
+    function deletePlaylist(id) { if (source.live) source.live.deletePlaylist(id); }
+    function setPlaylistSubscribed(id, subscribed) { if (source.live) source.live.setPlaylistSubscribed(id, subscribed); }
+    function logout() { if (source.live) source.live.logout(); }
+
     function lyrics(trackId) {
         if (trackId === source.d.lyricsTrackId)
             return source.d.lyrics;
@@ -214,16 +241,39 @@ QtObject {
             // 歌单：key = "playlist:<id>"，推荐歌单与「我的」歌单都可以。曲目先看卡片自带的（快照），
             // 再看按需取回的 playlistDetails；都没有就向 live 要一次
             if (key.startsWith("playlist:")) {
+                // 卡片可能来自推荐歌单、我的歌单或排行榜；都没有时用按需取回的详情（它自带名称与封面）
                 const id = Number(key.slice(9));
-                const card = source.playlists.concat(source.myPlaylists).find(pl => pl.id === id) || { id: id, name: "", cover: "", count: 0 };
                 const detail = (p.playlistDetails || {})[id] || {};
+                const card = source.playlists.concat(source.myPlaylists, source.toplists).find(pl => pl.id === id)
+                    || { id: id, name: detail.name || "", cover: detail.cover || "", count: detail.count || 0 };
                 const tracks = (card.tracks && card.tracks.length > 0) ? card.tracks : detail.tracks || [];
-                if (tracks.length === 0 && card.count > 0)
+                if (tracks.length === 0)
                     source.need(key);
+                const mine = source.myPlaylists.find(pl => pl.id === id);
+                const owned = mine !== undefined && mine.owned && id !== (p.liked.id || 0);
                 return { heading: card.name, cover: source.sized(card.cover, 560), tracks: tracks,
+                         ranked: source.toplists.some(t => t.id === id),
                          facts: card.count > 0 ? [source.songs(card.count)] : [],
                          description: card.description || detail.description || card.reason || "",
+                         // 歌单操作（左栏「更多」）：自己建的可改名/删除，别人的可收藏/取消收藏；
+                         // 自己建的歌单里，曲目菜单多一项「从歌单中移除」
+                         listId: id,
+                         owned: owned,
+                         subscribed: mine !== undefined && !mine.owned,
+                         playlistId: owned ? id : 0,
                          emptyText: source.live ? "正在取回曲目…" : "这个歌单的曲目还没取到" };
+            }
+            if (key.startsWith("album:")) {
+                const al = source.album(Number(key.slice(6)));
+                const year = al.publishTime > 0 ? new Date(al.publishTime).getFullYear() : 0;
+                const facts = [{ label: al.artist, artistId: al.artistId }];
+                if (year > 0)
+                    facts.push({ label: String(year) });
+                if (al.tracks.length > 0)
+                    facts.push(source.songs(al.tracks.length));
+                return { heading: al.name, cover: source.sized(al.cover, 560), tracks: al.tracks, facts: facts, isAlbum: true,
+                         description: al.description || (al.company ? "发行：" + al.company : ""),
+                         emptyText: source.live ? "正在取回曲目…" : "这张专辑的曲目还没取到" };
             }
             const pl = source.d.playlist;
             const facts = [{ label: "官方榜" }, source.songs(pl.count)];

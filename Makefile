@@ -59,7 +59,10 @@ SHOTS = home:page=home home-anon:account=anonymous,page=home charts:page=charts 
         offline:simulateOffline=true,page=home session-expired:account=anonymous,simulateExpired=true,page=home \
         mine:page=mine worst-mine:fixture=worst,page=mine empty-mine:fixture=empty,page=mine \
         search:page=search search-results:searchQuery=林俊杰,page=search worst-search:fixture=worst,searchQuery=x,page=search \
-        empty-search:fixture=empty,searchQuery=x,page=search
+        empty-search:fixture=empty,searchQuery=x,page=search \
+        worst-search-albums:fixture=worst,searchQuery=x,searchCollection=albums,page=search \
+        worst-artist:fixture=worst,listKey=artist:1,page=artist worst-artist-albums:fixture=worst,listKey=artist:1,artistPane=albums,page=artist \
+        worst-album:fixture=worst,listKey=album:1,page=list worst-trackmenu:fixture=worst,listKey=daily,page=list,startOverlay=trackmenu
 
 data: ## 重新抓取数据快照（有 gtk4 客户端登录 cookie 时同时生成个人快照）
 	scripts/snapshot.py

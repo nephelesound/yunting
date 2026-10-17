@@ -78,20 +78,52 @@ Kirigami.Page {
                 Layout.rightMargin: Tokens.space2
             }
 
-            // 头像：人物用圆形；图片没到或没有时，Avatar 自己显示名字首字
-            Components.Avatar {
-                visible: screen.loggedIn && !Source.sessionExpired
-                implicitWidth: Tokens.height7
-                implicitHeight: Tokens.height7
-                name: screen.loggedIn ? Source.account.name : ""
-                source: screen.loggedIn ? Source.sized(Source.account.avatar, 96) : ""
-                // 没有图片时用通用人像图标：中文名取首字母会显示成乱码
-                initialsMode: Components.Avatar.InitialsMode.UseIcon
-            }
-            Label {
-                text: Source.sessionExpired ? "登录已过期" : screen.loggedIn ? Source.account.name : "未登录"
-                font.pixelSize: Tokens.textSm
-                color: Source.sessionExpired ? Kirigami.Theme.neutralTextColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+            // 账号：头像 + 名字。登录时整块可点，打开账号菜单（退出登录）
+            AbstractButton {
+                id: account
+                readonly property bool active: screen.loggedIn && !Source.sessionExpired
+                Layout.rightMargin: account.active ? -Tokens.space2 : 0
+                enabled: account.active
+                hoverEnabled: true
+                implicitHeight: Tokens.height8
+                leftPadding: account.active ? Tokens.space1 : 0
+                rightPadding: account.active ? Tokens.space2 : 0
+                Accessible.name: "账号：" + accountName.text
+                onClicked: accountMenu.popup(account, 0, account.height)
+
+                background: Rectangle {
+                    radius: Tokens.radius
+                    color: Qt.alpha(Kirigami.Theme.highlightColor, account.down ? Tokens.tintPressed : account.hovered ? Tokens.tintHover : 0)
+                    border.width: account.visualFocus ? Tokens.lineStrong : 0
+                    border.color: Kirigami.Theme.highlightColor
+                }
+                contentItem: RowLayout {
+                    spacing: Tokens.space2
+                    // 头像：人物用圆形；没有图片时用通用人像图标（中文名取首字母会显示成乱码）
+                    Components.Avatar {
+                        visible: account.active
+                        implicitWidth: Tokens.height7
+                        implicitHeight: Tokens.height7
+                        name: screen.loggedIn ? Source.account.name : ""
+                        source: screen.loggedIn ? Source.sized(Source.account.avatar, 96) : ""
+                        initialsMode: Components.Avatar.InitialsMode.UseIcon
+                    }
+                    Label {
+                        id: accountName
+                        text: Source.sessionExpired ? "登录已过期" : screen.loggedIn ? Source.account.name : "未登录"
+                        font.pixelSize: Tokens.textSm
+                        color: Source.sessionExpired ? Kirigami.Theme.neutralTextColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                    }
+                }
+
+                Menu {
+                    id: accountMenu
+                    MenuItem {
+                        icon.name: "system-log-out"
+                        text: "退出登录…"
+                        onTriggered: Actions.logoutRequested()
+                    }
+                }
             }
             Button {
                 Layout.rightMargin: -Tokens.space2

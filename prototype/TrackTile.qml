@@ -21,8 +21,10 @@ AbstractButton {
     property bool removable  // 播放队列：悬停时显示「移出」
     readonly property bool liked: Source.isLiked(tile.modelData.id)   // 在红心歌单里：标题后一颗小红心
     property bool showReason // 每日推荐：右侧细节列优先显示推荐理由，没有理由再显示专辑
+    property bool showAlbum: true  // 专辑页里每行的专辑都相同：细节列留空（列仍占位，时长列对齐）
     readonly property string alias: tile.modelData.alias || ""
     property bool hangingMarker: true  // 左侧没有留白（紧挨别的元素）时关掉悬挂竖条
+    property var menuContext: ({})     // 交给曲目菜单：{ playlistId } 时多一项「从歌单中移除」
 
     signal activated(int index)
     signal removeRequested(int index)
@@ -32,6 +34,18 @@ AbstractButton {
     focusPolicy: Qt.StrongFocus
     onClicked: tile.activated(tile.index)
     Keys.onReturnPressed: tile.activated(tile.index)
+    // 曲目菜单：右键，或键盘的菜单键 / Shift+F10
+    Keys.onPressed: event => {
+        if (event.key === Qt.Key_Menu || (event.key === Qt.Key_F10 && (event.modifiers & Qt.ShiftModifier))) {
+            Actions.trackMenu(tile.modelData, tile.menuContext);
+            event.accepted = true;
+        }
+    }
+    TapHandler {
+        acceptedButtons: Qt.RightButton
+        onTapped: Actions.trackMenu(tile.modelData, tile.menuContext)
+    }
+    Accessible.name: tile.modelData.name + "，" + tile.modelData.artist
 
     background: Rectangle {
         radius: Tokens.radius
@@ -152,24 +166,26 @@ AbstractButton {
             // 细节列：每日推荐里「为什么推荐」比专辑名更有用；单曲的专辑名常与曲名相同，重复就留空
             //（列仍占位，保证时长列对齐）
             text: tile.showReason && tile.modelData.reason ? tile.modelData.reason
-                : tile.modelData.album === tile.modelData.name ? "" : tile.modelData.album
+                : !tile.showAlbum || tile.modelData.album === tile.modelData.name ? "" : tile.modelData.album
             font.pixelSize: Tokens.textSm
             color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             elide: Text.ElideRight
         }
 
-        // 时长列；可移除的行（播放队列）在悬停/聚焦时把时长换成「移出」按钮，列宽不变、行不跳动
+        // 时长列；悬停/聚焦时把时长换成行内动作，列宽不变、行不跳动：
+        // 播放队列里是「移出」，其余是「更多」（曲目菜单）
         Item {
+            id: endColumn
             Layout.rightMargin: Tokens.space3
             Layout.preferredWidth: Math.max(durationLabel.implicitWidth, Tokens.height8)
             Layout.fillHeight: true
-            readonly property bool showRemove: tile.removable && (tile.hovered || tile.visualFocus)
+            readonly property bool showAction: tile.hovered || tile.visualFocus
 
             Label {
                 id: durationLabel
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                visible: !parent.showRemove
+                visible: !endColumn.showAction
                 text: Format.duration(tile.modelData.dur)
                 font.pixelSize: Tokens.textSm
                 font.features: { "tnum": 1 }
@@ -179,10 +195,10 @@ AbstractButton {
                 anchors.right: parent.right
                 anchors.rightMargin: -Tokens.space2
                 anchors.verticalCenter: parent.verticalCenter
-                visible: parent.showRemove
-                icon.name: "list-remove-symbolic"
-                text: "移出队列"
-                onClicked: tile.removeRequested(tile.index)
+                visible: endColumn.showAction
+                icon.name: tile.removable ? "list-remove-symbolic" : "overflow-menu"
+                text: tile.removable ? "移出队列" : "更多"
+                onClicked: tile.removable ? tile.removeRequested(tile.index) : Actions.trackMenu(tile.modelData, tile.menuContext)
             }
         }
     }

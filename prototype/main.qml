@@ -7,6 +7,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Controls
 import org.kde.kirigami as Kirigami
 
 Kirigami.ApplicationWindow {
@@ -110,8 +111,11 @@ Kirigami.ApplicationWindow {
         }
     }
 
-    // 截图 harness 用：正在播放页右栏（lyrics | comments）、模拟离线 / 登录过期
+    // 截图 harness 用：正在播放页右栏（lyrics | comments）、搜索右栏（artists | albums | playlists）、
+    // 歌手页右栏（songs | albums）、模拟离线 / 登录过期
     property string nowPlayingPane: "lyrics"
+    property string searchCollection: "artists"
+    property string artistPane: "songs"
     property bool simulateOffline: false
     property bool simulateExpired: false
     onSimulateOfflineChanged: Source.simulateOffline = root.simulateOffline
@@ -156,8 +160,172 @@ Kirigami.ApplicationWindow {
         session: root.backend ? root.backend.session : simSession
     }
 
+    // ── 曲目菜单与歌单写操作 ──
+    TrackMenu {
+        id: trackMenu
+        player: playback
+        loggedIn: root.loggedIn
+        onLoginRequested: root.requestLogin()
+        onNewPlaylistRequested: track => playlistNameDialog.ask(0, "", track)
+        onAddRequested: (playlist, track) => {
+            root.noteOnSuccess(playlist.id, "已添加到「" + playlist.name + "」");
+            Source.addToPlaylist(playlist.id, track.id);
+        }
+        onRemoveRequested: (playlistId, track) => {
+            root.noteOnSuccess(playlistId, "已从歌单移除「" + track.name + "」");
+            Source.removeFromPlaylist(playlistId, track.id);
+        }
+        onCopied: root.showPassiveNotification("已复制歌曲链接")
+    }
+
+    // 歌单写操作成功时 Store 只发 playlistChanged(id)：发请求时按 id 记下要说的话，回来再说
+    property var successNotes: ({})
+    function noteOnSuccess(id, text) {
+        const notes = Object.assign({}, root.successNotes);
+        notes[id] = text;
+        root.successNotes = notes;
+    }
+
+    // 新建（id = 0，可带一首要加进去的歌）或重命名（id > 0）共用一个对话框
+    Kirigami.PromptDialog {
+        id: playlistNameDialog
+        property real playlistId
+        property var pendingTrack: null
+        function ask(id, name, track) {
+            playlistNameDialog.playlistId = id;
+            playlistNameDialog.pendingTrack = track;
+            nameField.text = name;
+            playlistNameDialog.open();
+            nameField.forceActiveFocus();
+            nameField.selectAll();
+        }
+        title: playlistNameDialog.playlistId > 0 ? "重命名歌单" : "新建歌单"
+        standardButtons: Kirigami.Dialog.NoButton
+        customFooterActions: [
+            Kirigami.Action {
+                text: playlistNameDialog.playlistId > 0 ? "重命名" : "创建"
+                icon.name: "dialog-ok"
+                enabled: nameField.text.trim().length > 0
+                onTriggered: playlistNameDialog.accept()
+            },
+            Kirigami.Action {
+                text: "取消"
+                icon.name: "dialog-cancel"
+                onTriggered: playlistNameDialog.reject()
+            }
+        ]
+        onAccepted: {
+            const name = nameField.text.trim();
+            if (playlistNameDialog.playlistId > 0) {
+                root.noteOnSuccess(playlistNameDialog.playlistId, "已重命名为「" + name + "」");
+                Source.renamePlaylist(playlistNameDialog.playlistId, name);
+            } else {
+                root.trackForNewPlaylist = playlistNameDialog.pendingTrack;
+                Source.createPlaylist(name);
+            }
+        }
+        TextField {
+            id: nameField
+            placeholderText: "歌单名称"
+            maximumLength: 40
+            onAccepted: if (nameField.text.trim().length > 0) playlistNameDialog.accept()
+        }
+    }
+
+    // 删除歌单不可撤销：明确说出删的是哪个，确认按钮用否定色
+    Kirigami.PromptDialog {
+        id: deleteDialog
+        property real playlistId
+        property string playlistName
+        function ask(id, name) {
+            deleteDialog.playlistId = id;
+            deleteDialog.playlistName = name;
+            deleteDialog.open();
+        }
+        title: "删除歌单"
+        subtitle: "删除「" + deleteDialog.playlistName + "」？歌单里的歌不会从网易云消失，但这个歌单无法恢复。"
+        standardButtons: Kirigami.Dialog.NoButton
+        customFooterActions: [
+            Kirigami.Action {
+                text: "删除"
+                icon.name: "edit-delete"
+                onTriggered: deleteDialog.accept()
+            },
+            Kirigami.Action {
+                text: "取消"
+                icon.name: "dialog-cancel"
+                onTriggered: deleteDialog.reject()
+            }
+        ]
+        onAccepted: {
+            root.noteOnSuccess(deleteDialog.playlistId, "已删除歌单「" + deleteDialog.playlistName + "」");
+            Source.deletePlaylist(deleteDialog.playlistId);
+            if (root.page === "list" && root.listKey === "playlist:" + deleteDialog.playlistId)
+                root.goBack();
+        }
+    }
+
+    // 退出登录要重新扫码：确认一次
+    Kirigami.PromptDialog {
+        id: logoutDialog
+        title: "退出登录"
+        subtitle: "退出后个人推荐、红心与歌单都会隐藏，下次需要重新扫码登录。"
+        standardButtons: Kirigami.Dialog.NoButton
+        customFooterActions: [
+            Kirigami.Action {
+                text: "退出登录"
+                icon.name: "system-log-out"
+                onTriggered: logoutDialog.accept()
+            },
+            Kirigami.Action {
+                text: "取消"
+                icon.name: "dialog-cancel"
+                onTriggered: logoutDialog.reject()
+            }
+        ]
+        onAccepted: {
+            Source.logout();
+            root.switchPivot("home");
+        }
+    }
+
+    // Store 的写操作结果：新建歌单后把待加的歌放进去；失败一律用被动通知说明原因
+    property var trackForNewPlaylist: null
+    Connections {
+        target: root.backend ? root.backend.store : null
+        ignoreUnknownSignals: true
+        function onPlaylistCreated(id, name) {
+            if (root.trackForNewPlaylist) {
+                root.noteOnSuccess(id, "已创建歌单「" + name + "」，并加入「" + root.trackForNewPlaylist.name + "」");
+                Source.addToPlaylist(id, root.trackForNewPlaylist.id);
+                root.trackForNewPlaylist = null;
+            } else {
+                root.showPassiveNotification("已创建歌单「" + name + "」");
+            }
+        }
+        function onPlaylistChanged(id) {
+            const text = root.successNotes[id];
+            if (!text)
+                return;
+            const notes = Object.assign({}, root.successNotes);
+            delete notes[id];
+            root.successNotes = notes;
+            root.showPassiveNotification(text);
+        }
+        function onPlaylistActionFailed(action, message) {
+            root.trackForNewPlaylist = null;
+            root.successNotes = {};
+            root.showPassiveNotification(message);
+        }
+    }
+
     function openOverlay() {
-        if (root.startOverlay === "queue")
+        if (root.startOverlay === "trackmenu") {
+            // 截图：在列表第一行右侧打开曲目菜单（与点行尾「更多」的位置相同）
+            trackMenu.track = root.openList.tracks[0];
+            trackMenu.context = {};
+            trackMenu.popup(root.width - Tokens.pageMargin - trackMenu.implicitWidth, Tokens.height12 * 3);
+        } else if (root.startOverlay === "queue")
             queuePanel.open();
         else if (root.startOverlay === "login") {
             loginDialog.open();
@@ -170,7 +338,24 @@ Kirigami.ApplicationWindow {
     readonly property var pageNames: ({ home: "推荐", mine: "我的", search: "搜索", charts: "排行榜" })
     readonly property string parentName: {
         const prev = root.history.length > 0 ? root.history[root.history.length - 1] : { page: "home" };
-        return prev.page === "list" ? Source.list(prev.listKey).heading : root.pageNames[prev.page] || "推荐";
+        if (prev.page === "list")
+            return Source.list(prev.listKey).heading;
+        if (prev.page === "artist")
+            return Source.artist(Number(prev.listKey.slice(7))).name;
+        return root.pageNames[prev.page] || "推荐";
+    }
+
+    // 深处组件经 Actions 发来的导航请求：歌手页、专辑页（列表页的一种）、任意歌单（含榜单）
+    Connections {
+        target: Actions
+        function onArtistRequested(id) { root.open("artist", "artist:" + id); }
+        function onAlbumRequested(id) { root.open("list", "album:" + id); }
+        function onPlaylistRequested(id) {
+            // 热歌榜在快照里有现成曲目，用它；其余歌单按 id 取
+            root.open("list", id === Source.d.playlist.id ? "hot" : "playlist:" + id);
+        }
+        function onTrackMenuRequested(track, context) { trackMenu.show(track, context); }
+        function onLogoutRequested() { logoutDialog.open(); }
     }
 
     function open(page, listKey) {
@@ -228,7 +413,7 @@ Kirigami.ApplicationWindow {
     // 「我的」未登录时是登录引导；搜索词由 harness 的 searchQuery 预填（空 = 热门搜索）
     property string searchQuery: ""
     readonly property var pages: ({ home: homePage, mine: root.loggedIn ? minePage : placeholderPage, search: searchPage,
-                                    charts: chartsPage, list: listPage, nowplaying: nowPlayingPage })
+                                    charts: chartsPage, list: listPage, artist: artistPage, nowplaying: nowPlayingPage })
     onPageChanged: {
         pageStack.clear();
         pageStack.push(root.pages[root.page]);
@@ -296,7 +481,7 @@ Kirigami.ApplicationWindow {
             currentId: root.currentTrack ? root.currentTrack.id : 0
             onLeaveRequested: root.goBack()
             onLoginRequested: root.requestLogin()
-            onToplistOpened: index => root.open("list", "hot")
+            onToplistOpened: index => Actions.openPlaylist(Source.toplists[index].id)
             onTrackActivated: index => root.play(Source.hotChart.tracks, index)
         }
     }
@@ -312,6 +497,30 @@ Kirigami.ApplicationWindow {
             onActivated: index => root.play(root.openList.tracks, index)
             onPlayAllRequested: root.play(root.openList.tracks, 0)
             onShuffleRequested: root.play(root.openList.tracks, Math.floor(Math.random() * root.openList.tracks.length))
+            onLeaveRequested: root.goBack()
+            onLoginRequested: root.requestLogin()
+            onRenameRequested: (id, name) => playlistNameDialog.ask(id, name, null)
+            onDeleteRequested: (id, name) => deleteDialog.ask(id, name)
+            onSubscribeToggled: (id, name, subscribed) => {
+                root.noteOnSuccess(id, (subscribed ? "已收藏「" : "已取消收藏「") + name + "」");
+                Source.setPlaylistSubscribed(id, subscribed);
+            }
+        }
+    }
+
+    Component {
+        id: artistPage
+        ArtistPage {
+            id: artistView
+            artistId: Number(root.listKey.slice(7))
+            pane: root.artistPane
+            loggedIn: root.loggedIn
+            vip: root.vip
+            parentText: root.parentName
+            currentId: root.currentTrack ? root.currentTrack.id : 0
+            onActivated: index => root.play(artistView.artist.tracks, index)
+            onPlayAllRequested: root.play(artistView.artist.tracks, 0)
+            onShuffleRequested: root.play(artistView.artist.tracks, Math.floor(Math.random() * artistView.artist.tracks.length))
             onLeaveRequested: root.goBack()
             onLoginRequested: root.requestLogin()
         }
@@ -350,6 +559,7 @@ Kirigami.ApplicationWindow {
             pivots: root.pivots
             loggedIn: root.loggedIn
             query: root.searchQuery
+            collection: root.searchCollection
             currentId: root.currentTrack ? root.currentTrack.id : 0
             onPivotActivated: key => root.switchPivot(key)
             onLoginRequested: root.requestLogin()
