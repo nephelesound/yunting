@@ -56,6 +56,14 @@ Kirigami.ApplicationWindow {
         target: playback.engine
         function onFailed(reason) { root.showPassiveNotification(reason); }
     }
+    // 红心是乐观更新：失败时 Store 已经改回，这里只说明原因
+    Connections {
+        target: root.backend ? root.backend.store : null
+        ignoreUnknownSignals: true
+        function onLikeFailed(songId, liked, message) {
+            root.showPassiveNotification((liked ? "没能加上红心：" : "没能取消红心：") + message);
+        }
+    }
     // 媒体键 / 锁屏 / Plasma 媒体控件 / 托盘菜单的上一首、下一首：同样走 Playback，切歌规则只有一份
     Connections {
         target: root.backend ? root.backend.mpris : null
@@ -257,8 +265,13 @@ Kirigami.ApplicationWindow {
         onPreviousRequested: playback.previous()
         onModeRequested: m => playback.mode = m
         onSeekRequested: seconds => playback.engine.seek(seconds)
-        // 红心的写操作（weapi 加密接口）还没接：先如实告知，不做会骗人的本地假状态
-        onLikeToggled: root.showPassiveNotification("红心与取消红心即将支持，目前显示的是你在网易云里的红心状态")
+        onLikeToggled: {
+            if (!root.loggedIn) {
+                root.showPassiveNotification("红心会同步到你的网易云账号，登录后可用", "long", "扫码登录", () => root.requestLogin());
+                return;
+            }
+            Source.setLiked(root.currentTrack.id, !Source.isLiked(root.currentTrack.id));
+        }
         onNowPlayingToggled: root.toggleNowPlaying()
         onQueueRequested: queuePanel.drawerOpen ? queuePanel.close() : queuePanel.open()
     }

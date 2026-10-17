@@ -57,13 +57,27 @@ QtObject {
     })
 
     // ── 红心：id → true 的查找表（一千多首，逐行查要 O(1)）──
+    // live：Store 先改 likedIds（乐观），失败时改回并发 likeFailed。
+    // 原型：点红心只改这份内存里的覆盖，不写任何地方
+    property var likedOverride: ({})
     readonly property var likedSet: {
         const set = {};
         for (const id of (source.p.likedIds || []))
             set[id] = true;
+        for (const id in source.likedOverride)
+            set[id] = source.likedOverride[id];
         return set;
     }
     function isLiked(id) { return source.likedSet[id] === true; }
+    function setLiked(id, liked) {
+        if (source.live) {
+            source.live.setLiked(id, liked);
+            return;
+        }
+        const o = Object.assign({}, source.likedOverride);
+        o[id] = liked;
+        source.likedOverride = o;
+    }
 
     // ── 热门评论：只有 live 按需取；快照里带的是歌词那首的 ──
     function comments(songId) {
