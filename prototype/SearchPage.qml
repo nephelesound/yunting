@@ -13,6 +13,8 @@ ScreenFrame {
     id: page
 
     property string query
+    onQueryChanged: Source.search(page.query)
+    Component.onCompleted: Source.search(page.query)
     property int currentId
 
     signal trackActivated(int index)

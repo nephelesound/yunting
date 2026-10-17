@@ -1,7 +1,9 @@
 // 数据模块：页面只问「要什么」（某个列表、首页入口、某首歌的歌词），不碰快照的原始形状。
 // 缺数据时怎么退化（没有封面、空列表、没有种子歌）也只在这里决定，页面拿到的永远是可直接渲染的值。
-// 数据来源：fixture 为空 = 真实快照（Data.js 匿名 + Personal.js 个人）；worst | empty | one = Fixtures.js 压力数据。
-// 以后接 C++ 后端时，替换的就是这一个模块。
+// 原始数据有三个来源，形状完全相同（data / personal 两个对象，字段见 DESIGN.md「后端接口」）：
+//   live 非空      = C++ Store（应用里注入，实时接口，按需加载）
+//   fixture 非空   = Fixtures.js 压力数据（worst | empty | one）
+//   都没有         = 快照（Data.js 匿名 + Personal.js 个人）
 pragma Singleton
 
 import QtQuick
@@ -13,9 +15,20 @@ QtObject {
     id: source
 
     property string fixture: ""
+    property var live: null         // C++ Store（鸭子类型）
 
-    readonly property var d: source.fixture === "" ? Data : Fixtures[source.fixture].data
-    readonly property var p: source.fixture === "" ? Personal : Fixtures[source.fixture].personal
+    readonly property var d: source.live ? source.live.data : source.fixture === "" ? Data : Fixtures[source.fixture].data
+    readonly property var p: source.live ? source.live.personal : source.fixture === "" ? Personal : Fixtures[source.fixture].personal
+
+    // 按需加载：只有 live 来源需要（快照与压力数据是一次给全的）。key 见 DESIGN.md，Store 自己去重
+    function need(key) {
+        if (source.live)
+            Qt.callLater(() => source.live.request(key));
+    }
+    function search(query) {
+        if (query.length > 0)
+            source.need("search:" + query);
+    }
 
     // ── 账号 ──
     readonly property var account: source.p.account   // null = 没有登录快照
@@ -47,7 +60,10 @@ QtObject {
     }
 
     function lyrics(trackId) {
-        return trackId === source.d.lyricsTrackId ? source.d.lyrics : [];
+        if (trackId === source.d.lyricsTrackId)
+            return source.d.lyrics;
+        source.need("lyrics:" + trackId);
+        return [];
     }
 
     // 封面 URL 换成需要的尺寸；没有封面就是空串，交给 Cover 显示占位
@@ -136,11 +152,19 @@ QtObject {
             description: "", emptyText: "云盘里还没有歌，可以在官方客户端上传" };
         default: {
             // 推荐歌单：key = "playlist:<序号>"，快照只带了前几个的曲目
+            // 歌单：key = "playlist:<id>"，推荐歌单与「我的」歌单都可以。曲目先看卡片自带的（快照），
+            // 再看按需取回的 playlistDetails；都没有就向 live 要一次
             if (key.startsWith("playlist:")) {
-                const card = source.playlists[Number(key.slice(9))] || { name: "", cover: "", tracks: [], count: 0 };
-                return { heading: card.name, cover: source.sized(card.cover, 560), tracks: card.tracks || [],
-                         facts: card.count > 0 ? [source.songs(card.count)] : [], description: card.description || card.reason || "",
-                         emptyText: "这个歌单的曲目还没取到" };
+                const id = Number(key.slice(9));
+                const card = source.playlists.concat(source.myPlaylists).find(pl => pl.id === id) || { id: id, name: "", cover: "", count: 0 };
+                const detail = (p.playlistDetails || {})[id] || {};
+                const tracks = (card.tracks && card.tracks.length > 0) ? card.tracks : detail.tracks || [];
+                if (tracks.length === 0 && card.count > 0)
+                    source.need(key);
+                return { heading: card.name, cover: source.sized(card.cover, 560), tracks: tracks,
+                         facts: card.count > 0 ? [source.songs(card.count)] : [],
+                         description: card.description || detail.description || card.reason || "",
+                         emptyText: source.live ? "正在取回曲目…" : "这个歌单的曲目还没取到" };
             }
             const pl = source.d.playlist;
             const facts = [{ label: "官方榜" }, source.songs(pl.count)];

@@ -16,7 +16,10 @@ MinePage MinePage.qml
 NowPlayingPage NowPlayingPage.qml
 PageTitle PageTitle.qml
 PlayerBar PlayerBar.qml
+Playback Playback.qml
 PlaylistPage PlaylistPage.qml
 ScreenFrame ScreenFrame.qml
 SearchPage SearchPage.qml
+SimEngine SimEngine.qml
+SimSession SimSession.qml
 TrackTile TrackTile.qml

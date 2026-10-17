@@ -1,7 +1,9 @@
 // 设计语言参照 Rune（Zune/Metro 一脉）：展示字做导航，扁平磁贴，极简播放条。
 // 当前阶段只做「底板」：版面、令牌、对齐、密度。整窗一块底色，页面与播放条都没有自己的面，
 // 内部不画分隔线；装饰（封面取色、滚动边缘渐隐、悬停动效）留到版面定稿之后。
-// 数据：所有组件经 Source.qml 单例读快照（fixture 可换 Fixtures.js 压力数据）。
+// 三条接缝（见 DESIGN.md「后端接口」），每条都有原型实现与 C++ 实现：
+//   数据 Source.live ← backend.store；声音 Playback.engine ← backend.audio；登录 LoginDialog.session ← backend.session。
+// backend 只由 C++ 应用注入；用 qml 工具或截图 harness 直接打开时为 null，走原型实现。
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -25,72 +27,52 @@ Kirigami.ApplicationWindow {
     property string fixture: ""           // worst | empty | one：Fixtures.js 压力测试数据（截图用，必须在 page 之前设置）
     onFixtureChanged: root.applyFixture()
 
+    property var backend: null      // { store, audio, session }，C++ 应用注入
+
     readonly property bool loggedIn: root.account !== "anonymous" && Source.account !== null
     readonly property bool vip: root.loggedIn && Source.account.vip
     readonly property var pivots: [{ key: "home", text: "推荐" }, { key: "mine", text: "我的" }, { key: "search", text: "搜索" }]
 
     readonly property var openList: Source.list(root.listKey)
 
-    // ── 播放状态（原型内模拟，之后由 Player 后端驱动）。队列为空时 currentTrack 为 null ──
-    property var queue: []
-    property int trackIndex: -1
-    property bool playing: true
-    property real positionSec: 83
-    property bool liked: false
+    // ── 播放：队列与规则在 Playback，声音在 engine。队列为空时 currentTrack 为 null ──
+    SimEngine { id: simEngine }
+    SimSession { id: simSession }
 
-    readonly property var currentTrack: root.trackIndex >= 0 && root.trackIndex < root.queue.length ? root.queue[root.trackIndex] : null
-
-    // 换数据源后，原型的「正在播放」从热歌榜第 3 首开始（数据不够就取最后一首）
-    function applyFixture() {
-        Source.fixture = root.fixture;
-        root.queue = Source.hotChart.tracks;
-        root.trackIndex = Math.min(2, root.queue.length - 1);
-    }
-
-    Timer {
-        interval: 1000
-        repeat: true
-        running: root.playing
-        onTriggered: root.positionSec = Math.min(root.positionSec + 1, root.currentTrack ? root.currentTrack.dur : 0)
-    }
-
-    // 付费专辑（fee=4）要单独购买，VIP 也不能播；VIP 曲（fee=1）要会员
-    function canPlay(track) {
-        return track.fee !== 4 && (root.vip || track.fee !== 1);
-    }
-    function play(tracks, i) {
-        if (i < 0 || i >= tracks.length)
-            return;
-        const track = tracks[i];
-        if (track.fee === 4) {
-            root.showPassiveNotification("「" + track.name + "」所在专辑需要单独购买");
-            return;
-        }
-        if (!root.canPlay(track)) {
-            if (root.loggedIn)
+    Playback {
+        id: playback
+        engine: root.backend ? root.backend.audio : simEngine
+        vip: root.vip
+        onBlocked: (track, reason) => {
+            if (reason === "paid")
+                root.showPassiveNotification("「" + track.name + "」所在专辑需要单独购买");
+            else if (root.loggedIn)
                 root.showPassiveNotification("「" + track.name + "」是 VIP 曲目，开通会员后可播放");
             else
                 root.showPassiveNotification("「" + track.name + "」是 VIP 曲目，登录后可播放", "long", "扫码登录", () => root.requestLogin());
-            return;
         }
-        root.queue = tracks;
-        root.trackIndex = i;
-        root.positionSec = 0;
-        root.playing = true;
     }
-    function step(delta) {
-        if (root.queue.length === 0)
+    Connections {
+        target: playback.engine
+        function onFailed(reason) { root.showPassiveNotification(reason); }
+    }
+
+    readonly property var currentTrack: playback.current
+    property bool liked: false
+
+    // 换数据源。原型（没有 backend）的「正在播放」从热歌榜第 3 首开始、停在 1:23，截图才有内容可看
+    function applyFixture() {
+        Source.live = root.backend ? root.backend.store : null;
+        Source.fixture = root.fixture;
+        if (root.backend)
             return;
-        let i = root.trackIndex;
-        do {
-            i = (i + delta + root.queue.length) % root.queue.length;
-        } while (!root.canPlay(root.queue[i]) && i !== root.trackIndex);
-        root.play(root.queue, i);
+        playback.restore(Source.hotChart.tracks, 2);
+        simEngine.position = Math.min(83, simEngine.duration);
+        simEngine.playing = true;
     }
-    function requestLogin() {
-        loginDialog.state = "waiting";
-        loginDialog.open();
-    }
+
+    function play(tracks, i) { playback.play(tracks, i); }
+    function requestLogin() { loginDialog.open(); }
 
     // ── 浮层：播放队列（右侧抽屉）与扫码登录（对话框）──
     // 截图 harness 可用 startOverlay = queue | login，以及 loginState = waiting | scanned | expired
@@ -101,29 +83,25 @@ Kirigami.ApplicationWindow {
 
     QueuePanel {
         id: queuePanel
-        queue: root.queue
-        currentIndex: root.trackIndex
+        queue: playback.queue
+        currentIndex: playback.index
         vip: root.vip
-        onActivated: index => root.play(root.queue, index)
-        onRemoveRequested: index => {
-            const q = root.queue.slice();
-            q.splice(index, 1);
-            root.queue = q;
-        }
-        onClearRequested: root.queue = root.queue.slice(0, root.trackIndex + 1)
+        onActivated: index => playback.play(playback.queue, index)
+        onRemoveRequested: index => playback.remove(index)
+        onClearRequested: playback.clearUpcoming()
     }
 
     LoginDialog {
         id: loginDialog
-        onRefreshRequested: loginDialog.state = "waiting"
+        session: root.backend ? root.backend.session : simSession
     }
 
     function openOverlay() {
         if (root.startOverlay === "queue")
             queuePanel.open();
         else if (root.startOverlay === "login") {
-            loginDialog.state = root.loginState;
             loginDialog.open();
+            simSession.state = root.loginState;
         }
     }
 
@@ -165,7 +143,7 @@ Kirigami.ApplicationWindow {
         else if (key === "fm") {
             if (Source.fmTracks.length === 0)
                 return;
-            root.play(Source.fmTracks, 0);
+            playback.play(Source.fmTracks, 0);
             root.open("nowplaying");
         } else if (!root.loggedIn && key !== "similar")
             root.requestLogin();
@@ -174,11 +152,11 @@ Kirigami.ApplicationWindow {
     }
 
     // ── 键盘与鼠标侧键：每个常用动作都不必离开键盘 ──
-    Shortcut { sequence: "Space"; onActivated: root.playing = !root.playing }
-    Shortcut { sequence: "Left"; onActivated: root.positionSec = Math.max(0, root.positionSec - 5) }
-    Shortcut { sequence: "Right"; onActivated: root.positionSec = Math.min(root.currentTrack ? root.currentTrack.dur : 0, root.positionSec + 5) }
-    Shortcut { sequence: "Ctrl+Left"; onActivated: root.step(-1) }
-    Shortcut { sequence: "Ctrl+Right"; onActivated: root.step(1) }
+    Shortcut { sequence: "Space"; onActivated: playback.engine.toggle() }
+    Shortcut { sequence: "Left"; onActivated: playback.engine.seek(playback.engine.position - 5) }
+    Shortcut { sequence: "Right"; onActivated: playback.engine.seek(playback.engine.position + 5) }
+    Shortcut { sequence: "Ctrl+Left"; onActivated: playback.previous() }
+    Shortcut { sequence: "Ctrl+Right"; onActivated: playback.next() }
     Shortcut { sequence: StandardKey.Find; onActivated: root.switchPivot("search") }
     Shortcut { sequences: ["Esc", StandardKey.Back]; onActivated: root.goBack() }
     Shortcut { sequence: "Ctrl+L"; onActivated: root.toggleNowPlaying() }
@@ -210,14 +188,16 @@ Kirigami.ApplicationWindow {
 
     footer: PlayerBar {
         track: root.currentTrack
-        playing: root.playing
-        elapsed: root.positionSec
+        playing: playback.engine.playing
+        elapsed: playback.engine.position
+        mode: playback.mode
         liked: root.liked
         nowPlayingShown: root.page === "nowplaying"
-        onPlayPauseRequested: root.playing = !root.playing
-        onNextRequested: root.step(1)
-        onPreviousRequested: root.step(-1)
-        onSeekRequested: seconds => root.positionSec = seconds
+        onPlayPauseRequested: playback.engine.toggle()
+        onNextRequested: playback.next()
+        onPreviousRequested: playback.previous()
+        onModeRequested: m => playback.mode = m
+        onSeekRequested: seconds => playback.engine.seek(seconds)
         onLikeToggled: root.liked = !root.liked
         onNowPlayingToggled: root.toggleNowPlaying()
         onQueueRequested: queuePanel.drawerOpen ? queuePanel.close() : queuePanel.open()
@@ -231,7 +211,7 @@ Kirigami.ApplicationWindow {
             onPivotActivated: key => root.switchPivot(key)
             onLoginRequested: root.requestLogin()
             onEntryOpened: key => root.openEntry(key)
-            onPlaylistOpened: index => root.open("list", "playlist:" + index)
+            onPlaylistOpened: index => root.open("list", "playlist:" + Source.playlists[index].id)
         }
     }
 
@@ -268,7 +248,7 @@ Kirigami.ApplicationWindow {
         id: nowPlayingPage
         NowPlayingPage {
             track: root.currentTrack
-            elapsed: root.positionSec
+            elapsed: playback.engine.position
             loggedIn: root.loggedIn
             parentText: root.parentName
             onLeaveRequested: root.goBack()
@@ -285,7 +265,7 @@ Kirigami.ApplicationWindow {
             onPivotActivated: key => root.switchPivot(key)
             onLoginRequested: root.requestLogin()
             onEntryOpened: key => root.open("list", key)
-            onPlaylistOpened: index => root.showPassiveNotification("歌单详情：待接 NcmClient.playlist()")
+            onPlaylistOpened: index => root.open("list", "playlist:" + Source.myPlaylists[index].id)
             onRecentActivated: index => root.play(Source.recent.tracks, index)
         }
     }

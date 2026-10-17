@@ -34,6 +34,7 @@ Item {
     signal likeToggled()
     signal nowPlayingToggled()
     signal queueRequested()
+    signal modeRequested(int mode)
 
     // 没有曲目或时长未知时进度为 0、不能拖动，传输控件整体禁用
     readonly property real duration: bar.track ? bar.track.dur : 0
@@ -136,7 +137,7 @@ Item {
             IconButton {
                 icon.name: bar.modes[bar.mode].icon
                 text: bar.modes[bar.mode].text
-                onClicked: bar.mode = (bar.mode + 1) % bar.modes.length
+                onClicked: bar.modeRequested((bar.mode + 1) % bar.modes.length)
             }
             IconButton { icon.name: "media-skip-backward"; text: "上一首"; onClicked: bar.previousRequested() }
             RoundButton {

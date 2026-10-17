@@ -1,7 +1,7 @@
-// 扫码登录：Kirigami 原生对话框（浮层，自带遮罩与投影）。一次性动作，只有三个状态：
-//   waiting 等待扫码 · scanned 已扫码、等手机确认 · expired 二维码过期、可刷新。
-// 二维码用 KDE 自带的 org.kde.prison 生成；内容是 /api/login/qrcode/unikey 换来的登录链接（原型里是示例 key）。
-// 取消永远可用；登录成功由调用方关闭对话框并提示。
+// 扫码登录：Kirigami 原生对话框（浮层，自带遮罩与投影）。一次性动作，状态全部来自 session：
+//   waiting 等待扫码 · scanned 已扫码、等手机确认 · expired 二维码过期、可刷新 · done 登录成功（对话框自己关闭）。
+// session 是 SimSession（原型）或 C++ Session（应用），接口相同。二维码用 KDE 自带的 org.kde.prison 生成。
+// 打开时开始轮询，取消或关闭时停止；取消永远可用。
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -11,13 +11,12 @@ import org.kde.prison as Prison
 Kirigami.Dialog {
     id: dialog
 
-    property string state: "waiting"   // waiting | scanned | expired
-    property string unikey: "8f3c1e2a-prototype-unikey"
+    required property var session   // 鸭子类型：SimSession 或 C++ Session
 
-    signal refreshRequested()
+    readonly property string state: dialog.session.state
 
     title: "扫码登录"
-    // 不用 standardButtons：原型没加载 Qt 翻译，标准按钮会显示英文 Cancel
+    // 不用 standardButtons：没加载 Qt 翻译时标准按钮会显示英文 Cancel
     standardButtons: Kirigami.Dialog.NoButton
     customFooterActions: [
         Kirigami.Action {
@@ -28,6 +27,10 @@ Kirigami.Dialog {
     ]
     padding: Tokens.space6
     preferredWidth: Tokens.measureMax
+
+    onOpened: if (dialog.state === "idle" || dialog.state === "done") dialog.session.start()
+    onClosed: if (dialog.state !== "done") dialog.session.cancel()
+    onStateChanged: if (dialog.state === "done") dialog.close()
 
     ColumnLayout {
         spacing: Tokens.space4
@@ -46,16 +49,22 @@ Kirigami.Dialog {
             Prison.Barcode {
                 anchors.fill: parent
                 anchors.margins: Tokens.space6
+                visible: dialog.session.qrContent.length > 0
                 barcodeType: Prison.Barcode.QRCode
-                content: "https://music.163.com/login?codekey=" + dialog.unikey
+                content: dialog.session.qrContent
                 opacity: dialog.state === "expired" ? Tokens.faded : 1
+            }
+            BusyIndicator {
+                anchors.centerIn: parent
+                visible: dialog.session.qrContent.length === 0 && dialog.state !== "expired"
+                running: visible
             }
             Button {
                 anchors.centerIn: parent
                 visible: dialog.state === "expired"
                 icon.name: "view-refresh-symbolic"
                 text: "刷新二维码"
-                onClicked: dialog.refreshRequested()
+                onClicked: dialog.session.start()
             }
         }
 
