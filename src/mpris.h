@@ -19,6 +19,7 @@ public:
 signals:
     void nextRequested();
     void previousRequested();
+    void raiseRequested();   // Plasma 媒体弹窗里点了曲目：把主窗口拿到前面
 
 private:
     MprisBaseAdaptor *m_base;

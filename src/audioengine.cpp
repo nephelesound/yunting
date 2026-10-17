@@ -118,10 +118,12 @@ void AudioEngine::seek(double seconds)
 {
     const double d = duration();
     const qint64 ms = qint64(std::max(0.0, std::min(d > 0 ? d : seconds, seconds)) * 1000);
-    if (m_player->source().isValid())
+    if (m_player->source().isValid()) {
         m_player->setPosition(ms);
-    else
+        emit seeked();
+    } else {
         m_pendingSeek = ms; // 地址未落地，开播前应用
+    }
 }
 
 // 播放地址有时效（接口给 expi 秒数，通常 20 分钟）：时效内重播、切回同一首都直接用缓存
@@ -160,6 +162,7 @@ void AudioEngine::startSource(const QString &url)
     if (m_pendingSeek >= 0) {
         m_player->setPosition(m_pendingSeek);
         m_pendingSeek = -1;
+        emit seeked();
     }
     if (m_playing)
         m_player->play();

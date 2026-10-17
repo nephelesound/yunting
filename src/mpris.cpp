@@ -5,13 +5,14 @@
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDBusObjectPath>
+#include <QRegularExpression>
 
 // ── org.mpris.MediaPlayer2 ──
 class MprisBaseAdaptor : public QDBusAbstractAdaptor {
     Q_OBJECT
     Q_CLASSINFO("D-Bus Interface", "org.mpris.MediaPlayer2")
 public:
-    explicit MprisBaseAdaptor(Mpris *mpris) : QDBusAbstractAdaptor(mpris) {}
+    explicit MprisBaseAdaptor(Mpris *mpris) : QDBusAbstractAdaptor(mpris), m_mpris(mpris) {}
 
     Q_PROPERTY(bool CanQuit READ CanQuit CONSTANT)
     Q_PROPERTY(bool CanSetFullscreen READ CanSetFullscreen CONSTANT)
@@ -24,16 +25,20 @@ public:
 
     bool CanQuit() const { return false; }
     bool CanSetFullscreen() const { return false; }
-    bool CanRaise() const { return false; }
+    // Plasma 媒体弹窗里点曲目会调 Raise：窗口在 QML 手里，这里只发信号
+    bool CanRaise() const { return true; }
     bool HasTrackList() const { return false; }
-    QString Identity() const { return QStringLiteral("NCM Player"); }
+    QString Identity() const { return QStringLiteral("云听"); }
     QString DesktopEntry() const { return QStringLiteral("ncm-player"); }
     QStringList SupportedUriSchemes() const { return {}; }
     QStringList SupportedMimeTypes() const { return {}; }
 
 public slots:
     void Quit() {}
-    void Raise() {}
+    void Raise() { emit m_mpris->raiseRequested(); }
+
+private:
+    Mpris *m_mpris;
 };
 
 // ── org.mpris.MediaPlayer2.Player ──
@@ -95,8 +100,12 @@ public:
                  QVariant::fromValue(QDBusObjectPath(QStringLiteral("/org/ncmplayer/track/%1")
                                                         .arg(t.value("id").toLongLong())))},
                 {QStringLiteral("mpris:length"), qlonglong(t.value("dur").toDouble()) * 1000000ll},
+                // 封面：Plasma 媒体弹窗、锁屏都用它；换成 512 的尺寸参数
+                {QStringLiteral("mpris:artUrl"), t.value("cover").toString().replace(
+                     QRegularExpression(QStringLiteral("\\?param=\\d+y\\d+$")), QStringLiteral("?param=512y512"))},
                 {QStringLiteral("xesam:title"), t.value("name").toString()},
-                {QStringLiteral("xesam:artist"), QStringList{t.value("artist").toString()}},
+                // 多位歌手在曲目里是「A / B」，MPRIS 要列表
+                {QStringLiteral("xesam:artist"), t.value("artist").toString().split(QStringLiteral(" / "))},
                 {QStringLiteral("xesam:album"), t.value("album").toString()}};
     }
     qint64 Position() const { return qlonglong(m_audio->position() * 1000000.0); }
@@ -155,6 +164,9 @@ Mpris::Mpris(AudioEngine *audio, QObject *parent)
     });
     connect(audio, &AudioEngine::volumeChanged, this,
             [emitChanged] { emitChanged({QStringLiteral("Volume")}); });
+    // 跳转后发 Seeked，Plasma 弹窗的进度条才会跟上（Position 本身不广播）
+    connect(audio, &AudioEngine::seeked, this,
+            [this] { emit m_player->Seeked(m_player->Position()); });
 }
 
 Mpris::~Mpris()

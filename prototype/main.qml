@@ -62,6 +62,11 @@ Kirigami.ApplicationWindow {
         ignoreUnknownSignals: true
         function onNextRequested() { playback.next(); }
         function onPreviousRequested() { playback.previous(); }
+        function onRaiseRequested() {
+            root.show();
+            root.raise();
+            root.requestActivate();
+        }
     }
     Connections {
         target: root.backend && root.backend.tray ? root.backend.tray : null

@@ -54,6 +54,7 @@ signals:
     void durationChanged();
     void volumeChanged();
     void mutedChanged();
+    void seeked();   // 跳转生效（MPRIS 据此发 Seeked）
     // 自然播完
     void finished();
     // 取不到播放地址等；reason 是给用户看的中文句子
