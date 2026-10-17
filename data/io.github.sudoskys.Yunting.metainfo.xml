@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.sudoskys.Yunting</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <name>云听</name>
+  <summary>网易云音乐的 Linux 客户端</summary>
+  <developer id="io.github.sudoskys">
+    <name>sudoskys</name>
+  </developer>
+  <launchable type="desktop-id">io.github.sudoskys.Yunting.desktop</launchable>
+  <provides>
+    <binary>yunting</binary>
+  </provides>
+  <content_rating type="oars-1.1"/>
+  <description>
+    <p>
+      非官方的网易云音乐客户端，为 Linux 打造：原生 KDE/Qt 界面，个人推荐优先，
+      支持 MPRIS 媒体键与系统托盘。
+    </p>
+  </description>
+</component>

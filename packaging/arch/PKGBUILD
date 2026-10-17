@@ -1,0 +1,43 @@
+# 云听 —— 从本目录所在的检出直接构建（无网络源）
+# 维护者注意：上游许可未定，license 先占位 LicenseRef-unknown，定案后同步 metainfo 的 project_license
+pkgname=yunting-git
+# 占位版本：makepkg 入口的 lint 要求静态 pkgver，pkgver() 成功后会被就地改写
+pkgver=0.1
+pkgver() {
+  cd "$srcdir/yunting-git"
+  printf 'r%s.%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+pkgrel=1
+pkgdesc='网易云音乐的 Linux 客户端（Qt 6）'
+arch=(x86_64)
+url='https://github.com/sudoskys/Yunting'
+license=('LicenseRef-unknown')
+# 系统 makepkg.conf 默认开 debug：会把剥过符号的二进制挪进 -debug 子包，主包变空
+options=(!debug)
+depends=(qt6-base qt6-declarative qt6-multimedia kirigami kirigami-addons prison qtkeychain-qt6 kstatusnotifieritem)
+makedepends=(cmake ninja git)
+source=("$pkgname::git+file://$startdir/../..")
+sha256sums=(SKIP)
+
+prepare() {
+  # git 源只含已提交内容；把检出当前状态（含未提交改动）整树盖上去，构建的才是这份检出。
+  # 排除 .git（用克隆里的）、build/ 与 packaging/（makepkg 的 srcdir 在检出内，整拷会自套）
+  (cd "$startdir/../.." && tar --exclude=./.git --exclude=./build --exclude=./packaging -cf - .) \
+    | tar -C "$srcdir/yunting-git" -xf -
+}
+
+build() {
+  cmake -S "$srcdir/yunting-git/src" -B "$srcdir/yunting-git/build" -G Ninja \
+    -DCMAKE_BUILD_TYPE=None \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DBUILD_TESTING=ON
+  cmake --build "$srcdir/yunting-git/build"
+}
+
+check() {
+  ctest --test-dir "$srcdir/yunting-git/build" --output-on-failure
+}
+
+package() {
+  DESTDIR="$pkgdir" cmake --install "$srcdir/yunting-git/build"
+}

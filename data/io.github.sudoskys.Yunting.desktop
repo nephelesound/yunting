@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=云听
+GenericName=音乐播放器
+Comment=网易云音乐的 Linux 客户端
+Exec=yunting
+Icon=io.github.sudoskys.Yunting
+Terminal=false
+Categories=AudioVideo;Audio;Player;Qt;
+Keywords=music;netease;网易云;
+StartupNotify=true
+SingleMainWindow=true

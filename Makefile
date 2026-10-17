@@ -8,8 +8,8 @@ QMLFORMAT ?= /usr/lib/qt6/bin/qmlformat
 
 .PHONY: run lint fmt refs shots data app app-build contract test
 
-# ── 应用（C++ 后端 + QML 界面）──
-app-build: prototype/Personal.js
+# ── 应用（C++ 后端 + QML 界面，QML 编进可执行文件的资源）──
+app-build:
 	cmake -S src -B build/app -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo >/dev/null
 	ninja -C build/app
 
