@@ -7,12 +7,14 @@
 
 #include <QDeadlineTimer>
 #include <QElapsedTimer>
+#include <QFile>
 #include <QHostAddress>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QQueue>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QTemporaryDir>
 #include <QTest>
 #include <QUrlQuery>
 
@@ -39,8 +41,9 @@ class RetryTest : public QObject {
                         const QByteArray body = "{\"code\":200}\n";
                         sock->write("HTTP/1.1 " + QByteArray::number(status)
                                     + " x\r\nContent-Type: application/json\r\nContent-Length: "
-                                    + QByteArray::number(body.size()) + "\r\nConnection: close\r\n\r\n"
-                                    + body);
+                                    + QByteArray::number(body.size()) + "\r\nConnection: close\r\n"
+                                    + (setCookie.isEmpty() ? QByteArray() : "Set-Cookie: " + setCookie + "\r\n")
+                                    + "\r\n" + body);
                         sock->flush();
                     });
                     connect(sock, &QTcpSocket::disconnected, sock, &QTcpSocket::deleteLater);
@@ -48,6 +51,7 @@ class RetryTest : public QObject {
             });
         }
         QQueue<int> script;
+        QByteArray setCookie;   // 非空时每个响应都带这个 Set-Cookie
 
     private:
         QHash<QTcpSocket *, QByteArray> m_buf;
@@ -61,7 +65,47 @@ class RetryTest : public QObject {
         void record(bool o, bool n) { ++calls; ok = o; networkFailure = n; }
     };
 
+    QTemporaryDir m_home;
+
 private slots:
+    // 凭据只落在这次测试自己的目录里：断开会话总线（钥匙串不可用 → 后备文件），数据目录指到临时目录。
+    // 即使被测代码出错，也碰不到真实的钥匙串与 ~/.local/share
+    void initTestCase()
+    {
+        QVERIFY(m_home.isValid());
+        qputenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent");
+        qputenv("XDG_DATA_HOME", m_home.path().toUtf8());
+    }
+
+    // 匿名调试（不读存储）时，响应里的 Set-Cookie 绝不能写回存储：那会用匿名 jar 盖掉登录凭据。
+    // 对照：同样的响应，正常的客户端会写（证明这个测试能失败）
+    void anonymousClientNeverWritesCredentials()
+    {
+        FakeApi api;
+        QVERIFY(api.listen(QHostAddress::LocalHost));
+        api.setCookie = "NMTID=anonymous-test-value; Path=/";
+        const auto requestOnce = [&](NcmClient &client) {
+            client.setApiBase(baseUrl(&api));
+            Outcome out;
+            client.get("api/x", {}, false, [&](const QJsonDocument &, bool ok) { out.record(ok, false); });
+            QVERIFY(wait(out));
+        };
+
+        // 写凭据是异步的（先试钥匙串，失败再落后备文件）：每次检查前等写完，否则迟到的写会混进下一步
+        NcmClient anonymous(nullptr, false);
+        const QString store = anonymous.fallbackPath();
+        QFile::remove(store);
+        requestOnce(anonymous);
+        QVERIFY(anonymous.flushCredentials(3000));
+        QVERIFY2(!QFile::exists(store), "匿名客户端把 cookie 写进了凭据存储");
+
+        NcmClient normal;
+        QTRY_VERIFY(normal.isReady());
+        requestOnce(normal);
+        QVERIFY(normal.flushCredentials(3000));
+        QVERIFY2(QFile::exists(store), "对照失败：正常客户端没有写凭据，测试证明不了什么");
+    }
+
     void serverErrorThenSuccessRetries()
     {
         FakeApi api;

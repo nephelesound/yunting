@@ -98,5 +98,6 @@ private:
     QNetworkAccessManager *m_nam;
     QString m_apiBase = QStringLiteral("https://music.163.com/");
     QMap<QString, QString> m_jar;
-    bool m_ready = false;
+    bool m_ready = false;     // 存储已读出：可以发请求
+    bool m_persist = true;    // jar 变了写回存储；匿名调试（不读存储）时绝不写，否则匿名 jar 会盖掉登录凭据
 };

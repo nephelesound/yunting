@@ -67,6 +67,7 @@ NcmClient::NcmClient(QObject *parent, bool loadCookies)
 {
     if (!loadCookies) {
         m_ready = true;
+        m_persist = false;
         return;
     }
     // legacy 明文文件 → 钥匙串（写成功才删文件），完成后才读最终存储；
@@ -140,7 +141,7 @@ int NcmClient::importGtk4()
 // 存储还没成功读出时绝不落盘：那会把空 jar 写在仍然完好的登录凭据上。
 void NcmClient::persistJar()
 {
-    if (!m_ready)
+    if (!m_ready || !m_persist)
         return;
     m_vault->save(jarToJson(m_jar));
 }
