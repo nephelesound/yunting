@@ -209,16 +209,12 @@ Window {
             }
         }
 
-        // 悬停底板：深色半透明面 + 系统阴影（真的浮在一切之上，阴影是对的）
-        Kirigami.ShadowedRectangle {
+        // 悬停底板：只是一块深色半透明面。不加描边（深色面上的亮边是一圈白线），
+        // 不加阴影（半透明的面透出自己的阴影，边缘发脏）
+        Rectangle {
             anchors.fill: parent
             radius: Tokens.radiusLg
             color: Qt.alpha("black", Tokens.desktopPanel)
-            border.width: Tokens.line
-            border.color: Qt.alpha(box.ink, Tokens.track)
-            shadow.size: Tokens.space4
-            shadow.color: Qt.alpha("black", Tokens.faded)
-            shadow.yOffset: Tokens.line
             opacity: box.active ? 1 : 0
             Behavior on opacity { NumberAnimation { duration: Tokens.motionFast; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut } }
         }
@@ -305,7 +301,8 @@ Window {
                 }
             }
 
-            // 歌词：一层柔和阴影托住（与 Plasma 桌面图标的文字同一做法），在任意壁纸上可读
+            // 歌词：贴着字形的一圈窄阴影勾出轮廓（与 Plasma 桌面图标的文字同一做法），浅色壁纸上白字也立得住。
+            // 只有几像素宽：再宽就成了字后面一团脏雾
             Item {
                 id: lyricsBlock
                 Layout.fillWidth: true
@@ -313,8 +310,9 @@ Window {
                 layer.enabled: true
                 layer.effect: MultiEffect {
                     shadowEnabled: true
-                    shadowColor: Qt.alpha("black", Tokens.navHover)
-                    shadowBlur: 0.35   // 收紧一点：浅色壁纸上白字靠阴影的轮廓立住
+                    shadowColor: Qt.alpha("black", Tokens.fadedHover)
+                    blurMax: Tokens.space2
+                    shadowBlur: 0.5
                     shadowVerticalOffset: Tokens.line
                     shadowHorizontalOffset: 0
                 }

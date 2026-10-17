@@ -158,6 +158,12 @@ QtObject {
 
     // 账号
     readonly property var account: source.p.account   // null = 没有登录快照
+    // 当前账号的等级与累计听歌（level、nowPlayCount）；还没取到时为 null
+    function userLevel() {
+        if (!source.d.userLevel)
+            source.need("userLevel");
+        return source.d.userLevel || null;
+    }
 
     // 榜单
     readonly property var toplists: source.d.toplists
