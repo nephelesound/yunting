@@ -366,6 +366,62 @@ QVariantList ncmParseLrc(const QString &lrc, const QString &tlyric)
     return out;
 }
 
+// YRC 每句形如 [行起ms,行时长ms](字起ms,字长ms,0)字……；词文本紧跟在词标签之后，
+// 英文的词间空格就落在前一个词里。{…} 开头的署名行没有时间戳，与 LRC 路径一样跳过。
+QVariantList ncmParseYrc(const QString &yrc, const QString &tlyric)
+{
+    static const QRegularExpression lineStart(QStringLiteral("^\\[(\\d+),(\\d+)\\]"));
+    static const QRegularExpression wordTag(QStringLiteral("\\((\\d+),(\\d+),(\\d+)\\)"));
+    const QMap<double, QString> tr = lrcStamps(tlyric);
+    QMap<double, QVariantMap> out;
+    for (const QString &raw : yrc.split(u'\n')) {
+        const QString line = raw.trimmed();
+        const QRegularExpressionMatch head = lineStart.match(line);
+        if (!head.hasMatch())
+            continue;
+        QVariantList words;
+        QString text;
+        bool haveWord = false;
+        double wordStart = 0;
+        double wordDuration = 0;
+        qsizetype textFrom = 0;
+        for (QRegularExpressionMatchIterator it = wordTag.globalMatch(line, head.capturedEnd());
+             it.hasNext();) {
+            const QRegularExpressionMatch tag = it.next();
+            if (haveWord) {
+                const QString word = line.mid(textFrom, tag.capturedStart() - textFrom);
+                if (!word.isEmpty()) {
+                    words.append(QVariantMap{{"t", wordStart}, {"d", wordDuration},
+                                             {"text", word}});
+                    text += word;
+                }
+            }
+            haveWord = true;
+            wordStart = tag.captured(1).toDouble() / 1000;
+            wordDuration = tag.captured(2).toDouble() / 1000;
+            textFrom = tag.capturedEnd();
+        }
+        if (haveWord) {
+            const QString word = line.mid(textFrom);
+            if (!word.isEmpty()) {
+                words.append(QVariantMap{{"t", wordStart}, {"d", wordDuration}, {"text", word}});
+                text += word;
+            }
+        }
+        const QString body = text.trimmed();
+        if (body.isEmpty())
+            continue;
+        const double t = round(head.captured(1).toDouble() / 1000 * 100) / 100;
+        if (!out.contains(t))
+            out.insert(t, QVariantMap{{"t", t}, {"text", body}, {"tr", tr.value(t)},
+                                      {"words", words}});
+    }
+    QVariantList lines;
+    for (auto it = out.cbegin(); it != out.cend(); ++it)
+        lines.append(it.value());
+    return lines;
+}
+
 QString ncmLyricsToLrc(const QVariantList &lines)
 {
     QString out;

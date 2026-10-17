@@ -33,6 +33,8 @@ QVariantMap ncmComment(const QJsonObject &c);
 // 账户与用户主页共用的 profile 映射：avatar/background 尺寸由调用方决定
 QVariantMap ncmProfile(const QJsonObject &p, int avatarPx, int backgroundPx);
 QVariantList ncmParseLrc(const QString &lrc, const QString &tlyric);
+// 逐字歌词（YRC）：形状与 ncmParseLrc 相同，多一个 words 表；行时间与译文同样取两位数
+QVariantList ncmParseYrc(const QString &yrc, const QString &tlyric);
 // ncmParseLrc 的反向：把 {t, text, tr} 写回 LRC；有译文时同一时间戳再写一行（通行的双语 LRC 写法，
 // MPRIS 的 xesam:asText 交给歌词组件时用）
 QString ncmLyricsToLrc(const QVariantList &lines);

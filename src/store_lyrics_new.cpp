@@ -1,4 +1,4 @@
-// 新版歌词：逐字 yrc / klyric / romalrc + 普通 LRC。只读 GET。
+// 新版歌词：逐字 yrc 解析成与普通歌词相同的行，没有 yrc 时退回 LRC。只读 GET。
 #include "store.h"
 
 #include "json_util.h"
@@ -21,19 +21,20 @@ void Store::requestLyricsNew(double songId)
                   [this, songId](const QJsonDocument &doc, bool ok) {
         const QJsonObject root = body(doc);
         if (!ok || root.value("code").toInt() != 200) {
-            emit requestFailed(QStringLiteral("lyricsNew"), QStringLiteral("暂时取不到逐字歌词"));
+            emit requestFailed(QStringLiteral("lyricsNew:%1").arg(num(songId)),
+                               QStringLiteral("暂时取不到逐字歌词"));
             return;
         }
         const QString lrc = root.value("lrc").toObject().value("lyric").toString();
         const QString tlyric = root.value("tlyric").toObject().value("lyric").toString();
+        const QString yrc = root.value("yrc").toObject().value("lyric").toString();
+        // 逐字歌词有自己的译文 ytlrc，时间戳与 yrc 的行对齐；tlyric 对的是 LRC 的行，与 yrc 对不上
+        QString ytlrc = root.value("ytlrc").toObject().value("lyric").toString();
+        if (ytlrc.isEmpty())
+            ytlrc = tlyric;
         put("lyricsNew", QVariantMap{
             {"songId", songId},
-            {"lrc", lrc},
-            {"tlyric", tlyric},
-            {"yrc", root.value("yrc").toObject().value("lyric").toString()},
-            {"klyric", root.value("klyric").toObject().value("lyric").toString()},
-            {"romalrc", root.value("romalrc").toObject().value("lyric").toString()},
-            {"lines", ncmParseLrc(lrc, tlyric)},
+            {"lines", yrc.isEmpty() ? ncmParseLrc(lrc, tlyric) : ncmParseYrc(yrc, ytlrc)},
         }, false);
     });
 }

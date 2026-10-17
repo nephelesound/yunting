@@ -1000,6 +1000,55 @@ private slots:
         QVERIFY(waitUntil([&] { return failed.count() == 2; }));
         QCOMPARE(failed.at(1).at(1).toString(), QStringLiteral("网易云没有接受这次操作"));
     }
+
+    // 逐字歌词：yrc 有内容时 lines 一次解析好（带 words），原始 yrc 不再留；失败 key 带 songId
+    void lyricsNewParsesWordTimings()
+    {
+        bool fail = false;
+        m_api->handler = [&fail](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/song/lyric/v1") {
+                if (fail) {
+                    respond(500, "{\"code\":500}");
+                    return;
+                }
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"lrc", QJsonObject{{"lyric", "[00:01.00]hello"}}},
+                    // 实测：tlyric 对的是 LRC 的行，逐字歌词的译文在 ytlrc（时间与 yrc 的行对齐）
+                    {"tlyric", QJsonObject{{"lyric", "[00:01.00]LRC 的译文"}}},
+                    {"ytlrc", QJsonObject{{"lyric", "[00:01.00]你好"}}},
+                    {"yrc", QJsonObject{{"lyric", QStringLiteral(
+                        "{\"t\":0,\"c\":[{\"tx\":\"作词: \"}]}\n"
+                        "[1000,1200](1000,200,0)Hel(1200,300,0)lo (1500,700,0)world\n")}}},
+                }));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("lyricsNew:5"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("lyricsNew").toMap().value("lines").toList().size() == 1;
+        }));
+        const QVariantMap lyrics = m_store->data().value("lyricsNew").toMap();
+        QCOMPARE(lyrics.value("songId").toDouble(), 5.0);
+        QVERIFY(!lyrics.contains(QStringLiteral("yrc")));
+        const QVariantMap line = lyrics.value("lines").toList().first().toMap();
+        QCOMPARE(line.value("t").toDouble(), 1.0);
+        QCOMPARE(line.value("text").toString(), QStringLiteral("Hello world"));
+        QCOMPARE(line.value("tr").toString(), QStringLiteral("你好"));
+        const QVariantList words = line.value("words").toList();
+        QCOMPARE(words.size(), 3);
+        QCOMPARE(words.at(1).toMap().value("t").toDouble(), 1.2);
+        QCOMPARE(words.at(1).toMap().value("d").toDouble(), 0.3);
+        QCOMPARE(words.at(2).toMap().value("text").toString(), QStringLiteral("world"));
+
+        fail = true;
+        QSignalSpy failed(m_store, &Store::requestFailed);
+        m_store->request(QStringLiteral("lyricsNew:6"));
+        QVERIFY(waitUntil([&] { return failed.count() == 1; }));
+        QCOMPARE(failed.first().at(0).toString(), QStringLiteral("lyricsNew:6"));
+    }
 };
 
 QTEST_GUILESS_MAIN(StoreTest)

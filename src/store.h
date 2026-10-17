@@ -171,7 +171,7 @@ private:
     void requestUserSubcount();
     // -- 评论楼中楼：data.commentReplies；只读
     void requestCommentReplies(double songId, double commentId, qint64 before);
-    // -- 新版歌词：data.lyricsNew；yrc/klyric/romalrc + 普通 LRC
+    // -- 逐字歌词：data.lyricsNew = { songId, lines }，lines 与普通歌词同形，有 yrc 时每句多 words
     void requestLyricsNew(double songId);
     // 首屏的 stale-while-revalidate：启动时先放上次的值，refresh() 的结果陆续覆盖
     void restoreScreen();

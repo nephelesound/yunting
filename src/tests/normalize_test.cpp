@@ -209,6 +209,44 @@ private slots:
         }
         QCOMPARE(ncmParseLrc(original, translation), lines);
     }
+
+    // YRC：逐字标签拆成 words，句子按词拼接（英文词间空格留在前一个词里），译文按行时间对上；
+    // {…} 开头的署名行与 LRC 一样不算歌词
+    void yrcParsesWordsAndTranslation()
+    {
+        const QString yrc = QStringLiteral(
+            "{\"t\":0,\"c\":[{\"tx\":\"作词: \"},{\"tx\":\"某人\"}]}\n"
+            "[7880,2310](7880,150,0)I've (8030,300,0)been (8330,570,0)reading\n"
+            "[10310,2160](10310,210,0)The (10520,820,0)legends (11640,90,0)and "
+            "(11730,740,0)the (12470,0,0)myths\n"
+            "[12710,2100](12710,960,0)Achilles (13670,270,0)and (13940,180,0)his\r\n");
+        const QString tr = QStringLiteral("[00:07.88]我曾饱览\n[00:12.71]阿喀琉斯\n");
+        const QVariantList lines = ncmParseYrc(yrc, tr);
+        QCOMPARE(lines.size(), 3);
+
+        const QVariantMap first = lines.at(0).toMap();
+        QCOMPARE(first.value("t").toDouble(), 7.88);
+        QCOMPARE(first.value("text").toString(), QStringLiteral("I've been reading"));
+        QCOMPARE(first.value("tr").toString(), QStringLiteral("我曾饱览"));
+        const QVariantList words = first.value("words").toList();
+        QCOMPARE(words.size(), 3);
+        QCOMPARE(words.at(0).toMap().value("t").toDouble(), 7.88);
+        QCOMPARE(words.at(0).toMap().value("d").toDouble(), 0.15);
+        QCOMPARE(words.at(0).toMap().value("text").toString(), QStringLiteral("I've "));
+        QCOMPARE(words.at(2).toMap().value("t").toDouble(), 8.33);
+        QCOMPARE(words.at(2).toMap().value("d").toDouble(), 0.57);
+
+        // 零时长的词也保留；没有对应译文的行 tr 为空
+        const QVariantMap second = lines.at(1).toMap();
+        QCOMPARE(second.value("text").toString(), QStringLiteral("The legends and the myths"));
+        QCOMPARE(second.value("tr").toString(), QString());
+        const QVariantList secondWords = second.value("words").toList();
+        QCOMPARE(secondWords.size(), 5);
+        QCOMPARE(secondWords.at(4).toMap().value("d").toDouble(), 0.0);
+
+        QCOMPARE(lines.at(2).toMap().value("t").toDouble(), 12.71);
+        QCOMPARE(lines.at(2).toMap().value("tr").toString(), QStringLiteral("阿喀琉斯"));
+    }
 };
 
 QTEST_GUILESS_MAIN(NormalizeTest)
