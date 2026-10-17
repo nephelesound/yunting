@@ -63,9 +63,6 @@ ScreenFrame {
     Component.onCompleted: page.startComments()
     readonly property int lyricIndex: Source.lyricIndex(page.lines, page.elapsed)
 
-    function count(n) {
-        return n >= 10000 ? (n / 10000).toFixed(n >= 100000 ? 0 : 1) + "万" : String(n);
-    }
 
     // 左半：封面与事实。这一屏是「左封面、右歌词」的两栏构图：封面在左半栏水平居中是有意的构图轴
     //（不贴页边线），事实行与封面左缘对齐；右栏从中线开始
@@ -350,7 +347,7 @@ ScreenFrame {
                     visible: comment.index === 0 || page.commentRows[comment.index - 1].group !== comment.modelData.group
                     Layout.topMargin: comment.index === 0 ? 0 : Tokens.space6
                     text: comment.modelData.group === "hot" ? "精彩评论"
-                        : "最新评论" + (page.latest && page.latest.total > 0 ? " " + page.count(page.latest.total) : "")
+                        : "最新评论" + (page.latest && page.latest.total > 0 ? " " + Format.count(page.latest.total) : "")
                     font.pixelSize: Tokens.textSm
                     color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                 }
@@ -429,7 +426,7 @@ ScreenFrame {
                                         isMask: true
                                     }
                                     Label {
-                                        text: page.count(comment.modelData.likes)
+                                        text: Format.count(comment.modelData.likes)
                                         font.pixelSize: Tokens.textSm
                                         font.features: { "tnum": 1 }
                                         color: commentLike.liked ? Kirigami.Theme.negativeTextColor

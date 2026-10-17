@@ -47,7 +47,6 @@ private:
     };
     void enqueue(const Op &op);
     void pump();
-    void startProbe();
     void runSave(const QByteArray &json);
     void readKeychain();
     void writeMigrated(const QByteArray &json);

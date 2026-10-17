@@ -8,6 +8,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
+import "Format.js" as Format
 
 ScreenFrame {
     id: page
@@ -39,16 +40,13 @@ ScreenFrame {
     readonly property int tileWidth: Math.floor((page.rightWidth - (page.tileColumns - 1) * Tokens.space2) / page.tileColumns)
     readonly property int rightWidth: body.width - page.half - Tokens.space6
     readonly property int tileHeight: page.tileWidth + Tokens.space2 + Tokens.height12
-    function count(n) {
-        return n >= 10000 ? (n / 10000).toFixed(n >= 100000 ? 0 : 1) + " 万" : String(n);
-    }
     function caption(item) {
         if (page.collection === "artists")
             return item.albums > 0 ? item.albums + " 张专辑" : "";
         if (page.collection === "albums")
             return item.artist || "";
         if (page.collection === "mvs")
-            return item.playCount > 0 ? page.count(item.playCount) + " 次播放" : "";
+            return item.playCount > 0 ? Format.count(item.playCount) + " 次播放" : "";
         return item.count > 0 ? item.count + " 首" : "";
     }
 

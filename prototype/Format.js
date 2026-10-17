@@ -47,6 +47,15 @@ function quality(q) {
     return q === "hires" ? "Hi-Res" : q === "lossless" ? "无损" : "";
 }
 
+// 次数（播放、点赞、评论数）：一万以下照写，一亿以下按万（十万以下留一位小数），再往上按亿
+function count(n) {
+    if (n >= 1e8)
+        return (n / 1e8).toFixed(1) + " 亿";
+    if (n >= 1e4)
+        return (n / 1e4).toFixed(n >= 1e5 ? 0 : 1) + " 万";
+    return String(n);
+}
+
 // 曲目的歌手，交给 LinkText：每位各自可点。旧数据没有 artists 时只有第一位带 id
 function artistLinks(track) {
     if (!track)

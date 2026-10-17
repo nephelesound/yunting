@@ -14,7 +14,6 @@ pkgbase = yunting-git
 	depends = qt6-declarative
 	depends = qt6-multimedia
 	depends = kirigami
-	depends = kirigami-addons
 	depends = kstatusnotifieritem
 	depends = purpose
 	depends = prison

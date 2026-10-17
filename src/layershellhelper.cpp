@@ -62,17 +62,3 @@ void LayerShellHelper::placeOverlay(QWindow *window, int anchors, int left, int 
     Q_UNUSED(bottom);
 #endif
 }
-
-void LayerShellHelper::release(QWindow *window)
-{
-    if (!window)
-        return;
-#ifdef YUNTING_LAYERSHELL
-    if (!QGuiApplication::platformName().startsWith(QLatin1String("wayland")))
-        return;
-    // LayerShellQt 没有公开的 detach；隐藏窗口后由 QWindow 生命周期回收。
-    window->hide();
-#else
-    Q_UNUSED(window);
-#endif
-}

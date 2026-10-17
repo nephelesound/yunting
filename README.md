@@ -41,7 +41,7 @@
 **听歌**
 - 扫码登录，凭据存在系统钥匙串
 - 每日推荐（带推荐理由）、心动模式、私人漫游、私人雷达、相似歌曲、我喜欢的音乐、推荐歌单、排行榜
-- 搜索单曲、歌手、专辑、歌单、MV、用户与电台
+- 搜索单曲、歌手、专辑、歌单与 MV
 - 歌手页、专辑页、用户主页；MV 播放
 - 音质可选（标准到 Hi-Res），10 段均衡器、低音与空间感，输出设备选择
 
@@ -72,7 +72,7 @@ paru -S yunting-git    # 或 yay -S yunting-git
 
 ### 从源码构建
 
-依赖：Qt 6（Base、Declarative、Multimedia）、Kirigami、kirigami-addons、KStatusNotifierItem、Purpose、Prison、QtKeychain、OpenSSL；可选 LayerShellQt（Wayland 下的桌面歌词置顶）、libqrencode（分享二维码）、zstd。
+依赖：Qt 6（Base、Declarative、Multimedia）、Kirigami、KStatusNotifierItem、Purpose、Prison、QtKeychain、OpenSSL；可选 LayerShellQt（Wayland 下的桌面歌词置顶）、libqrencode（分享二维码）、zstd。
 
 ```bash
 git clone https://github.com/nephelesound/yunting.git

@@ -43,8 +43,8 @@ QtObject {
     readonly property real ambienceScrim: 0.85
     // 悬停在可点的封面上：系统底色淡底，衬出说明去向的图标
     readonly property real coverScrim: 0.6
-    // 桌面歌词悬停时的深色底：压在任意壁纸上，白字仍可读，又不挡住桌面
-    readonly property real desktopBacking: 0.45
+    // 压在视频画面上的控制条深色底：白字图标在任何画面上都看得清，又不挡住画面
+    readonly property real videoScrim: 0.45
     // 桌面歌词悬停时的深色底板：白字在任意壁纸与窗口上都看得清，又透出一点底下的东西
     readonly property real desktopPanel: 0.6
     // 桌面歌词：隔着一段距离看的字，三档（当前句 / 第二行）；填色可选系统强调色或这几种在任意壁纸上都醒目的颜色
@@ -85,14 +85,7 @@ QtObject {
     readonly property int wideRow: 480                        // 曲目行宽于此时显示专辑列（60 × 8）
     readonly property int albumColumn: 160                    // 专辑列宽（20 × 8）
 
-    // 封面磁贴边长：3 块磁贴 + 2 道间距 恰好等于 n 条曲目行（48 + 8）的高度，
-    // 所以「排行榜」与「热歌」两组在全景里上下边缘对齐。n = 9 → 160，n = 6 → 104。
-    readonly property int tileSm: 104   // 2 行曲目的高度（2 × 56 − 8）
+    // 封面磁贴边长
+    readonly property int tileSm: 104   // 2 行曲目的高度（2 × 56 − 8）：榜单卡片的封面与右侧两行对齐
     readonly property int tileLg: 160
-    function tileFor(availableHeight) {
-        return availableHeight >= 3 * tileLg + 2 * space2 ? tileLg : tileSm;
-    }
-    function rowsFor(tile) {
-        return (3 * tile + 2 * space2 + space2) / (trackRow + space2);
-    }
 }

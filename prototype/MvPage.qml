@@ -87,7 +87,7 @@ ScreenFrame {
                 anchors.bottom: parent.bottom
                 height: Tokens.height12
                 radius: Tokens.radius
-                color: Qt.alpha("black", Tokens.desktopBacking)
+                color: Qt.alpha("black", Tokens.videoScrim)
                 visible: page.ready
 
                 RowLayout {
@@ -152,15 +152,11 @@ ScreenFrame {
                 visible: parts.length > 0
                 separator: " · "
                 parts: [{ text: page.mv.artist || "", artistId: page.mv.artistId || 0 },
-                        { text: page.mv.playCount > 0 ? page.formatCount(page.mv.playCount) + " 次播放" : "" }].filter(p => p.text.length > 0)
+                        { text: page.mv.playCount > 0 ? Format.count(page.mv.playCount) + " 次播放" : "" }].filter(p => p.text.length > 0)
                 font.pixelSize: Tokens.textSm
                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                 elide: Text.ElideRight
             }
         }
-    }
-
-    function formatCount(n) {
-        return n >= 10000 ? (n / 10000).toFixed(n >= 100000 ? 0 : 1) + " 万" : String(n);
     }
 }
