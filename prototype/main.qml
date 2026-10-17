@@ -56,12 +56,34 @@ Kirigami.ApplicationWindow {
         target: playback.engine
         function onFailed(reason) { root.showPassiveNotification(reason); }
     }
-    // 媒体键 / 锁屏 / Plasma 媒体控件的上一首、下一首：同样走 Playback，切歌规则只有一份
+    // 媒体键 / 锁屏 / Plasma 媒体控件 / 托盘菜单的上一首、下一首：同样走 Playback，切歌规则只有一份
     Connections {
         target: root.backend ? root.backend.mpris : null
         ignoreUnknownSignals: true
         function onNextRequested() { playback.next(); }
         function onPreviousRequested() { playback.previous(); }
+    }
+    Connections {
+        target: root.backend && root.backend.tray ? root.backend.tray : null
+        ignoreUnknownSignals: true
+        function onNextRequested() { playback.next(); }
+        function onPreviousRequested() { playback.previous(); }
+    }
+
+    // 有托盘时，关窗口 = 隐藏到托盘、继续播放；托盘「退出」或 Ctrl+Q 才真正退出
+    property bool quitting: false
+    onClosing: close => {
+        if (root.backend && root.backend.tray && !root.quitting) {
+            close.accepted = false;
+            root.hide();
+        }
+    }
+    Shortcut {
+        sequence: StandardKey.Quit
+        onActivated: {
+            root.quitting = true;
+            Qt.quit();
+        }
     }
 
     readonly property var currentTrack: playback.current
