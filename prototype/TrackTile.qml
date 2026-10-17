@@ -112,31 +112,6 @@ AbstractButton {
             Layout.preferredHeight: Tokens.trackRow
             source: tile.modelData.cover
             pixelSize: 96
-
-            // 正在播放：封面上一层淡底和三根强调色竖条（与可点封面的「淡底 + 图标」同一种说法）
-            Rectangle {
-                anchors.fill: parent
-                visible: tile.current
-                radius: Tokens.radius
-                color: Qt.alpha(Kirigami.Theme.backgroundColor, Tokens.coverScrim)
-                Row {
-                    anchors.centerIn: parent
-                    height: Tokens.iconSm
-                    spacing: Tokens.lineStrong
-                    Repeater {
-                        model: [0.625, 1, 0.75]   // 10 · 16 · 12
-                        // 竖条底边对齐：按自己的高度往下推（不引用 parent，Repeater 建条时它还没放进 Row）
-                        delegate: Rectangle {
-                            required property real modelData
-                            y: Tokens.iconSm - height
-                            width: Tokens.space1
-                            height: Tokens.iconSm * modelData
-                            radius: Tokens.radiusSm
-                            color: Kirigami.Theme.highlightColor
-                        }
-                    }
-                }
-            }
         }
 
         ColumnLayout {
