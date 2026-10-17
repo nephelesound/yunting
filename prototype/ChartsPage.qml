@@ -11,7 +11,7 @@ import QtQuick.Layouts
 ScreenFrame {
     id: page
 
-    property int currentId   // 正在播放的曲目 id
+    property real currentId   // 正在播放的曲目 id（新歌的 id 超出 32 位整数，不能用 int）
 
     signal toplistOpened(int index)
     signal trackActivated(int index)

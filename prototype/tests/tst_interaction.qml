@@ -254,6 +254,18 @@ Item {
         }
 
         // 正在播放的那一行滚出视野才出现定位按钮；点一下回到那一行，按钮随之消失
+        // 正在播放的高亮靠 id 相等：新歌的 id 超出 32 位整数，页面的 currentId 存成 int 会被截断、永远对不上
+        function test_pagesKeepFullTrackIds() {
+            const id = 18478568150;
+            const extra = { PlaylistPage: { list: Source.list("daily"), listKey: "daily" } };
+            for (const name of ["ChartsPage", "MinePage", "PlaylistPage", "ArtistPage", "SearchPage"]) {
+                const page = createTemporaryObject(Qt.createComponent("../" + name + ".qml"), root,
+                                                   Object.assign({ currentId: id }, extra[name] || {}));
+                verify(page !== null, name);
+                compare(page.currentId, id, name);
+            }
+        }
+
         function test_locateCurrentAppearsOnlyWhenOutOfView() {
             const list = createTemporaryObject(locateComponent, root);
             const locate = findChild(list, "locate");

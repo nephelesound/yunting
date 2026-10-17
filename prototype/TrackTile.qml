@@ -34,6 +34,9 @@ AbstractButton {
     signal moveRequested(int index, int delta)
 
     implicitHeight: Tokens.trackRow
+    // 左边封面本身就是行的左缘；右边的时长、行内按钮离淡底的边留一个列间距，不贴边
+    leftPadding: 0
+    rightPadding: Tokens.space3
     hoverEnabled: true
     focusPolicy: Qt.StrongFocus
     onClicked: tile.activated(tile.index)
@@ -228,8 +231,6 @@ AbstractButton {
 
         // 时长列；悬停/聚焦时把时长换成行内动作，列宽不变、行不跳动：
         // 播放队列里是「移出」，其余是「更多」（曲目菜单）
-        // 右缘贴页边线（与左边的封面贴页边线对称，和页头、播放条的右缘同一条线）。
-        // 行内按钮整个落在行里：不像播放条那样往外伸 space2 让图形对齐边线——行有悬停淡底，伸出去的按钮框会越过淡底的边
         Item {
             id: endColumn
             Layout.preferredWidth: tile.reordering ? Tokens.height8 * 2 + Tokens.space1

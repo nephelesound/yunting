@@ -12,7 +12,7 @@ ScreenFrame {
     id: page
 
     property real artistId
-    property int currentId
+    property real currentId
     property bool vip
     property string pane: "songs"   // songs | albums
 

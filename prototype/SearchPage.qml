@@ -16,7 +16,7 @@ ScreenFrame {
     property string query
     onQueryChanged: Source.search(page.query)
     Component.onCompleted: Source.search(page.query)
-    property int currentId
+    property real currentId
 
     signal trackActivated(int index)
     signal allSongsRequested()

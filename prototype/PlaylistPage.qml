@@ -13,7 +13,7 @@ ScreenFrame {
 
     // { heading, cover, facts: [{ value, label }], description, tracks, ranked }
     property var list
-    property int currentId   // 正在播放的曲目 id；不在本列表里就没有高亮
+    property real currentId   // 正在播放的曲目 id；不在本列表里就没有高亮
     property bool vip
     // 自己的歌单可以进入排序模式：每行固定显示上移 / 下移，提交一次后退出
     property bool reordering: false

@@ -12,7 +12,7 @@ import org.kde.kirigami as Kirigami
 ScreenFrame {
     id: page
 
-    property int currentId
+    property real currentId
 
     signal entryOpened(string key)
     signal playlistOpened(int index)
