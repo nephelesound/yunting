@@ -15,6 +15,8 @@ ScreenFrame {
     property real mvId
     readonly property var mv: Source.mv(page.mvId)
     readonly property bool ready: page.mv.url !== ""
+    // 正在出画面：main.qml 据此让屏幕常亮（backend.power.keepScreenOn）
+    readonly property bool videoPlaying: video.playbackState === MediaPlayer.PlayingState
 
     heading: page.mv.name || "MV"
     Component.onDestruction: video.stop()

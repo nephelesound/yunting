@@ -25,6 +25,7 @@ qt_add_executable(yunting
     session.h session.cpp
     mpris.h mpris.cpp
     tray.h tray.cpp
+    powerinhibitor.h powerinhibitor.cpp
     crypto.h crypto.cpp
     perf.h perf.cpp
     layershellhelper.h layershellhelper.cpp
@@ -135,6 +136,11 @@ endif()
 if (YUNTING_EXPERIMENTAL_EQ)
     target_compile_definitions(yunting PRIVATE YUNTING_EXPERIMENTAL_EQ=1)
 endif()
+
+# 电源抑制：对着真的会话总线测（没有 Plasma 电源管理时自行跳过），所以不像其他测试那样断开总线
+qt_add_executable(powerinhibitor_test tests/powerinhibitor_test.cpp powerinhibitor.h powerinhibitor.cpp)
+target_link_libraries(powerinhibitor_test PRIVATE Qt6::Core Qt6::Gui Qt6::DBus Qt6::Test)
+add_test(NAME powerinhibitor COMMAND powerinhibitor_test)
 
 qt_add_executable(crypto_test tests/crypto_test.cpp crypto.h crypto.cpp)
 target_link_libraries(crypto_test PRIVATE Qt6::Core Qt6::Test OpenSSL::Crypto)

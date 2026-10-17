@@ -26,19 +26,48 @@ Kirigami.OverlayDrawer {
     // 拖动时只在这份顺序表里挪（每项记着它在 upcoming 里的原位置 src），松手才提交给 Playback：
     // 若拖动中直接改队列，列表会整个重建、拖动随之中断
     ListModel { id: order }
-    function rebuild() {
-        order.clear();
-        for (let i = 0; i < panel.upcoming.length; i++)
-            order.append({ src: i });
+    property var synced: []   // 上次同步时的 upcoming：order 里的 src 指向它
+
+    // 队列变了：按差异更新 order，不清空重建。移出一首、切到下一首、加一首都只动那一行（有过渡），
+    // 其余行原地不动；拖动提交后顺序已经一致，只改 src。认不出的变化（换了整个队列）才整表重建
+    function sync() {
+        const next = panel.upcoming.map(t => t.id);
+        const shown = [];
+        for (let i = 0; i < order.count; i++)
+            shown.push((panel.synced[order.get(i).src] || {}).id);
+        const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+        const without = (a, k) => a.slice(0, k).concat(a.slice(k + 1));
+        let k = 0;
+        while (k < shown.length && k < next.length && shown[k] === next[k])
+            k++;
+        if (same(shown, next)) {
+            // 顺序没变
+        } else if (shown.length === next.length + 1 && same(without(shown, k), next)) {
+            // 移出的那一行在淡出期间仍显示原来的歌，不跟着 upcoming 变成下一首
+            const leaving = list.itemAtIndex(k);
+            if (leaving)
+                leaving.frozen = panel.synced[order.get(k).src];
+            order.remove(k);
+        } else if (next.length === shown.length + 1 && same(without(next, k), shown)) {
+            order.insert(k, { src: k });
+        } else {
+            order.clear();
+            for (let i = 0; i < next.length; i++)
+                order.append({ src: i });
+        }
+        for (let i = 0; i < order.count; i++)
+            if (order.get(i).src !== i)
+                order.setProperty(i, "src", i);
+        panel.synced = panel.upcoming;
     }
-    onUpcomingChanged: panel.rebuild()
-    Component.onCompleted: panel.rebuild()
-    // keepFocus：键盘挪动后队列重建、原来的行被销毁，焦点要交给挪到新位置的那一行，才能连续按 Alt+↑/↓
+    onUpcomingChanged: panel.sync()
+    Component.onCompleted: panel.sync()
+    // keepFocus：键盘挪动后队列更新，焦点要交给挪到新位置的那一行，才能连续按 Alt+↑/↓
     function commitMove(src, to, keepFocus) {
         if (src !== to)
             panel.moveRequested(panel.currentIndex + 1 + src, panel.currentIndex + 1 + to);
         else
-            panel.rebuild();
+            panel.sync();
         if (keepFocus)
             Qt.callLater(() => {
                 const row = list.itemAtIndex(to);
@@ -134,6 +163,7 @@ Kirigami.OverlayDrawer {
         }
         ListView {
             id: list
+            objectName: "queueList"
             Layout.fillWidth: true
             Layout.fillHeight: true
             leftMargin: Tokens.pageMargin
@@ -145,15 +175,28 @@ Kirigami.OverlayDrawer {
             model: order
             ScrollBar.vertical: ScrollBar {}
             WheelScroll { flickable: list }
+            // 过渡：拖动换位快（跟手）；移出 / 加入的那一行淡出 / 淡入，其余行平移补位，不跳。
+            // 补位动画里把 opacity 也拉回 1：被打断的淡入不会把行留在半透明
             moveDisplaced: Transition {
                 NumberAnimation { property: "y"; duration: Tokens.motionFast; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut }
+            }
+            remove: Transition {
+                NumberAnimation { property: "opacity"; to: 0; duration: Tokens.motionFast; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut }
+            }
+            add: Transition {
+                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Tokens.motionBase; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut }
+            }
+            displaced: Transition {
+                NumberAnimation { property: "y"; duration: Tokens.motionBase; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut }
+                NumberAnimation { property: "opacity"; to: 1; duration: Tokens.motionBase }
             }
 
             delegate: Item {
                 id: row
                 required property int index
                 required property int src
-                readonly property var track: panel.upcoming[row.src] || { name: "", artist: "", album: "", dur: 0, fee: 0, cover: "" }
+                property var frozen: null   // 正在淡出的行：定格在移出前的那首（见 sync）
+                readonly property var track: row.frozen || panel.upcoming[row.src] || { name: "", artist: "", album: "", dur: 0, fee: 0, cover: "" }
                 width: list.width - list.leftMargin - list.rightMargin
                 implicitHeight: tile.implicitHeight
                 function focusTile() { tile.forceActiveFocus(); }

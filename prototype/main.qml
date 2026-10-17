@@ -577,6 +577,15 @@ Kirigami.ApplicationWindow {
     }
     // 桌面歌词与迷你播放器：独立的顶层窗口，状态（显示与否）由主窗口持有
     property bool desktopLyricsShown: false
+
+    // 看 MV 时屏幕常亮（放歌时不睡眠由 C++ 直接跟着 AudioEngine 设，屏幕照常熄灭）
+    property bool videoPlaying: false
+    Binding {
+        target: root.backend ? root.backend.power : null
+        property: "keepScreenOn"
+        value: root.videoPlaying
+        when: target !== null
+    }
     property bool fullscreenShown: false
     DesktopLyrics {
         visible: root.desktopLyricsShown
@@ -835,6 +844,8 @@ Kirigami.ApplicationWindow {
             loggedIn: root.loggedIn
             parentText: root.parentName
             onLeaveRequested: root.goBack()
+            onVideoPlayingChanged: root.videoPlaying = videoPlaying
+            Component.onDestruction: root.videoPlaying = false
         }
     }
 

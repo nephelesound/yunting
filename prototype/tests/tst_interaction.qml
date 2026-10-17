@@ -19,6 +19,7 @@ Item {
     Component { id: tileComponent; TrackTile { width: 900 } }
     Component { id: nowPlayingComponent; NowPlayingPage { width: root.width; height: root.height } }
     Component { id: spyComponent; SignalSpy {} }
+    Component { id: queueComponent; QueuePanel {} }
     TextEdit { id: pasteTarget; visible: false }
 
     SignalSpy { id: artistSpy; target: Actions; signalName: "artistRequested" }
@@ -83,6 +84,32 @@ Item {
             mouseClick(like);
             compare(likeSpy.count, 1);
             compare(likeSpy.signalArguments[0][0].id, root.track.id);
+        }
+
+        // 队列变化只动变的那一行：移出、加入、切到下一首时，其余行是同一个对象（没有重建，所以不跳）
+        function test_queueChangesKeepOtherRows() {
+            const song = (id, name) => ({ id: id, name: name, artist: "歌手", album: "", dur: 200, fee: 0, cover: "" });
+            const a = song(1, "A"), b = song(2, "B"), c = song(3, "C"), d = song(4, "D"), x = song(5, "X");
+            const panel = createTemporaryObject(queueComponent, root, { queue: [a, b, c, d], currentIndex: 0 });
+            panel.open();
+            const list = findChild(panel, "queueList");
+            tryVerify(() => list.count === 3 && list.itemAtIndex(2) !== null);
+            const names = () => { const out = []; for (let i = 0; i < list.count; i++) { const it = list.itemAtIndex(i); out.push(it ? it.track.name : "?"); } return out.join(""); };
+            compare(names(), "BCD");
+            const rowB = list.itemAtIndex(0), rowD = list.itemAtIndex(2);
+
+            panel.queue = [a, b, d];                       // 移出 C（淡出期间它还在，等过渡结束）
+            compare(list.count, 2);
+            tryVerify(() => names() === "BD");
+            verify(list.itemAtIndex(0) === rowB && list.itemAtIndex(1) === rowD, "移出一首后其余行原地保留");
+
+            panel.queue = [a, b, x, d];                    // 在 B 后加入 X
+            tryVerify(() => names() === "BXD");
+            verify(list.itemAtIndex(0) === rowB && list.itemAtIndex(2) === rowD, "加入一首后其余行原地保留");
+
+            panel.currentIndex = 1;                        // 切到下一首：B 离开「接下来」
+            tryVerify(() => names() === "XD");
+            verify(list.itemAtIndex(1) === rowD, "切歌后其余行原地保留");
         }
 
         function lyricsPage() {

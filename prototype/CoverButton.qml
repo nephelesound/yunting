@@ -28,7 +28,7 @@ AbstractButton {
             radius: Tokens.radius
             color: Qt.alpha(Kirigami.Theme.backgroundColor, Tokens.coverScrim)
             opacity: button.enabled && (button.hovered || button.visualFocus) ? 1 : 0
-            Behavior on opacity { NumberAnimation { duration: Tokens.motionFast } }
+            Behavior on opacity { NumberAnimation { duration: Tokens.motionFast; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut } }
             Kirigami.Icon {
                 anchors.centerIn: parent
                 width: Tokens.iconMd

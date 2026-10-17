@@ -6,6 +6,7 @@
 #include "layershellhelper.h"
 #include "mpris.h"
 #include "ncmclient.h"
+#include "powerinhibitor.h"
 #include "session.h"
 #include "store.h"
 #include "tray.h"
@@ -580,6 +581,9 @@ int main(int argc, char *argv[])
 
     // 托盘只在有窗口的运行方式下创建（--dump-store / --smoke-audio 上面已返回，无窗口）
     Tray tray(&audio);
+    // 放歌时系统不睡眠（屏幕照常熄灭、锁屏）；看 MV 时屏幕常亮由 QML 设 backend.power.keepScreenOn
+    PowerInhibitor power;
+    QObject::connect(&audio, &AudioEngine::playingChanged, &power, [&] { power.setPreventSleep(audio.playing()); });
 
     store.refresh();   // 首屏数据异步到达，QML 通过 data / personal 的 NOTIFY 自动更新
     // 钥匙串超时后才读出 jar（例如在等用户解锁钱包）：先按匿名起来，读出后再按登录态刷一次
@@ -593,14 +597,15 @@ int main(int argc, char *argv[])
     QQmlApplicationEngine engine;
     ImageCacheFactory imageCache(imageCacheDir);
     engine.setNetworkAccessManagerFactory(&imageCache);
-    // main.qml 用 root.backend.{store,audio,session,mpris,tray} 取后端；QVariantMap 的 key 就是属性名
+    // main.qml 用 root.backend.{store,audio,session,mpris,tray,layerShell,power} 取后端；QVariantMap 的 key 就是属性名
     LayerShellHelper layerShell;
     QVariantMap backend{{"store", QVariant::fromValue<QObject *>(&store)},
                         {"audio", QVariant::fromValue<QObject *>(&audio)},
                         {"session", QVariant::fromValue<QObject *>(&session)},
                         {"mpris", QVariant::fromValue<QObject *>(&mpris)},
                         {"tray", QVariant::fromValue<QObject *>(&tray)},
-                        {"layerShell", QVariant::fromValue<QObject *>(&layerShell)}};
+                        {"layerShell", QVariant::fromValue<QObject *>(&layerShell)},
+                        {"power", QVariant::fromValue<QObject *>(&power)}};
     engine.setInitialProperties({{"backend", backend}});
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
                      [] { QCoreApplication::exit(1); }, Qt::QueuedConnection);

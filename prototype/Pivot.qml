@@ -31,7 +31,7 @@ Row {
             activeFocusOnTab: !tab.active
             font.underline: tab.activeFocus
             opacity: active ? 1 : hover.hovered || tab.activeFocus ? Tokens.navHover : Tokens.navInactive
-            Behavior on opacity { NumberAnimation { duration: Tokens.motionFast } }
+            Behavior on opacity { NumberAnimation { duration: Tokens.motionFast; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut } }
             Accessible.role: Accessible.PageTab
             Accessible.name: text
             Keys.onReturnPressed: pivot.activated(tab.modelData.key)

@@ -60,7 +60,7 @@ Row {
             activeFocusOnTab: !item.active
             font.underline: item.activeFocus
             opacity: active ? 1 : hover.hovered || item.activeFocus ? Tokens.navHover : Tokens.navInactive
-            Behavior on opacity { NumberAnimation { duration: Tokens.motionFast } }
+            Behavior on opacity { NumberAnimation { duration: Tokens.motionFast; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut } }
             Accessible.role: item.modelData.key === ".." ? Accessible.Link : Accessible.PageTab
             Accessible.name: item.modelData.text
 

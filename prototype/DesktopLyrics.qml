@@ -54,7 +54,7 @@ Window {
         radius: Tokens.radiusLg
         color: Qt.alpha("black", Tokens.desktopBacking)
         opacity: hover.hovered ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: Tokens.motionFast } }
+        Behavior on opacity { NumberAnimation { duration: Tokens.motionFast; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut } }
     }
 
     ColumnLayout {
@@ -95,7 +95,7 @@ Window {
         spacing: Tokens.space1
         opacity: hover.hovered ? 1 : 0
         visible: opacity > 0
-        Behavior on opacity { NumberAnimation { duration: Tokens.motionFast } }
+        Behavior on opacity { NumberAnimation { duration: Tokens.motionFast; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut } }
         // 底是固定的深色，图标固定用白色（ToolButton 的图标色来自样式调色板，不跟 Kirigami.Theme）
         IconButton {
             icon.color: "white"

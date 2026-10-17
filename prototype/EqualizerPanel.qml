@@ -14,8 +14,7 @@ Popup {
     readonly property var bands: ["31", "62", "125", "250", "500", "1k", "2k", "4k", "8k", "16k"]
 
     width: 10 * Tokens.height8 + 9 * Tokens.space2 + 2 * Tokens.space4
-    height: 430
-    padding: Tokens.space4
+    padding: Tokens.space4   // 高度随内容
     modal: false
     focus: true
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
@@ -105,7 +104,7 @@ Popup {
                         Layout.alignment: Qt.AlignHCenter
                         orientation: Qt.Vertical
                         Layout.preferredWidth: Tokens.height8
-                        Layout.preferredHeight: 150
+                        Layout.preferredHeight: 4 * Tokens.height10   // 160：±12 dB 每档 6px 左右，拖得准
                         from: -12
                         to: 12
                         stepSize: 1
