@@ -33,11 +33,18 @@ Kirigami.OverlayDrawer {
     }
     onUpcomingChanged: panel.rebuild()
     Component.onCompleted: panel.rebuild()
-    function commitMove(src, to) {
+    // keepFocus：键盘挪动后队列重建、原来的行被销毁，焦点要交给挪到新位置的那一行，才能连续按 Alt+↑/↓
+    function commitMove(src, to, keepFocus) {
         if (src !== to)
             panel.moveRequested(panel.currentIndex + 1 + src, panel.currentIndex + 1 + to);
         else
             panel.rebuild();
+        if (keepFocus)
+            Qt.callLater(() => {
+                const row = list.itemAtIndex(to);
+                if (row)
+                    row.focusTile();
+            });
     }
 
     edge: Qt.RightEdge
@@ -148,6 +155,7 @@ Kirigami.OverlayDrawer {
                 readonly property var track: panel.upcoming[row.src] || { name: "", artist: "", album: "", dur: 0, fee: 0, cover: "" }
                 width: list.width - list.leftMargin - list.rightMargin
                 implicitHeight: tile.implicitHeight
+                function focusTile() { tile.forceActiveFocus(); }
 
                 // 把手悬挂在页边线外侧（与「正在播放」竖条同一处），曲目行本身仍从页边线开始
                 Kirigami.ListItemDragHandle {
@@ -175,13 +183,13 @@ Kirigami.OverlayDrawer {
                     // 键盘：Alt+↑ / Alt+↓ 上下挪一位
                     Keys.onUpPressed: event => {
                         if ((event.modifiers & Qt.AltModifier) && row.index > 0)
-                            panel.commitMove(row.src, row.index - 1);
+                            panel.commitMove(row.src, row.index - 1, true);
                         else
                             event.accepted = false;
                     }
                     Keys.onDownPressed: event => {
                         if ((event.modifiers & Qt.AltModifier) && row.index < order.count - 1)
-                            panel.commitMove(row.src, row.index + 1);
+                            panel.commitMove(row.src, row.index + 1, true);
                         else
                             event.accepted = false;
                     }

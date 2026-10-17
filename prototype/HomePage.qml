@@ -19,9 +19,10 @@ ScreenFrame {
     // 入口内容（封面、理由、缺数据时的退化）由 Source 决定，这里只管排版
     readonly property var entries: Source.homeEntries(page.loggedIn)
 
-    // 列网格：最小磁贴 160。宽度够时磁贴撑满两条页边线之间；高度不够时边长改由高度决定（取 8 的倍数），网格靠左
+    // 列网格：宽度够时磁贴撑满两条页边线之间；高度不够时边长改由高度决定（取 8 的倍数），网格靠左
     readonly property int textBlock: Tokens.space2 + Tokens.height12             // 磁贴下方两行字
-    readonly property int columns: Math.max(3, Math.min(6, Math.floor((body.width + Tokens.space2) / (Tokens.tileLg + Tokens.space2))))
+    // 固定 6 列：第一排的六个入口是首页的主体，窄窗口下磁贴变小，但一个都不能少（最窄时约 118）
+    readonly property int columns: 6
     readonly property int tileByWidth: Math.floor((body.width - (columns - 1) * Tokens.space2) / columns)
     readonly property int tileByHeight: Math.floor((body.height - Tokens.space6 - Tokens.height10 - Tokens.space3 - 2 * textBlock) / 2 / Tokens.space2) * Tokens.space2
     readonly property int tile: Math.min(tileByWidth, tileByHeight)

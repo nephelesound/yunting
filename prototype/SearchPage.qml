@@ -21,7 +21,8 @@ ScreenFrame {
 
     currentPivot: "search"
 
-    readonly property var result: Source.searchResult
+    // 只用这个词的结果；旧词的响应后到时不会冒充新词的结果
+    readonly property var result: Source.searchFor(page.query)
     readonly property int half: Math.floor((body.width - Tokens.space6) / 2)
     readonly property int headerBlock: Tokens.height10 + Tokens.space3
     readonly property int pitch: Tokens.trackRow + Tokens.space2
@@ -163,7 +164,7 @@ ScreenFrame {
                 }
                 Label {
                     visible: page.result.songs.length === 0
-                    text: "没有找到相关单曲"
+                    text: page.result.pending ? "正在搜索…" : "没有找到相关单曲"
                     font.pixelSize: Tokens.textSm
                     color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                 }

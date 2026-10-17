@@ -124,15 +124,12 @@ ScreenFrame {
                 ScrollBar.vertical: ScrollBar {}
                 onAtYEndChanged: if (atYEnd && page.artist.tracks.length > 0) Source.moreArtistSongs(page.artistId, page.artist.tracks)
 
-                footer: Label {
+                footer: PagingFooter {
                     width: ListView.view.width - ListView.view.rightMargin
-                    height: visible ? Tokens.height10 : 0
-                    visible: page.paging !== null && (page.paging.loading || !page.paging.more)
-                    verticalAlignment: Text.AlignVCenter
-                    horizontalAlignment: Text.AlignHCenter
-                    text: page.paging && page.paging.loading ? "正在取回更多歌曲…" : "已经是全部 " + page.songs.length + " 首"
-                    font.pixelSize: Tokens.textSm
-                    color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                    paging: page.paging
+                    loadingText: "正在取回更多歌曲…"
+                    doneText: "已经是全部 " + page.songs.length + " 首"
+                    onRetryRequested: Source.moreArtistSongs(page.artistId, page.artist.tracks)
                 }
 
                 delegate: TrackTile {

@@ -100,18 +100,28 @@ QtObject {
             seen[item.id] = true;
         const fresh = list.filter(item => item.id === undefined || !seen[item.id]);
         return { owner: acc.owner, items: acc.items.concat(fresh), total: page.total,
-                 more: page.more && list.length > 0, next: acc.next + list.length, loading: false };
+                 more: page.more && list.length > 0, next: acc.next + list.length, loading: false, failed: false };
     }
-    // 返回标成「在取」的新 acc 和要请求的 offset；换了 owner 从 start 开始；在取或没有更多时返回 null。
-    // Store 请求失败时不回调：「在取」超过 10 秒就当失败，允许再取一次（否则滚到底永远不再加载）
+    // 返回标成「在取」的新 acc（next 是要请求的 offset）；换了 owner 从 start 开始；在取或没有更多时返回 null
     function nextPage(acc, owner, start, seed) {
         if (!source.live)
             return null;
         if (acc.owner !== owner)
-            acc = { owner: owner, items: seed, total: 0, more: true, next: start, loading: false, since: 0 };
-        if ((acc.loading && Date.now() - acc.since < 10000) || !acc.more)
+            acc = { owner: owner, items: seed, total: 0, more: true, next: start, loading: false, failed: false };
+        if (acc.loading || !acc.more)
             return null;
-        return Object.assign({}, acc, { loading: true, since: Date.now() });
+        pageTimeout.restart();
+        return Object.assign({}, acc, { loading: true, failed: false });
+    }
+    // Store 请求失败时不回调：在取超过 10 秒就标成 failed，界面给出「点此重试」，不会一直转圈
+    readonly property Timer pageTimeout: Timer {
+        interval: 10000
+        onTriggered: {
+            if (source.latestComments.loading)
+                source.latestComments = Object.assign({}, source.latestComments, { loading: false, failed: true });
+            if (source.artistSongs.loading)
+                source.artistSongs = Object.assign({}, source.artistSongs, { loading: false, failed: true });
+        }
     }
 
     // 最新评论：打开评论或滚到底时调用 moreComments
@@ -170,6 +180,13 @@ QtObject {
     // 搜索：快照只有一个查询词的结果；热门搜索是匿名可得的
     readonly property var hotSearches: source.d.hotSearches || []
     readonly property var searchResult: source.d.search || { query: "", songs: [], artists: [], playlists: [], albums: [] }
+    // 某个词的结果：data 里只放最后落地的一份，词对不上（慢的旧请求后到、新词还在路上）就当还没有，pending 为真
+    function searchFor(query) {
+        const r = source.searchResult;
+        if (!source.live || r.query === query)
+            return Object.assign({ pending: false }, r);
+        return { query: query, songs: [], artists: [], playlists: [], albums: [], pending: true };
+    }
 
     // 一位小数且去掉多余的 .0：59.9 GB / 60 GB。取整会把将满显示成「60 / 60」
     function gigabytes(bytes) {
@@ -310,7 +327,9 @@ QtObject {
                 const card = source.playlists.concat(source.myPlaylists, source.toplists).find(pl => pl.id === id)
                     || { id: id, name: detail.name || "", cover: detail.cover || "", count: detail.count || 0 };
                 const tracks = (card.tracks && card.tracks.length > 0) ? card.tracks : detail.tracks || [];
-                if (tracks.length === 0)
+                // 只在详情还没取回时要一次：取回来是空歌单（tracks 为 []）也算取到了，
+                // 否则每次 put 触发重新求值都会再发一次，空歌单会让请求无限翻倍
+                if (tracks.length === 0 && detail.tracks === undefined)
                     source.need(key);
                 const mine = source.myPlaylists.find(pl => pl.id === id);
                 const owned = mine !== undefined && mine.owned && id !== (p.liked.id || 0);

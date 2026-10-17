@@ -105,7 +105,8 @@ ScreenFrame {
             GroupHeader {
                 text: Source.hotChart.name
                 actionText: "全部 " + Source.hotChart.count + " 首"
-                onActionTriggered: page.toplistOpened(3)
+                // 热歌榜按它自己的 id 打开，不依赖它在榜单列表里排第几
+                onActionTriggered: Actions.openPlaylist(Source.d.playlist.id)
             }
             Grid {
                 id: hot

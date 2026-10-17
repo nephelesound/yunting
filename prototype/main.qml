@@ -197,22 +197,39 @@ Kirigami.ApplicationWindow {
         onLoginRequested: root.requestLogin()
         onNewPlaylistRequested: track => playlistNameDialog.ask(0, "", track)
         onAddRequested: (playlist, track) => {
-            root.noteOnSuccess(playlist.id, "已添加到「" + playlist.name + "」");
+            root.noteOnSuccess(playlist.id, "添加歌曲", "已添加到「" + playlist.name + "」");
             Source.addToPlaylist(playlist.id, track.id);
         }
         onRemoveRequested: (playlistId, track) => {
-            root.noteOnSuccess(playlistId, "已从歌单移除「" + track.name + "」");
+            root.noteOnSuccess(playlistId, "移出歌单", "已从歌单移除「" + track.name + "」");
             Source.removeFromPlaylist(playlistId, track.id);
         }
         onCopied: root.showPassiveNotification("已复制歌曲链接")
     }
 
-    // 歌单写操作成功时 Store 只发 playlistChanged(id)：发请求时按 id 记下要说的话，回来再说
+    // 歌单写操作成功时 Store 只发 playlistChanged(id)、失败只发 playlistActionFailed(操作名, 原因)：
+    // 发请求时按歌单 id 排队记下 { action, text }（同一歌单连续几次操作各有各的话），
+    // 成功时取该歌单最早的一条说出来，失败时按操作名撤掉最早的那条
     property var successNotes: ({})
-    function noteOnSuccess(id, text) {
+    function noteOnSuccess(id, action, text) {
         const notes = Object.assign({}, root.successNotes);
-        notes[id] = text;
+        notes[id] = (notes[id] || []).concat([{ action: action, text: text }]);
         root.successNotes = notes;
+    }
+    function takeNote(match) {
+        const notes = Object.assign({}, root.successNotes);
+        for (const id in notes) {
+            const i = notes[id].findIndex(match);
+            if (i < 0)
+                continue;
+            const note = notes[id][i];
+            notes[id] = notes[id].filter((_, k) => k !== i);
+            if (notes[id].length === 0)
+                delete notes[id];
+            root.successNotes = notes;
+            return note;
+        }
+        return null;
     }
 
     // 新建（id = 0，可带一首要加进去的歌）或重命名（id > 0）共用一个对话框
@@ -246,7 +263,7 @@ Kirigami.ApplicationWindow {
         onAccepted: {
             const name = nameField.text.trim();
             if (playlistNameDialog.playlistId > 0) {
-                root.noteOnSuccess(playlistNameDialog.playlistId, "已重命名为「" + name + "」");
+                root.noteOnSuccess(playlistNameDialog.playlistId, "重命名歌单", "已重命名为「" + name + "」");
                 Source.renamePlaylist(playlistNameDialog.playlistId, name);
             } else {
                 root.trackForNewPlaylist = playlistNameDialog.pendingTrack;
@@ -287,7 +304,7 @@ Kirigami.ApplicationWindow {
             }
         ]
         onAccepted: {
-            root.noteOnSuccess(deleteDialog.playlistId, "已删除歌单「" + deleteDialog.playlistName + "」");
+            root.noteOnSuccess(deleteDialog.playlistId, "删除歌单", "已删除歌单「" + deleteDialog.playlistName + "」");
             Source.deletePlaylist(deleteDialog.playlistId);
             if (root.page === "list" && root.listKey === "playlist:" + deleteDialog.playlistId)
                 root.goBack();
@@ -325,7 +342,7 @@ Kirigami.ApplicationWindow {
         ignoreUnknownSignals: true
         function onPlaylistCreated(id, name) {
             if (root.trackForNewPlaylist) {
-                root.noteOnSuccess(id, "已创建歌单「" + name + "」，并加入「" + root.trackForNewPlaylist.name + "」");
+                root.noteOnSuccess(id, "添加歌曲", "已创建歌单「" + name + "」，并加入「" + root.trackForNewPlaylist.name + "」");
                 Source.addToPlaylist(id, root.trackForNewPlaylist.id);
                 root.trackForNewPlaylist = null;
             } else {
@@ -333,18 +350,22 @@ Kirigami.ApplicationWindow {
             }
         }
         function onPlaylistChanged(id) {
-            const text = root.successNotes[id];
-            if (!text)
+            const queued = root.successNotes[id];
+            if (!queued)
                 return;
             const notes = Object.assign({}, root.successNotes);
-            delete notes[id];
+            notes[id] = queued.slice(1);
+            if (notes[id].length === 0)
+                delete notes[id];
             root.successNotes = notes;
-            root.showPassiveNotification(text);
+            root.showPassiveNotification(queued[0].text);
         }
         function onPlaylistActionFailed(action, message) {
             console.warn(logUi, "playlist action failed:", action, message);
-            root.trackForNewPlaylist = null;
-            root.successNotes = {};
+            // 只撤掉这次失败的那条；新建失败时才放弃「建好后要加入的歌」
+            root.takeNote(note => note.action === action);
+            if (action === "创建歌单")
+                root.trackForNewPlaylist = null;
             root.showPassiveNotification(message);
         }
     }
@@ -365,7 +386,8 @@ Kirigami.ApplicationWindow {
 
     // 导航：推荐/我的/搜索 是顶层枢轴；排行榜、列表、歌手、正在播放压在其上，history 记录来路
     property var history: []
-    readonly property var pageNames: ({ home: "推荐", mine: "我的", search: "搜索", charts: "排行榜", playlists: "全部歌单" })
+    readonly property var pageNames: ({ home: "推荐", mine: "我的", search: "搜索", charts: "排行榜", playlists: "全部歌单",
+                                        nowplaying: "正在播放" })
     readonly property string parentName: {
         const prev = root.history.length > 0 ? root.history[root.history.length - 1] : { page: "home" };
         if (prev.page === "list")
@@ -424,7 +446,7 @@ Kirigami.ApplicationWindow {
             icon.name: "bookmark-remove"
             text: "取消收藏"
             onTriggered: {
-                root.noteOnSuccess(playlistMenu.playlist.id, "已取消收藏「" + playlistMenu.playlist.name + "」");
+                root.noteOnSuccess(playlistMenu.playlist.id, "取消收藏歌单", "已取消收藏「" + playlistMenu.playlist.name + "」");
                 Source.setPlaylistSubscribed(playlistMenu.playlist.id, false);
             }
         }
@@ -491,6 +513,8 @@ Kirigami.ApplicationWindow {
         pageStack.clear();
         pageStack.push(root.pages[root.page]);
     }
+    // 「我的」在登录前后是两个不同的页（引导 / 内容）：登录状态一变就换掉，不必切走再切回来
+    onLoggedInChanged: if (root.page === "mine") root.pageChanged()
     Component.onCompleted: {
         root.applyCommandLine();
         // 先换好数据源与队列，再推首页
@@ -604,7 +628,7 @@ Kirigami.ApplicationWindow {
             onRenameRequested: (id, name) => playlistNameDialog.ask(id, name, null)
             onDeleteRequested: (id, name) => deleteDialog.ask(id, name)
             onSubscribeToggled: (id, name, subscribed) => {
-                root.noteOnSuccess(id, (subscribed ? "已收藏「" : "已取消收藏「") + name + "」");
+                root.noteOnSuccess(id, subscribed ? "收藏歌单" : "取消收藏歌单", (subscribed ? "已收藏「" : "已取消收藏「") + name + "」");
                 Source.setPlaylistSubscribed(id, subscribed);
             }
         }

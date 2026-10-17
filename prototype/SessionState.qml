@@ -11,7 +11,7 @@ Item {
     required property var window
     required property var player      // Playback
 
-    readonly property int maxQueue: 500   // 队列存成 JSON；太长的队列只留前 500 首，配置文件不至于膨胀
+    readonly property int maxQueue: 500   // 队列存成 JSON；太长的队列只留当前曲目附近的 500 首，配置文件不至于膨胀
     readonly property var pivots: ["home", "mine", "search"]
 
     Settings {
@@ -61,8 +61,12 @@ Item {
     }
 
     // 恢复完成后才开始回写，避免启动途中的默认值把存档覆盖掉
-    Binding { when: persisted.restored; target: saved; property: "queue"; value: JSON.stringify(persisted.player.queue.slice(0, persisted.maxQueue)) }
-    Binding { when: persisted.restored; target: saved; property: "index"; value: persisted.player.index }
+    // 队列超过 500 首时存「当前曲目附近」的 500 首（而不是前 500 首），下标相应换算：
+    // 否则放到第 550 首时重启，存下的队列里根本没有这首歌
+    readonly property int windowStart: Math.max(0, Math.min(persisted.player.index - persisted.maxQueue / 2,
+                                                             persisted.player.queue.length - persisted.maxQueue))
+    Binding { when: persisted.restored; target: saved; property: "queue"; value: JSON.stringify(persisted.player.queue.slice(persisted.windowStart, persisted.windowStart + persisted.maxQueue)) }
+    Binding { when: persisted.restored; target: saved; property: "index"; value: persisted.player.index - persisted.windowStart }
     Binding { when: persisted.restored; target: saved; property: "origin"; value: persisted.player.origin }
     Binding { when: persisted.restored; target: saved; property: "position"; value: Math.floor(persisted.player.engine.position) }
     Binding { when: persisted.restored; target: saved; property: "volume"; value: persisted.player.engine.volume }

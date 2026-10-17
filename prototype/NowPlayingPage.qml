@@ -32,8 +32,16 @@ ScreenFrame {
     // 最新评论（分页累积）：只认这首歌的；打开评论或换歌时从第一页开始取
     readonly property var latest: page.track && page.pane === "comments" && Source.latestComments.owner === page.track.id
         ? Source.latestComments : null
-    readonly property var commentRows: page.comments.map(c => Object.assign({ group: "hot" }, c))
-        .concat((page.latest ? page.latest.items : []).map(c => Object.assign({ group: "latest" }, c)))
+    // 精彩评论也会出现在按时间排的分页里：同一条（用户 + 时间 + 内容）只在精彩评论里出现一次
+    function commentKey(c) { return c.user + "\n" + c.time + "\n" + c.content; }
+    readonly property var commentRows: {
+        const hotKeys = {};
+        for (const c of page.comments)
+            hotKeys[page.commentKey(c)] = true;
+        const latest = (page.latest ? page.latest.items : []).filter(c => !hotKeys[page.commentKey(c)]);
+        return page.comments.map(c => Object.assign({ group: "hot" }, c))
+            .concat(latest.map(c => Object.assign({ group: "latest" }, c)));
+    }
     function startComments() {
         if (page.track && page.pane === "comments" && Source.latestComments.owner !== page.track.id)
             Source.moreComments(page.track.id);
@@ -172,14 +180,12 @@ ScreenFrame {
             ScrollBar.vertical: ScrollBar {}
             onAtYEndChanged: if (atYEnd && page.track && page.pane === "comments") Source.moreComments(page.track.id)
 
-            footer: Label {
-                width: ListView.view.width
-                height: visible ? Tokens.height10 : 0
-                visible: page.latest !== null && (page.latest.loading || !page.latest.more) && page.latest.items.length > 0
-                verticalAlignment: Text.AlignVCenter
-                text: page.latest && page.latest.loading ? "正在取回更多评论…" : "没有更多评论了"
-                font.pixelSize: Tokens.textSm
-                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+            footer: PagingFooter {
+                width: ListView.view.width - Tokens.space4
+                paging: page.latest
+                loadingText: "正在取回更多评论…"
+                doneText: "没有更多评论了"
+                onRetryRequested: Source.moreComments(page.track.id)
             }
 
             delegate: ColumnLayout {
