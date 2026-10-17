@@ -31,7 +31,7 @@ target_compile_options(ncm-player PRIVATE -Wall -Wextra)
 find_package(Qt6 REQUIRED COMPONENTS Test)
 enable_testing()
 qt_add_executable(querycache_test tests/querycache_test.cpp querycache.h querycache.cpp)
-target_link_libraries(querycache_test PRIVATE Qt6::Core Qt6::Test)
+target_link_libraries(querycache_test PRIVATE Qt6::Core Qt6::Test Qt6::Network)
 add_test(NAME querycache COMMAND querycache_test)
 
 # 音量/静音走 QAudioOutput，测试要能构造真实引擎（无窗口、无网络）
@@ -40,6 +40,12 @@ qt_add_executable(audioengine_test tests/audioengine_test.cpp audioengine.h audi
 target_compile_options(audioengine_test PRIVATE -Wall -Wextra)
 target_link_libraries(audioengine_test PRIVATE Qt6::Core Qt6::Test Qt6::Network Qt6::Multimedia)
 add_test(NAME audioengine COMMAND audioengine_test)
+
+# 重试策略：seam 是本地 QTcpServer（I/O 边界），不 mock NcmClient 内部
+qt_add_executable(retry_test tests/retry_test.cpp ncmclient.h ncmclient.cpp)
+target_compile_options(retry_test PRIVATE -Wall -Wextra)
+target_link_libraries(retry_test PRIVATE Qt6::Core Qt6::Network Qt6::Test)
+add_test(NAME retry COMMAND retry_test)
 
 target_link_libraries(ncm-player PRIVATE
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Qml Qt6::Quick Qt6::QuickControls2

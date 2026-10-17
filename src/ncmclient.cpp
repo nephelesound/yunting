@@ -13,10 +13,10 @@
 Q_LOGGING_CATEGORY(lcNet, "ncm.net", QtWarningMsg)
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QTimer>
 #include <QUrl>
 
 namespace {
-constexpr auto ApiBase = "https://music.163.com/";
 constexpr auto Referer = "https://music.163.com";
 constexpr auto UserAgent = "Mozilla/5.0 (X11; Linux x86_64) Chrome/140.0";
 } // namespace
@@ -140,9 +140,34 @@ QString NcmClient::cookieHeader(bool personal) const
     return header;
 }
 
+void NcmClient::setApiBase(const QString &base)
+{
+    m_apiBase = base;
+}
+
+namespace {
+// 重试节奏：最多 3 次，间隔 0.5 / 1 / 2 秒
+constexpr int MaxRetries = 3;
+const int RetryDelaysMs[] = {500, 1000, 2000};
+} // namespace
+
+bool NcmClient::isNetworkError(const QNetworkReply &reply)
+{
+    // 「网络原因」= 没拿到 HTTP 状态：连接被拒/无路由、DNS 失败、超时。
+    // 服务器明确回的任何状态码（含 5xx）都说明网络通。
+    return reply.attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 0
+        && reply.error() != QNetworkReply::NoError;
+}
+
 void NcmClient::get(const QString &path, const QUrlQuery &query, bool personal, GetCallback callback)
 {
-    QUrl url(QString::fromLatin1(ApiBase) + path);
+    startGet(path, query, personal, 0, false, std::move(callback));
+}
+
+void NcmClient::startGet(const QString &path, const QUrlQuery &query, bool personal,
+                         int attempt, bool retrying, GetCallback callback)
+{
+    QUrl url(m_apiBase + path);
     url.setQuery(query);
 
     QNetworkRequest req(url);
@@ -158,10 +183,21 @@ void NcmClient::get(const QString &path, const QUrlQuery &query, bool personal, 
         req.setRawHeader("Cookie", cookie.toUtf8());
     }
     // 请求计数用（--verbose）：只记路径，不记 query（可能含搜索词）和请求头
-    qCDebug(lcNet).noquote() << "GET" << url.path();
+    qCDebug(lcNet).noquote() << "GET" << url.path() << (retrying ? QStringLiteral("(retry %1)").arg(attempt) : QStringLiteral(""));
     QNetworkReply *reply = m_nam->get(req);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, callback] {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, callback, path, query, personal, attempt]
+    {
         reply->deleteLater();
+        const bool networkError = isNetworkError(*reply);
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        // 重试：网络原因（无 HTTP 状态）或服务器端 5xx；4xx 与业务码不重试
+        const bool retryable = networkError || status >= 500;
+        if (retryable && attempt < MaxRetries) {
+            QTimer::singleShot(RetryDelaysMs[attempt], this, [this, path, query, personal, attempt, callback] {
+                startGet(path, query, personal, attempt + 1, true, std::move(callback));
+            });
+            return;
+        }
         QJsonDocument doc;
         bool ok = false;
         if (reply->error() == QNetworkReply::NoError) {
@@ -176,6 +212,7 @@ void NcmClient::get(const QString &path, const QUrlQuery &query, bool personal, 
                        << reply->url().toString(QUrl::RemoveQuery);
         }
         keepSetCookies(reply);
+        emit requestFinished(ok, networkError);
         if (callback)
             callback(doc, ok);
     });
