@@ -37,27 +37,22 @@ AudioEngine::AudioEngine(NcmClient *client, QObject *parent)
     : QObject(parent), m_client(client)
 {
     m_player = new QMediaPlayer(this);
-#ifdef YUNTING_EXPERIMENTAL_EQ
-    // DSP 链路：解码后的 PCM 由 QAudioBufferOutput 交给 EqAudioSink（默认启用）。
-    m_eqSink = new EqAudioSink(this);
-    m_bufferOutput = new QAudioBufferOutput(this);
-    m_player->setAudioBufferOutput(m_bufferOutput);
-    connect(m_bufferOutput, &QAudioBufferOutput::audioBufferReceived,
-            m_eqSink, &EqAudioSink::bufferReceived);
-    connect(m_eqSink, &EqAudioSink::unavailable, this, [this](const QString &reason) {
-        if (m_audio)
-            return;
-        qWarning() << "eq unavailable, falling back to QAudioOutput:" << reason;
-        m_player->setAudioBufferOutput(nullptr);
-        m_audio = new QAudioOutput(this);
-        m_player->setAudioOutput(m_audio);
-        m_audio->setVolume(applyVolumeScale(m_volume));
-        m_audio->setMuted(m_muted);
-    });
-#else
+    // 默认走系统音频输出：它有自己的实时线程和缓冲，UI/内存回收不会直接卡住它。
     m_audio = new QAudioOutput(this);
     m_player->setAudioOutput(m_audio);
     m_audio->setVolume(applyVolumeScale(m_volume));
+    m_audio->setMuted(m_muted);
+#ifdef YUNTING_EXPERIMENTAL_EQ
+    // EQ 非平直时才挂上自建 DSP 链路：QMediaPlayer → QAudioBufferOutput → EqAudioSink。
+    m_eqSink = new EqAudioSink(this);
+    m_bufferOutput = new QAudioBufferOutput(this);
+    connect(m_bufferOutput, &QAudioBufferOutput::audioBufferReceived,
+            m_eqSink, &EqAudioSink::bufferReceived);
+    connect(m_eqSink, &EqAudioSink::unavailable, this, [this](const QString &reason) {
+        qWarning() << "eq unavailable, falling back to QAudioOutput:" << reason;
+        m_eqBroken = true;
+        disableEq();
+    });
 #endif
 
     connect(m_player, &QMediaPlayer::positionChanged, this, [this] {
@@ -71,6 +66,18 @@ AudioEngine::AudioEngine(NcmClient *client, QObject *parent)
             scrobbleFinish();
             setPlaying(false);
             emit finished();
+            return;
+        }
+        qCDebug(lcPerf) << "media status=" << int(status);
+        // 只在 BufferedMedia 跳转：LoadedMedia 时后端还没准备好，setPosition 会被随后的 play() 冲掉。
+        if (m_resumePosition >= 0 && status == QMediaPlayer::BufferedMedia) {
+            const qint64 resume = m_resumePosition;
+            m_resumePosition = -1;
+            m_player->setPosition(resume);
+            qCDebug(lcPerf).nospace() << "audio resume at=" << resume;
+            if (m_playing)
+                m_player->play();
+            emit seeked();
         }
     });
     // 真正开始出声才打卡：地址还在解析时不算听过
@@ -120,6 +127,7 @@ void AudioEngine::setTrack(const QVariantMap &track)
     scrobbleFinish();
     m_track = track;
     m_pendingSeek = -1;   // 上一首的跳转只属于上一首，不能落到新曲目上
+    m_resumePosition = -1;
     m_failed = false;
     m_scrobbleStarted = false;
     m_scrobbleFinished = false;
@@ -207,6 +215,71 @@ QString AudioEngine::effectiveLevel() const
     return QStringLiteral("exhigh");
 }
 
+#ifdef YUNTING_EXPERIMENTAL_EQ
+void AudioEngine::updateEqActive()
+{
+    if (m_eqBroken)
+        return;
+    bool neutral = qFuzzyCompare(m_bassBoost, 0.0) && qFuzzyCompare(m_stereoWidth, 1.0);
+    for (const QVariant &gain : m_eqGains)
+        neutral = neutral && qFuzzyCompare(gain.toDouble(), 0.0);
+    if (neutral)
+        disableEq();
+    else
+        enableEq();
+}
+
+void AudioEngine::enableEq()
+{
+    if (m_eqActive || m_eqBroken)
+        return;
+    m_eqActive = true;
+    if (m_eqSink) {
+        m_eqSink->setVolume(m_volume);
+        m_eqSink->setMuted(m_muted);
+        for (int band = 0; band < m_eqGains.size(); ++band)
+            m_eqSink->setGain(band, m_eqGains.at(band).toDouble());
+        m_eqSink->setBassBoost(m_bassBoost);
+        m_eqSink->setStereoWidth(m_stereoWidth);
+    }
+    m_player->setAudioOutput(nullptr);
+    m_player->setAudioBufferOutput(m_bufferOutput);
+    restartForOutput();
+    qCDebug(lcPerf) << "eq path enabled";
+}
+
+void AudioEngine::disableEq()
+{
+    if (!m_eqActive)
+        return;
+    m_eqActive = false;
+    if (m_eqSink)
+        m_eqSink->stopAndClear();
+    m_player->setAudioBufferOutput(nullptr);
+    m_player->setAudioOutput(m_audio);
+    m_audio->setVolume(applyVolumeScale(m_volume));
+    m_audio->setMuted(m_muted);
+    restartForOutput();
+    qCDebug(lcPerf) << "eq path disabled";
+}
+
+void AudioEngine::restartForOutput()
+{
+    const QUrl source = m_player->source();
+    if (!source.isValid())
+        return;
+    const qint64 position = m_player->position();
+    const bool wasPlaying = m_playing;
+    m_resumePosition = position;
+    m_player->stop();
+    m_player->setSource(QUrl());
+    m_player->setSource(source);
+    if (wasPlaying)
+        m_player->play();
+    qCDebug(lcPerf).nospace() << "audio output restarted at=" << position;
+}
+#endif
+
 void AudioEngine::setEqGain(int band, double db)
 {
     if (band < 0 || band >= m_eqGains.size())
@@ -218,6 +291,7 @@ void AudioEngine::setEqGain(int band, double db)
 #ifdef YUNTING_EXPERIMENTAL_EQ
     if (m_eqSink)
         m_eqSink->setGain(band, clamped);
+    updateEqActive();
 #endif
     emit eqGainsChanged();
 }
@@ -239,6 +313,7 @@ void AudioEngine::setBassBoost(double db)
 #ifdef YUNTING_EXPERIMENTAL_EQ
     if (m_eqSink)
         m_eqSink->setBassBoost(clamped);
+    updateEqActive();
 #endif
     emit bassBoostChanged();
 }
@@ -252,6 +327,7 @@ void AudioEngine::setStereoWidth(double width)
 #ifdef YUNTING_EXPERIMENTAL_EQ
     if (m_eqSink)
         m_eqSink->setStereoWidth(clamped);
+    updateEqActive();
 #endif
     emit stereoWidthChanged();
 }

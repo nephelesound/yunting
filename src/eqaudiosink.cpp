@@ -8,6 +8,7 @@
 #include <QMediaDevices>
 #include <QIODevice>
 #include <QLoggingCategory>
+#include <QTimer>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -23,12 +24,28 @@ double linearVolume(double slider)
 EqAudioSink::EqAudioSink(QObject *parent)
     : QObject(parent)
 {
+    m_drainTimer = new QTimer(this);
+    m_drainTimer->setInterval(10);
+    connect(m_drainTimer, &QTimer::timeout, this, &EqAudioSink::drain);
 }
 
 EqAudioSink::~EqAudioSink()
 {
-    if (m_sink)
+    stopAndClear();
+}
+
+void EqAudioSink::stopAndClear()
+{
+    m_pending.clear();
+    if (m_drainTimer)
+        m_drainTimer->stop();
+    if (m_sink) {
         m_sink->stop();
+        delete m_sink;
+        m_sink = nullptr;
+    }
+    m_io = nullptr;
+    m_format = QAudioFormat();
 }
 
 void EqAudioSink::setVolume(double slider)
@@ -53,13 +70,7 @@ void EqAudioSink::setDevice(const QAudioDevice &device)
     if (m_device == device)
         return;
     m_device = device;
-    if (m_sink) {
-        m_sink->stop();
-        delete m_sink;
-        m_sink = nullptr;
-        m_io = nullptr;
-        m_format = QAudioFormat();
-    }
+    stopAndClear();
 }
 
 void EqAudioSink::applyVolume()
@@ -72,12 +83,7 @@ void EqAudioSink::ensureSink(const QAudioFormat &format)
 {
     if (m_sink && m_format == format)
         return;
-    if (m_sink) {
-        m_sink->stop();
-        delete m_sink;
-        m_sink = nullptr;
-        m_io = nullptr;
-    }
+    stopAndClear();
 
     const QAudioDevice device = m_device.isNull() ? QMediaDevices::defaultAudioOutput() : m_device;
     if (device.isNull()) {
@@ -90,6 +96,11 @@ void EqAudioSink::ensureSink(const QAudioFormat &format)
     m_format = format;
     m_eq.configure(format.sampleRate(), format.channelCount());
     m_sink = new QAudioSink(device, format, this);
+    // 默认 sink 缓冲区只有一两帧的量；主线程被 UI 或内存回收拖住时，
+    // QAudioBufferOutput 的下一块来不及写进去就会断音。留 500ms 余量。
+    const qint64 bufferBytes = format.bytesForDuration(500000);
+    if (bufferBytes > 0)
+        m_sink->setBufferSize(bufferBytes);
     m_io = m_sink->start();
     applyVolume();
     if (!m_io) {
@@ -102,7 +113,8 @@ void EqAudioSink::ensureSink(const QAudioFormat &format)
         m_unavailable = false;
         qCDebug(lcPerf).nospace() << "eq sink format=" << format.sampleRate()
                                   << "Hz/" << format.channelCount() << "ch/"
-                                  << int(format.sampleFormat());
+                                  << int(format.sampleFormat())
+                                  << " buffer=" << m_sink->bufferSize();
     }
 }
 
@@ -117,6 +129,9 @@ QByteArray EqAudioSink::render(const QAudioBuffer &buffer, bool *processed)
 
     const auto raw = QByteArray::fromRawData(buffer.constData<char>(),
                                              buffer.byteCount());
+    // 平直曲线下不需要转换采样格式，也不跑 biquad；直接把原始 PCM 交给 sink。
+    if (m_eq.neutral())
+        return raw;
     switch (fmt.sampleFormat()) {
     case QAudioFormat::Float: {
         QByteArray out = raw;
@@ -174,14 +189,55 @@ void EqAudioSink::bufferReceived(const QAudioBuffer &buffer)
     const QByteArray data = render(buffer, &processed);
     if (data.isEmpty())
         return;
-    if (m_sink->bytesFree() < data.size()) {
-        if (++m_dropped == 1 || m_dropped % 100 == 0)
-            qCDebug(lcPerf).nospace() << "eq drop=" << m_dropped
-                                      << " free=" << m_sink->bytesFree()
-                                      << " need=" << data.size();
+    Q_UNUSED(processed)
+
+    // sink 满时不丢整块：先入队，再由 drain() 按空闲空间写入。
+    m_pending.append(data);
+    const qint64 maxPending = m_format.bytesForDuration(1000000);
+    if (maxPending > 0 && m_pending.size() > maxPending) {
+        int drop = int(m_pending.size() - maxPending);
+        const int frameBytes = m_format.bytesPerFrame();
+        if (frameBytes > 0)
+            drop -= drop % frameBytes;
+        if (drop > 0) {
+            m_pending.remove(0, drop);
+            if (++m_dropped == 1 || m_dropped % 100 == 0)
+                qCDebug(lcPerf).nospace() << "eq drop=" << m_dropped
+                                          << " pending=" << m_pending.size()
+                                          << " max=" << maxPending;
+        }
+    }
+    drain();
+}
+
+void EqAudioSink::drain()
+{
+    if (!m_io || !m_sink) {
+        m_pending.clear();
+        if (m_drainTimer)
+            m_drainTimer->stop();
         return;
     }
-    m_io->write(data);
-    if (!processed)
-        qCDebug(lcPerf) << "eq passthrough";
+    const int frameBytes = m_format.bytesPerFrame();
+    while (!m_pending.isEmpty() && frameBytes > 0) {
+        const qint64 free = m_sink->bytesFree();
+        if (free <= 0)
+            break;
+        qint64 count = std::min<qint64>(free, m_pending.size());
+        count -= count % frameBytes;
+        if (count <= 0)
+            break;
+        const qint64 written = m_io->write(m_pending.constData(), count);
+        if (written <= 0)
+            break;
+        m_pending.remove(0, written);
+        if (written < count)
+            break;
+    }
+    if (m_pending.isEmpty()) {
+        if (m_drainTimer)
+            m_drainTimer->stop();
+    } else if (m_drainTimer && !m_drainTimer->isActive()) {
+        m_drainTimer->start();
+    }
 }

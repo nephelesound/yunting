@@ -33,7 +33,8 @@ class AudioEngine : public QObject {
     Q_PROPERTY(bool muted READ muted WRITE setMuted NOTIFY mutedChanged)
     // auto / standard / higher / exhigh / lossless / hires
     Q_PROPERTY(QString quality READ quality WRITE setQuality NOTIFY qualityChanged)
-    // DSP 链路默认启用；-DYUNTING_EXPERIMENTAL_EQ=OFF 时为 false，隐藏 EQ UI
+    // DSP 可用（-DYUNTING_EXPERIMENTAL_EQ=OFF 时为 false，隐藏 EQ UI）；默认播放走系统
+    // QAudioOutput，只有 EQ 非平直时才切到自建 QAudioSink，避免主线程忙时拖累普通播放
     Q_PROPERTY(bool eqAvailable READ eqAvailable CONSTANT)
     // 10 段增益（dB），band 0..9 = 31Hz..16kHz
     Q_PROPERTY(QVariantList eqGains READ eqGains NOTIFY eqGainsChanged)
@@ -116,6 +117,14 @@ signals:
 private:
     // 地址取不到即 failed；quality=auto 时按曲目元数据选档
     void resolveUrl(double songId);
+#ifdef YUNTING_EXPERIMENTAL_EQ
+    // 平直曲线不需要 DSP：继续用系统 QAudioOutput；任一参数非平直才切到自建 sink。
+    void updateEqActive();
+    void enableEq();
+    void disableEq();
+    // 运行中切换输出后端：QMediaPlayer 不会在播放中重挂音频输出，重新打开同一 URL 并回到原位置
+    void restartForOutput();
+#endif
     void startSource(const QString &url);
     QString effectiveLevel() const;
     // 听歌打卡：startplay 写「最近播放」，play 写「听歌排行」；每首歌各一次
@@ -137,6 +146,8 @@ private:
 #ifdef YUNTING_EXPERIMENTAL_EQ
     QAudioBufferOutput *m_bufferOutput = nullptr;
     EqAudioSink *m_eqSink = nullptr;
+    bool m_eqActive = false;
+    bool m_eqBroken = false;   // sink 起不来：不再尝试切换，保留系统输出
 #endif
     QVariantMap m_track;
     bool m_playing = false;
@@ -153,6 +164,7 @@ private:
     double m_bassBoost = 0;
     double m_stereoWidth = 1;
     double m_pendingSeek = -1;
+    qint64 m_resumePosition = -1;   // 切换输出后端后，等媒体重新加载完再跳回的位置
     bool m_scrobbleStarted = false;
     bool m_scrobbleFinished = false;
     QElapsedTimer m_trackClock;
