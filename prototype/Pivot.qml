@@ -30,7 +30,7 @@ Row {
             // 键盘：非当前项进 Tab 顺序，回车 / 空格切换；聚焦时与悬停同样提亮，并加下划线
             activeFocusOnTab: !tab.active
             font.underline: tab.activeFocus
-            opacity: active ? 1 : hover.hovered || tab.activeFocus ? Tokens.fadedHover : Tokens.faded
+            opacity: active ? 1 : hover.hovered || tab.activeFocus ? Tokens.navHover : Tokens.navInactive
             Behavior on opacity { NumberAnimation { duration: Tokens.motionFast } }
             Accessible.role: Accessible.PageTab
             Accessible.name: text

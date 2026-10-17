@@ -33,8 +33,12 @@ QtObject {
     readonly property real tonalHover: 0.15
     readonly property real placeholder: 0.05  // 封面加载前的占位底
     readonly property real track: 0.15        // 进度线未播放段
-    readonly property real faded: 0.25        // 非当前枢轴 / 面包屑上级
-    readonly property real fadedHover: 0.5
+    readonly property real faded: 0.25        // 压暗：过期的二维码、封面占位图标
+    readonly property real fadedHover: 0.5    // 禁用的强调色按钮
+    // 排版导航（枢轴、面包屑上级）的非当前项：Metro 式「当前实、其余虚」，但 0.5 才让 36/24 的细体
+    // 在 Breeze 亮色下有约 3:1 的对比度，读得出是可点的导航；悬停 / 键盘聚焦提到 0.75
+    readonly property real navInactive: 0.5
+    readonly property real navHover: 0.75
 
     // 动效：时长一律取 Kirigami.Units，桌面平台插件会按 Plasma「动画速度」(AnimationDurationFactor) 缩放，
     // 用户关掉动画时它们就是 0，减弱动效不用另写分支。

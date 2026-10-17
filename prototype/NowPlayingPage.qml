@@ -63,7 +63,8 @@ ScreenFrame {
         return n >= 10000 ? (n / 10000).toFixed(n >= 100000 ? 0 : 1) + "万" : String(n);
     }
 
-    // 左半：封面与事实
+    // 左半：封面与事实。这一屏是「左封面、右歌词」的两栏构图：封面在左半栏水平居中是有意的构图轴
+    //（不贴页边线），事实行与封面左缘对齐；右栏从中线开始
     ColumnLayout {
         x: Math.round((parent.width / 2 - width) / 2)
         y: page.coverTopRow * page.pitch
@@ -162,7 +163,7 @@ ScreenFrame {
             height: page.pitch
             visible: page.pane === "lyrics" && page.lines.length === 0
             verticalAlignment: Text.AlignVCenter
-            text: "暂无歌词"
+            text: page.track ? "暂无歌词" : "还没有在播放的歌"
             font.pixelSize: Tokens.text2xl
             color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
         }
@@ -175,7 +176,7 @@ ScreenFrame {
             width: parent.width
             height: (page.rows - 1) * page.pitch
             clip: true
-            spacing: Tokens.space4
+            spacing: Tokens.space6   // 评论之间 24：每条是一段独立的话，间距比行内大一档才分得开
             topMargin: Tokens.space3
             bottomMargin: Tokens.space6
             boundsBehavior: Flickable.StopAtBounds
@@ -198,64 +199,66 @@ ScreenFrame {
                 width: ListView.view.width - Tokens.space4
                 spacing: Tokens.space3
 
-                // 分组标题：每组第一条之前（精彩评论 / 最新评论 N）
+                // 分组标题：每组第一条之前，与队列的「正在播放 / 接下来播放」同一种小节标题
                 Label {
                     visible: comment.index === 0 || page.commentRows[comment.index - 1].group !== comment.modelData.group
-                    Layout.topMargin: comment.index === 0 ? 0 : Tokens.space4
+                    Layout.topMargin: comment.index === 0 ? 0 : Tokens.space6
                     text: comment.modelData.group === "hot" ? "精彩评论"
                         : "最新评论" + (page.latest && page.latest.total > 0 ? " " + page.count(page.latest.total) : "")
                     font.pixelSize: Tokens.textSm
-                    font.weight: Font.DemiBold
                     color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                 }
 
+                // 一条评论：头像 | 作者与时间挨在一起（都是关于「谁、何时」），赞数在右；正文放宽行距便于阅读
                 RowLayout {
-                Layout.fillWidth: true
-                spacing: Tokens.space3
-
-                Components.Avatar {
-                    Layout.alignment: Qt.AlignTop
-                    implicitWidth: Tokens.height8
-                    implicitHeight: Tokens.height8
-                    name: comment.modelData.user
-                    source: comment.modelData.avatar || ""
-                    initialsMode: Components.Avatar.InitialsMode.UseIcon
-                }
-                ColumnLayout {
                     Layout.fillWidth: true
-                    spacing: Tokens.space1
-                    RowLayout {
+                    spacing: Tokens.space3
+
+                    Components.Avatar {
+                        Layout.alignment: Qt.AlignTop
+                        implicitWidth: Tokens.height8
+                        implicitHeight: Tokens.height8
+                        name: comment.modelData.user
+                        source: comment.modelData.avatar || ""
+                        initialsMode: Components.Avatar.InitialsMode.UseIcon
+                    }
+                    ColumnLayout {
                         Layout.fillWidth: true
+                        spacing: Tokens.space1
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Tokens.space2
+                            Label {
+                                Layout.maximumWidth: implicitWidth
+                                Layout.fillWidth: true
+                                text: comment.modelData.user
+                                font.pixelSize: Tokens.textSm
+                                elide: Text.ElideRight
+                            }
+                            Label {
+                                text: Format.commentTime(comment.modelData.time)
+                                font.pixelSize: Tokens.textSm
+                                font.features: { "tnum": 1 }
+                                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                            }
+                            Item { Layout.fillWidth: true }
+                            Label {
+                                text: page.count(comment.modelData.likes) + " 赞"
+                                font.pixelSize: Tokens.textSm
+                                font.features: { "tnum": 1 }
+                                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                            }
+                        }
                         Label {
                             Layout.fillWidth: true
-                            text: comment.modelData.user
-                            font.pixelSize: Tokens.textSm
-                            color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                            text: comment.modelData.content
+                            font.pixelSize: Tokens.textBase
+                            lineHeight: 1.4
+                            wrapMode: Text.Wrap
+                            maximumLineCount: 6
                             elide: Text.ElideRight
                         }
-                        Label {
-                            text: Format.commentTime(comment.modelData.time)
-                            font.pixelSize: Tokens.textSm
-                            font.features: { "tnum": 1 }
-                            color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
-                        }
-                        Label {
-                            Layout.leftMargin: Tokens.space2
-                            text: page.count(comment.modelData.likes) + " 赞"
-                            font.pixelSize: Tokens.textSm
-                            font.features: { "tnum": 1 }
-                            color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
-                        }
                     }
-                    Label {
-                        Layout.fillWidth: true
-                        text: comment.modelData.content
-                        font.pixelSize: Tokens.textBase
-                        wrapMode: Text.Wrap
-                        maximumLineCount: 6
-                        elide: Text.ElideRight
-                    }
-                }
                 }
             }
         }
@@ -263,7 +266,7 @@ ScreenFrame {
         // 评论空着时：在取（10 秒内）/ 没取到（可点重试）/ 原型里就是没有。Store 失败不回调，只能靠超时判断
         Label {
             id: commentsEmpty
-            readonly property bool waiting: page.pane === "comments" && page.commentRows.length === 0 && Source.live
+            readonly property bool waiting: page.pane === "comments" && page.commentRows.length === 0 && Source.live && page.track !== null
             property bool timedOut: false
             onWaitingChanged: {
                 commentsEmpty.timedOut = false;
@@ -276,7 +279,8 @@ ScreenFrame {
             height: page.pitch
             visible: page.pane === "comments" && page.commentRows.length === 0
             verticalAlignment: Text.AlignVCenter
-            text: !Source.live ? "暂无评论" : commentsEmpty.timedOut ? "没取到评论，点此重试" : "正在取回评论…"
+            text: !page.track ? "还没有在播放的歌" : !Source.live ? "暂无评论"
+                : commentsEmpty.timedOut ? "没取到评论，点此重试" : "正在取回评论…"
             font.pixelSize: Tokens.text2xl
             font.underline: commentsEmpty.timedOut && retryHover.hovered
             color: commentsEmpty.timedOut ? Kirigami.Theme.textColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)

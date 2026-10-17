@@ -245,7 +245,7 @@ QtObject {
         const fm = p.fm.tracks;
         const similar = p.similar;
         const fmEntry = fm.length > 0
-            ? { key: "fm", title: "私人漫游", cover: source.sized(fm[0].cover, 400), caption: "从" + source.quoted(fm[0].name) + "开启漫游" }
+            ? { key: "fm", title: "私人漫游", cover: source.sized(fm[0].cover, 400), caption: "立即播放：从" + source.quoted(fm[0].name) + "开始" }   // 唯一点了就放的入口，先说清楚
             : { key: "fm", title: "私人漫游", symbol: "radio-symbolic", caption: "暂时没有可漫游的歌" };
         const similarEntry = similar.tracks.length > 0
             ? { key: "similar", title: "相似歌曲", cover: source.sized(similar.tracks[0].cover, 400), caption: "和" + source.quoted(similar.seed.name) + "相似" }
