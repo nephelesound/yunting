@@ -1,14 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>io.github.sudoskys.Yunting</id>
+  <id>io.github.nephelesound.Yunting</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
   <name>云听</name>
   <summary>网易云音乐的 Linux 客户端</summary>
-  <developer id="io.github.sudoskys">
-    <name>sudoskys</name>
+  <developer id="io.github.nephelesound">
+    <name>Nephele Sound</name>
   </developer>
-  <launchable type="desktop-id">io.github.sudoskys.Yunting.desktop</launchable>
+  <url type="homepage">https://github.com/nephelesound/yunting</url>
+  <url type="bugtracker">https://github.com/nephelesound/yunting/issues</url>
+  <launchable type="desktop-id">io.github.nephelesound.Yunting.desktop</launchable>
   <provides>
     <binary>yunting</binary>
   </provides>

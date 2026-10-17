@@ -1,5 +1,5 @@
 // 应用入口：装配 NcmClient / Store / AudioEngine / Session / Mpris，注入 prototype/main.qml。
-// QML 编进可执行文件的 Qt 资源（qrc:/qt/qml/org/sudoskys/yunting/），资源清单见 CMakeLists.txt。
+// QML 编进可执行文件的 Qt 资源（qrc:/qt/qml/org/nephelesound/yunting/），资源清单见 CMakeLists.txt。
 #include "apicli.h"
 #include "audioengine.h"
 #include "imagecache.h"
@@ -71,11 +71,11 @@ int main(int argc, char *argv[])
     //   desktopFileName：.desktop 文件名、托盘 Id、图标名
     app.setApplicationName(QStringLiteral("yunting"));
     app.setApplicationDisplayName(QStringLiteral("云听"));
-    app.setDesktopFileName(QStringLiteral("io.github.sudoskys.Yunting"));
+    app.setDesktopFileName(QStringLiteral("io.github.nephelesound.Yunting"));
     // 任务栏/窗口图标：装好后走主题；从源码运行时用内嵌 SVG，避免显示通用占位图标
-    QIcon appIcon = QIcon::fromTheme(QStringLiteral("io.github.sudoskys.Yunting"));
+    QIcon appIcon = QIcon::fromTheme(QStringLiteral("io.github.nephelesound.Yunting"));
     if (appIcon.isNull())
-        appIcon = QIcon(QStringLiteral(":/io.github.sudoskys.Yunting.svg"));
+        appIcon = QIcon(QStringLiteral(":/io.github.nephelesound.Yunting.svg"));
     app.setWindowIcon(appIcon);
 
     QCommandLineParser parser;
@@ -611,7 +611,7 @@ int main(int argc, char *argv[])
                      [] { QCoreApplication::exit(1); }, Qt::QueuedConnection);
     // 界面编进资源：单一资源目录（qmldir 的 singleton 声明按同目录解析），
     // Snapshot.qml 与快照数据不编入，backend 注入后它的创建路径不会走到
-    engine.load(QUrl(QStringLiteral("qrc:/qt/qml/org/sudoskys/yunting/main.qml")));
+    engine.load(QUrl(QStringLiteral("qrc:/qt/qml/org/nephelesound/yunting/main.qml")));
     if (engine.rootObjects().isEmpty())
         return 1;
 

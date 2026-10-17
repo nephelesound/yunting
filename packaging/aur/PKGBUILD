@@ -1,0 +1,48 @@
+# Maintainer: sudoskys <tururu02 at gmail dot com>
+# 云听：AUR 的 -git 包（跟主干构建）。本地试打包这个仓库的已提交内容：
+#   YUNTING_REPO="git+file://$(git rev-parse --show-toplevel)" makepkg -si
+# 改了这个文件后重新生成 .SRCINFO：makepkg --printsrcinfo > .SRCINFO
+pkgname=yunting-git
+_name=yunting
+# 占位版本：makepkg 入口的 lint 要求静态 pkgver，pkgver() 成功后会被就地改写
+pkgver=0.1
+pkgver() {
+  cd "$srcdir/$_name"
+  printf 'r%s.%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+pkgrel=1
+pkgdesc='Native KDE client for NetEase Cloud Music (Qt 6 / Kirigami)'
+arch=(x86_64 aarch64)
+url='https://github.com/nephelesound/yunting'
+license=('GPL-3.0-or-later' 'MIT')   # MIT：应用图标（Microsoft Fluent Emoji），见 data/ICON-LICENSE
+depends=(
+  qt6-base qt6-declarative qt6-multimedia
+  kirigami kirigami-addons kstatusnotifieritem purpose prison
+  qtkeychain-qt6 openssl
+  layer-shell-qt   # Wayland 下桌面歌词置顶
+  qrencode         # 分享二维码
+  zstd
+)
+makedepends=(cmake ninja git)
+optdepends=('kdeconnect: 把歌曲链接发到手机')
+provides=("$_name")
+conflicts=("$_name")
+# 系统 makepkg.conf 默认开 debug：会把剥过符号的二进制挪进 -debug 子包，主包变空
+options=(!debug)
+source=("$_name::${YUNTING_REPO:-git+https://github.com/nephelesound/yunting.git}")
+sha256sums=(SKIP)
+
+build() {
+  cmake -S "$_name/src" -B build -G Ninja \
+    -DCMAKE_BUILD_TYPE=None \
+    -DCMAKE_INSTALL_PREFIX=/usr
+  cmake --build build
+}
+
+check() {
+  ctest --test-dir build --output-on-failure
+}
+
+package() {
+  DESTDIR="$pkgdir" cmake --install build
+}

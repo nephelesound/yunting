@@ -34,7 +34,7 @@ qt_add_executable(yunting
     eqaudiosink.h eqaudiosink.cpp
 )
 
-# 界面 QML/JS 编进可执行文件：整个 prototype/ 目录挂到 qrc:/qt/qml/org/sudoskys/yunting/ 下，
+# 界面 QML/JS 编进可执行文件：整个 prototype/ 目录挂到 qrc:/qt/qml/org/nephelesound/yunting/ 下，
 # qmldir 与组件同目录，singleton 声明照常解析。Snapshot.qml 与它读的 Data.js / Personal.js /
 # Fixtures.js 是原型与截图专用，不编入；其中 Personal.js 是账号数据，绝不能进二进制。
 file(GLOB _app_qml RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/../prototype"
@@ -47,16 +47,16 @@ list(FILTER _app_qml EXCLUDE REGEX "^(Snapshot\\.qml|Data\\.js|Personal\\.js|Fix
 list(TRANSFORM _app_qml REPLACE "^" "${CMAKE_CURRENT_SOURCE_DIR}/../prototype/")
 
 qt_add_resources(yunting "app_qml"
-    PREFIX "/qt/qml/org/sudoskys/yunting"
+    PREFIX "/qt/qml/org/nephelesound/yunting"
     BASE "${CMAKE_CURRENT_SOURCE_DIR}/../prototype"
     FILES ${_app_qml})
 
 # 窗口/任务栏图标：运行时优先取主题里的已安装图标；源码运行时回退到内嵌 SVG
-set_source_files_properties("../data/io.github.sudoskys.Yunting.svg"
-    PROPERTIES QT_RESOURCE_ALIAS "io.github.sudoskys.Yunting.svg")
+set_source_files_properties("../data/io.github.nephelesound.Yunting.svg"
+    PROPERTIES QT_RESOURCE_ALIAS "io.github.nephelesound.Yunting.svg")
 qt_add_resources(yunting "app_icon"
     PREFIX "/"
-    FILES "${CMAKE_CURRENT_SOURCE_DIR}/../data/io.github.sudoskys.Yunting.svg")
+    FILES "${CMAKE_CURRENT_SOURCE_DIR}/../data/io.github.nephelesound.Yunting.svg")
 
 target_compile_options(yunting PRIVATE -Wall -Wextra)
 
@@ -156,11 +156,11 @@ set_target_properties(yunting PROPERTIES QT_QML_MODULE_NO_IMPORT_SCAN ON)
 # 安装：可执行文件 + 桌面项 + AppStream 元数据 + 图标；测试可执行文件不装
 include(GNUInstallDirs)
 install(TARGETS yunting RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(FILES ../data/io.github.sudoskys.Yunting.desktop
+install(FILES ../data/io.github.nephelesound.Yunting.desktop
         DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
-install(FILES ../data/io.github.sudoskys.Yunting.metainfo.xml
+install(FILES ../data/io.github.nephelesound.Yunting.metainfo.xml
         DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
-install(FILES ../data/io.github.sudoskys.Yunting.svg
+install(FILES ../data/io.github.nephelesound.Yunting.svg
         DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
 install(FILES ../data/ICON-LICENSE
         DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/yunting)

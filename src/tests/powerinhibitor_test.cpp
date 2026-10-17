@@ -12,7 +12,7 @@
 class PowerInhibitorTest : public QObject {
     Q_OBJECT
 
-    static constexpr auto kApp = "io.github.sudoskys.Yunting.test";
+    static constexpr auto kApp = "io.github.nephelesound.Yunting.test";
     // PowerDevil 收到 freedesktop 的抑制后约 5 秒才生效（短暂的抑制不算），等足这么久
     static constexpr int kApplied = 10000;
 

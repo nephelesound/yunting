@@ -7,6 +7,12 @@ node_modules/
 # 个人数据快照（scripts/snapshot.py 用登录 cookie 生成），不入库
 prototype/Personal.js
 
+# 截图与图片：都是本地的验收产物（应用图标是 SVG；商店截图走 URL）
+*.png
+*.jpg
+*.jpeg
+*.webp
+
 # 内部笔记：只在本地，不进公开仓库（参考库也在 docs/ 下，用 `make refs` 按 SHA 复原）
 BACKEND.md
 PROGRESS.md
