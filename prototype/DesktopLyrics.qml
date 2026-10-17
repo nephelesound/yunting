@@ -5,12 +5,14 @@
 // 当前句随播放从左到右点亮：引擎的进度几次一秒，点亮走逐帧时钟（与引擎进度对齐），所以是连续的。
 // 观感：纯白的字配不透明度，直接压在桌面上，没有底板、没有阴影。还没唱到的字与第二行半透明，唱到的字点亮成全白。
 // 应用读不到窗口背后的壁纸（Wayland 不给），白字在亮壁纸上看不见，所以字色可换成纯黑，由用户按壁纸选。
-// 悬停时字的正上方出现一条小工具条：字号、字色、点亮颜色、第二行、复位、锁定、关闭。
+// 悬停时字的正上方出现一条标准工具栏（QQC2 ToolBar + ToolButton，样式与配色全由系统画，不自绘）：
+// 字号、黑字、唱到的字的颜色（菜单）、第二行、复位、锁定、关闭。
 // 锁定后点击穿透，在播放条关掉再打开即解锁。样式与位置只在应用里记住（persist），原型与截图不读不写。
 pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
 import QtQuick.Window
 import QtCore
 import org.kde.kirigami as Kirigami
@@ -61,6 +63,9 @@ Window {
     readonly property var fills: [lyricsWindow.ink,
         Qt.hsla(lyricsWindow.accent.hslHue, Math.max(0.7, lyricsWindow.accent.hslSaturation),
                 Math.max(0.5, Math.min(0.6, lyricsWindow.accent.hslLightness)), 1)].concat(Tokens.desktopLyricColors)
+    // 菜单里的名字，与 fills 一一对应（Tokens.desktopLyricColors 是蓝、红、绿、橙）
+    readonly property var fillNames: [lyricsWindow.darkInk ? "黑色（与字同色）" : "白色（与字同色）", "系统强调色",
+                                      "蓝色", "红色", "绿色", "橙色"]
     readonly property color fillColor: lyricsWindow.fills[lyricsWindow.colorIndex]
     readonly property var sizes: Tokens.desktopLyricSizes[lyricsWindow.sizeStep]
 
@@ -78,7 +83,7 @@ Window {
     title: "云听 · 桌面歌词"
     color: "transparent"
     width: Math.min(2 * Tokens.trackColumn + Tokens.measureMax, lyricsWindow.screenWidth - 2 * Tokens.space6)   // 至多 960
-    height: tools.height + Tokens.space2 + textColumn.implicitHeight
+    height: tools.implicitHeight + Tokens.space2 + textColumn.implicitHeight
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
            | (lyricsWindow.locked ? Qt.WindowTransparentForInput : 0)
 
@@ -179,7 +184,7 @@ Window {
     Item {
         id: stage
         anchors.fill: parent
-        readonly property bool active: hover.hovered || drag.active
+        readonly property bool active: hover.hovered || drag.active || colorMenu.visible
 
         HoverHandler { id: hover; enabled: !lyricsWindow.locked }
         DragHandler {
@@ -201,84 +206,88 @@ Window {
             elide: Text.ElideRight
         }
 
-        // 工具：悬停（或拖动）时出现在歌词正上方。一天要碰很多次，出现与消失都不做动画；
-        // 位置一直留着，窗口高度不随悬停跳动。底固定是深灰，按钮按 Complementary 配色画
-        Rectangle {
+        // 一个工具按钮：系统的 ToolButton，图标、悬停、按下、勾选都由样式画；悬停一会儿显示说明
+        component Tool: ToolButton {
+            display: AbstractButton.IconOnly
+            ToolTip.text: text
+            ToolTip.visible: hovered
+            ToolTip.delay: 600
+        }
+
+        // 工具栏：悬停（或拖动）时出现在歌词正上方。一天要碰很多次，出现与消失都不做动画；
+        // 位置一直留着，窗口高度不随悬停跳动。标准 ToolBar：底色与边线是系统工具栏的样子
+        ToolBar {
             id: tools
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
-            width: toolRow.implicitWidth + 2 * Tokens.space1
-            height: toolRow.implicitHeight + 2 * Tokens.space1
-            radius: Tokens.radius
-            color: Tokens.desktopToolbar
             visible: stage.active
-            Kirigami.Theme.colorSet: Kirigami.Theme.Complementary
-            Kirigami.Theme.inherit: false
 
-            Row {
-                id: toolRow
-                anchors.centerIn: parent
-                spacing: Tokens.space1
-                IconButton {
+            RowLayout {
+                spacing: 0
+                Tool {
                     icon.name: "format-font-size-less"
-                    icon.color: "white"
                     text: "字号缩小"
                     enabled: lyricsWindow.sizeStep > 0
                     onClicked: lyricsWindow.sizeStep--
                 }
-                IconButton {
+                Tool {
                     icon.name: "format-font-size-more"
-                    icon.color: "white"
                     text: "字号放大"
                     enabled: lyricsWindow.sizeStep < Tokens.desktopLyricSizes.length - 1
                     onClicked: lyricsWindow.sizeStep++
                 }
-                IconButton {
+                ToolSeparator {}
+                Tool {
                     icon.name: "color-mode-invert-text"
-                    icon.color: "white"
-                    text: lyricsWindow.darkInk ? "换成白字（暗壁纸）" : "换成黑字（亮壁纸）"
-                    onClicked: lyricsWindow.darkInk = !lyricsWindow.darkInk
+                    text: "黑字（亮壁纸时用）"
+                    checkable: true
+                    checked: lyricsWindow.darkInk
+                    onToggled: lyricsWindow.darkInk = checked
                 }
-                // 点亮颜色：字色本身、系统强调色与几种固定颜色之间轮换；按钮下沿的色条就是当前颜色
-                IconButton {
+                Tool {
+                    id: colorButton
                     icon.name: "format-text-color"
-                    icon.color: "white"
-                    text: "唱到的字的颜色（点一下换下一种）"
-                    onClicked: lyricsWindow.colorIndex = (lyricsWindow.colorIndex + 1) % lyricsWindow.fills.length
-                    Rectangle {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.bottom: parent.bottom
-                        anchors.bottomMargin: Tokens.space1
-                        width: Tokens.iconSm
-                        height: Tokens.lineStrong
-                        radius: Tokens.radiusSm
-                        color: lyricsWindow.fillColor
+                    text: "唱到的字的颜色"
+                    down: colorMenu.visible
+                    onClicked: colorMenu.popup(colorButton, 0, colorButton.height)
+                    Menu {
+                        id: colorMenu
+                        Instantiator {
+                            model: lyricsWindow.fillNames
+                            delegate: MenuItem {
+                                required property int index
+                                required property string modelData
+                                text: modelData
+                                checkable: true
+                                checked: lyricsWindow.colorIndex === index
+                                onTriggered: lyricsWindow.colorIndex = index
+                            }
+                            onObjectAdded: (index, object) => colorMenu.insertItem(index, object)
+                            onObjectRemoved: (index, object) => colorMenu.removeItem(object)
+                        }
                     }
                 }
-                IconButton {
+                Tool {
                     icon.name: "view-list-text"
-                    icon.color: "white"
-                    text: lyricsWindow.showSecond ? "只显示当前句" : "显示译文或下一句"
-                    // 开关状态用图标明暗表示
-                    opacity: lyricsWindow.showSecond ? 1 : Tokens.navInactive
-                    onClicked: lyricsWindow.showSecond = !lyricsWindow.showSecond
+                    text: "显示译文或下一句"
+                    checkable: true
+                    checked: lyricsWindow.showSecond
+                    onToggled: lyricsWindow.showSecond = checked
                 }
-                IconButton {
+                ToolSeparator {}
+                Tool {
                     icon.name: "edit-reset-symbolic"
-                    icon.color: "white"
                     text: "回到默认位置"
                     visible: lyricsWindow.layerShell !== null
                     onClicked: lyricsWindow.placeDefault()
                 }
-                IconButton {
+                Tool {
                     icon.name: "object-locked-symbolic"
-                    icon.color: "white"
                     text: "锁定（鼠标穿透；在播放条关掉再打开即解锁）"
                     onClicked: lyricsWindow.locked = true
                 }
-                IconButton {
+                Tool {
                     icon.name: "window-close-symbolic"
-                    icon.color: "white"
                     text: "关闭桌面歌词"
                     onClicked: lyricsWindow.closeRequested()
                 }
