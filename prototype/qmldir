@@ -20,12 +20,14 @@ EqualizerPanel EqualizerPanel.qml
 WheelScroll WheelScroll.qml
 FullscreenCover FullscreenCover.qml
 AccentButton AccentButton.qml
+AccountPanel AccountPanel.qml
 ChartCard ChartCard.qml
 ChartsPage ChartsPage.qml
 Cover Cover.qml
 CoverTile CoverTile.qml
 Facts Facts.qml
 LinkText LinkText.qml
+LocateCurrent LocateCurrent.qml
 GrowingModel GrowingModel.qml
 Tag Tag.qml
 GroupHeader GroupHeader.qml

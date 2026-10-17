@@ -77,7 +77,7 @@ Kirigami.Page {
                 Layout.rightMargin: Tokens.space2
             }
 
-            // 账号：头像 + 名字。登录时整块可点，打开账号菜单（退出登录）
+            // 账号：头像 + 名字。登录时整块可点，打开账号面板（我是谁、会员与等级、我的主页、退出登录）
             AbstractButton {
                 id: account
                 readonly property bool active: screen.loggedIn && !Source.sessionExpired
@@ -88,7 +88,7 @@ Kirigami.Page {
                 leftPadding: account.active ? Tokens.space1 : 0
                 rightPadding: account.active ? Tokens.space2 : 0
                 Accessible.name: "账号：" + accountName.text
-                onClicked: accountMenu.popup(account, 0, account.height)
+                onClicked: accountPanel.visible ? accountPanel.close() : accountPanel.open()
 
                 background: Rectangle {
                     radius: Tokens.radius
@@ -114,13 +114,13 @@ Kirigami.Page {
                     }
                 }
 
-                Menu {
-                    id: accountMenu
-                    MenuItem {
-                        icon.name: "system-log-out"
-                        text: "退出登录…"
-                        onTriggered: Actions.logoutRequested()
-                    }
+                // 面板右缘与账号块右缘对齐，贴在它下方
+                AccountPanel {
+                    id: accountPanel
+                    x: account.width - width
+                    y: account.height + Tokens.space1
+                    onProfileRequested: Actions.openUser(Source.account.id)
+                    onLogoutRequested: Actions.logoutRequested()
                 }
             }
             Button {

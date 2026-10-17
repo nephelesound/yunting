@@ -51,9 +51,13 @@ AbstractButton {
     }
     Accessible.name: tile.modelData.name + "，" + tile.modelData.artist
 
+    // 正在播放的那一行常驻强调色淡底（悬停再深一档），长列表里一眼找得到；其余行静止时无底色
     background: Rectangle {
         radius: Tokens.radius
-        color: Qt.alpha(Kirigami.Theme.highlightColor, tile.down ? Tokens.tintPressed : tile.hovered ? Tokens.tintHover : 0)
+        color: Qt.alpha(Kirigami.Theme.highlightColor,
+                        tile.down ? Tokens.tintPressed
+                        : tile.current ? (tile.hovered ? Tokens.tonalHover : Tokens.tonal)
+                        : tile.hovered ? Tokens.tintHover : 0)
         border.width: tile.visualFocus ? Tokens.lineStrong : 0
         border.color: Kirigami.Theme.highlightColor
         Behavior on color { ColorAnimation { duration: Tokens.motionFast } }
@@ -105,6 +109,31 @@ AbstractButton {
             Layout.preferredHeight: Tokens.trackRow
             source: tile.modelData.cover
             pixelSize: 96
+
+            // 正在播放：封面上一层淡底和三根强调色竖条（与可点封面的「淡底 + 图标」同一种说法）
+            Rectangle {
+                anchors.fill: parent
+                visible: tile.current
+                radius: Tokens.radius
+                color: Qt.alpha(Kirigami.Theme.backgroundColor, Tokens.coverScrim)
+                Row {
+                    anchors.centerIn: parent
+                    height: Tokens.iconSm
+                    spacing: Tokens.lineStrong
+                    Repeater {
+                        model: [0.625, 1, 0.75]   // 10 · 16 · 12
+                        // 竖条底边对齐：按自己的高度往下推（不引用 parent，Repeater 建条时它还没放进 Row）
+                        delegate: Rectangle {
+                            required property real modelData
+                            y: Tokens.iconSm - height
+                            width: Tokens.space1
+                            height: Tokens.iconSm * modelData
+                            radius: Tokens.radiusSm
+                            color: Kirigami.Theme.highlightColor
+                        }
+                    }
+                }
+            }
         }
 
         ColumnLayout {
@@ -199,7 +228,8 @@ AbstractButton {
 
         // 时长列；悬停/聚焦时把时长换成行内动作，列宽不变、行不跳动：
         // 播放队列里是「移出」，其余是「更多」（曲目菜单）
-        // 右缘贴页边线（与左边的封面贴页边线对称，和页头、播放条的右缘同一条线）
+        // 右缘贴页边线（与左边的封面贴页边线对称，和页头、播放条的右缘同一条线）。
+        // 行内按钮整个落在行里：不像播放条那样往外伸 space2 让图形对齐边线——行有悬停淡底，伸出去的按钮框会越过淡底的边
         Item {
             id: endColumn
             Layout.preferredWidth: tile.reordering ? Tokens.height8 * 2 + Tokens.space1
@@ -219,7 +249,6 @@ AbstractButton {
             }
             Row {
                 anchors.right: parent.right
-                anchors.rightMargin: -Tokens.space2
                 anchors.verticalCenter: parent.verticalCenter
                 visible: tile.reordering
                 spacing: 0
@@ -238,7 +267,6 @@ AbstractButton {
             }
             IconButton {
                 anchors.right: parent.right
-                anchors.rightMargin: -Tokens.space2
                 anchors.verticalCenter: parent.verticalCenter
                 visible: endColumn.showAction
                 icon.name: tile.removable ? "list-remove-symbolic" : "overflow-menu"

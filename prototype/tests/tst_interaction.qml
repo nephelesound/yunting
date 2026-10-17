@@ -20,6 +20,28 @@ Item {
     Component { id: nowPlayingComponent; NowPlayingPage { width: root.width; height: root.height } }
     Component { id: spyComponent; SignalSpy {} }
     Component { id: queueComponent; QueuePanel {} }
+    // 定位按钮：与歌单页、歌手页同一种接法（LocateCurrent 挂在 ListView 上）
+    Component {
+        id: locateComponent
+        ListView {
+            id: longList
+            width: 400
+            height: 300
+            model: 200
+            delegate: Text {
+                required property int index
+                width: 400
+                height: 30
+                text: "第 " + index + " 行"
+            }
+            LocateCurrent {
+                objectName: "locate"
+                parent: longList
+                view: longList
+                index: 150
+            }
+        }
+    }
     // 分页列表：与评论区、歌手页同一种接法（GrowingModel + values[index]）
     Component {
         id: pagedComponent
@@ -225,6 +247,18 @@ Item {
             view.items = [{ id: 999, name: "另一首歌的评论" }];   // 换了歌：重建
             compare(view.count, 1);
             tryVerify(() => view.itemAtIndex(0) !== null && view.itemAtIndex(0).text === "另一首歌的评论");
+        }
+
+        // 正在播放的那一行滚出视野才出现定位按钮；点一下回到那一行，按钮随之消失
+        function test_locateCurrentAppearsOnlyWhenOutOfView() {
+            const list = createTemporaryObject(locateComponent, root);
+            const locate = findChild(list, "locate");
+            tryCompare(locate, "opacity", 1);              // 第 150 行一开始就不在视野里
+            mouseClick(locate);
+            tryVerify(() => list.itemAtIndex(150) !== null && locate.inView);
+            tryCompare(locate, "opacity", 0);
+            list.positionViewAtBeginning();
+            tryCompare(locate, "opacity", 1);              // 滚走了又出现
         }
 
         function lyricsPage() {

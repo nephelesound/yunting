@@ -134,6 +134,11 @@ ScreenFrame {
                 currentIndex: -1
                 ScrollBar.vertical: ScrollBar {}
                 WheelScroll { flickable: tracks }
+                LocateCurrent {
+                    parent: tracks
+                    view: tracks
+                    index: page.songs.findIndex(t => t.id === page.currentId)
+                }
                 onAtYEndChanged: if (atYEnd && page.artist.tracks.length > 0) Source.moreArtistSongs(page.artistId, page.artist.tracks)
 
                 footer: PagingFooter {

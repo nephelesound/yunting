@@ -163,6 +163,11 @@ ScreenFrame {
             currentIndex: -1
             ScrollBar.vertical: ScrollBar {}
             WheelScroll { flickable: tracks }
+            LocateCurrent {
+                parent: tracks
+                view: tracks
+                index: page.list.tracks.findIndex(t => t.id === page.currentId)
+            }
 
             delegate: TrackTile {
                 width: tracks.width - tracks.rightMargin
