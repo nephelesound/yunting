@@ -12,12 +12,21 @@
 
 using namespace ncm;
 
+namespace {
+// 对数（滑条）刻度 → QAudioOutput 的线性刻度
+double applyVolumeScale(double slider)
+{
+    return QAudio::convertVolume(slider, QAudio::LogarithmicVolumeScale, QAudio::LinearVolumeScale);
+}
+} // namespace
+
 AudioEngine::AudioEngine(NcmClient *client, QObject *parent)
     : QObject(parent), m_client(client)
 {
     m_audio = new QAudioOutput(this);
     m_player = new QMediaPlayer(this);
     m_player->setAudioOutput(m_audio);
+    m_audio->setVolume(applyVolumeScale(m_volume));
 
     connect(m_player, &QMediaPlayer::positionChanged, this, [this] {
         emit positionChanged();
@@ -79,6 +88,25 @@ void AudioEngine::setPlaying(bool playing)
         m_player->pause();
     }
     emit playingChanged();
+}
+
+void AudioEngine::setVolume(double volume)
+{
+    const double clamped = std::clamp(volume, 0.0, 1.0);
+    if (clamped == m_volume)
+        return;
+    m_volume = clamped;
+    m_audio->setVolume(applyVolumeScale(clamped));
+    emit volumeChanged();
+}
+
+void AudioEngine::setMuted(bool muted)
+{
+    if (muted == m_muted)
+        return;
+    m_muted = muted;
+    m_audio->setMuted(muted);
+    emit mutedChanged();
 }
 
 void AudioEngine::toggle()

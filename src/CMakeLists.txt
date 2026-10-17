@@ -27,12 +27,19 @@ target_compile_definitions(ncm-player PRIVATE
 
 target_compile_options(ncm-player PRIVATE -Wall -Wextra)
 
-# 测试：只测有策略的深模块（QueryCache 的缓存与去重规则）
+# 测试：只测有策略的深模块（QueryCache 的缓存与去重规则、AudioEngine 的音量刻度与钳制）
 find_package(Qt6 REQUIRED COMPONENTS Test)
 enable_testing()
 qt_add_executable(querycache_test tests/querycache_test.cpp querycache.h querycache.cpp)
 target_link_libraries(querycache_test PRIVATE Qt6::Core Qt6::Test)
 add_test(NAME querycache COMMAND querycache_test)
+
+# 音量/静音走 QAudioOutput，测试要能构造真实引擎（无窗口、无网络）
+qt_add_executable(audioengine_test tests/audioengine_test.cpp audioengine.h audioengine.cpp
+    ncmclient.h ncmclient.cpp json_util.h)
+target_compile_options(audioengine_test PRIVATE -Wall -Wextra)
+target_link_libraries(audioengine_test PRIVATE Qt6::Core Qt6::Test Qt6::Network Qt6::Multimedia)
+add_test(NAME audioengine COMMAND audioengine_test)
 
 target_link_libraries(ncm-player PRIVATE
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Qml Qt6::Quick Qt6::QuickControls2

@@ -73,8 +73,9 @@ public:
     double Rate() const { return 1.0; }
     void setRate(double) {}
     bool Shuffle() const { return false; }
-    double Volume() const { return 1.0; }
-    void setVolume(double) {}
+    // MPRIS 的 Volume 与 AudioEngine.volume 同刻度（对数滑条 0–1），透传即可
+    double Volume() const { return m_audio->volume(); }
+    void setVolume(double volume) { m_audio->setVolume(volume); }
     double MinimumRate() const { return 1.0; }
     double MaximumRate() const { return 1.0; }
     bool CanGoNext() const { return true; }
@@ -152,6 +153,8 @@ Mpris::Mpris(AudioEngine *audio, QObject *parent)
     connect(audio, &AudioEngine::playingChanged, this, [emitChanged] {
         emitChanged({QStringLiteral("PlaybackStatus"), QStringLiteral("CanSeek")});
     });
+    connect(audio, &AudioEngine::volumeChanged, this,
+            [emitChanged] { emitChanged({QStringLiteral("Volume")}); });
 }
 
 Mpris::~Mpris()
