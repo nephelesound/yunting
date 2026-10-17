@@ -1,6 +1,7 @@
 #include "audioengine.h"
 #include "json_util.h"
 #include "ncmclient.h"
+#include "normalize.h"
 #include "perf.h"
 #ifdef YUNTING_EXPERIMENTAL_EQ
 #include "eqaudiosink.h"
@@ -451,7 +452,7 @@ void AudioEngine::resolveUrl(double songId)
             ? arr(resp, "data").at(0).toObject() : QJsonObject();
         const QString url = item.value("url").toString();
         // 服务器可能降档给流（VIP/版权），上报必须用实际拿到的 level
-        const Ncbl::PlayedLevel played = Ncbl::playedLevel(item, level);
+        const NcmPlayedLevel played = ncmPlayedLevel(item, level);
         if (!url.isEmpty()) {
             // 留一分钟余量，避免拿到即将失效的地址
             const int expi = item.value("expi").toInt(1200);
@@ -551,9 +552,9 @@ void AudioEngine::scrobbleNcbl(int seconds)
     if (!m_client->hasMusicU() || m_track.isEmpty())
         return;
     // 播放地址响应里实际拿到的档位；拿不到时退回本次请求的档位，不用曲目元数据里的最高档
-    const Ncbl::PlayedLevel reportedLevel = m_playedLevel.isEmpty()
-        ? Ncbl::playedLevel({}, effectiveLevel())
-        : Ncbl::PlayedLevel{m_playedLevel, m_playedBitrate};
+    const NcmPlayedLevel reportedLevel = m_playedLevel.isEmpty()
+        ? ncmPlayedLevel({}, effectiveLevel())
+        : NcmPlayedLevel{m_playedLevel, m_playedBitrate};
     const int rawFee = m_track.value("fee").toInt();
     const int fee = (rawFee == 1 || rawFee == 4 || rawFee == 8) ? rawFee : 0;
 

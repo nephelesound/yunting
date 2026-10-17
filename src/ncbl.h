@@ -29,26 +29,6 @@ struct Context {
     QString cid;
 };
 
-// 播放地址响应（song/enhance/player/url/v1 的 data[0]）里服务器实际给了哪一档。
-// 上报的是这次播放的档位，不是曲目的最高可用档位；服务器没回 level 时用请求档位。
-struct PlayedLevel {
-    QString level;
-    int bitrate = 320000;
-};
-
-inline PlayedLevel playedLevel(const QJsonObject &urlItem, const QString &requestedLevel)
-{
-    const QString returned = urlItem.value(QStringLiteral("level")).toString();
-    const QString level = returned.isEmpty() ? requestedLevel : returned;
-    if (level == QLatin1String("hires") || level == QLatin1String("lossless"))
-        return {level, 999000};
-    if (level == QLatin1String("higher"))
-        return {level, 192000};
-    if (level == QLatin1String("standard"))
-        return {level, 128000};
-    return {level, 320000};
-}
-
 QByteArray chacha20(const QByteArray &key, quint32 counter, const QByteArray &nonce,
                     const QByteArray &data);
 QByteArray rsaWrap(const QByteArray &key);

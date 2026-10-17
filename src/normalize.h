@@ -38,5 +38,12 @@ QVariantList ncmParseYrc(const QString &yrc, const QString &tlyric);
 // ncmParseLrc 的反向：把 {t, text, tr} 写回 LRC；有译文时同一时间戳再写一行（通行的双语 LRC 写法，
 // MPRIS 的 xesam:asText 交给歌词组件时用）
 QString ncmLyricsToLrc(const QVariantList &lines);
+// 播放地址响应（song/enhance/player/url/v1 的 data[0]）里服务器实际给了哪一档与码率：
+// 可能比请求的低（版权、会员）；服务器没回 level 时用请求档位
+struct NcmPlayedLevel {
+    QString level;
+    int bitrate = 320000;
+};
+NcmPlayedLevel ncmPlayedLevel(const QJsonObject &urlItem, const QString &requestedLevel);
 QString ncmSized(const QJsonValue &url, int px);
 QString ncmFirstLine(const QString &text);

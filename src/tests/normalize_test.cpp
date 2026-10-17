@@ -210,6 +210,18 @@ private slots:
         QCOMPARE(ncmParseLrc(original, translation), lines);
     }
 
+    // 这次播放实际拿到的档位：请求 lossless、服务器降档给 higher 时是 higher；响应缺 level 时退回请求档位
+    void playedLevelComesFromTheUrlResponse()
+    {
+        const NcmPlayedLevel played = ncmPlayedLevel(QJsonObject{{"level", "higher"}, {"br", 192000}},
+                                                     QStringLiteral("lossless"));
+        QCOMPARE(played.level, QStringLiteral("higher"));
+        QCOMPARE(played.bitrate, 192000);
+        const NcmPlayedLevel fallback = ncmPlayedLevel({}, QStringLiteral("hires"));
+        QCOMPARE(fallback.level, QStringLiteral("hires"));
+        QCOMPARE(fallback.bitrate, 999000);
+    }
+
     // YRC：逐字标签拆成 words，句子按词拼接（英文词间空格留在前一个词里），译文按行时间对上；
     // {…} 开头的署名行与 LRC 一样不算歌词
     void yrcParsesWordsAndTranslation()

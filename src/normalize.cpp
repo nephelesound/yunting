@@ -444,3 +444,16 @@ QString ncmFirstLine(const QString &text)
 {
     return text.section(u'\n', 0, 0);
 }
+
+NcmPlayedLevel ncmPlayedLevel(const QJsonObject &urlItem, const QString &requestedLevel)
+{
+    const QString returned = urlItem.value(QStringLiteral("level")).toString();
+    const QString level = returned.isEmpty() ? requestedLevel : returned;
+    if (level == QLatin1String("hires") || level == QLatin1String("lossless"))
+        return {level, 999000};
+    if (level == QLatin1String("higher"))
+        return {level, 192000};
+    if (level == QLatin1String("standard"))
+        return {level, 128000};
+    return {level, 320000};
+}

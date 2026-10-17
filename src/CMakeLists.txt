@@ -91,7 +91,7 @@ add_test(NAME normalize COMMAND normalize_test)
 # 音量/静音走 QAudioOutput，测试要能构造真实引擎（无窗口、无网络）
 qt_add_executable(audioengine_test tests/audioengine_test.cpp audioengine.h audioengine.cpp
     ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp json_util.h crypto.h crypto.cpp
-    perf.h perf.cpp)
+    normalize.h normalize.cpp perf.h perf.cpp)
 target_compile_options(audioengine_test PRIVATE -Wall -Wextra)
 target_link_libraries(audioengine_test PRIVATE Qt6::Core Qt6::Test Qt6::Network Qt6::Multimedia Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
 add_test(NAME audioengine COMMAND audioengine_test)
@@ -120,7 +120,7 @@ add_test(NAME store COMMAND store_test)
 # 切歌时挂起的 seek 不能落到下一首：本地假接口 + 本地 WAV
 qt_add_executable(audioengine_seek_test tests/audioengine_seek_test.cpp
     audioengine.h audioengine.cpp ncmclient.h ncmclient.cpp
-    cookievault.h cookievault.cpp json_util.h crypto.h crypto.cpp perf.h perf.cpp)
+    cookievault.h cookievault.cpp json_util.h crypto.h crypto.cpp normalize.h normalize.cpp perf.h perf.cpp)
 target_compile_options(audioengine_seek_test PRIVATE -Wall -Wextra)
 target_link_libraries(audioengine_seek_test PRIVATE Qt6::Core Qt6::Test Qt6::Network Qt6::Multimedia Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
 add_test(NAME audioengine_seek COMMAND audioengine_seek_test)
