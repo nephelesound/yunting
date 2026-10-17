@@ -1,5 +1,7 @@
 #include "mpris.h"
 #include "audioengine.h"
+#include "normalize.h"
+#include "store.h"
 
 #include <QDBusAbstractAdaptor>
 #include <QDBusConnection>
@@ -115,7 +117,9 @@ public:
                 {QStringLiteral("xesam:title"), t.value("name").toString()},
                 // 多位歌手在曲目里是「A / B」，MPRIS 要列表
                 {QStringLiteral("xesam:artist"), t.value("artist").toString().split(QStringLiteral(" / "))},
-                {QStringLiteral("xesam:album"), t.value("album").toString()}};
+                {QStringLiteral("xesam:album"), t.value("album").toString()},
+                // 歌词（LRC，双语时同一时间戳两行）：还没取到时是空串
+                {QStringLiteral("xesam:asText"), m_mpris->lyricsText()}};
     }
     qint64 Position() const { return qlonglong(m_audio->position() * 1000000.0); }
 
@@ -139,8 +143,8 @@ private:
     AudioEngine *m_audio;
 };
 
-Mpris::Mpris(AudioEngine *audio, QObject *parent)
-    : QObject(parent)
+Mpris::Mpris(AudioEngine *audio, Store *store, QObject *parent)
+    : QObject(parent), m_audio(audio), m_store(store)
 {
     m_base = new MprisBaseAdaptor(this);
     m_player = new MprisPlayerAdaptor(this, audio);
@@ -154,28 +158,50 @@ Mpris::Mpris(AudioEngine *audio, QObject *parent)
     }
     bus.registerObject(QStringLiteral("/org/mpris/MediaPlayer2"), this);
 
-    // 换歌 / 播放状态变化时广播 PropertiesChanged，Plasma 媒体控件与锁屏才不会停留在旧曲目
-    auto emitChanged = [this](const QStringList &props) {
-        QDBusMessage msg = QDBusMessage::createSignal(
-            QStringLiteral("/org/mpris/MediaPlayer2"),
-            QStringLiteral("org.freedesktop.DBus.Properties"),
-            QStringLiteral("PropertiesChanged"));
-        QVariantMap changed;
-        for (const QString &p : props)
-            changed.insert(p, m_player->property(p.toUtf8().constData()));
-        msg << QStringLiteral("org.mpris.MediaPlayer2.Player") << changed << QStringList();
-        QDBusConnection::sessionBus().send(msg);
-    };
-    connect(audio, &AudioEngine::trackChanged, this,
-            [emitChanged] { emitChanged({QStringLiteral("Metadata")}); });
-    connect(audio, &AudioEngine::playingChanged, this, [emitChanged] {
+    // 换歌：先广播新曲目，再向 Store 要这首的歌词（到了由 refreshLyrics 补进元数据）
+    connect(audio, &AudioEngine::trackChanged, this, [this] {
+        refreshLyrics();
+        emitChanged({QStringLiteral("Metadata")});
+        const double id = m_audio->track().value("id").toDouble();
+        if (id > 0)
+            m_store->request(QStringLiteral("lyrics:%1").arg(qlonglong(id)));
+    });
+    connect(store, &Store::dataChanged, this, &Mpris::refreshLyrics);
+    connect(audio, &AudioEngine::playingChanged, this, [this] {
         emitChanged({QStringLiteral("PlaybackStatus"), QStringLiteral("CanSeek")});
     });
     connect(audio, &AudioEngine::volumeChanged, this,
-            [emitChanged] { emitChanged({QStringLiteral("Volume")}); });
+            [this] { emitChanged({QStringLiteral("Volume")}); });
     // 跳转后发 Seeked，Plasma 弹窗的进度条才会跟上（Position 本身不广播）
     connect(audio, &AudioEngine::seeked, this,
             [this] { emit m_player->Seeked(m_player->Position()); });
+}
+
+// 换歌 / 播放状态 / 歌词变化时广播 PropertiesChanged，Plasma 媒体控件、锁屏与歌词组件才不会停留在旧内容
+void Mpris::emitChanged(const QStringList &properties)
+{
+    QDBusMessage msg = QDBusMessage::createSignal(QStringLiteral("/org/mpris/MediaPlayer2"),
+                                                  QStringLiteral("org.freedesktop.DBus.Properties"),
+                                                  QStringLiteral("PropertiesChanged"));
+    QVariantMap changed;
+    for (const QString &p : properties)
+        changed.insert(p, m_player->property(p.toUtf8().constData()));
+    msg << QStringLiteral("org.mpris.MediaPlayer2.Player") << changed << QStringList();
+    QDBusConnection::sessionBus().send(msg);
+}
+
+// Store 只放当前请求过的那一首歌词（lyricsTrackId + lyrics）：是正在放的这首才用，否则清空
+void Mpris::refreshLyrics()
+{
+    const QVariantMap data = m_store->data();
+    const double current = m_audio->track().value("id").toDouble();
+    const QString text = current > 0 && data.value("lyricsTrackId").toDouble() == current
+        ? ncmLyricsToLrc(data.value("lyrics").toList())
+        : QString();
+    if (text == m_lyricsText)
+        return;
+    m_lyricsText = text;
+    emitChanged({QStringLiteral("Metadata")});
 }
 
 Mpris::~Mpris()

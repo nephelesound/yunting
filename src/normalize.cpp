@@ -243,6 +243,24 @@ QVariantList ncmParseLrc(const QString &lrc, const QString &tlyric)
     return out;
 }
 
+QString ncmLyricsToLrc(const QVariantList &lines)
+{
+    QString out;
+    for (const QVariant &v : lines) {
+        const QVariantMap line = v.toMap();
+        const qint64 centis = qRound64(line.value("t").toDouble() * 100);
+        const QString stamp = QStringLiteral("[%1:%2.%3]")
+                                  .arg(centis / 6000, 2, 10, QLatin1Char('0'))
+                                  .arg(centis / 100 % 60, 2, 10, QLatin1Char('0'))
+                                  .arg(centis % 100, 2, 10, QLatin1Char('0'));
+        out += stamp + line.value("text").toString() + u'\n';
+        const QString tr = line.value("tr").toString();
+        if (!tr.isEmpty())
+            out += stamp + tr + u'\n';
+    }
+    return out;
+}
+
 QString ncmFirstLine(const QString &text)
 {
     return text.section(u'\n', 0, 0);

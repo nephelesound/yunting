@@ -21,5 +21,8 @@ QVariantList ncmTracks(const QJsonArray &items);
 // 热门评论：data.comments 的取数形状（snapshot.py 的 hot_comments）
 QVariantMap ncmHotComments(const QJsonObject &resp, double songId);
 QVariantList ncmParseLrc(const QString &lrc, const QString &tlyric);
+// ncmParseLrc 的反向：把 {t, text, tr} 写回 LRC；有译文时同一时间戳再写一行（通行的双语 LRC 写法，
+// MPRIS 的 xesam:asText 交给歌词组件时用）
+QString ncmLyricsToLrc(const QVariantList &lines);
 QString ncmSized(const QJsonValue &url, int px);
 QString ncmFirstLine(const QString &text);

@@ -199,7 +199,7 @@ int main(int argc, char *argv[])
     if (parser.isSet(scrobbleModeOption))
         audio.setScrobbleMode(parser.value(scrobbleModeOption));
     Session session(&client, &store);
-    Mpris mpris(&audio);
+    Mpris mpris(&audio, &store);
     // 打卡成功后本地「最近播放」立即更新；服务端数据仍是权威，下次 refresh 会覆盖
     QObject::connect(&audio, &AudioEngine::scrobbled, &store, &Store::notePlayed);
 

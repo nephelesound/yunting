@@ -89,6 +89,26 @@ private slots:
         QCOMPARE(lines.at(1).toMap().value("tr").toString(), QStringLiteral("我们碰到了点小事"));
         QCOMPARE(lines.at(4).toMap().value("tr").toString(), QStringLiteral("我们碰到了点小事"));
     }
+
+    // 写回的 LRC 再解析一遍得到同样的句子（时间、原文、译文）；分钟超过 99 不会出现，不测
+    void lyricsToLrcRoundTrips()
+    {
+        const QString lrc = QStringLiteral("[00:10.00]开头\n[01:22.68]We got a little problem\n[03:05.40]结尾\n");
+        const QString tr = QStringLiteral("[01:22.68]我们碰到了点小事\n");
+        const QVariantList lines = ncmParseLrc(lrc, tr);
+        const QString written = ncmLyricsToLrc(lines);
+        QVERIFY(written.contains(QStringLiteral("[01:22.68]We got a little problem\n[01:22.68]我们碰到了点小事\n")));
+        // 双语 LRC 里同一时间戳的第二行是译文：按这个约定拆回原文与译文
+        QString original;
+        QString translation;
+        QString previousStamp;
+        for (const QString &row : written.split(u'\n', Qt::SkipEmptyParts)) {
+            const QString stamp = row.left(10);
+            (stamp == previousStamp ? translation : original) += row + u'\n';
+            previousStamp = stamp;
+        }
+        QCOMPARE(ncmParseLrc(original, translation), lines);
+    }
 };
 
 QTEST_GUILESS_MAIN(NormalizeTest)
