@@ -49,4 +49,19 @@ Item {
         anchors.fill: parent
         color: Qt.alpha(Kirigami.Theme.backgroundColor, Tokens.ambienceScrim)
     }
+
+    // 与窗口标题栏软过渡：顶边从标题栏的颜色（Breeze 标题栏用 Header 配色）渐变到透明，不留一条硬边。
+    // 不铺进标题栏：那是系统装饰，改成自绘标题栏就不原生了
+    Rectangle {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: Tokens.height12 * 2
+        Kirigami.Theme.colorSet: Kirigami.Theme.Header
+        Kirigami.Theme.inherit: false
+        gradient: Gradient {
+            GradientStop { position: 0; color: Kirigami.Theme.backgroundColor }
+            GradientStop { position: 1; color: Qt.alpha(Kirigami.Theme.backgroundColor, 0) }
+        }
+    }
 }
