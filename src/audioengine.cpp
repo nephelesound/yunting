@@ -96,27 +96,45 @@ void AudioEngine::seek(double seconds)
         m_pendingSeek = ms; // 地址未落地，开播前应用
 }
 
+// 播放地址有时效（接口给 expi 秒数，通常 20 分钟）：时效内重播、切回同一首都直接用缓存
 void AudioEngine::resolveUrl(double songId)
 {
+    const auto cached = m_urls.constFind(songId);
+    if (cached != m_urls.constEnd() && QDateTime::currentDateTimeUtc() < cached->expires) {
+        startSource(cached->url);
+        return;
+    }
     m_client->get("api/song/enhance/player/url",
                   query({{"ids", QStringLiteral("[%1]").arg(num(songId))}, {"br", "320000"}}), true,
-                  [this](const QJsonDocument &doc, bool ok) {
-        const QJsonArray data = ok ? arr(body(doc), "data") : QJsonArray();
-        const QString url = data.isEmpty() ? QString()
-                                           : data.at(0).toObject().value("url").toString();
+                  [this, songId](const QJsonDocument &doc, bool ok) {
+        const QJsonObject item = ok ? arr(body(doc), "data").at(0).toObject() : QJsonObject();
+        const QString url = item.value("url").toString();
+        if (!url.isEmpty()) {
+            // 留一分钟余量，避免拿到即将失效的地址
+            const int expi = item.value("expi").toInt(1200);
+            m_urls.insert(songId, {url, QDateTime::currentDateTimeUtc().addSecs(std::max(0, expi - 60))});
+        }
+        // 用户可能已经切到别的歌：迟到的地址只进缓存，不播
+        if (m_track.value("id").toDouble() != songId)
+            return;
         if (url.isEmpty()) {
             m_failed = true;
             emit failed(QStringLiteral("暂时无法播放这首歌"));
             return;
         }
-        m_player->setSource(url);
-        if (m_pendingSeek >= 0) {
-            m_player->setPosition(m_pendingSeek);
-            m_pendingSeek = -1;
-        }
-        if (m_playing)
-            m_player->play();
+        startSource(url);
     });
+}
+
+void AudioEngine::startSource(const QString &url)
+{
+    m_player->setSource(url);
+    if (m_pendingSeek >= 0) {
+        m_player->setPosition(m_pendingSeek);
+        m_pendingSeek = -1;
+    }
+    if (m_playing)
+        m_player->play();
 }
 
 int AudioEngine::smokeTest(double songId, int seconds)

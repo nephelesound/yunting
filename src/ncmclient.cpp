@@ -8,6 +8,9 @@
 #include <QJsonParseError>
 #include <QNetworkAccessManager>
 #include <QNetworkCookie>
+#include <QLoggingCategory>
+
+Q_LOGGING_CATEGORY(lcNet, "ncm.net", QtWarningMsg)
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QUrl>
@@ -154,6 +157,8 @@ void NcmClient::get(const QString &path, const QUrlQuery &query, bool personal, 
     if (!cookie.isEmpty()) {
         req.setRawHeader("Cookie", cookie.toUtf8());
     }
+    // 请求计数用（--verbose）：只记路径，不记 query（可能含搜索词）和请求头
+    qCDebug(lcNet).noquote() << "GET" << url.path();
     QNetworkReply *reply = m_nam->get(req);
     connect(reply, &QNetworkReply::finished, this, [this, reply, callback] {
         reply->deleteLater();

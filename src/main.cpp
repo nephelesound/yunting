@@ -1,6 +1,7 @@
 // 应用入口：装配 NcmClient / Store / AudioEngine / Session / Mpris，注入 prototype/main.qml。
 // QML 仍来自源码树（原型阶段，界面与后端并行演进），由 PROTOTYPE_DIR 编译定义给出路径。
 #include "audioengine.h"
+#include "imagecache.h"
 #include "mpris.h"
 #include "ncmclient.h"
 #include "session.h"
@@ -15,6 +16,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLoggingCategory>
 #include <QQuickStyle>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -26,8 +28,8 @@
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
+    // 不设组织名：缓存与数据目录就是 ~/.cache/ncm-player、~/.local/share/ncm-player，不多套一层
     app.setApplicationName(QStringLiteral("ncm-player"));
-    app.setOrganizationName(QStringLiteral("ncm-player"));
 
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("NetEase Cloud Music client"));
@@ -48,8 +50,12 @@ int main(int argc, char *argv[])
     parser.process(app);
 
     if (parser.isSet(verboseOption) || parser.isSet(shotOption)) {
-        qInstallMessageHandler([](QtMsgType type, const QMessageLogContext &, const QString &msg) {
-            if (type != QtDebugMsg && type != QtInfoMsg)
+        // 警告以上一律打印；--verbose 时再打开本应用的 ncm.* 调试分类（网络请求路径等）
+        if (parser.isSet(verboseOption))
+            QLoggingCategory::setFilterRules(QStringLiteral("ncm.*.debug=true"));
+        qInstallMessageHandler([](QtMsgType type, const QMessageLogContext &ctx, const QString &msg) {
+            const bool ours = ctx.category && qstrncmp(ctx.category, "ncm.", 4) == 0;
+            if (ours || (type != QtDebugMsg && type != QtInfoMsg))
                 std::fprintf(stderr, "%s\n", qPrintable(msg));
         });
     }
@@ -75,6 +81,25 @@ int main(int argc, char *argv[])
 
     if (parser.isSet(dumpOption)) {
         store.waitForInitial();
+        // 按需数据走真实的 request() 路径（经 QueryCache），契约也就覆盖了它：
+        // 搜索一个词、取热歌榜第一首的歌词，等两者落地（兜底 15 秒）
+        const QString probeQuery = QStringLiteral("林俊杰");
+        const QVariantList hot = store.data().value("tracks").toList();
+        const double probeSong = hot.isEmpty() ? 0 : hot.first().toMap().value("id").toDouble();
+        const auto landed = [&] {
+            const QVariantMap d = store.data();
+            return d.value("search").toMap().value("query").toString() == probeQuery
+                && !d.value("search").toMap().value("songs").toList().isEmpty()
+                && (probeSong == 0 || d.value("lyricsTrackId").toDouble() == probeSong);
+        };
+        store.request(QStringLiteral("search:") + probeQuery);
+        if (probeSong != 0)
+            store.request(QStringLiteral("lyrics:%1").arg(qlonglong(probeSong)));
+        QEventLoop loop;
+        QTimer::singleShot(15 * 1000, &loop, &QEventLoop::quit);
+        QObject::connect(&store, &Store::dataChanged, &loop, [&] { if (landed()) loop.quit(); });
+        if (!landed())
+            loop.exec();
         const QJsonObject root{{"data", QJsonObject::fromVariantMap(store.data())},
                                {"personal", QJsonObject::fromVariantMap(store.personal())}};
         QFile out(parser.value(dumpOption));
@@ -99,6 +124,8 @@ int main(int argc, char *argv[])
 
     store.refresh();   // 首屏数据异步到达，QML 通过 data / personal 的 NOTIFY 自动更新
     QQmlApplicationEngine engine;
+    ImageCacheFactory imageCache;
+    engine.setNetworkAccessManagerFactory(&imageCache);
     // main.qml 用 root.backend.{store,audio,session,mpris} 取后端；QVariantMap 的 key 就是属性名
     QVariantMap backend{{"store", QVariant::fromValue<QObject *>(&store)},
                         {"audio", QVariant::fromValue<QObject *>(&audio)},

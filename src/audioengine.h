@@ -2,6 +2,8 @@
 // AudioEngine：声音接缝（prototype/Playback.qml 消费）。接口与 SimEngine.qml 逐字段一致：
 // track（Playback 设置即开始取播放地址）· playing · position / duration（秒）。
 // 队列与「下一首」不在这里：自然播完只发 finished()，切歌规则只有 Playback 那一份。
+#include <QDateTime>
+#include <QHash>
 #include <QJsonObject>
 #include <QObject>
 #include <QString>
@@ -49,6 +51,13 @@ signals:
 private:
     // fee=8 免费曲匿名也能拿 320k；data[0].url 为空即 failed
     void resolveUrl(double songId);
+    void startSource(const QString &url);
+
+    struct CachedUrl {
+        QString url;
+        QDateTime expires;
+    };
+    QHash<double, CachedUrl> m_urls;   // 播放地址缓存，到 expi 前复用
 
     NcmClient *m_client;
     QMediaPlayer *m_player;

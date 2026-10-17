@@ -3,6 +3,7 @@
 // 形状定义在 scripts/snapshot.py 的归一化函数里（src/normalize.cpp 移植），契约由
 // scripts/check_contract.py 把关。
 #include "ncmclient.h"
+#include "querycache.h"
 #include <QJsonObject>
 #include <QMap>
 #include <QObject>
@@ -38,10 +39,8 @@ signals:
     void settled();
 
 private:
-    // 发一条首屏请求并计数；waitForInitial 等计数归零。
-    // sharedKey 非空时，回调落地后递减 request() 的在途引用计数（search 一次发四条）
-    void fetch(const QString &path, const QUrlQuery &query, bool personal,
-               NcmClient::GetCallback callback, const QString &sharedKey = {});
+    // 发一条首屏请求并计数；waitForInitial 等计数归零
+    void fetch(const QString &path, const QUrlQuery &query, bool personal, NcmClient::GetCallback callback);
     void fetchAnonymous();
     void fetchAccount();
     void fetchPublicPersonal();
@@ -53,9 +52,12 @@ private:
     void fetchHeart(const QVariantMap &seed, const QJsonObject &likedList);
     void fetchRadar(const QVariantMap &seed);
     void fetchTail();
-    void fetchPlaylistDetail(double playlistId);
-    void fetchLyrics(double songId);
-    void fetchSearch(const QString &raw, const QString &sharedKey);
+    void requestLyrics(const QString &key, double songId);
+    void requestPlaylist(const QString &key, double playlistId);
+    void requestSearch(const QString &key, const QString &raw);
+    // 首屏的 stale-while-revalidate：启动时先放上次的值，refresh() 的结果陆续覆盖
+    void restoreScreen();
+    QString personalKey() const;
     // 相似歌曲的种子（红心第一首，未登录退回热歌榜第一首）到齐后发一次
     void maybeFetchSimilar();
 
@@ -65,8 +67,9 @@ private:
     NcmClient *m_client;
     QVariantMap m_data;
     QVariantMap m_personal;
+    QVariantMap m_emptyPersonal;     // 个人骨架（换账号时清回它）
     QVariantMap m_similarSeed;
     bool m_similarFired = false;
-    QMap<QString, int> m_inFlight;   // request(key) 的在途引用计数（search 一次四条）
+    QueryCache m_cache;              // 按需数据与首屏快照的缓存（~/.cache/ncm-player/queries.json）
     int m_pending = 0;               // 首屏在途请求计数
 };

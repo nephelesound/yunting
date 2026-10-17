@@ -38,7 +38,8 @@ def walk(a, b, path, out):
         if a and b:
             walk(a[0], b[0], path + "[]", out)
         elif a and not b:
-            out.append(f"{path}[]: expected {kind(a[0])} got missing")
+            # 空列表是「没有数据」，不是形状错误（云盘为空、按需加载的歌词还没取）；列出来但不算失败
+            print(f"not checked (empty): {path}[]")
 
 
 def load_js(path):

@@ -5,6 +5,7 @@
 
 #include <QDate>
 #include <QEventLoop>
+#include <QStandardPaths>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QTimer>
@@ -20,7 +21,8 @@ QVariant nullVariant() { return QVariant::fromValue(nullptr); }
 } // namespace
 
 Store::Store(NcmClient *client, QObject *parent)
-    : QObject(parent), m_client(client)
+    : QObject(parent), m_client(client),
+      m_cache(QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/queries.json")
 {
     // 骨架先就位：形状永远完整，QML 绑定不会踩到缺键（值本身仍可为 null / 空表）
     m_data = QVariantMap{
@@ -50,15 +52,37 @@ Store::Store(NcmClient *client, QObject *parent)
         {"similar", QVariantMap{{"seed", nullVariant()}, {"tracks", QVariantList{}}}},
         {"playlistDetails", QVariantMap{}},
     };
+    m_emptyPersonal = m_personal;
+    restoreScreen();
+}
+
+// 上次的首屏值先放上（只放骨架里有的键，旧版本缓存里多出来的字段不带进来）。
+// 个人部分按会话分开存：登录与匿名各一份，互不覆盖；换了账号由 fetchAccount 发现并清掉
+QString Store::personalKey() const
+{
+    return m_client->hasMusicU() ? QStringLiteral("screen:personal") : QStringLiteral("screen:personal:anon");
+}
+
+void Store::restoreScreen()
+{
+    const auto overlay = [](QVariantMap &into, const QVariantMap &cached) {
+        for (auto it = cached.constBegin(); it != cached.constEnd(); ++it)
+            if (into.contains(it.key()))
+                into.insert(it.key(), it.value());
+    };
+    overlay(m_data, m_cache.peek("screen:data").toMap());
+    overlay(m_personal, m_cache.peek(personalKey()).toMap());
 }
 
 void Store::put(const char *key, const QVariant &value, bool personalSide)
 {
     if (personalSide) {
         m_personal.insert(QLatin1String(key), value);
+        m_cache.remember(personalKey(), m_personal);
         emit personalChanged();
     } else {
         m_data.insert(QLatin1String(key), value);
+        m_cache.remember("screen:data", m_data);
         emit dataChanged();
     }
 }
@@ -76,19 +100,15 @@ void Store::refresh()
         fetchAnonymousPlaylists();
 }
 
-void Store::fetch(const QString &path, const QUrlQuery &q, bool personal, NcmClient::GetCallback callback,
-                  const QString &sharedKey)
+void Store::fetch(const QString &path, const QUrlQuery &q, bool personal, NcmClient::GetCallback callback)
 {
     ++m_pending;
-    m_client->get(path, q, personal, [this, sharedKey, callback](const QJsonDocument &doc, bool ok) {
-        callback(doc, ok);
-        if (!sharedKey.isEmpty()) {
-            const int left = m_inFlight.value(sharedKey) - 1;
-            if (left <= 0)
-                m_inFlight.remove(sharedKey);
-            else
-                m_inFlight.insert(sharedKey, left);
-        }
+    m_client->get(path, q, personal, [this, callback](const QJsonDocument &doc, bool ok) {
+        // stale-while-revalidate 的另一半：失败（断网、超时、接口回 301 未登录等）一律不回调，
+        // 已经恢复或取到的旧值原样保留，绝不用空结果覆盖
+        const QJsonValue code = doc.object().value("code");
+        if (ok && (code.isUndefined() || code.toInt() == 200))
+            callback(doc, ok);
         if (--m_pending == 0)
             emit settled();
     });
@@ -148,11 +168,10 @@ void Store::fetchAnonymous()
                                 {"plays", hot.value("playCount").toDouble()},
                             }, false);
         }
-        // snapshot.py 的 CURRENT = 2：原型「正在播放」停在热歌榜第 3 首，歌词跟着它取。
-        // 相似歌曲的种子：未登录用热歌榜第一首；登录后等红心第一首（fetchHeart）
-        if (tracks.size() > 2) {
+        // 相似歌曲的种子：未登录用热歌榜第一首；登录后等红心第一首（fetchHeart）。
+        // 歌词不在首屏取：正在播放页按当前歌曲 request("lyrics:<id>")
+        if (!tracks.isEmpty()) {
             m_similarSeed = tracks.at(0).toMap();
-            fetchLyrics(tracks.at(2).toMap().value("id").toDouble());
             if (!m_client->hasMusicU())
                 maybeFetchSimilar();
         }
@@ -173,49 +192,6 @@ void Store::fetchAnonymous()
         }
         put("hotSearches", hot, false);
     });
-
-    fetch("api/search/get", query({{"s", QStringLiteral("林俊杰")}, {"type", "1"}, {"limit", "10"}}), false,
-          [this](const QJsonDocument &doc, bool ok) {
-        if (ok) {
-            QVariantMap search = m_data.value("search").toMap();
-            search.insert("query", QStringLiteral("林俊杰"));
-            search.insert("songs", ncmTracks(arr(body(doc).value("result").toObject(), "songs")));
-            put("search", search, false);
-        }
-    });
-    fetch("api/search/get", query({{"s", QStringLiteral("林俊杰")}, {"type", "100"}, {"limit", "6"}}), false,
-          [this](const QJsonDocument &doc, bool ok) {
-        if (ok) {
-            QVariantMap search = m_data.value("search").toMap();
-            QVariantList artists;
-            for (const QJsonValue &a : arr(body(doc).value("result").toObject(), "artists"))
-                artists.append(ncmSearchArtist(a.toObject()));
-            search.insert("artists", artists);
-            put("search", search, false);
-        }
-    });
-    fetch("api/search/get", query({{"s", QStringLiteral("林俊杰")}, {"type", "1000"}, {"limit", "6"}}), false,
-          [this](const QJsonDocument &doc, bool ok) {
-        if (ok) {
-            QVariantMap search = m_data.value("search").toMap();
-            QVariantList playlists;
-            for (const QJsonValue &p : arr(body(doc).value("result").toObject(), "playlists"))
-                playlists.append(ncmSearchPlaylist(p.toObject()));
-            search.insert("playlists", playlists);
-            put("search", search, false);
-        }
-    });
-    fetch("api/search/get", query({{"s", QStringLiteral("林俊杰")}, {"type", "10"}, {"limit", "6"}}), false,
-          [this](const QJsonDocument &doc, bool ok) {
-        if (ok) {
-            QVariantMap search = m_data.value("search").toMap();
-            QVariantList albums;
-            for (const QJsonValue &a : arr(body(doc).value("result").toObject(), "albums"))
-                albums.append(ncmSearchAlbum(a.toObject()));
-            search.insert("albums", albums);
-            put("search", search, false);
-        }
-    });
 }
 
 void Store::fetchAccount()
@@ -224,6 +200,13 @@ void Store::fetchAccount()
     fetch("api/nuser/account/get", {}, true, [this](const QJsonDocument &doc, bool ok) {
         const QJsonObject profile = body(doc).value("profile").toObject();
         const double uid = profile.value("userId").toDouble();
+        // 恢复出来的个人缓存属于另一个账号（或会话已失效）：先清回空骨架，不让旧账号的数据停留
+        const QString cachedName = m_personal.value("account").toMap().value("name").toString();
+        if (!cachedName.isEmpty() && (uid <= 0 || cachedName != profile.value("nickname").toString())) {
+            m_personal = m_emptyPersonal;
+            m_cache.remember(personalKey(), m_personal);
+            emit personalChanged();
+        }
         if (uid > 0) {
             put("account", QVariantMap{
                                {"name", profile.value("nickname").toString()},
