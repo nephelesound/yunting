@@ -12,6 +12,7 @@
 #include <QVariantMap>
 
 class NcmClient;
+class QNetworkInformation;
 
 class Store : public QObject {
     Q_OBJECT
@@ -19,11 +20,17 @@ class Store : public QObject {
     // 骨架字段（toplists / lyrics / daily / account …）在构造时就位，QML 绑定不会踩到缺键。
     Q_PROPERTY(QVariantMap data READ data NOTIFY dataChanged)
     Q_PROPERTY(QVariantMap personal READ personal NOTIFY personalChanged)
+    // 任一请求因网络原因（无连接、超时、DNS）失败后为 false；之后任一请求成功回 true
+    Q_PROPERTY(bool online READ online NOTIFY onlineChanged)
+    // 持有 MUSIC_U 但账号接口说没有会话（无 profile / 301）；登录成功或 refresh 拿到账号后回 false
+    Q_PROPERTY(bool sessionExpired READ sessionExpired NOTIFY sessionExpiredChanged)
 public:
     explicit Store(NcmClient *client, QObject *parent = nullptr);
 
     QVariantMap data() const { return m_data; }
     QVariantMap personal() const { return m_personal; }
+    bool online() const { return m_online; }
+    bool sessionExpired() const { return m_sessionExpired; }
 
     // 按需加载："lyrics:<id>"、"playlist:<id>"、"search:<query>"；同 key 在途时去重
     Q_INVOKABLE void request(const QString &key);
@@ -36,11 +43,20 @@ public:
 signals:
     void dataChanged();
     void personalChanged();
+    void onlineChanged();
+    void sessionExpiredChanged();
     void settled();
+
+private slots:
+    // NcmClient 每个请求的落地真相：收敛 online / sessionExpired 与欠账刷新
+    void requestFinished(bool ok, bool networkFailure);
+    // QNetworkInformation 的离线→在线沿：恢复后拉一次首屏（每次离线期间只欠一次）
+    void connectionRegained();
 
 private:
     // 发一条首屏请求并计数；waitForInitial 等计数归零
-    void fetch(const QString &path, const QUrlQuery &query, bool personal, NcmClient::GetCallback callback);
+    void fetch(const QString &path, const QUrlQuery &query, bool personal, NcmClient::GetCallback callback,
+               bool acceptNotLoggedIn = false);
     void fetchAnonymous();
     void fetchAccount();
     void fetchPublicPersonal();
@@ -63,6 +79,8 @@ private:
 
     // 归一化结果写回 m_data / m_personal 并 NOTIFY
     void put(const char *key, const QVariant &value, bool personalSide);
+    void setOnline(bool online);
+    void setSessionExpired(bool expired);
 
     NcmClient *m_client;
     QVariantMap m_data;
@@ -70,6 +88,10 @@ private:
     QVariantMap m_emptyPersonal;     // 个人骨架（换账号时清回它）
     QVariantMap m_similarSeed;
     bool m_similarFired = false;
+    bool m_online = true;
+    bool m_sessionExpired = false;
+    QNetworkInformation *m_netInfo = nullptr;
+    bool m_refreshOwed = false;      // 离线期间欠下的恢复刷新；到账后只还一次
     QueryCache m_cache;              // 按需数据与首屏快照的缓存（~/.cache/ncm-player/queries.json）
     int m_pending = 0;               // 首屏在途请求计数
 };

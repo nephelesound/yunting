@@ -10,6 +10,7 @@
 #include <QUrlQuery>
 
 class QNetworkAccessManager;
+class QNetworkReply;
 
 class NcmClient : public QObject {
     Q_OBJECT
@@ -32,10 +33,23 @@ public:
     void adoptCookies(const QJsonDocument &jarDoc);
 
     // GET https://music.163.com/<path>?<query>，完成后回调一次；失败时 doc 为空、ok=false。
+    // 网络错误、超时与 HTTP 5xx 自动重试，最多 3 次，间隔 0.5 / 1 / 2 秒；4xx 与业务码不重试。
     // 语义层的在途去重在 Store.request（key 在它那里才知道）；这里每个请求都发。
     void get(const QString &path, const QUrlQuery &query, bool personal, GetCallback callback);
 
+    // 测试接缝：把 API 指到本地 QTcpServer。默认 music.163.com。
+    void setApiBase(const QString &base);
+
+signals:
+    // 每个请求（含重试）最终落地一次。networkFailure = 网络原因（无连接 / 超时 / DNS），
+    // 区别于服务器明确回了非 200 或业务码；Store 靠它区分离线与「服务器说不行」。
+    void requestFinished(bool ok, bool networkFailure);
+
 private:
+    // 发起一次尝试；retrying 表示这是重试（成功/终局只发一次回调与信号）
+    void startGet(const QString &path, const QUrlQuery &query, bool personal,
+                  int attempt, bool retrying, GetCallback callback);
+    static bool isNetworkError(const QNetworkReply &reply);
     void loadJar();
     void saveJar() const;
     void keepSetCookies(class QNetworkReply *reply);
@@ -44,5 +58,6 @@ private:
 
     QNetworkAccessManager *m_nam;
     QString m_jarPath;
+    QString m_apiBase = QStringLiteral("https://music.163.com/");
     QMap<QString, QString> m_jar;
 };

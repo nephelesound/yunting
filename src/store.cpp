@@ -5,6 +5,7 @@
 
 #include <QDate>
 #include <QEventLoop>
+#include <QNetworkInformation>
 #include <QStandardPaths>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -54,6 +55,34 @@ Store::Store(NcmClient *client, QObject *parent)
     };
     m_emptyPersonal = m_personal;
     restoreScreen();
+
+    connect(m_client, &NcmClient::requestFinished, this, &Store::requestFinished);
+    // 系统说网络恢复（离线→在线沿）：还上离线期间欠的那次刷新
+    if (QNetworkInformation::loadDefaultBackend()) {
+        m_netInfo = QNetworkInformation::instance();
+        connect(m_netInfo, &QNetworkInformation::reachabilityChanged, this, &Store::connectionRegained);
+        if (m_netInfo->reachability() == QNetworkInformation::Reachability::Disconnected)
+            setOnline(false);
+    }
+}
+
+// 离线→在线：QNetworkInformation 报告恢复，或（后端不可用时）下一个请求成功。
+// m_refreshOwed 保证每次离线期间只补拉一次，两个来源谁先到谁还，不循环刷新。
+void Store::connectionRegained()
+{
+    if (!m_netInfo || m_netInfo->reachability() != QNetworkInformation::Reachability::Online)
+        return;
+    if (m_online) {
+        // 迟到的 Online 沿（请求成功已把 online 翻回 true）：按欠账处理，不重复刷
+        if (m_refreshOwed) {
+            m_refreshOwed = false;
+            refresh();
+        }
+        return;
+    }
+    setOnline(true);
+    m_refreshOwed = false;
+    refresh();
 }
 
 // 上次的首屏值先放上（只放骨架里有的键，旧版本缓存里多出来的字段不带进来）。
@@ -100,14 +129,50 @@ void Store::refresh()
         fetchAnonymousPlaylists();
 }
 
-void Store::fetch(const QString &path, const QUrlQuery &q, bool personal, NcmClient::GetCallback callback)
+// 连接状态与会话过期的唯一写入口：请求落地的真相在这里收敛
+void Store::requestFinished(bool ok, bool networkFailure)
+{
+    // 只要服务器回了话（成功、4xx、业务码、坏 JSON 都算），网络就是通的；只有连不上才算离线
+    if (networkFailure) {
+        setOnline(false);
+        m_refreshOwed = true;
+        return;
+    }
+    setOnline(true);
+    // 后端不可用时的兜底：网络通了本身就是恢复信号，还掉欠账
+    if (ok && m_refreshOwed) {
+        m_refreshOwed = false;
+        refresh();
+    }
+}
+
+void Store::setOnline(bool online)
+{
+    if (m_online == online)
+        return;
+    m_online = online;
+    emit onlineChanged();
+}
+
+void Store::setSessionExpired(bool expired)
+{
+    if (m_sessionExpired == expired)
+        return;
+    m_sessionExpired = expired;
+    emit sessionExpiredChanged();
+}
+
+void Store::fetch(const QString &path, const QUrlQuery &q, bool personal, NcmClient::GetCallback callback,
+                  bool acceptNotLoggedIn)
 {
     ++m_pending;
-    m_client->get(path, q, personal, [this, callback](const QJsonDocument &doc, bool ok) {
+    m_client->get(path, q, personal, [this, callback, acceptNotLoggedIn](const QJsonDocument &doc, bool ok) {
         // stale-while-revalidate 的另一半：失败（断网、超时、接口回 301 未登录等）一律不回调，
-        // 已经恢复或取到的旧值原样保留，绝不用空结果覆盖
+        // 已经恢复或取到的旧值原样保留，绝不用空结果覆盖。
+        // 例外：账号接口要看到 301，才能判断「登录已过期」（acceptNotLoggedIn）
         const QJsonValue code = doc.object().value("code");
-        if (ok && (code.isUndefined() || code.toInt() == 200))
+        const bool success = code.isUndefined() || code.toInt() == 200;
+        if (ok && (success || (acceptNotLoggedIn && code.toInt() == 301)))
             callback(doc, ok);
         if (--m_pending == 0)
             emit settled();
@@ -200,9 +265,13 @@ void Store::fetchAccount()
     fetch("api/nuser/account/get", {}, true, [this](const QJsonDocument &doc, bool ok) {
         const QJsonObject profile = body(doc).value("profile").toObject();
         const double uid = profile.value("userId").toDouble();
-        // 恢复出来的个人缓存属于另一个账号（或会话已失效）：先清回空骨架，不让旧账号的数据停留
+        // 会话已死（200 且无 profile，或回 301）：个人字段保持匿名替身的形状
+        setSessionExpired(ok && uid <= 0);
+        // 恢复出来的个人缓存属于另一个账号（或会话已失效）：先清回空骨架，不让旧账号的数据停留。
+        // 请求本身失败（ok=false）时不清：失败保留已有的值
         const QString cachedName = m_personal.value("account").toMap().value("name").toString();
-        if (!cachedName.isEmpty() && (uid <= 0 || cachedName != profile.value("nickname").toString())) {
+        if (ok && !cachedName.isEmpty()
+            && (uid <= 0 || cachedName != profile.value("nickname").toString())) {
             m_personal = m_emptyPersonal;
             m_cache.remember(personalKey(), m_personal);
             emit personalChanged();
@@ -221,7 +290,7 @@ void Store::fetchAccount()
                 qWarning() << "session expired, serving anonymous personal data";
             fetchAnonymousPlaylists();
         }
-    });
+    }, /*acceptNotLoggedIn=*/true);
 }
 
 void Store::fetchPublicPersonal()
