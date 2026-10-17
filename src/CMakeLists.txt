@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Qml Quick QuickControls2 Network Multimedia DBus)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Qml Quick QuickControls2 Network Multimedia DBus Sql)
 find_package(Qt6Keychain REQUIRED)
 find_package(KF6StatusNotifierItem REQUIRED)
 find_package(KF6CoreAddons QUIET)   # KSignalHandler；没有时 cli.cpp 用自管道
@@ -72,7 +72,7 @@ target_compile_options(yunting PRIVATE -Wall -Wextra)
 find_package(Qt6 REQUIRED COMPONENTS Test)
 enable_testing()
 qt_add_executable(querycache_test tests/querycache_test.cpp querycache.h querycache.cpp perf.h perf.cpp)
-target_link_libraries(querycache_test PRIVATE Qt6::Core Qt6::Test Qt6::Network)
+target_link_libraries(querycache_test PRIVATE Qt6::Core Qt6::Sql Qt6::Test Qt6::Network)
 add_test(NAME querycache COMMAND querycache_test)
 
 # 归一化形状：曲目导航字段、MV、云盘后备、LRC 译文
@@ -114,7 +114,7 @@ qt_add_executable(store_test tests/store_test.cpp
     ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp
     normalize.h normalize.cpp json_util.h crypto.h crypto.cpp perf.h perf.cpp)
 target_compile_options(store_test PRIVATE -Wall -Wextra)
-target_link_libraries(store_test PRIVATE Qt6::Core Qt6::Network Qt6::Test Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
+target_link_libraries(store_test PRIVATE Qt6::Core Qt6::Sql Qt6::Network Qt6::Test Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
 add_test(NAME store COMMAND store_test)
 
 # 切歌时挂起的 seek 不能落到下一首：本地假接口 + 本地 WAV
@@ -131,7 +131,7 @@ set_tests_properties(querycache normalize form eqprocessor audioengine audioengi
 
 target_link_libraries(yunting PRIVATE
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Qml Qt6::Quick Qt6::QuickControls2
-    Qt6::Network Qt6::Multimedia Qt6::DBus
+    Qt6::Network Qt6::Multimedia Qt6::DBus Qt6::Sql
     Qt6Keychain::Qt6Keychain
     KF6::StatusNotifierItem
     OpenSSL::Crypto

@@ -1,9 +1,14 @@
 // QueryCache 的行为测试：只经它的公开接口（query / peek / remember），取数函数用计数的假实现。
+// 测新鲜期时直接改落盘行的生成时间：公开接口只会写「现在」。
 #include "../querycache.h"
 
+#include <QDateTime>
 #include <QFile>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QUuid>
 
 class QueryCacheTest : public QObject {
     Q_OBJECT
@@ -27,12 +32,41 @@ class QueryCacheTest : public QObject {
         }
     };
 
-    // 预置一份当前格式的缓存文件：entries 是 "key": {...} 的 JSON 片段
-    static void writeCache(const QString &path, const QByteArray &entries)
+    static bool withDatabase(const QString &path, const std::function<bool(QSqlDatabase &)> &work)
     {
-        QFile f(path);
-        QVERIFY(f.open(QIODevice::WriteOnly));
-        f.write("{\"_format\": " + QByteArray::number(QueryCache::diskFormat) + ", " + entries + "}");
+        const QString connection = QStringLiteral("querycache-test-%1")
+                                       .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+        bool ok = false;
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+            db.setDatabaseName(path);
+            if (db.open())
+                ok = work(db);
+        }
+        QSqlDatabase::removeDatabase(connection);
+        return ok;
+    }
+
+    // 经公开接口写入并落盘，再把生成时间改到 ageSeconds 秒之前
+    static bool seedAged(const QString &path, const QHash<QString, QVariant> &entries,
+                         qint64 ageSeconds)
+    {
+        {
+            QueryCache cache(path);
+            for (auto it = entries.constBegin(); it != entries.constEnd(); ++it)
+                cache.remember(it.key(), it.value());
+        }
+        return withDatabase(path, [&](QSqlDatabase &db) {
+            QSqlQuery query(db);
+            query.prepare(QStringLiteral("UPDATE entries SET fetched_at = ? WHERE key = ?"));
+            for (auto it = entries.constBegin(); it != entries.constEnd(); ++it) {
+                query.bindValue(0, QDateTime::currentSecsSinceEpoch() - ageSeconds);
+                query.bindValue(1, it.key());
+                if (!query.exec() || query.numRowsAffected() != 1)
+                    return false;
+            }
+            return true;
+        });
     }
 
 private slots:
@@ -41,17 +75,36 @@ private slots:
     void otherFormatFileIsDiscarded()
     {
         QTemporaryDir dir;
-        const QString path = dir.filePath("q.json");
-        QFile f(path);
-        QVERIFY(f.open(QIODevice::WriteOnly));
-        f.write(R"({"lyrics:7": {"value": "[00:36.19]la", "at": "2026-01-01T00:00:00Z"}})");
-        f.close();
+        const QString path = dir.filePath("cache.db");
+        {
+            QueryCache cache(path);
+            cache.remember("lyrics:7", "[00:36.19]la");
+        }
+        QVERIFY(withDatabase(path, [](QSqlDatabase &db) {
+            QSqlQuery query(db);
+            return query.exec(QStringLiteral("PRAGMA user_version = 1"));
+        }));
         QVERIFY(!QueryCache(path).peek("lyrics:7").isValid());
     }
+
+    // 旧版整份 JSON 缓存不迁移：它只是缓存，留在盘上白占地方
+    void legacyJsonCacheIsRemoved()
+    {
+        QTemporaryDir dir;
+        const QString legacy = dir.filePath("queries.json");
+        QFile file(legacy);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("{\"_format\":2}");
+        file.close();
+
+        QueryCache cache(dir.filePath("queries.db"));
+        QVERIFY(!QFile::exists(legacy));
+    }
+
     void freshHitDoesNotFetchAgain()
     {
         QTemporaryDir dir;
-        QueryCache cache(dir.filePath("q.json"));
+        QueryCache cache(dir.filePath("cache.db"));
         FakeFetch fetch;
         QVariantList got;
         const auto deliver = [&](const QVariant &v) { got.append(v); };
@@ -65,7 +118,7 @@ private slots:
     void refreshNeverServesOrKeepsCachedValue()
     {
         QTemporaryDir dir;
-        QueryCache cache(dir.filePath("q.json"));
+        QueryCache cache(dir.filePath("cache.db"));
         cache.remember("mvUrl:7", "old");
         FakeFetch fetch;
         fetch.next = "new";
@@ -79,7 +132,7 @@ private slots:
     void concurrentRequestsShareOneFetch()
     {
         QTemporaryDir dir;
-        QueryCache cache(dir.filePath("q.json"));
+        QueryCache cache(dir.filePath("cache.db"));
         FakeFetch fetch;
         fetch.hold = true;
         int deliveredA = 0, deliveredB = 0;
@@ -95,8 +148,8 @@ private slots:
     void staleValueIsServedThenKeptWhenRevalidationFails()
     {
         QTemporaryDir dir;
-        const QString path = dir.filePath("q.json");
-        writeCache(path, R"("playlist:1": {"value": "old", "at": "2000-01-01T00:00:00Z"})");
+        const QString path = dir.filePath("cache.db");
+        QVERIFY(seedAged(path, {{"playlist:1", "old"}}, 2 * 24 * 60 * 60));
 
         QueryCache cache(path);
         FakeFetch failing;
@@ -111,8 +164,8 @@ private slots:
     void staleValueIsReplacedWhenRevalidationSucceeds()
     {
         QTemporaryDir dir;
-        const QString path = dir.filePath("q.json");
-        writeCache(path, R"("playlist:1": {"value": "old", "at": "2000-01-01T00:00:00Z"})");
+        const QString path = dir.filePath("cache.db");
+        QVERIFY(seedAged(path, {{"playlist:1", "old"}}, 2 * 24 * 60 * 60));
 
         QueryCache cache(path);
         FakeFetch fetch;
@@ -123,10 +176,36 @@ private slots:
         QCOMPARE(cache.peek("playlist:1"), QVariant("new"));
     }
 
+    // 新鲜期按 key 的种类：album 30 天。界内不发请求；界外先给旧值、同时发一次请求
+    void freshnessFollowsKeyKind()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath("cache.db");
+        QVERIFY(seedAged(path, {{"album:9", "old"}}, 20 * 24 * 60 * 60));
+        {
+            QueryCache cache(path);
+            FakeFetch fetch;
+            QVariantList got;
+            cache.query("album:9", fetch.fn(), [&](const QVariant &v) { got.append(v); });
+            QCOMPARE(fetch.calls, 0);                   // 20 天内：只给缓存
+            QCOMPARE(got, (QVariantList{"old"}));
+        }
+
+        QVERIFY(seedAged(path, {{"album:9", "old"}}, 31 * 24 * 60 * 60));
+        QueryCache cache(path);
+        FakeFetch fetch;
+        fetch.next = "new";
+        QVariantList got;
+        cache.query("album:9", fetch.fn(), [&](const QVariant &v) { got.append(v); });
+        QCOMPARE(fetch.calls, 1);                       // 过期：发一次
+        QCOMPARE(got, (QVariantList{"old", "new"}));    // 先旧后新
+        QCOMPARE(cache.peek("album:9"), QVariant("new"));
+    }
+
     void missingKeyFetchesAndFailureDeliversNothing()
     {
         QTemporaryDir dir;
-        QueryCache cache(dir.filePath("q.json"));
+        QueryCache cache(dir.filePath("cache.db"));
         FakeFetch failing;
         failing.ok = false;
         int delivered = 0;
@@ -139,18 +218,23 @@ private slots:
     void clearDropsPersonalData()
     {
         QTemporaryDir dir;
-        QueryCache cache(dir.filePath("q.json"));
-        cache.remember("playlist:1", "private");
-        cache.remember("lyrics:1", "public");
-        cache.clear();
-        QVERIFY(!cache.peek("playlist:1").isValid());
-        QVERIFY(!cache.peek("lyrics:1").isValid());
+        const QString path = dir.filePath("cache.db");
+        {
+            QueryCache cache(path);
+            cache.remember("playlist:1", "private");
+            cache.remember("lyrics:1", "public");
+            cache.clear();
+            QVERIFY(!cache.peek("playlist:1").isValid());
+            QVERIFY(!cache.peek("lyrics:1").isValid());
+        }
+        QueryCache reopened(path);
+        QVERIFY(!reopened.peek("playlist:1").isValid());   // 库里也清了
     }
 
     void clearIgnoresInFlightResult()
     {
         QTemporaryDir dir;
-        QueryCache cache(dir.filePath("q.json"));
+        QueryCache cache(dir.filePath("cache.db"));
         FakeFetch fetch;
         fetch.hold = true;
         int delivered = 0;
@@ -164,7 +248,7 @@ private slots:
     void lyricsSurviveRestartButSearchDoesNot()
     {
         QTemporaryDir dir;
-        const QString path = dir.filePath("q.json");
+        const QString path = dir.filePath("cache.db");
         {
             QueryCache cache(path);
             cache.remember("lyrics:7", "la la");
@@ -183,7 +267,7 @@ private slots:
     void forgetMakesTheNextQueryRefetch()
     {
         QTemporaryDir dir;
-        QueryCache cache(dir.filePath("q.json"));
+        QueryCache cache(dir.filePath("cache.db"));
         FakeFetch fetch;
         int delivered = 0;
         cache.remember("playlist:1", "old");

@@ -47,7 +47,7 @@ QString failureMessage(NcmClient::Failure failure, const QJsonObject &body)
 
 Store::Store(NcmClient *client, QObject *parent)
     : QObject(parent), m_client(client),
-      m_cache(QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/queries.json")
+      m_cache(QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/queries.db")
 {
     // 骨架先就位：形状永远完整，QML 绑定不会踩到缺键（值本身仍可为 null / 空表）
     m_data = QVariantMap{

@@ -4,6 +4,7 @@
 #include "../store.h"
 #include "../ncmclient.h"
 
+#include <QDateTime>
 #include <QDeadlineTimer>
 #include <QElapsedTimer>
 #include <QHostAddress>
@@ -11,6 +12,9 @@
 #include <QJsonDocument>
 #include <QPointer>
 #include <QSignalSpy>
+#include <QSqlDatabase>
+#include <QSqlQuery>
+#include <QStandardPaths>
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTemporaryDir>
@@ -1048,6 +1052,145 @@ private slots:
         m_store->request(QStringLiteral("lyricsNew:6"));
         QVERIFY(waitUntil([&] { return failed.count() == 1; }));
         QCOMPARE(failed.first().at(0).toString(), QStringLiteral("lyricsNew:6"));
+    }
+
+    // 离线：缓存里的歌单、专辑、歌手在接口拒绝连接时照常交付。新鲜期内根本不发请求；
+    // 过期后先交付旧值，取数失败只发 requestFailed，不清掉已交付的数据。
+    void offlineCacheServesPlaylistAlbumArtist()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/v6/playlist/detail") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"playlist", QJsonObject{
+                        {"id", 601}, {"name", "P"}, {"coverImgUrl", ""}, {"description", ""},
+                        {"trackCount", 1},
+                        {"tracks", QJsonArray{QJsonObject{{"id", 7}, {"name", "song"},
+                                                          {"ar", QJsonArray{}}, {"al", QJsonObject{}},
+                                                          {"dt", 1000}}}},
+                        {"trackIds", QJsonArray{QJsonObject{{"id", 7}}}}}}}));
+                return;
+            }
+            if (req.path == "/api/v1/album/123") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"album", QJsonObject{
+                        {"id", 123}, {"name", "A"},
+                        {"artists", QJsonArray{QJsonObject{{"id", 9}, {"name", "X"}}}},
+                        {"picUrl", ""}, {"description", ""}, {"company", ""},
+                        {"isSub", false}, {"publishTime", 0}}},
+                    {"songs", QJsonArray{QJsonObject{{"id", 8}, {"name", "b"},
+                                                     {"ar", QJsonArray{}}, {"al", QJsonObject{}},
+                                                     {"dt", 1000}}}}}));
+                return;
+            }
+            if (req.path == "/api/v1/artist/321") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"artist", QJsonObject{
+                        {"id", 321}, {"name", "Ar"}, {"alias", QJsonArray{}},
+                        {"picUrl", ""}, {"briefDesc", ""}, {"followed", false},
+                        {"musicSize", 1}, {"albumSize", 0}}},
+                    {"hotSongs", QJsonArray{QJsonObject{{"id", 9}, {"name", "h"},
+                                                        {"ar", QJsonArray{}}, {"al", QJsonObject{}},
+                                                        {"dt", 1000}}}}}));
+                return;
+            }
+            if (req.path == "/api/artist/albums/321") {
+                respond(200, json(QJsonObject{{"code", 200}, {"hotAlbums", QJsonArray{}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        const auto cachedValues = [this] {
+            return m_store->personal().value("playlistDetails").toMap()
+                       .value(QStringLiteral("601")).toMap().value("name").toString()
+                       == QLatin1String("P")
+                && m_store->data().value("album").toMap().value("name").toString()
+                       == QLatin1String("A")
+                && m_store->data().value("artist").toMap().value("name").toString()
+                       == QLatin1String("Ar");
+        };
+
+        m_store->request(QStringLiteral("playlist:601"));
+        m_store->request(QStringLiteral("album:123"));
+        m_store->request(QStringLiteral("artist:321"));
+        QVERIFY(waitUntil(cachedValues));
+
+        // 直接把落盘条目的生成时间改老：公开接口只会写「现在」
+        const QString cachePath = QStandardPaths::writableLocation(QStandardPaths::CacheLocation)
+                                  + QStringLiteral("/queries.db");
+        const auto ageCache = [&cachePath](qint64 seconds) {
+            bool ok = false;
+            {
+                QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),
+                                                             QStringLiteral("store-test-age"));
+                db.setDatabaseName(cachePath);
+                if (db.open()) {
+                    QSqlQuery query(db);
+                    query.prepare(QStringLiteral("UPDATE entries SET fetched_at = ?"));
+                    query.addBindValue(QDateTime::currentSecsSinceEpoch() - seconds);
+                    ok = query.exec();
+                }
+            }
+            QSqlDatabase::removeDatabase(QStringLiteral("store-test-age"));
+            return ok;
+        };
+        const quint16 port = m_api->serverPort();
+        const auto reopenStore = [this, port] {
+            delete m_store;
+            m_store = nullptr;
+            delete m_client;
+            m_client = nullptr;
+
+            m_client = new NcmClient(nullptr, false);
+            m_client->setApiBase(QStringLiteral("http://127.0.0.1:%1/").arg(port));
+            m_client->adoptCookies(QJsonDocument(QJsonArray{
+                QJsonObject{{"MUSIC_U", "test"}, {"__csrf", "csrf"}}}));
+            m_store = new Store(m_client);
+        };
+
+        // 新鲜期内不发请求。接口对每个连接都不回包、直接断开（连接层拒绝）
+        const auto refuse = [](const FakeApi::Request &, const FakeApi::Responder &respond) {
+            respond(0, {});
+        };
+        m_api->requests.clear();
+        m_api->handler = refuse;
+        delete m_store;
+        m_store = nullptr;
+        delete m_client;
+        m_client = nullptr;
+        QVERIFY(ageCache(2 * 60 * 60));   // 2 小时：三种 key 都还在新鲜期内
+
+        reopenStore();
+        {
+            QSignalSpy failed(m_store, &Store::requestFailed);
+            m_store->request(QStringLiteral("playlist:601"));
+            m_store->request(QStringLiteral("album:123"));
+            m_store->request(QStringLiteral("artist:321"));
+            QVERIFY(cachedValues());
+            QTest::qWait(100);
+            QCOMPARE(m_api->requests.size(), 0);   // 缓存新鲜：断网也不发请求
+            QCOMPARE(failed.count(), 0);
+        }
+
+        // 31 天后全部过期：旧值仍然先交付，失败不覆盖
+        delete m_store;
+        m_store = nullptr;
+        delete m_client;
+        m_client = nullptr;
+        QVERIFY(ageCache(31 * 24 * 60 * 60));
+        m_api->close();   // 监听也关掉：连接直接被拒
+
+        reopenStore();
+        QSignalSpy failed(m_store, &Store::requestFailed);
+        m_store->request(QStringLiteral("playlist:601"));
+        m_store->request(QStringLiteral("album:123"));
+        m_store->request(QStringLiteral("artist:321"));
+        QVERIFY(cachedValues());            // 先给缓存
+        QVERIFY(waitUntil([&] { return failed.count() == 3; }, 15000));
+        QVERIFY(cachedValues());            // 三个请求都失败，旧值原样保留
     }
 };
 
