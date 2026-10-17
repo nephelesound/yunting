@@ -5,6 +5,7 @@
 
 #include <QDate>
 #include <QEventLoop>
+#include <QHash>
 #include <QNetworkInformation>
 #include <QStandardPaths>
 #include <QJsonArray>
@@ -37,6 +38,7 @@ Store::Store(NcmClient *client, QObject *parent)
                                {"artists", QVariantList{}}, {"playlists", QVariantList{}},
                                {"albums", QVariantList{}}}},
         {"hotSearches", QVariantList{}},
+        {"comments", QVariantMap{{"songId", 0.0}, {"items", QVariantList{}}}},
     };
     m_personal = QVariantMap{
         {"account", nullVariant()},
@@ -44,6 +46,7 @@ Store::Store(NcmClient *client, QObject *parent)
         {"heart", nullVariant()},
         {"radar", nullVariant()},
         {"liked", nullVariant()},
+        {"likedIds", QVariantList{}},
         {"mine", QVariantList{}},
         {"recent", nullVariant()},
         {"cloud", nullVariant()},
@@ -281,7 +284,16 @@ void Store::fetchAccount()
                                {"name", profile.value("nickname").toString()},
                                {"vip", profile.value("vipType").toDouble() > 0},
                                {"avatar", ncmSized(profile.value("avatarUrl"), 96)},
+                               {"background", ncmSized(profile.value("backgroundUrl"), 1200)},
                            }, true);
+            // 全部红心曲目 id（播放条与行内小红心）；没有红心时接口也可能回 null
+            fetch("api/song/like/get", query({{"uid", num(uid)}}), true,
+                  [this](const QJsonDocument &doc, bool /*ok*/) {
+                QVariantList ids;
+                for (const QJsonValue &v : arr(body(doc), "ids"))
+                    ids.append(v.toDouble());
+                put("likedIds", ids, true);
+            });
             fetchDaily();
             fetchUserLists(uid);
         } else {
@@ -341,11 +353,24 @@ void Store::fetchDaily()
             QString date = today.toString(QStringLiteral("MM月dd日"));
             if (date.startsWith(u'0'))
                 date.remove(0, 1);
+            const QJsonObject data = body(doc).value("data").toObject();
+            // 推荐理由按 songId 对上：data.recommendReasons 里每条 { songId, reason }
+            QHash<double, QString> reasons;
+            for (const QJsonValue &r : arr(data, "recommendReasons")) {
+                const QJsonObject o = r.toObject();
+                reasons.insert(o.value("songId").toDouble(), o.value("reason").toString());
+            }
+            QVariantList tracks;
+            const QJsonArray dailySongs = take(arr(data, "dailySongs"), 30);
+            tracks.reserve(dailySongs.size());
+            for (const QJsonValue &s : dailySongs) {
+                const QJsonObject song = s.toObject();
+                tracks.append(ncmTrack(song, reasons.value(song.value("id").toDouble())));
+            }
             put("daily", QVariantMap{
                              {"date", date},
                              {"day", QString::number(today.day())},
-                             {"tracks", ncmTracks(take(arr(body(doc).value("data").toObject(),
-                                                          "dailySongs"), 30))},
+                             {"tracks", tracks},
                          }, true);
         }
     });

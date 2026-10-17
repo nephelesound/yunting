@@ -32,7 +32,7 @@ public:
     bool online() const { return m_online; }
     bool sessionExpired() const { return m_sessionExpired; }
 
-    // 按需加载："lyrics:<id>"、"playlist:<id>"、"search:<query>"；同 key 在途时去重
+    // 按需加载："lyrics:<id>"、"playlist:<id>"、"search:<query>"、"comments:<id>"；同 key 在途时去重
     Q_INVOKABLE void request(const QString &key);
     // 重新拉全部首屏数据（登录成功后调用）
     Q_INVOKABLE void refresh();
@@ -71,6 +71,7 @@ private:
     void requestLyrics(const QString &key, double songId);
     void requestPlaylist(const QString &key, double playlistId);
     void requestSearch(const QString &key, const QString &raw);
+    void requestComments(const QString &key, double songId);
     // 首屏的 stale-while-revalidate：启动时先放上次的值，refresh() 的结果陆续覆盖
     void restoreScreen();
     QString personalKey() const;

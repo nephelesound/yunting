@@ -47,10 +47,11 @@ def get(path, personal=False):
         return json.load(r)
 
 
-def track(s):
+def track(s, reason=""):
     """新旧两种歌曲结构（ar/al/dt 与 artists/album/duration）统一成原型用的字段。"""
     artists = s.get("ar") or s.get("artists") or []
     album = s.get("al") or s.get("album") or {}
+    alias = s.get("alia") or s.get("alias") or s.get("tns") or s.get("transNames") or [""]
     return {
         "id": s["id"],
         "name": s["name"],
@@ -59,12 +60,30 @@ def track(s):
         "dur": (s.get("dt") or s.get("duration") or 0) // 1000,
         "fee": s.get("fee", 0),
         "cover": sized(album.get("picUrl"), 120),
+        # 别名/译名取第一项（新结构 alia，旧结构 alias，再退 tns/transNames）；quality 看有没有更高一档音频
+        "alias": alias[0],
+        "quality": "hires" if (s.get("hr") or s.get("hrMusic")) else ("lossless" if (s.get("sq") or s.get("sqMusic")) else ""),
+        "mv": s.get("mv") or s.get("mvid") or 0,
+        # 推荐理由只有每日推荐带（data.recommendReasons 里 songId 对上的那条），其余为空
+        "reason": reason,
     }
 
 
 def sized(url, px):
     """图片地址加尺寸参数；没有图（搜索结果等常见 null）就是空串，不能拼出只有参数的假地址。"""
     return f"{url}?param={px}y{px}" if url else ""
+
+
+def parse_lrc(lrc, tlyric=""):
+    """LRC → [{t, text, tr}]；译文按取整到两位小数的时间戳对上，没有为 ""。"""
+    def stamps(text):
+        out = {}
+        for m in re.finditer(r"\[(\d+):(\d+(?:\.\d+)?)\](.*)", text):
+            if m[3].strip():
+                out.setdefault(round(int(m[1]) * 60 + float(m[2]), 2), m[3].strip())
+        return out
+    tr = stamps(tlyric)
+    return [{"t": t, "text": text, "tr": tr.get(t, "")} for t, text in stamps(lrc).items()]
 
 
 def cloud_track(item):
@@ -110,16 +129,26 @@ def write(name, header, parts):
     print("wrote", os.path.relpath(path, ROOT))
 
 
+def hot_comments(song_id):
+    """热门评论：按接口给的顺序，最多 10 条；avatar 是用户头像（96 方图）。"""
+    resp = get(f"api/v1/resource/hotcomments/R_SO_4_{song_id}?limit=10")
+    # 实测热评在顶层 hotComments（不在 data 里），保持接口顺序
+    return {"songId": song_id,
+            "items": [{"user": (c.get("user") or {}).get("nickname") or "",
+                       "avatar": sized((c.get("user") or {}).get("avatarUrl"), 96),
+                       "content": c.get("content") or "",
+                       "likes": c.get("likedCount") or 0,
+                       "time": c.get("time") or 0}
+                      for c in (resp.get("hotComments") or [])[:10]]}
+
+
 def anonymous():
     top = get("api/toplist/detail")["list"]
     hot = get(f"api/v6/playlist/detail?id={HOT_CHART}&n=40")["playlist"]
     tracks = [track(s) for s in hot["tracks"][:40]]
-    lrc = get(f"api/song/lyric?id={tracks[CURRENT]['id']}&lv=1&tv=-1").get("lrc", {}).get("lyric", "")
-    lyrics = [
-        {"t": round(int(m[1]) * 60 + float(m[2]), 2), "text": m[3].strip()}
-        for m in re.finditer(r"\[(\d+):(\d+(?:\.\d+)?)\](.*)", lrc)
-        if m[3].strip()
-    ]
+    lyric = get(f"api/song/lyric?id={tracks[CURRENT]['id']}&lv=1&tv=-1")
+    lyrics = parse_lrc(lyric.get("lrc", {}).get("lyric", ""),
+                       (lyric.get("tlyric") or {}).get("lyric") or "")
     toplists = [
         {
             "id": t["id"],
@@ -153,26 +182,33 @@ def anonymous():
     write("Data.js", f"匿名接口快照（{time.strftime('%Y-%m-%d')}），由 scripts/snapshot.py 生成",
           [js("toplists", toplists), js("playlist", playlist), js("tracks", tracks),
            js("lyricsTrackId", tracks[CURRENT]["id"]), js("lyrics", lyrics),
+           js("comments", hot_comments(tracks[CURRENT]["id"])),
            js("search", search), js("hotSearches", hot_searches)])
     return tracks
 
 
 def personal(hot_tracks):
     # playlistDetails：按需加载的歌单曲目 { "<id>": { tracks, description } }，快照里为空，由应用的 Store 填
-    data = {"account": None, "daily": None, "heart": None, "radar": None, "liked": None, "mine": [],
-            "recent": None, "cloud": None, "subscribed": [], "playlistDetails": {}}
+    # likedIds：全部红心曲目 id，登录后由 /api/song/like/get 填
+    data = {"account": None, "daily": None, "heart": None, "radar": None, "liked": None, "likedIds": [],
+            "mine": [], "recent": None, "cloud": None, "subscribed": [], "playlistDetails": {}}
     account = get("api/nuser/account/get", personal=True) if COOKIE else {}
     profile = account.get("profile") or {}
     uid = profile.get("userId")
 
     if uid:
         data["account"] = {"name": profile["nickname"], "vip": (profile.get("vipType") or 0) > 0,
-                           "avatar": sized(profile.get("avatarUrl"), 96)}
-        daily = get("api/v3/discovery/recommend/songs", personal=True)["data"]["dailySongs"]
+                           "avatar": sized(profile.get("avatarUrl"), 96),
+                           "background": sized(profile.get("backgroundUrl"), 1200)}
+        daily = get("api/v3/discovery/recommend/songs", personal=True)["data"]
+        # 推荐理由按 songId 对上：data.recommendReasons 里每条 { songId, reason }
+        reasons = {r.get("songId"): r.get("reason") or "" for r in daily.get("recommendReasons") or []}
         data["daily"] = {"date": time.strftime("%m月%d日").lstrip("0"), "day": time.strftime("%d").lstrip("0"),
-                         "tracks": [track(s) for s in daily[:30]]}
+                         "tracks": [track(s, reasons.get(s["id"], "")) for s in daily["dailySongs"][:30]]}
 
         lists = get(f"api/user/playlist?uid={uid}&limit=30&offset=0", personal=True)["playlist"]
+        # 全部红心曲目 id（播放条与行内小红心用）；没有红心时接口也可能回 null
+        data["likedIds"] = get(f"api/song/like/get?uid={uid}", personal=True).get("ids") or []
         liked_list = lists[0]
         liked = get(f"api/v6/playlist/detail?id={liked_list['id']}&n=30", personal=True)["playlist"]
         data["liked"] = {"id": liked["id"], "count": liked["trackCount"], "tracks": [track(s) for s in liked["tracks"][:30]]}
