@@ -77,18 +77,18 @@ Kirigami.Page {
                 Layout.rightMargin: Tokens.space2
             }
 
-            // 账号：头像 + 名字。登录时整块可点，打开账号面板（我是谁、会员与等级、我的主页、退出登录）
+            // 账号：头像 + 名字。登录时整块可点，直接进自己的主页（会员、等级与退出登录都在那里）
             AbstractButton {
                 id: account
                 readonly property bool active: screen.loggedIn && !Source.sessionExpired
                 Layout.rightMargin: account.active ? -Tokens.space2 : 0
-                enabled: account.active
+                enabled: account.active && (Source.account.id || 0) > 0
                 hoverEnabled: true
                 implicitHeight: Tokens.height8
                 leftPadding: account.active ? Tokens.space1 : 0
                 rightPadding: account.active ? Tokens.space2 : 0
                 Accessible.name: "账号：" + accountName.text
-                onClicked: accountPanel.visible ? accountPanel.close() : accountPanel.open()
+                onClicked: Actions.openUser(Source.account.id)
 
                 background: Rectangle {
                     radius: Tokens.radius
@@ -112,15 +112,6 @@ Kirigami.Page {
                         font.pixelSize: Tokens.textSm
                         color: Source.sessionExpired ? Kirigami.Theme.neutralTextColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                     }
-                }
-
-                // 面板右缘与账号块右缘对齐，贴在它下方
-                AccountPanel {
-                    id: accountPanel
-                    x: account.width - width
-                    y: account.height + Tokens.space1
-                    onProfileRequested: Actions.openUser(Source.account.id)
-                    onLogoutRequested: Actions.logoutRequested()
                 }
             }
             Button {

@@ -20,7 +20,6 @@ EqualizerPanel EqualizerPanel.qml
 WheelScroll WheelScroll.qml
 FullscreenCover FullscreenCover.qml
 AccentButton AccentButton.qml
-AccountPanel AccountPanel.qml
 ChartCard ChartCard.qml
 ChartsPage ChartsPage.qml
 Cover Cover.qml

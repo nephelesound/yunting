@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
+import "Format.js" as Format
 
 ScreenFrame {
     id: page
@@ -12,6 +13,8 @@ ScreenFrame {
     property real userId
 
     readonly property var user: Source.user(page.userId)
+    // 自己的主页：账号的去处都在这里（页头的头像与名字直接跳过来），关注的位置换成退出登录
+    readonly property bool own: page.userId > 0 && Source.account !== null && Source.account.id === page.userId
     heading: page.user.name || "用户"
 
     RowLayout {
@@ -60,7 +63,18 @@ ScreenFrame {
                     { value: String(page.user.follows || 0), label: "关注" },
                     { value: String(page.user.followeds || 0), label: "粉丝" },
                     { value: String(page.user.playlistCount || 0), label: "歌单" },
-                ]
+                ].concat((page.user.listenSongs || 0) > 0
+                    ? [{ value: Format.count(page.user.listenSongs), label: "累计听歌" }] : [])
+            }
+
+            // 破坏性操作，确认在对话框里；只用文字（次要操作），不配图标
+            Button {
+                Layout.topMargin: Tokens.space4
+                visible: page.own
+                implicitHeight: Tokens.height8
+                flat: true
+                text: "退出登录…"
+                onClicked: Actions.logoutRequested()
             }
         }
 
