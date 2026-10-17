@@ -39,4 +39,5 @@ private:
     QString m_state = QStringLiteral("idle");
     QString m_qrContent;
     QString m_unikey;
+    quint64 m_generation = 0;   // start()/cancel() 递增；旧二维码的回包一律丢弃
 };

@@ -1,0 +1,397 @@
+// Store 的行为测试：seam 是本地 QTcpServer（扮演 music.163.com），不 mock Store/NcmClient 内部。
+// 覆盖：业务码错误不写缓存、歌单写后缓存失效、连点红心不丢最后一次意图、迟到的详情不把
+// 已取消的红心插回列表。
+#include "../store.h"
+#include "../ncmclient.h"
+
+#include <QDeadlineTimer>
+#include <QElapsedTimer>
+#include <QHostAddress>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QPointer>
+#include <QSignalSpy>
+#include <QTcpServer>
+#include <QTcpSocket>
+#include <QTemporaryDir>
+#include <QTest>
+#include <QUrlQuery>
+
+class FakeApi : public QTcpServer {
+public:
+    struct Request {
+        QByteArray method;
+        QByteArray path;
+        QByteArray query;
+        QByteArray body;
+    };
+    using Responder = std::function<void(int status, const QByteArray &body)>;
+
+    explicit FakeApi(QObject *parent = nullptr) : QTcpServer(parent)
+    {
+        connect(this, &QTcpServer::newConnection, this, [this] {
+            while (QTcpSocket *sock = nextPendingConnection()) {
+                auto *buffer = new QByteArray;
+                connect(sock, &QTcpSocket::readyRead, this, [this, sock, buffer] {
+                    buffer->append(sock->readAll());
+                    const qsizetype headerEnd = buffer->indexOf("\r\n\r\n");
+                    if (headerEnd < 0)
+                        return;
+                    const QByteArray head = buffer->left(headerEnd);
+                    const QByteArray rest = buffer->mid(headerEnd + 4);
+                    int contentLength = 0;
+                    for (const QByteArray &line : head.split('\n')) {
+                        const QByteArray text = line.trimmed();
+                        if (text.toLower().startsWith("content-length:"))
+                            contentLength = text.mid(15).trimmed().toInt();
+                    }
+                    if (rest.size() < contentLength)
+                        return;
+                    buffer->clear();
+
+                    Request req;
+                    const QByteArray firstLine = head.left(head.indexOf('\n')).trimmed();
+                    const QList<QByteArray> first = firstLine.split(' ');
+                    req.method = first.value(0);
+                    const QByteArray target = first.value(1);
+                    const qsizetype q = target.indexOf('?');
+                    req.path = q < 0 ? target : target.left(q);
+                    req.query = q < 0 ? QByteArray() : target.mid(q + 1);
+                    req.body = rest.left(contentLength);
+                    requests.append(req);
+
+                    QPointer<QTcpSocket> guard(sock);
+                    const Responder respond = [guard](int status, const QByteArray &body) {
+                        if (!guard)
+                            return;
+                        guard->write("HTTP/1.1 " + QByteArray::number(status) + " x\r\n"
+                                     "Content-Type: application/json\r\nContent-Length: "
+                                     + QByteArray::number(body.size()) + "\r\nConnection: close\r\n\r\n"
+                                     + body);
+                        guard->flush();
+                        guard->disconnectFromHost();
+                    };
+                    if (handler)
+                        handler(req, respond);
+                    else
+                        respond(200, "{\"code\":200}");
+                });
+                connect(sock, &QTcpSocket::disconnected, sock, &QTcpSocket::deleteLater);
+                connect(sock, &QTcpSocket::disconnected, this, [buffer] { delete buffer; });
+            }
+        });
+    }
+
+    std::function<void(const Request &, Responder)> handler;
+    QList<Request> requests;
+};
+
+class StoreTest : public QObject {
+    Q_OBJECT
+
+    QTemporaryDir m_dir;
+    FakeApi *m_api = nullptr;
+    NcmClient *m_client = nullptr;
+    Store *m_store = nullptr;
+
+    static QByteArray json(const QJsonObject &object)
+    {
+        return QJsonDocument(object).toJson(QJsonDocument::Compact);
+    }
+
+    static bool waitUntil(const std::function<bool()> &done, int timeoutMs = 5000)
+    {
+        QDeadlineTimer deadline(timeoutMs);
+        while (!done() && !deadline.hasExpired())
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+        return done();
+    }
+
+    static bool likedIdsContain(const Store *store, double songId)
+    {
+        for (const QVariant &v : store->personal().value("likedIds").toList())
+            if (v.toDouble() == songId)
+                return true;
+        return false;
+    }
+
+private slots:
+    void init()
+    {
+        qputenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent");
+        qputenv("XDG_DATA_HOME", m_dir.filePath("data").toUtf8());
+        qputenv("XDG_CACHE_HOME", m_dir.filePath("cache").toUtf8());
+        qputenv("YUNTING_KEYCHAIN_SERVICE", "yunting-test");
+
+        m_api = new FakeApi(this);
+        QVERIFY(m_api->listen(QHostAddress::LocalHost));
+        m_client = new NcmClient(nullptr, false);
+        m_client->setApiBase(QStringLiteral("http://127.0.0.1:%1/").arg(m_api->serverPort()));
+        m_client->adoptCookies(QJsonDocument(QJsonArray{
+            QJsonObject{{"MUSIC_U", "test"}, {"__csrf", "csrf"}}}));
+        m_store = new Store(m_client);
+    }
+
+    void cleanup()
+    {
+        delete m_store;
+        m_store = nullptr;
+        delete m_client;
+        m_client = nullptr;
+        delete m_api;
+        m_api = nullptr;
+    }
+
+    // 业务码 -460 的歌词回包不能当成「没有歌词」永久缓存
+    void businessErrorIsNotCachedAsFresh()
+    {
+        int lyricRequests = 0;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/song/lyric") {
+                ++lyricRequests;
+                if (lyricRequests == 1) {
+                    respond(200, "{\"code\":-460}");
+                    return;
+                }
+                respond(200, "{\"code\":200,\"lrc\":{\"lyric\":\"[00:01.00]hello\"},"
+                             "\"tlyric\":{\"lyric\":\"\"}}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("lyrics:9"));
+        QVERIFY(waitUntil([&] { return lyricRequests >= 1; }));
+        QTest::qWait(100);
+        QVERIFY(m_store->data().value("lyrics").toList().isEmpty());
+
+        m_store->request(QStringLiteral("lyrics:9"));
+        QVERIFY(waitUntil([&] { return lyricRequests >= 2; }));
+        QVERIFY(waitUntil([&] { return m_store->data().value("lyrics").toList().size() == 1; }));
+    }
+
+    // 歌单写成功后，下一次 playlist:<id> 请求必须重新取，不能拿写前的详情
+    void playlistWriteInvalidatesCachedDetail()
+    {
+        bool removed = false;
+        int detailRequests = 0;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/v6/playlist/detail") {
+                ++detailRequests;
+                QJsonArray tracks;
+                if (!removed)
+                    tracks.append(QJsonObject{{"id", 7}, {"name", "song"},
+                                              {"ar", QJsonArray{}}, {"al", QJsonObject{}}, {"dt", 1000}});
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"playlist", QJsonObject{
+                        {"id", 501}, {"name", "P"}, {"coverImgUrl", ""}, {"description", ""},
+                        {"trackCount", removed ? 0 : 1}, {"tracks", tracks},
+                        {"trackIds", removed ? QJsonArray{} : QJsonArray{QJsonObject{{"id", 7}}}}}}}));
+                return;
+            }
+            if (req.path == "/weapi/playlist/manipulate/tracks") {
+                removed = true;
+                respond(200, "{\"code\":200}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("playlist:501"));
+        QVERIFY(waitUntil([&] { return detailRequests >= 1; }));
+        QVERIFY(waitUntil([&] {
+            return m_store->personal().value("playlistDetails").toMap().contains(QStringLiteral("501"));
+        }));
+
+        m_store->request(QStringLiteral("playlist:501"));
+        QTest::qWait(100);
+        QCOMPARE(detailRequests, 1);   // 新鲜期内不重复取
+
+        m_store->removeSongFromPlaylist(501, 7);
+        QVERIFY(waitUntil([&] {
+            const QVariantMap detail = m_store->personal().value("playlistDetails").toMap()
+                                           .value(QStringLiteral("501")).toMap();
+            return detail.value("tracks").toList().isEmpty();
+        }));
+
+        m_store->request(QStringLiteral("playlist:501"));
+        QVERIFY(waitUntil([&] { return detailRequests >= 2; }));
+    }
+
+    // 请求在途时再点一次不能被丢掉：回包落地后要追发最后一次意图
+    void secondLikeClickIsQueued()
+    {
+        int likeRequests = 0;
+        QList<FakeApi::Responder> held;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/weapi/radio/like") {
+                ++likeRequests;
+                held.append(respond);
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->setLiked(5, true);
+        QVERIFY(waitUntil([&] { return likeRequests == 1; }));
+        QVERIFY(likedIdsContain(m_store, 5));
+
+        m_store->setLiked(5, false);   // 第一次还没回来
+        QCOMPARE(likeRequests, 1);     // 但不丢意图，也不并发发请求
+        QVERIFY(!likedIdsContain(m_store, 5));
+
+        held.takeFirst()(200, "{\"code\":200}");
+        QVERIFY(waitUntil([&] { return likeRequests == 2; }));
+        held.takeFirst()(200, "{\"code\":200}");
+        QVERIFY(waitUntil([&] { return held.isEmpty(); }));
+        QVERIFY(waitUntil([&] { return !likedIdsContain(m_store, 5); }));
+        QCOMPARE(likeRequests, 2);
+    }
+
+    // 红心详情晚到：期间已取消红心，就不能把曲目再插回 liked.tracks
+    void lateLikeDetailDoesNotReaddUnlikedSong()
+    {
+        bool detailHeld = false;
+        FakeApi::Responder heldDetail;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/nuser/account/get") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"profile", QJsonObject{{"userId", 42}, {"nickname", "same"}}}}));
+            } else if (req.path == "/api/user/playlist") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"playlist", QJsonArray{QJsonObject{
+                        {"id", 100}, {"trackCount", 0},
+                        {"creator", QJsonObject{{"userId", 42}}}}}}}));
+            } else if (req.path == "/api/song/like/get") {
+                respond(200, "{\"code\":200,\"ids\":[]}");
+            } else if (req.path == "/api/v6/playlist/detail") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"playlist", QJsonObject{{"id", 100}, {"name", "liked"}, {"trackCount", 0},
+                                             {"tracks", QJsonArray{}}, {"trackIds", QJsonArray{}}}}}));
+            } else if (req.path == "/api/v3/song/detail") {
+                detailHeld = true;
+                heldDetail = respond;
+            } else if (req.path == "/weapi/radio/like") {
+                respond(200, "{\"code\":200}");
+            } else {
+                respond(200, "{\"code\":200}");
+            }
+        };
+
+        m_store->refresh();
+        QVERIFY(waitUntil([&] {
+            const QVariant liked = m_store->personal().value("liked");
+            return liked.isValid() && !liked.isNull();
+        }));
+
+        m_store->setLiked(77, true);
+        QVERIFY(waitUntil([&] { return detailHeld; }));
+
+        m_store->setLiked(77, false);
+        QVERIFY(waitUntil([&] { return !likedIdsContain(m_store, 77); }));
+
+        heldDetail(200, json(QJsonObject{
+            {"code", 200},
+            {"songs", QJsonArray{QJsonObject{{"id", 77}, {"name", "song"},
+                                             {"ar", QJsonArray{}}, {"al", QJsonObject{}}, {"dt", 1000}}}}}));
+        QTest::qWait(100);
+        QVERIFY(m_store->personal().value("liked").toMap().value("tracks").toList().isEmpty());
+    }
+
+    // 从排行榜收藏：卡片不在 personal/搜索结果里，也要用排行榜已有的名字与封面
+    void subscribingChartKeepsItsName()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/toplist/detail") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"list", QJsonArray{QJsonObject{
+                        {"id", 777}, {"name", "Chart"}, {"coverImgUrl", "http://cover"},
+                        {"trackCount", 5}, {"updateFrequency", "weekly"},
+                        {"tracks", QJsonArray{}}}}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->waitForInitial();
+        QVERIFY(!m_store->data().value("toplists").toList().isEmpty());
+
+        QSignalSpy changed(m_store, &Store::playlistChanged);
+        m_store->setPlaylistSubscribed(777, true);
+        QVERIFY(waitUntil([&] { return changed.count() > 0; }));
+
+        const QVariantList subscribed = m_store->personal().value("subscribed").toList();
+        QCOMPARE(subscribed.size(), 1);
+        QCOMPARE(subscribed.first().toMap().value("name").toString(), QStringLiteral("Chart"));
+    }
+
+    // 已存在的歌再加一次：列表与计数都不能变（服务器的幂等请求不代表本地新增）
+    void addingPresentSongDoesNotInflateCount()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/nuser/account/get") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"profile", QJsonObject{{"userId", 42}, {"nickname", "n"}}}}));
+            } else if (req.path == "/api/user/playlist") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"playlist", QJsonArray{
+                        QJsonObject{{"id", 100}, {"trackCount", 0},
+                                    {"creator", QJsonObject{{"userId", 42}}}},
+                        QJsonObject{{"id", 101}, {"name", "Mine"}, {"trackCount", 1},
+                                    {"creator", QJsonObject{{"userId", 42}}}}}}}));
+            } else if (req.path == "/api/song/like/get") {
+                respond(200, "{\"code\":200,\"ids\":[]}");
+            } else if (req.path == "/api/v6/playlist/detail") {
+                const QUrlQuery query(QString::fromLatin1(req.query));
+                const double id = query.queryItemValue(QStringLiteral("id")).toDouble();
+                QJsonArray tracks;
+                QJsonArray trackIds;
+                if (id == 101) {
+                    tracks.append(QJsonObject{{"id", 7}, {"name", "song"},
+                                              {"ar", QJsonArray{}}, {"al", QJsonObject{}}, {"dt", 1000}});
+                    trackIds.append(QJsonObject{{"id", 7}});
+                }
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"playlist", QJsonObject{
+                        {"id", id}, {"name", "P"}, {"trackCount", id == 101 ? 1 : 0},
+                        {"tracks", tracks}, {"trackIds", trackIds}}}}));
+            } else {
+                respond(200, "{\"code\":200}");
+            }
+        };
+
+        m_store->refresh();
+        QVERIFY(waitUntil([&] {
+            const QVariant liked = m_store->personal().value("liked");
+            return liked.isValid() && !liked.isNull();
+        }));
+
+        m_store->request(QStringLiteral("playlist:101"));
+        QVERIFY(waitUntil([&] {
+            const QVariant detail = m_store->personal().value("playlistDetails").toMap()
+                                        .value(QStringLiteral("101"));
+            return detail.toMap().value("tracks").toList().size() == 1;
+        }));
+
+        QSignalSpy changed(m_store, &Store::playlistChanged);
+        m_store->addSongToPlaylist(101, 7);
+        QVERIFY(waitUntil([&] { return changed.count() > 0; }));
+        QTest::qWait(100);
+
+        const QVariantMap detail = m_store->personal().value("playlistDetails").toMap()
+                                       .value(QStringLiteral("101")).toMap();
+        QCOMPARE(detail.value("count").toDouble(), 1.0);
+        QCOMPARE(detail.value("tracks").toList().size(), 1);
+    }
+};
+
+QTEST_GUILESS_MAIN(StoreTest)
+#include "store_test.moc"

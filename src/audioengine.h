@@ -8,6 +8,7 @@
 #include <QHash>
 #include <QJsonObject>
 #include <QObject>
+#include <QSet>
 #include <QString>
 #include <QVariantMap>
 
@@ -82,6 +83,7 @@ private:
         QDateTime expires;
     };
     QHash<QString, CachedUrl> m_urls;   // songId:level → 地址，到 expi 前复用
+    QSet<QString> m_urlRequests;        // 在途的取址（songId:level）：同一首同一音质只发一次，避免重复 startSource
 
     NcmClient *m_client;
     QMediaPlayer *m_player;

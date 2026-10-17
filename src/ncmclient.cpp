@@ -80,6 +80,11 @@ NcmClient::NcmClient(QObject *parent, bool loadCookies)
         m_ready = true;
         emit ready();
     });
+    // 读存储失败（不是「没有条目」）：不认空 jar，也不进入 ready。
+    // 之后 keepSetCookies / persistJar 都因 !m_ready 跳过，匿名 NMTID 不会覆盖真凭据。
+    connect(m_vault, &CookieVault::loadFailed, this, [] {
+        qCWarning(lcNet) << "cannot read cookie store; credentials stay untouched this run";
+    });
     m_vault->load();
 }
 
@@ -129,9 +134,12 @@ int NcmClient::importGtk4()
     return m_jar.size();
 }
 
-// jar 变了就存一份进 vault（钥匙串或后备文件）
+// jar 变了就存一份进 vault（钥匙串或后备文件）。
+// 存储还没成功读出时绝不落盘：那会把空 jar 写在仍然完好的登录凭据上。
 void NcmClient::persistJar()
 {
+    if (!m_ready)
+        return;
     m_vault->save(jarToJson(m_jar));
 }
 
@@ -186,6 +194,11 @@ void NcmClient::clearAuthCookies()
     persistJar();
 }
 
+bool NcmClient::flushCredentials(int timeoutMs)
+{
+    return m_vault->waitForPending(timeoutMs);
+}
+
 // POST 的共同部分：写请求不重试，重复发送会产生副作用（红心、打卡、改歌单）。
 void NcmClient::postRaw(const QUrl &url, const QByteArray &body, const QString &cookie,
                         GetCallback callback, bool keepCookies)
@@ -237,11 +250,8 @@ void NcmClient::postWeapi(const QString &path, const QJsonObject &payload, bool 
         body.insert(QStringLiteral("csrf_token"), csrf);
 
     QUrl url(m_apiBase + QStringLiteral("weapi/") + path);
-    if (!csrf.isEmpty()) {
-        QUrlQuery q;
-        q.addQueryItem(QStringLiteral("csrf_token"), csrf);
-        url.setQuery(q);
-    }
+    if (!csrf.isEmpty())
+        url.setQuery(ncm::query({{"csrf_token", csrf}}));
 
     // 写接口除了登录 cookie 还要带客户端标识：缺 os/appver 时服务器回 -460「网络环境风险」。
     QString cookie = cookieHeader(personal);

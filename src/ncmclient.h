@@ -61,6 +61,9 @@ explicit NcmClient(QObject *parent = nullptr, bool loadCookies = true);
     // 测试接缝：把 API 指到本地 QTcpServer。默认 music.163.com。
     void setApiBase(const QString &base);
 
+    // 退出前把排队中的凭据写盘做完（钥匙串是异步的）；最多等 timeoutMs 毫秒
+    bool flushCredentials(int timeoutMs = 2000);
+
     // jar 是否已从存储读出（ready() 发过）
     bool isReady() const { return m_ready; }
 

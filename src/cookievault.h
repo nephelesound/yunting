@@ -28,8 +28,13 @@ public:
     // （NcmClient 构造时先 migrate 再 load），其探测读兼作钥匙串可用性判定。
     void migrate();
 
+    // 退出前等排队中的操作（尤其是保存）落地；返回是否在时限内清空。文件模式同步完成
+    bool waitForPending(int timeoutMs);
+
 signals:
     void loaded(const QByteArray &data);
+    // 读失败（不是 EntryNotFound）：存储里的内容未知，调用方不能把它当成空 jar
+    void loadFailed();
     void saved(bool ok);
     void migrated();
 

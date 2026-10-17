@@ -75,6 +75,7 @@ void AudioEngine::setTrack(const QVariantMap &track)
     // 切歌前把上一首的收听时长上报（位置 >= 1 秒才算）
     scrobbleFinish();
     m_track = track;
+    m_pendingSeek = -1;   // 上一首的跳转只属于上一首，不能落到新曲目上
     m_failed = false;
     m_scrobbleStarted = false;
     m_scrobbleFinished = false;
@@ -176,6 +177,10 @@ void AudioEngine::resolveUrl(double songId)
         startSource(cached->url);
         return;
     }
+    // 同一首歌、同一音质的取址已经在途（例如 A→B→A）：等那份回包，别再发一次，否则会重复 startSource
+    if (m_urlRequests.contains(cacheKey))
+        return;
+    m_urlRequests.insert(cacheKey);
 
     const bool lossless = level == QLatin1String("lossless") || level == QLatin1String("hires");
     m_client->postWeapi("song/enhance/player/url/v1",
@@ -184,6 +189,7 @@ void AudioEngine::resolveUrl(double songId)
                                     {"encodeType", lossless ? QStringLiteral("flac") : QStringLiteral("mp3")}},
                         true,
                         [this, songId, cacheKey](const QJsonDocument &doc, bool ok) {
+        m_urlRequests.remove(cacheKey);
         const QJsonObject resp = body(doc);
         const QJsonObject item = ok && resp.value("code").toInt() == 200
             ? arr(resp, "data").at(0).toObject() : QJsonObject();
@@ -241,7 +247,10 @@ void AudioEngine::scrobbleFinish()
 
 void AudioEngine::sendWeblog(const char *action, int seconds)
 {
-    const double sourceId = m_track.value("sourceId").toDouble();
+    // 曲目 map 没有歌单/专辑来源 id。参考实现允许省略来源并用歌曲 id 兜底
+    // （ncm-api-enhanced/module/scrobble_v1.js：source.id = sourceId || songId），
+    // 两个 weblog 字段都按这个值填，不能再固定成 0。
+    const double sourceId = m_track.value("id").toDouble();
     QJsonObject json{
         {"id", m_track.value("id").toDouble()},
         {"type", QStringLiteral("song")},

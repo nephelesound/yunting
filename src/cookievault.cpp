@@ -3,6 +3,7 @@
 #include <qt6keychain/keychain.h>
 
 #include <QCoreApplication>
+#include <QDeadlineTimer>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -138,18 +139,31 @@ void CookieVault::readKeychain()
     auto *job = new QKeychain::ReadPasswordJob(m_service, this);
     job->setKey(m_key);
     connect(job, &QKeychain::ReadPasswordJob::finished, this, [this, job](QKeychain::Job *done) {
-        // 读失败不能当「无条目」悄悄过去：空 jar 会让随后的匿名 NMTID 落盘，覆盖真凭据。
-        // 至少把错误留下来，排障时能看到这一步
-        if (done->error() != QKeychain::NoError && done->error() != QKeychain::EntryNotFound)
+        // 读失败不能当「无条目」：空 jar 会让随后的匿名 NMTID 落盘，覆盖真凭据。
+        // EntryNotFound 才是权威的「还没有条目」。
+        const bool readError = done->error() != QKeychain::NoError
+            && done->error() != QKeychain::EntryNotFound;
+        if (readError)
             qCWarning(lcVault) << "keychain read failed:" << done->errorString();
         const QByteArray data = done->error() == QKeychain::NoError ? job->binaryData() : QByteArray();
         done->deleteLater();
         m_busy = false;
         pump();
-        emit loaded(data);
+        if (readError)
+            emit loadFailed();
+        else
+            emit loaded(data);
     });
     job->start();
     m_busy = true;
+}
+
+bool CookieVault::waitForPending(int timeoutMs)
+{
+    QDeadlineTimer deadline(timeoutMs);
+    while ((m_busy || !m_pending.isEmpty()) && !deadline.hasExpired())
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+    return !m_busy && m_pending.isEmpty();
 }
 
 void CookieVault::writeMigrated(const QByteArray &json)

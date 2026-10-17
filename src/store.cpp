@@ -69,6 +69,9 @@ Store::Store(NcmClient *client, QObject *parent)
     };
     m_emptyPersonal = m_personal;
     restoreScreen();
+    // 换账号检测只认 userId：昵称会重复（「音乐爱好者」），不能当身份
+    if (m_client->hasMusicU())
+        m_accountUid = m_cache.peek(QStringLiteral("screen:uid")).toDouble();
 
     connect(m_client, &NcmClient::requestFinished, this, &Store::requestFinished);
     // 系统说网络恢复（离线→在线沿）：还上离线期间欠的那次刷新
@@ -113,7 +116,17 @@ void Store::restoreScreen()
             if (into.contains(it.key()))
                 into.insert(it.key(), it.value());
     };
-    overlay(m_data, m_cache.peek("screen:data").toMap());
+    // 旧版把整个 m_data 写进 screen:data；只恢复首屏字段，别把历史搜索词带进内存
+    static const QStringList screenKeys{QStringLiteral("toplists"), QStringLiteral("playlist"),
+                                        QStringLiteral("tracks"), QStringLiteral("hotSearches")};
+    QVariantMap cachedData = m_cache.peek("screen:data").toMap();
+    for (auto it = cachedData.begin(); it != cachedData.end();) {
+        if (screenKeys.contains(it.key()))
+            ++it;
+        else
+            it = cachedData.erase(it);
+    }
+    overlay(m_data, cachedData);
     overlay(m_personal, m_cache.peek(personalKey()).toMap());
 }
 
@@ -125,9 +138,22 @@ void Store::put(const char *key, const QVariant &value, bool personalSide)
         emit personalChanged();
     } else {
         m_data.insert(QLatin1String(key), value);
-        m_cache.remember("screen:data", m_data);
+        persistScreenData();
         emit dataChanged();
     }
+}
+
+// 首屏快照只留首屏字段。搜索词、评论、歌手/专辑/MV 详情都在别的 key 里，
+// 混进 screen:data 会绕过「搜索词不落盘」。
+void Store::persistScreenData()
+{
+    QVariantMap screen;
+    for (const char *key : {"toplists", "playlist", "tracks", "hotSearches"}) {
+        const QString name = QLatin1String(key);
+        if (m_data.contains(name))
+            screen.insert(name, m_data.value(name));
+    }
+    m_cache.remember(QStringLiteral("screen:data"), screen);
 }
 
 void Store::refresh()
@@ -151,69 +177,72 @@ void Store::setLiked(double songId, bool liked)
         emit likeFailed(songId, liked, QStringLiteral("登录后才能同步红心"));
         return;
     }
-    if (m_likePending.contains(songId))
-        return;
 
-    const QVariantList before = m_personal.value("likedIds").toList();
-    bool currentlyLiked = false;
-    for (const QVariant &v : before)
-        currentlyLiked = currentlyLiked || v.toDouble() == songId;
+    const auto pending = m_likes.find(songId);
+    if (pending != m_likes.end()) {
+        // 请求在途：不丢用户的新意图，记下来，回包落地后追发
+        if (pending->desired == liked)
+            return;
+        pending->desired = liked;
+        ++m_likeGeneration;
+        m_likeTouched.insert(songId);
+        setLikedLocal(songId, liked);
+        return;
+    }
+
+    const bool currentlyLiked = isLiked(songId);
     if (currentlyLiked == liked) {
         emit likeSucceeded(songId, liked);
         return;
     }
 
-    // 保持原有顺序：过滤掉这首歌，目标为喜欢时追加到末尾。
-    const auto withState = [songId](const QVariantList &source, bool target) {
-        QVariantList ids;
-        ids.reserve(source.size() + 1);
-        for (const QVariant &v : source)
-            if (v.toDouble() != songId)
-                ids.append(v);
-        if (target)
-            ids.append(songId);
-        return ids;
-    };
-    const auto writeIds = [this, withState](const QVariantList &source, bool target) {
-        put("likedIds", withState(source, target), true);
-    };
-    const auto writeCount = [this](int delta) {
-        const QVariant raw = m_personal.value("liked");
-        if (!raw.isValid() || raw.isNull())
-            return;
-        QVariantMap likedMap = raw.toMap();
-        likedMap.insert("count", std::max(0.0, likedMap.value("count").toDouble() + delta));
-        put("liked", likedMap, true);
-    };
+    m_likes.insert(songId, LikeState{currentlyLiked, liked});
+    ++m_likeGeneration;
+    m_likeTouched.insert(songId);
+    setLikedLocal(songId, liked);
+    sendLike(songId, liked);
+}
 
-    writeIds(before, liked);
-    writeCount(liked ? 1 : -1);
-    m_likePending.insert(songId);
+void Store::sendLike(double songId, bool liked)
+{
     const quint64 epoch = m_epoch;
-
     m_client->postWeapi("radio/like",
                         QJsonObject{{"alg", QStringLiteral("itembased")},
                                     {"trackId", num(songId)},
                                     {"like", liked ? QStringLiteral("true") : QStringLiteral("false")},
                                     {"time", QStringLiteral("25")}},
                         true,
-                        [this, songId, liked, writeIds, writeCount, epoch](const QJsonDocument &doc, bool ok) {
-        m_likePending.remove(songId);
-        if (epoch != m_epoch)   // 期间退出登录：不要把回滚写到新会话
+                        [this, songId, liked, epoch](const QJsonDocument &doc, bool ok) {
+        const auto pending = m_likes.find(songId);
+        if (epoch != m_epoch) {   // 期间退出登录：不要把回包写到新会话
+            if (pending != m_likes.end())
+                m_likes.erase(pending);
+            return;
+        }
+        if (pending == m_likes.end())
             return;
         const int code = doc.object().value("code").toInt();
         if (ok && code == 200) {
-            if (liked)
+            pending->serverState = liked;
+            if (pending->desired != liked) {
+                sendLike(songId, pending->desired);   // 用户在回包前又点了一次
+                return;
+            }
+            const bool finalState = pending->desired;
+            m_likes.erase(pending);
+            if (finalState)
                 addLikedTrack(songId);
             else
                 removeLikedTrack(songId);
-            emit likeSucceeded(songId, liked);
+            emit likeSucceeded(songId, finalState);
             return;
         }
 
-        // 回滚到点击前的状态。接口说会话过期时顺便更新全局状态，页头会显示「重新登录」。
-        writeIds(m_personal.value("likedIds").toList(), !liked);
-        writeCount(liked ? -1 : 1);
+        // 失败：退回服务器确认过的状态（可能是同一批里的上一次成功），丢弃排队的意图。
+        const bool serverState = pending->serverState;
+        const bool desired = pending->desired;
+        m_likes.erase(pending);
+        setLikedLocal(songId, serverState);
         if (code == 301)
             setSessionExpired(true);
 
@@ -224,9 +253,39 @@ void Store::setLiked(double songId, bool liked)
             : code == 301 ? QStringLiteral("登录已过期，请重新登录")
             : code == 250 ? QStringLiteral("这首歌暂时不能收藏")
                           : QStringLiteral("服务器没有接受这次操作");
-        emit likeFailed(songId, liked, reason);
+        emit likeFailed(songId, desired, reason);
         qWarning() << "like failed:" << songId << code;
     });
+}
+
+// 乐观写入：保持原有顺序，过滤掉这首歌，目标为喜欢时追加到末尾。
+void Store::setLikedLocal(double songId, bool liked)
+{
+    if (isLiked(songId) == liked)
+        return;
+
+    QVariantList ids = m_personal.value("likedIds").toList();
+    for (qsizetype i = ids.size() - 1; i >= 0; --i)
+        if (ids.at(i).toDouble() == songId)
+            ids.removeAt(i);
+    if (liked)
+        ids.append(songId);
+    put("likedIds", ids, true);
+
+    const QVariant raw = m_personal.value("liked");
+    if (!raw.isValid() || raw.isNull())
+        return;
+    QVariantMap likedMap = raw.toMap();
+    likedMap.insert("count", std::max(0.0, likedMap.value("count").toDouble() + (liked ? 1 : -1)));
+    put("liked", likedMap, true);
+}
+
+bool Store::isLiked(double songId) const
+{
+    for (const QVariant &v : m_personal.value("likedIds").toList())
+        if (v.toDouble() == songId)
+            return true;
+    return false;
 }
 
 void Store::notePlayed(const QVariantMap &track)
@@ -297,8 +356,12 @@ void Store::addLikedTrack(double songId)
         return;
     }
     // 本地没有这首歌（比如从播放条直接红心）：取一次详情再插到列表首位
+    const quint64 epoch = m_epoch;
     fetchSongDetails({songId}, true,
-                     [this, songId](const QHash<double, QVariantMap> &details, bool ok) {
+                     [this, songId, epoch](const QHash<double, QVariantMap> &details, bool ok) {
+        // 详情回来前用户可能已经取消红心（甚至退出登录）：那时不能再把它插回去
+        if (epoch != m_epoch || !isLiked(songId))
+            return;
         if (!ok || !details.contains(songId))
             return;
         const QVariant raw = m_personal.value("liked");
@@ -400,6 +463,20 @@ void Store::setPlaylistSubscribed(double id, bool subscribed)
                 if (card.value("id").toDouble() == id)
                     return card;
             }
+            // 从排行榜/当前歌单页收藏的曲目不在 personal 或搜索结果里：用已有的卡片字段补全，
+            // 否则「我的」页会出现无名卡片
+            for (const QVariant &v : m_data.value("toplists").toList()) {
+                const QVariantMap chart = v.toMap();
+                if (chart.value("id").toDouble() == id)
+                    return QVariantMap{{"id", id}, {"name", chart.value("name")},
+                                       {"cover", chart.value("cover")},
+                                       {"count", chart.value("count")}, {"reason", QString{}}};
+            }
+            const QVariantMap current = m_data.value("playlist").toMap();
+            if (current.value("id").toDouble() == id)
+                return QVariantMap{{"id", id}, {"name", current.value("name")},
+                                   {"cover", current.value("cover")},
+                                   {"count", current.value("count")}, {"reason", QString{}}};
             return {};
         };
 
@@ -415,6 +492,7 @@ void Store::setPlaylistSubscribed(double id, bool subscribed)
             lists.prepend(card);
         }
         put("subscribed", lists, true);
+        m_cache.forget(QStringLiteral("playlist:") + num(id));
         emit playlistChanged(id);
     });
 }
@@ -429,8 +507,9 @@ void Store::addSongToPlaylist(double playlistId, double songId)
                               {"imme", QStringLiteral("true")}},
                   QStringLiteral("添加歌曲"), [this, playlistId, songId](const QJsonObject &) {
         const QVariantMap track = trackById(songId);
+        bool stale = false;
 
-        const auto addToCards = [this, playlistId, songId, track](const char *key) {
+        const auto addToCards = [this, playlistId, songId, track, &stale](const char *key) {
             QVariantList cards = m_personal.value(QLatin1String(key)).toList();
             bool changed = false;
             for (QVariant &v : cards) {
@@ -441,14 +520,19 @@ void Store::addSongToPlaylist(double playlistId, double songId)
                 bool present = false;
                 for (const QVariant &t : list)
                     present = present || t.toMap().value("id").toDouble() == songId;
+                if (present)
+                    continue;   // 服务器端的幂等请求：本地没有新增，计数也不能动
                 // 卡片可能只带了曲目数、没带曲目（首屏预览）：不要把列表变成“只有这一首”，
                 // 保持空表让 Source 按需取完整曲目。空歌单（count=0）可以安全放入第一首。
-                if (!present && !track.isEmpty() && (!list.isEmpty() || card.value("count").toDouble() == 0))
+                if (!track.isEmpty() && (!list.isEmpty() || card.value("count").toDouble() == 0)) {
                     list.append(track);
-                card.insert("tracks", list);
-                card.insert("count", card.value("count").toDouble() + 1);
-                v = card;
-                changed = true;
+                    card.insert("tracks", list);
+                    card.insert("count", card.value("count").toDouble() + 1);
+                    v = card;
+                    changed = true;
+                } else {
+                    stale = true;   // 缺曲目信息：交给重新取详情，不盲改计数
+                }
             }
             if (changed)
                 put(key, cards, true);
@@ -465,13 +549,22 @@ void Store::addSongToPlaylist(double playlistId, double songId)
             bool present = false;
             for (const QVariant &t : list)
                 present = present || t.toMap().value("id").toDouble() == songId;
-            if (!present && !track.isEmpty())
-                list.append(track);
-            detail.insert("tracks", list);
-            detail.insert("count", std::max(0.0, detail.value("count").toDouble()) + 1);
-            details.insert(key, detail);
-            put("playlistDetails", details, true);
+            if (!present) {
+                if (!track.isEmpty()) {
+                    list.append(track);
+                    detail.insert("tracks", list);
+                    detail.insert("count", std::max(0.0, detail.value("count").toDouble()) + 1);
+                    details.insert(key, detail);
+                    put("playlistDetails", details, true);
+                } else {
+                    stale = true;
+                }
+            }
         }
+        // 缓存里的详情是写操作前的快照：失效，下一次按需请求重新取
+        m_cache.forget(QStringLiteral("playlist:") + key);
+        if (stale)
+            requestPlaylist(QStringLiteral("playlist:") + key, playlistId);
         emit playlistChanged(playlistId);
     });
 }
@@ -492,9 +585,15 @@ void Store::removeSongFromPlaylist(double playlistId, double songId)
                 if (card.value("id").toDouble() != playlistId)
                     continue;
                 QVariantList list = card.value("tracks").toList();
-                for (qsizetype i = list.size() - 1; i >= 0; --i)
-                    if (list.at(i).toMap().value("id").toDouble() == songId)
+                bool removed = false;
+                for (qsizetype i = list.size() - 1; i >= 0; --i) {
+                    if (list.at(i).toMap().value("id").toDouble() == songId) {
                         list.removeAt(i);
+                        removed = true;
+                    }
+                }
+                if (!removed)
+                    continue;   // 列表里本来就没有：计数不能凭空减一
                 card.insert("tracks", list);
                 card.insert("count", std::max(0.0, card.value("count").toDouble() - 1));
                 v = card;
@@ -512,14 +611,22 @@ void Store::removeSongFromPlaylist(double playlistId, double songId)
         if (details.contains(key)) {
             QVariantMap detail = details.value(key).toMap();
             QVariantList list = detail.value("tracks").toList();
-            for (qsizetype i = list.size() - 1; i >= 0; --i)
-                if (list.at(i).toMap().value("id").toDouble() == songId)
+            bool removed = false;
+            for (qsizetype i = list.size() - 1; i >= 0; --i) {
+                if (list.at(i).toMap().value("id").toDouble() == songId) {
                     list.removeAt(i);
-            detail.insert("tracks", list);
-            detail.insert("count", std::max(0.0, detail.value("count").toDouble() - 1));
-            details.insert(key, detail);
-            put("playlistDetails", details, true);
+                    removed = true;
+                }
+            }
+            if (removed) {
+                detail.insert("tracks", list);
+                detail.insert("count", std::max(0.0, detail.value("count").toDouble() - 1));
+                details.insert(key, detail);
+                put("playlistDetails", details, true);
+            }
         }
+        // 缓存里的详情是移除前的快照：下一次按需请求必须重新取
+        m_cache.forget(QStringLiteral("playlist:") + num(playlistId));
         emit playlistChanged(playlistId);
     });
 }
@@ -552,6 +659,7 @@ void Store::renamePlaylist(double id, const QString &name)
             details.insert(num(id), detail);
             put("playlistDetails", details, true);
         }
+        m_cache.forget(QStringLiteral("playlist:") + num(id));
         emit playlistChanged(id);
     });
 }
@@ -579,6 +687,7 @@ void Store::deletePlaylist(double id)
         QVariantMap details = m_personal.value("playlistDetails").toMap();
         details.remove(num(id));
         put("playlistDetails", details, true);
+        m_cache.forget(QStringLiteral("playlist:") + num(id));
         emit playlistChanged(id);
     });
 }
@@ -631,7 +740,9 @@ void Store::logout()
     resetPersonal();
     m_cache.clear();
     setSessionExpired(false);
-    m_likePending.clear();
+    m_likes.clear();
+    m_likeTouched.clear();
+    m_accountUid = 0;
     m_similarFired = false;
     m_similarSeed.clear();
     refresh();
@@ -887,38 +998,72 @@ void Store::fetchAnonymous()
 
 void Store::fetchAccount()
 {
-    // 账号是个人链的根：daily / liked→heart→radar→推荐歌单→最近/云盘 都挂在它后面
+    // 账号是个人链的根；radar / 推荐歌单 / 最近 / 云盘 与红心列表无关，独立拉，
+    // 红心为空或某一步失败时它们仍然会到（否则新账号的首页会缺块）。
     fetch("api/nuser/account/get", {}, true, [this](const QJsonDocument &doc, bool ok) {
         const QJsonObject profile = body(doc).value("profile").toObject();
         const double uid = profile.value("userId").toDouble();
         // 会话已死（200 且无 profile，或回 301）：个人字段保持匿名替身的形状
         setSessionExpired(ok && uid <= 0);
-        // 恢复出来的个人缓存属于另一个账号（或会话已失效）：先清回空骨架，不让旧账号的数据停留。
-        // 请求本身失败（ok=false）时不清：失败保留已有的值
-        const QString cachedName = m_personal.value("account").toMap().value("name").toString();
-        if (ok && !cachedName.isEmpty()
-            && (uid <= 0 || cachedName != profile.value("nickname").toString())) {
-            m_personal = m_emptyPersonal;
-            m_cache.remember(personalKey(), m_personal);
-            emit personalChanged();
+
+        // 换账号只认 userId（昵称会重复）。请求失败（ok=false）时不清：失败保留已有的值。
+        const bool accountChanged = ok && uid > 0 && m_accountUid > 0 && uid != m_accountUid;
+        const bool accountGone = ok && uid <= 0
+            && (m_accountUid > 0
+                || (m_personal.value("account").isValid() && !m_personal.value("account").isNull()));
+        if (accountChanged || accountGone) {
+            // 旧账号的首屏、按需缓存与在途回包一起作废：它们可能带着私人标记（followed/subscribed）
+            ++m_epoch;
+            m_cache.clear();
+            m_accountUid = 0;
+            m_likes.clear();
+            m_likeTouched.clear();
+            resetPersonal();
+            // 本次 refresh 早先发出的公共首屏请求属于旧 epoch，回包会被丢弃：补发一次
+            fetchAnonymous();
+            fetchPublicPersonal();
         }
+
         if (uid > 0) {
+            m_accountUid = uid;
+            m_cache.remember(QStringLiteral("screen:uid"), uid);
             put("account", QVariantMap{
                                {"name", profile.value("nickname").toString()},
                                {"vip", profile.value("vipType").toDouble() > 0},
                                {"avatar", ncmSized(profile.value("avatarUrl"), 96)},
                                {"background", ncmSized(profile.value("backgroundUrl"), 1200)},
                            }, true);
-            // 全部红心曲目 id（播放条与行内小红心）；没有红心时接口也可能回 null
+            // 全部红心曲目 id（播放条与行内小红心）；没有红心时接口也可能回 null。
+            // 快照是在请求前算的：期间点过红心的歌用本地状态覆盖，别让旧快照把心点回去。
+            const quint64 likeGeneration = m_likeGeneration;
             fetch("api/song/like/get", query({{"uid", num(uid)}}), true,
-                  [this](const QJsonDocument &doc, bool /*ok*/) {
+                  [this, likeGeneration](const QJsonDocument &doc, bool /*ok*/) {
                 QVariantList ids;
-                for (const QJsonValue &v : arr(body(doc), "ids"))
+                QSet<double> serverIds;
+                for (const QJsonValue &v : arr(body(doc), "ids")) {
                     ids.append(v.toDouble());
+                    serverIds.insert(v.toDouble());
+                }
+                if (likeGeneration != m_likeGeneration) {
+                    for (double songId : std::as_const(m_likeTouched)) {
+                        const bool local = isLiked(songId);
+                        const bool present = serverIds.contains(songId);
+                        if (local && !present) {
+                            ids.append(songId);
+                        } else if (!local && present) {
+                            for (qsizetype i = ids.size() - 1; i >= 0; --i)
+                                if (ids.at(i).toDouble() == songId)
+                                    ids.removeAt(i);
+                        }
+                    }
+                } else {
+                    m_likeTouched.clear();
+                }
                 put("likedIds", ids, true);
             });
             fetchDaily();
             fetchUserLists(uid);
+            fetchRadar();
         } else {
             // cookie 在但会话已过期（或请求失败）：个人字段保持匿名替身的形状
             if (ok)
@@ -1052,7 +1197,7 @@ void Store::fetchHeart(const QVariantMap &seed, const QJsonObject &likedList)
         for (const QJsonValue &x : arr(body(doc), "data"))
             tracks.append(ncmTrack(x.toObject().value("songInfo").toObject()));
         put("heart", QVariantMap{{"seed", seed}, {"tracks", tracks.mid(0, 30)}}, true);
-        fetchRadar();
+        // radar / tail 由 fetchAccount 独立发起，不挂在这条链尾
     });
 }
 

@@ -81,8 +81,26 @@ qt_add_executable(cookievault_test tests/cookievault_test.cpp cookievault.h cook
 target_link_libraries(cookievault_test PRIVATE Qt6::Core Qt6::Test Qt6Keychain::Qt6Keychain)
 add_test(NAME cookievault COMMAND cookievault_test)
 
+# Store 的缓存/写操作行为：本地假接口，不碰外网
+qt_add_executable(store_test tests/store_test.cpp
+    store.h store.cpp store_on_demand.cpp
+    querycache.h querycache.cpp
+    ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp
+    normalize.h normalize.cpp json_util.h crypto.h crypto.cpp)
+target_compile_options(store_test PRIVATE -Wall -Wextra)
+target_link_libraries(store_test PRIVATE Qt6::Core Qt6::Network Qt6::Test Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
+add_test(NAME store COMMAND store_test)
+
+# 切歌时挂起的 seek 不能落到下一首：本地假接口 + 本地 WAV
+qt_add_executable(audioengine_seek_test tests/audioengine_seek_test.cpp
+    audioengine.h audioengine.cpp ncmclient.h ncmclient.cpp
+    cookievault.h cookievault.cpp json_util.h crypto.h crypto.cpp)
+target_compile_options(audioengine_seek_test PRIVATE -Wall -Wextra)
+target_link_libraries(audioengine_seek_test PRIVATE Qt6::Core Qt6::Test Qt6::Network Qt6::Multimedia Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
+add_test(NAME audioengine_seek COMMAND audioengine_seek_test)
+
 # 任何测试都碰不到用户的真实凭据与缓存：会话总线不可达（钥匙串因此走后备文件），数据与缓存目录在构建目录里
-set_tests_properties(querycache normalize form audioengine retry cookievault PROPERTIES ENVIRONMENT
+set_tests_properties(querycache normalize form audioengine audioengine_seek retry cookievault store PROPERTIES ENVIRONMENT
     "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent;XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/data;XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/cache;YUNTING_KEYCHAIN_SERVICE=yunting-test")
 
 target_link_libraries(yunting PRIVATE

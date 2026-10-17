@@ -13,6 +13,16 @@
 
 using namespace ncm;
 
+namespace {
+// HTTP 200 不等于业务成功：网易用 code != 200（如 -460）表示限流/错误。
+// 这种回包不能当成空结果交给缓存，否则会被当成「没有歌词/没有搜索结果」长期保留。
+bool businessOk(const QJsonObject &resp)
+{
+    const QJsonValue code = resp.value("code");
+    return code.isUndefined() || code.toInt() == 200;
+}
+} // namespace
+
 void Store::maybeFetchSimilar()
 {
     if (m_similarFired || m_similarSeed.isEmpty())
@@ -90,7 +100,7 @@ void Store::requestLyrics(const QString &key, double songId)
                 const QJsonObject resp = body(doc);
                 const QString lrc = resp.value("lrc").toObject().value("lyric").toString();
                 const QString tlyric = resp.value("tlyric").toObject().value("lyric").toString();
-                done(ncmParseLrc(lrc, tlyric), ok);
+                done(ncmParseLrc(lrc, tlyric), ok && businessOk(resp));
             });
         },
         [this, songId](const QVariant &lines) {
@@ -132,6 +142,7 @@ void Store::requestPlaylist(const QString &key, double playlistId)
 // 搜索：四类结果并发取，全部回来后作为一个值交给缓存；页面先拿到同词的旧结果（若有）
 void Store::requestSearch(const QString &key, const QString &raw)
 {
+    const quint64 generation = ++m_searchGeneration;
     m_cache.query(key,
         [this, raw](QueryCache::Done done) {
             struct Pending {
@@ -145,8 +156,9 @@ void Store::requestSearch(const QString &key, const QString &raw)
                                                           std::function<QVariant(const QJsonObject &)> pick) {
                 m_client->get("api/search/get", query({{"s", raw}, {"type", type}, {"limit", limit}}), false,
                               [this, pending, done, field, pick](const QJsonDocument &doc, bool ok) {
-                    pending->result.insert(QLatin1String(field), pick(body(doc).value("result").toObject()));
-                    pending->ok = pending->ok && ok;
+                    const QJsonObject resp = body(doc);
+                    pending->result.insert(QLatin1String(field), pick(resp.value("result").toObject()));
+                    pending->ok = pending->ok && ok && businessOk(resp);
                     if (--pending->left != 0)
                         return;
 
@@ -185,7 +197,11 @@ void Store::requestSearch(const QString &key, const QString &raw)
             part("10", "30", "albums", [list](const QJsonObject &r) { return list(r, "albums", ncmSearchAlbum); });
             part("1004", "12", "mvs", [list](const QJsonObject &r) { return list(r, "mvs", ncmSearchMv); });
         },
-        [this](const QVariant &result) { put("search", result, false); });
+        [this, generation](const QVariant &result) {
+            // 用户已经输入了更新的搜索词：旧请求晚到也不能覆盖当前结果
+            if (generation == m_searchGeneration)
+                put("search", result, false);
+        });
 }
 
 // 全部评论分页：按时间倒序（接口 comments 数组），每页 20 条，10 分钟缓存
@@ -233,7 +249,8 @@ void Store::requestComments(const QString &key, double songId)
                                      .arg(qlonglong(songId));
             m_client->get(path, query({{"limit", "10"}}), false,
                           [done, songId](const QJsonDocument &doc, bool ok) {
-                done(ncmHotComments(body(doc), songId), ok);
+                const QJsonObject resp = body(doc);
+                done(ncmHotComments(resp, songId), ok && businessOk(resp));
             });
         },
         [this](const QVariant &comments) { put("comments", comments, false); });
