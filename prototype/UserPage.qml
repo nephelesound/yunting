@@ -16,6 +16,7 @@ ScreenFrame {
     property Flickable peopleView: null
     scroller: page.pane === "playlists" ? playlists : page.pane === "rank" ? rankList : page.peopleView
     kept: ["pane"]
+    background: PageAmbience { cover: page.user.avatar || "" }
 
     property real userId
     property real currentId
@@ -65,14 +66,18 @@ ScreenFrame {
         id: message
         property bool pending
         property bool failed
+        property bool restricted
+        property string restrictedText
         property string retryKey
         property string emptyText
         anchors.centerIn: parent
         width: parent.width - Tokens.pageMargin
-        text: message.failed ? "没取到，点此重试" : message.pending && Source.live ? "正在取回…" : message.emptyText
-        HoverHandler { enabled: message.failed; cursorShape: Qt.PointingHandCursor }
+        text: message.restricted ? message.restrictedText
+              : message.failed ? "没取到，点此重试"
+              : message.pending && Source.live ? "正在取回…" : message.emptyText
+        HoverHandler { enabled: message.failed && !message.restricted; cursorShape: Qt.PointingHandCursor }
         TapHandler {
-            enabled: message.failed
+            enabled: message.failed && !message.restricted
             onTapped: Source.retryKey(message.retryKey)
         }
     }
@@ -359,10 +364,15 @@ ScreenFrame {
                     }
 
                     PaneMessage {
+                        objectName: "peopleMessage:" + people.modelData.key
                         visible: people.count === 0
                         icon.name: "system-users"
                         pending: people.list.pending === true
                         failed: people.list.failed === true
+                        restricted: people.list.restricted === true
+                        restrictedText: people.modelData.key === "follows"
+                                        ? "对方设置了隐私，无法查看关注列表"
+                                        : "对方设置了隐私，无法查看粉丝列表"
                         retryKey: people.modelData.kind + ":" + page.userId
                         emptyText: people.modelData.empty
                     }

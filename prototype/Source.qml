@@ -31,6 +31,7 @@ QtObject {
     }
     // 按需请求失败：Store 发来 requestFailed 后由 main 标记；页面可显示「重试」而不是一直转圈
     property var requestFailures: ({})
+    property var requestRestrictions: ({})
     function markRequestFailed(key, message) {
         const f = Object.assign({}, source.requestFailures);
         f[key] = message || "请求失败";
@@ -44,6 +45,13 @@ QtObject {
         source.requestFailures = f;
     }
     function failure(key) { return source.requestFailures[key] || ""; }
+    // 预期内的不可见（隐私设置）：页面内说明，不显示重试
+    function markRequestRestricted(key, message) {
+        const r = Object.assign({}, source.requestRestrictions);
+        r[key] = message || "对方设置了隐私，无法查看";
+        source.requestRestrictions = r;
+    }
+    function restriction(key) { return source.requestRestrictions[key] || ""; }
     function retryKey(key) {
         source.clearRequestFailure(key);
         source.need(key);
@@ -260,11 +268,17 @@ QtObject {
     // 下面几种数据后端不经缓存、不去重：这里只读不要，由页面在打开那一栏时 need 一次
     // 关注 / 粉丝：kind 是 userFollows | userFolloweds；data 里只放最近取回的一个人的
     function people(kind, uid) {
+        const key = kind + ":" + uid;
+        const restricted = source.restriction(key);
         const l = source.d[kind];
         if (l && l.userId === uid)   // moreFailed：下一页（按已有条数翻）没取到，可重试
-            return Object.assign({ failed: false, moreFailed: Boolean(source.failure(kind + ":" + uid + ":" + l.items.length)) }, l);
-        return { userId: uid, items: [], more: false, pending: true, moreFailed: false,
-                 failed: Boolean(source.failure(kind + ":" + uid)) };
+            return Object.assign({ failed: false, moreFailed: Boolean(source.failure(kind + ":" + uid + ":" + l.items.length)),
+                                   restricted: l.restricted === true || restricted.length > 0,
+                                   restrictedMessage: l.message || restricted }, l);
+        return { userId: uid, items: [], more: false, pending: restricted.length === 0,
+                 moreFailed: false,
+                 restricted: restricted.length > 0, restrictedMessage: restricted,
+                 failed: restricted.length === 0 && Boolean(source.failure(key)) };
     }
     function morePeople(kind, list) {
         if (list.more && !list.pending)

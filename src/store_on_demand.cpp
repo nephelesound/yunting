@@ -164,6 +164,14 @@ void Store::requestLyrics(const QString &key, double songId)
                 const QJsonObject resp = body(doc);
                 const QString lrc = resp.value("lrc").toObject().value("lyric").toString();
                 const QString tlyric = resp.value("tlyric").toObject().value("lyric").toString();
+                const bool noLyrics = resp.value("pureMusic").toBool()
+                    || resp.value("nolyric").toBool();
+                // 网易偶尔会回「HTTP 200 + code 200 + 空 lrc」而不是错误；这种空包不能当成
+                // 「这首歌没有歌词」永久缓存，否则会一直显示「暂无歌词」。纯音乐/明确无歌词才落盘。
+                if (lrc.isEmpty() && tlyric.isEmpty() && !noLyrics) {
+                    done({}, false);
+                    return;
+                }
                 done(ncmParseLrc(lrc, tlyric), ok && businessOk(resp));
             });
         },
@@ -268,7 +276,8 @@ void Store::requestSearch(const QString &key, const QString &raw)
         });
 }
 
-// 全部评论分页：v2 接口按时间倒序（sortType=3），对外仍是每页 20 条的 offset 分页，10 分钟缓存
+// 全部评论分页：v2 接口按时间倒序（sortType=3），对外仍是每页 20 条的 offset 分页。
+// 登录态每次取网络（liked 是本人状态）；匿名态仍用缓存。
 void Store::requestCommentPage(const QString &key, double songId, int offset)
 {
     // 登录后评论带「我」的 liked；缓存不能作为点赞状态的权威（写过之后旧行会
@@ -337,7 +346,8 @@ void Store::requestCommentPage(const QString &key, double songId, int offset)
         m_cache.query(key, fetch, deliver);
 }
 
-// 热门评论：v2 按热度排序，写回 data.comments（10 分钟新鲜期，落盘）；保持接口顺序，最多 10 条
+// 热门评论：v2 按热度排序，写回 data.comments；登录态每次取网络，匿名态走缓存。
+// 保持接口顺序，最多 10 条。
 void Store::requestComments(const QString &key, double songId)
 {
     auto fetch = [this, songId](QueryCache::Done done) {

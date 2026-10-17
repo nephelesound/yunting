@@ -290,6 +290,32 @@ Item {
             fuzzyCompare(Source.lineFill({ t: 10, text: "x" }, { t: 20 }, 0, 15), 0.5, 0.001);
         }
 
+        // 关注/粉丝被对方隐私挡住：页面拿到 restricted，不再显示重试或当网络错误
+        function test_peoplePrivacyIsInlineState() {
+            Source.markRequestRestricted("userFolloweds:4242", "用户隐私无权限查看");
+            const people = Source.people("userFolloweds", 4242);
+            verify(people.restricted === true);
+            verify(people.pending === false);
+            verify(people.failed === false);
+            compare(people.restrictedMessage, "用户隐私无权限查看");
+        }
+
+        // 用户粉丝被隐私挡住时，UserPage 在自己的占位区说明，不给重试按钮。
+        function test_userPageShowsPrivacyInline() {
+            Source.markRequestRestricted("userFolloweds:4242", "用户隐私无权限查看");
+            const page = createTemporaryObject(Qt.createComponent("../UserPage.qml"), root, {
+                userId: 4242, width: root.width, height: root.height
+            });
+            verify(page !== null);
+            page.pane = "fans";
+            // 关注与粉丝各有一条说明（Repeater 的两个网格），要找粉丝那条
+            const message = findChild(page, "peopleMessage:fans");
+            verify(message !== null);
+            compare(message.restricted, true);
+            compare(message.failed, false);
+            verify(message.text.indexOf("隐私") >= 0);
+        }
+
         // 评论点赞从页面转发到后端时，参数不能丢（songId, commentId, 目标状态）。
         function test_commentLikeForwardsToLive() {
             const calls = [];

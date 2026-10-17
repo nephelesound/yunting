@@ -179,6 +179,80 @@ private slots:
         QVERIFY(waitUntil([&] { return m_store->data().value("lyrics").toList().size() == 1; }));
     }
 
+    // 没有 pureMusic/nolyric 标记的空歌词可能是瞬时空包：不能永久缓存成「暂无歌词」
+    void unexplainedEmptyLyricsIsNotCached()
+    {
+        int lyricRequests = 0;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/song/lyric") {
+                ++lyricRequests;
+                if (lyricRequests == 1) {
+                    respond(200, "{\"code\":200,\"lrc\":{\"lyric\":\"\"},"
+                                 "\"tlyric\":{\"lyric\":\"\"}}");
+                    return;
+                }
+                respond(200, "{\"code\":200,\"lrc\":{\"lyric\":\"[00:01.00]hello\"},"
+                             "\"tlyric\":{\"lyric\":\"\"}}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("lyrics:10"));
+        QVERIFY(waitUntil([&] { return lyricRequests >= 1; }));
+        QTest::qWait(100);
+        QVERIFY(m_store->data().value("lyrics").toList().isEmpty());
+
+        m_store->request(QStringLiteral("lyrics:10"));
+        QVERIFY(waitUntil([&] { return lyricRequests >= 2; }));
+        QVERIFY(waitUntil([&] { return m_store->data().value("lyrics").toList().size() == 1; }));
+    }
+
+    // 明确的纯音乐：空歌词是正确结果，永久缓存后第二次不再请求
+    void pureMusicEmptyLyricsIsCachedForever()
+    {
+        int lyricRequests = 0;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/song/lyric") {
+                ++lyricRequests;
+                respond(200, "{\"code\":200,\"pureMusic\":true,\"lrc\":{\"lyric\":\"\"}}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("lyrics:11"));
+        QVERIFY(waitUntil([&] { return lyricRequests >= 1; }));
+        QVERIFY(waitUntil([&] { return m_store->data().value("lyricsTrackId").toDouble() == 11; }));
+        m_store->request(QStringLiteral("lyrics:11"));
+        QTest::qWait(150);
+        QCOMPARE(lyricRequests, 1);   // 命中的是永久缓存
+        QVERIFY(m_store->data().value("lyrics").toList().isEmpty());
+    }
+
+    // 对方设置隐私是预期状态：页面内显示，不发 requestFailed（否则会弹全局错误）
+    void followersPrivacyIsInlineRestriction()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/user/getfolloweds/4242") {
+                respond(200, "{\"code\":-460,\"message\":\"用户隐私无权限查看\"}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        QSignalSpy restricted(m_store, &Store::requestRestricted);
+        QSignalSpy failed(m_store, &Store::requestFailed);
+
+        m_store->request(QStringLiteral("userFolloweds:4242"));
+        QVERIFY(waitUntil([&] { return restricted.count() == 1; }));
+        QCOMPARE(failed.count(), 0);
+        QCOMPARE(restricted.first().at(0).toString(), QStringLiteral("userFolloweds:4242"));
+        const QVariantMap page = m_store->data().value("userFolloweds").toMap();
+        QCOMPARE(page.value("userId").toDouble(), 4242.0);
+        QCOMPARE(page.value("restricted").toBool(), true);
+        QCOMPARE(page.value("message").toString(), QStringLiteral("用户隐私无权限查看"));
+    }
+
     // 歌单写成功后，下一次 playlist:<id> 请求必须重新取，不能拿写前的详情
     void playlistWriteInvalidatesCachedDetail()
     {
@@ -1083,6 +1157,31 @@ private slots:
         m_store->deletePlaylist(42);
         QVERIFY(waitUntil([&] { return failed.count() == 2; }));
         QCOMPARE(failed.at(1).at(1).toString(), QStringLiteral("网易云没有接受这次操作"));
+    }
+
+    // 逐字歌词与普通歌词一样是长缓存：同一首歌第二次打开只命中缓存
+    void lyricsNewIsCachedForever()
+    {
+        int requests = 0;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/song/lyric/v1") {
+                ++requests;
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"lrc", QJsonObject{{"lyric", "[00:01.00]hello"}}},
+                }));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("lyricsNew:8"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("lyricsNew").toMap().value("songId").toDouble() == 8;
+        }));
+        m_store->request(QStringLiteral("lyricsNew:8"));
+        QTest::qWait(150);
+        QCOMPARE(requests, 1);
     }
 
     // 逐字歌词：yrc 有内容时 lines 一次解析好（带 words），原始 yrc 不再留；失败 key 带 songId

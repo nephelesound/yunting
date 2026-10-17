@@ -92,6 +92,8 @@ signals:
     void commentLikeSucceeded(double songId, double commentId, bool liked);
     // 按需请求失败（含信箱与私信对话）：请求时的 key 与给用户看的一句话；成功走 dataChanged
     void requestFailed(const QString &key, const QString &message);
+    // 预期内的不可见状态（例如对方设置了隐私）：在对应页面内说明，不弹全局错误
+    void requestRestricted(const QString &key, const QString &message);
 
 private slots:
     // NcmClient 每个请求的落地真相：收敛 online / sessionExpired 与欠账刷新

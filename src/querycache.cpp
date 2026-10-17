@@ -72,7 +72,8 @@ QueryCache::~QueryCache()
 // 所以离线启动仍能用上次的快照，不需要为它们单独缩短寿命。个人数据由 clear() 在退出时清掉。
 qint64 QueryCache::freshFor(const QString &key)
 {
-    if (key.startsWith(QLatin1String("lyrics:")))
+    if (key.startsWith(QLatin1String("lyrics:"))
+        || key.startsWith(QLatin1String("lyricsNew:")))
         return -1;
     if (key.startsWith(QLatin1String("album:")))
         return 30 * kDay;

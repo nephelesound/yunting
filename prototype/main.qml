@@ -141,7 +141,7 @@ Kirigami.ApplicationWindow {
     }
 
     readonly property var currentTrack: playback.current
-    // 逐字歌词：后端不缓存这个接口，所以每换一首歌要一次，不在绑定里要（绑定会反复求值）
+    // 逐字歌词：每换一首歌要一次（后端永久缓存；不在绑定里要，绑定会反复求值）
     readonly property real currentTrackId: root.currentTrack ? root.currentTrack.id : 0
     onCurrentTrackIdChanged: if (root.currentTrackId > 0) Source.need("lyricsNew:" + root.currentTrackId)
 
@@ -416,9 +416,17 @@ Kirigami.ApplicationWindow {
         function onCommentLikeFailed(songId, commentId, message) {
             root.fail("评论点赞失败：" + message);
         }
+        function onRequestRestricted(key, message) {
+            Source.markRequestRestricted(key, message);
+        }
         function onRequestFailed(key, message) {
+            // 逐字歌词只是增强：失败不提示，等下次换歌再试。
+            if (key.startsWith("lyricsNew:"))
+                return;
             Source.markRequestFailed(key, message);
-            root.fail(message);
+            // 普通歌词页自己有「歌词没取到，点此重试」，不再额外弹全局网络错误。
+            if (!key.startsWith("lyrics:"))
+                root.fail(message);
         }
         function onPlaylistActionFailed(action, message) {
             console.warn(logUi, "playlist action failed:", action, message);
