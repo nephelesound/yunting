@@ -18,4 +18,5 @@ prototype/Personal.js
 *.md
 !README.md
 !AGENTS.md
+!CHANGELOG.md
 docs/

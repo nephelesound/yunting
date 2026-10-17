@@ -24,7 +24,7 @@
   <releases>
     <release version="0.2.0" date="2026-10-17">
       <description>
-        <p>返回时回到离开时的位置；播放条可以直接进评论区；内容页带封面的色调；隐私设置的列表在页面内说明。</p>
+        <p>返回时回到离开时的位置，播放条可以直接进评论区。完整的更新日志见仓库里的 CHANGELOG.md。</p>
       </description>
     </release>
     <release version="0.1.0" date="2026-10-17">
