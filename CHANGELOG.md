@@ -2,6 +2,11 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.1] - 2026-10-17
+
+### 修复
+- 播放条的评论按钮在桌面上显示成两个重叠的气泡。现在是系统原生的按钮：评论图标加评论数（999+、1w+）。
+
 ## [0.2.0] - 2026-10-17
 
 ### 新增
@@ -29,5 +34,6 @@
 - 分享：链接、二维码、Telegram 与邮件，以及带封面与歌词的分享图。
 - 「关于」窗口与「复制诊断信息」，方便反馈问题。
 
+[0.2.1]: https://github.com/nephelesound/yunting/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/nephelesound/yunting/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/nephelesound/yunting/releases/tag/v0.1.0
