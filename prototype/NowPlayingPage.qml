@@ -67,7 +67,9 @@ ScreenFrame {
         }
         Facts {
             Layout.fillWidth: true
-            items: page.track ? [{ value: page.track.artist, label: "" }, { label: page.track.album }] : []
+            // 歌手、专辑都可点：去歌手页 / 专辑页
+            items: page.track ? [{ label: page.track.artist, artistId: page.track.artistId || 0 },
+                                 { label: page.track.album, albumId: page.track.albumId || 0 }] : []
         }
     }
 
