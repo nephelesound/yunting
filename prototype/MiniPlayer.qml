@@ -83,7 +83,7 @@ Window {
             enabled: mini.track !== null
             icon.name: mini.liked ? "" : "love-symbolic"
             icon.source: mini.liked ? Tokens.likedIcon : ""
-            icon.color: mini.liked ? "transparent" : Kirigami.Theme.textColor
+            icon.color: mini.liked ? Tokens.liked : Kirigami.Theme.textColor
             text: mini.liked ? "取消喜欢" : "喜欢"
             onClicked: mini.likeToggled()
         }

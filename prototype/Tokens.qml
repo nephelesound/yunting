@@ -81,6 +81,10 @@ QtObject {
     readonly property url upvotedIcon: Qt.resolvedUrl("icons/thumb-like-16-filled.svg")
     // 退出登录：Breeze 的 system-log-out 在 16 px 是一个「<」，读起来像「返回」
     readonly property url logoutIcon: Qt.resolvedUrl("icons/arrow-exit-16-regular.svg")
+    // 播放队列：Breeze 的 view-media-playlist（几行加音符）与旁边的歌词按钮几乎一样；队列就是一张清单
+    readonly property url queueIcon: Qt.resolvedUrl("icons/text-bullet-list-16-regular.svg")
+    // 迷你播放器：Breeze 的 window-minimize-pip 是个方框带箭头，看不出是「画中画」
+    readonly property url miniIcon: Qt.resolvedUrl("icons/picture-in-picture-16-regular.svg")
 
     // 线宽：只有 1 与 2。播放条顶边那条进度线就是 2，同时充当内容区与播放条的分界
     readonly property int line: 1

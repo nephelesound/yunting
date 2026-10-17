@@ -139,7 +139,7 @@ Item {
                 // 喜欢 = 实心红心（与列表行里的小红心同一个图标与颜色）
                 icon.name: bar.liked ? "" : "love-symbolic"
                 icon.source: bar.liked ? Tokens.likedIcon : ""
-                icon.color: bar.liked ? "transparent" : Kirigami.Theme.textColor
+                icon.color: bar.liked ? Tokens.liked : Kirigami.Theme.textColor
                 text: bar.liked ? "取消喜欢" : "喜欢"
                 onClicked: bar.likeToggled()
             }
@@ -201,7 +201,7 @@ Item {
                 ToolTip.delay: 600
             }
             IconButton { icon.name: "media-skip-forward"; text: "下一首"; onClicked: bar.nextRequested() }
-            IconButton { icon.name: "view-media-playlist"; text: "播放队列"; onClicked: bar.queueRequested() }
+            IconButton { icon.source: Tokens.queueIcon; text: "播放队列"; onClicked: bar.queueRequested() }
         }
 
         // 右：时间与视图。放不下时（与中段传输控件之间不足 24）音质、桌面歌词、迷你播放器收进「更多」：
@@ -256,7 +256,7 @@ Item {
             }
             IconButton {
                 visible: !hud.compact
-                icon.name: "draw-text"
+                glyph: "词"
                 text: bar.desktopLyricsShown ? "关闭桌面歌词" : "桌面歌词"
                 checkable: true
                 checked: bar.desktopLyricsShown
@@ -264,7 +264,7 @@ Item {
             }
             IconButton {
                 visible: !hud.compact
-                icon.name: "window-minimize-pip"
+                icon.source: Tokens.miniIcon
                 text: "迷你播放器"
                 onClicked: bar.miniRequested()
             }
