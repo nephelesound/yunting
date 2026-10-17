@@ -45,11 +45,18 @@ QtObject {
     readonly property real coverScrim: 0.6
     // 压在视频画面上的控制条深色底：白字图标在任何画面上都看得清，又不挡住画面
     readonly property real videoScrim: 0.45
-    // 桌面歌词悬停时的深色底板：白字在任意壁纸与窗口上都看得清，又透出一点底下的东西
-    readonly property real desktopPanel: 0.6
-    // 桌面歌词：隔着一段距离看的字，三档（当前句 / 第二行）；填色可选系统强调色或这几种在任意壁纸上都醒目的颜色
+    // 桌面歌词的字：纯白（亮壁纸上可换纯黑）配不透明度，不靠阴影、不靠底板。
+    // 还没唱到的字与第二行是这个不透明度，唱到的字点亮成全不透明
+    readonly property real desktopInk: 0.55
+    // 悬停时工具条的底：与字同一色系的不透明深灰，白色图标
+    readonly property color desktopToolbar: "#505050"
+    // 桌面歌词：隔着一段距离看的字，三档（当前句 / 第二行）。
+    // 点亮色默认是字色本身（全不透明），也可选系统强调色或这几种中间调（亮壁纸、暗壁纸上都读得出）
+    // 分享图：3:4 竖图（45 × 8 宽），导出放大 3 倍（1080 × 1440）。底是封面色场，压暗到白字站得住
+    readonly property int shareCardWidth: 360
+    readonly property real shareScrim: 0.45
     readonly property var desktopLyricSizes: [[text2xl, textBase], [text4xl, text2xl], [48, text4xl]]
-    readonly property var desktopLyricColors: ["#4fc3f7", "#ff8a80", "#69f0ae", "#ffd740"]
+    readonly property var desktopLyricColors: ["#1e88e5", "#e53935", "#43a047", "#ef6c00"]
 
     // 动效：时长一律取 Kirigami.Units，桌面平台插件会按 Plasma「动画速度」(AnimationDurationFactor) 缩放，
     // 用户关掉动画时它们就是 0，减弱动效不用另写分支。

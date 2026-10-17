@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(yunting VERSION 0.1 LANGUAGES CXX)
+project(yunting VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -8,7 +8,8 @@ set(CMAKE_AUTOMOC ON)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Qml Quick QuickControls2 Network Multimedia DBus Sql)
 find_package(Qt6Keychain REQUIRED)
 find_package(KF6StatusNotifierItem REQUIRED)
-find_package(KF6CoreAddons QUIET)   # KSignalHandler；没有时 cli.cpp 用自管道
+find_package(KF6CoreAddons REQUIRED)   # KAboutData（「关于」页）、KSignalHandler
+find_package(KF6I18n REQUIRED)         # kirigami-addons 的页面（「关于」）在 QML 里用 i18nd()
 find_package(OpenSSL REQUIRED COMPONENTS Crypto)
 find_package(LayerShellQt QUIET)
 find_package(PkgConfig QUIET)
@@ -31,6 +32,8 @@ qt_add_executable(yunting
     session.h session.cpp
     mpris.h mpris.cpp
     tray.h tray.cpp
+    clipboardhelper.h
+    diagnostics.h diagnostics.cpp
     powerinhibitor.h powerinhibitor.cpp
     crypto.h crypto.cpp
     perf.h perf.cpp
@@ -83,6 +86,18 @@ add_test(NAME eqprocessor COMMAND eqprocessor_test)
 qt_add_executable(form_test tests/form_test.cpp json_util.h)
 target_link_libraries(form_test PRIVATE Qt6::Core Qt6::Test)
 add_test(NAME form COMMAND form_test)
+qt_add_executable(clientidentity_test tests/clientidentity_test.cpp clientidentity.h)
+target_link_libraries(clientidentity_test PRIVATE Qt6::Core Qt6::Test)
+add_test(NAME clientidentity COMMAND clientidentity_test)
+qt_add_executable(clipboardhelper_test tests/clipboardhelper_test.cpp clipboardhelper.h)
+target_link_libraries(clipboardhelper_test PRIVATE Qt6::Gui Qt6::Test)
+add_test(NAME clipboardhelper COMMAND clipboardhelper_test)
+set_tests_properties(clipboardhelper PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+qt_add_executable(diagnostics_test tests/diagnostics_test.cpp diagnostics.h diagnostics.cpp)
+target_link_libraries(diagnostics_test PRIVATE Qt6::Gui Qt6::Test)
+add_test(NAME diagnostics COMMAND diagnostics_test)
+
+
 
 qt_add_executable(normalize_test tests/normalize_test.cpp normalize.h normalize.cpp json_util.h)
 target_link_libraries(normalize_test PRIVATE Qt6::Core Qt6::Test)
@@ -126,7 +141,7 @@ target_link_libraries(audioengine_seek_test PRIVATE Qt6::Core Qt6::Test Qt6::Net
 add_test(NAME audioengine_seek COMMAND audioengine_seek_test)
 
 # 任何测试都碰不到用户的真实凭据与缓存：会话总线不可达（钥匙串因此走后备文件），数据与缓存目录在构建目录里
-set_tests_properties(querycache normalize form eqprocessor audioengine audioengine_seek retry cookievault store PROPERTIES ENVIRONMENT
+set_tests_properties(querycache normalize form eqprocessor clientidentity audioengine audioengine_seek retry cookievault store PROPERTIES ENVIRONMENT
     "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent;XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/data;XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/cache;YUNTING_KEYCHAIN_SERVICE=yunting-test")
 
 target_link_libraries(yunting PRIVATE
@@ -152,10 +167,8 @@ endif()
 if (YUNTING_EXPERIMENTAL_EQ)
     target_compile_definitions(yunting PRIVATE YUNTING_EXPERIMENTAL_EQ=1)
 endif()
-if (KF6CoreAddons_FOUND)
-    target_compile_definitions(yunting PRIVATE YUNTING_KSIGNALHANDLER=1)
-    target_link_libraries(yunting PRIVATE KF6::CoreAddons)
-endif()
+target_compile_definitions(yunting PRIVATE YUNTING_KSIGNALHANDLER=1 YUNTING_VERSION="${PROJECT_VERSION}")
+target_link_libraries(yunting PRIVATE KF6::CoreAddons KF6::I18nQml)
 if (QRENCODE_FOUND)
     target_sources(yunting PRIVATE qrcodeimage.h qrcodeimage.cpp)
     target_compile_definitions(yunting PRIVATE YUNTING_QRCODE=1)

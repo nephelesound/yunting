@@ -19,6 +19,9 @@ public:
 
     // QML 主窗口创建完成后调用；之后左键才是显示/隐藏
     void setAssociatedWindow(QWindow *window);
+    // 系统通知（freedesktop 通知，经 KStatusNotifierItem）：只给窗口不在眼前时的失败用，
+    // 窗口在前台时界面自己的提示条就够了
+    Q_INVOKABLE void notify(const QString &message);
 
 signals:
     void nextRequested();

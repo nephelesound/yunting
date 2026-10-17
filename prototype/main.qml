@@ -57,20 +57,20 @@ Kirigami.ApplicationWindow {
         vip: root.vip
         onBlocked: (track, reason) => {
             if (reason === "paid")
-                root.notify("「" + track.name + "」所在专辑需要单独购买");
+                root.fail("「" + track.name + "」所在专辑需要单独购买");
             else if (reason === "unavailable")
-                root.notify("「" + track.name + "」已下架或暂时没有版权，不能播放");
+                root.fail("「" + track.name + "」已下架或暂时没有版权，不能播放");
             else if (root.loggedIn)
-                root.notify("「" + track.name + "」是 VIP 曲目，开通会员后可播放");
+                root.fail("「" + track.name + "」是 VIP 曲目，开通会员后可播放");
             else
-                root.notify("「" + track.name + "」是 VIP 曲目，登录后可播放", "long", "扫码登录", () => root.requestLogin());
+                root.fail("「" + track.name + "」是 VIP 曲目，登录后可播放", "扫码登录", () => root.requestLogin());
         }
     }
     Connections {
         target: playback.engine
         function onFailed(reason) {
             console.warn(logUi, "playback failed:", root.currentTrack ? root.currentTrack.id : 0, reason);
-            root.notify(reason);
+            root.fail(reason);
         }
     }
     // 私人漫游是一个流：放到倒数第二首时续取一批，取回来的接在队尾，不会放完一轮又从头循环
@@ -102,7 +102,7 @@ Kirigami.ApplicationWindow {
         ignoreUnknownSignals: true
         function onLikeFailed(songId, liked, message) {
             console.warn(logUi, "like failed:", songId, liked ? "on" : "off", message);
-            root.notify((liked ? "没能加上红心：" : "没能取消红心：") + message);
+            root.fail((liked ? "没能加上红心：" : "没能取消红心：") + message);
         }
     }
     // 媒体键 / 锁屏 / Plasma 媒体控件 / 托盘菜单的上一首、下一首：同样走 Playback，切歌规则只有一份
@@ -180,14 +180,27 @@ Kirigami.ApplicationWindow {
 
     function play(tracks, i) { playback.play(tracks, i); }
     function requestLogin() { loginDialog.open(); }
-    // 一句话的提示（失败原因、操作结果）：参数与 Kirigami 的 showPassiveNotification 相同，样子与位置是应用自己的
-    function notify(message, timeout, actionText, action) { toast.show(message, timeout, actionText, action); }
+    // 操作结果与提示用 notify；做不成的事（失败、不能播放）用 fail，提示条是错误配色。
+    // 窗口不在眼前（藏在托盘、在别的窗口后面）时，失败另发一条系统通知，否则没人看得到
+    function notify(message, timeout, actionText, action) { toast.show(message, timeout, actionText, action, false); }
+    function fail(message, actionText, action) {
+        toast.show(message, "long", actionText, action, true);
+        if (!root.active && root.backend && root.backend.tray)
+            root.backend.tray.notify(message);
+    }
     Toast {
         id: toast
         parent: root.overlay
         anchors.fill: parent
-        bottomInset: playerBar.visible ? playerBar.height : 0
         z: 1
+    }
+    // 「关于」窗口：第一次打开时才创建
+    Loader {
+        id: aboutLoader
+        active: false
+        sourceComponent: AboutWindow {
+            diagnostics: root.backend && root.backend.diagnostics ? root.backend.diagnostics : null
+        }
     }
 
     // 浮层：播放队列（右侧抽屉）与扫码登录（对话框）
@@ -398,14 +411,14 @@ Kirigami.ApplicationWindow {
             root.notify(queued[0].text);
         }
         function onFollowFailed(action, message) {
-            root.notify(action + "失败：" + message);
+            root.fail(action + "失败：" + message);
         }
         function onCommentLikeFailed(songId, commentId, message) {
-            root.notify("评论点赞失败：" + message);
+            root.fail("评论点赞失败：" + message);
         }
         function onRequestFailed(key, message) {
             Source.markRequestFailed(key, message);
-            root.notify(message);
+            root.fail(message);
         }
         function onPlaylistActionFailed(action, message) {
             console.warn(logUi, "playlist action failed:", action, message);
@@ -413,7 +426,7 @@ Kirigami.ApplicationWindow {
             root.takeNote(note => note.action === action);
             if (action === "创建歌单")
                 root.trackForNewPlaylist = null;
-            root.notify(message);
+            root.fail(message);
         }
     }
 
@@ -448,6 +461,7 @@ Kirigami.ApplicationWindow {
 
     // 导航：推荐/我的/搜索 是顶层枢轴；排行榜、列表、歌手、正在播放压在其上，history 记录来路
     property var history: []
+    readonly property int maxHistory: 64
     readonly property var pageNames: ({ home: "推荐", mine: "我的", search: "搜索", charts: "排行榜", playlists: "全部歌单",
                                         nowplaying: "正在播放", mv: "MV", user: "用户" })
     // 返回键上的字：离开那一页时记下的标题（见 open）；记下时还没取到名字就用页的类别名，永远不为空
@@ -460,6 +474,13 @@ Kirigami.ApplicationWindow {
         target: Actions
         function onPlayRequested(tracks, index) { root.play(tracks, index); }
         function onInboxRequested() { root.open("inbox"); }
+        function onAboutRequested() {
+            aboutLoader.active = true;
+            const window = aboutLoader.item as AboutWindow;
+            window.show();
+            window.raise();
+            window.requestActivate();
+        }
         function onArtistRequested(id) { root.open("artist", "artist:" + id); }
         function onAlbumRequested(id) { root.open("list", "album:" + id); }
         function onMvRequested(id) {
@@ -539,13 +560,22 @@ Kirigami.ApplicationWindow {
     // 打开一页：先把「现在在哪」连同它此刻的标题记进来路，再换成新的页与参数（ids：{ mvId, userId }）。
     // 标题存快照：返回键上直接显示，不再按 id 去取数据（单槽数据会被来回挤掉，取数会互相触发、标题会变空）。
     // 已经在这一页（同一个列表 / 歌手 / 用户 / MV）就什么都不做，来路里不会出现重复的一格
+    // 一条路由 = 页面 + 该页的参数。页面相同但参数不同（例如换一个用户）也是一次新跳转。
+    function sameRoute(page, listKey, mvId, userId) {
+        return page === root.page && listKey === root.listKey
+            && mvId === root.mvId && userId === root.userId;
+    }
     function open(page, listKey, ids) {
         const next = { listKey: listKey || root.listKey, mvId: root.mvId, userId: root.userId };
         Object.assign(next, ids || {});
-        if (page === root.page && next.listKey === root.listKey && next.mvId === root.mvId && next.userId === root.userId)
+        if (root.sameRoute(page, next.listKey, next.mvId, next.userId))
             return;
-        root.history = root.history.concat([{ page: root.page, listKey: root.listKey, mvId: root.mvId,
-                                              userId: root.userId, title: root.currentTitle() }]);
+        let h = root.history.concat([{ page: root.page, listKey: root.listKey, mvId: root.mvId,
+                                       userId: root.userId, title: root.currentTitle() }]);
+        // 来路是历史，不是无限日志；连续循环也只能保留最近 maxHistory 层。
+        if (h.length > root.maxHistory)
+            h = h.slice(h.length - root.maxHistory);
+        root.history = h;
         root.listKey = next.listKey;
         root.mvId = next.mvId;
         root.userId = next.userId;
@@ -570,6 +600,8 @@ Kirigami.ApplicationWindow {
         return item && item.heading ? item.heading : (root.pageNames[root.page] || "推荐");
     }
     function switchPivot(key) {
+        if (root.page === key && root.history.length === 0)
+            return;
         root.history = [];
         root.page = key;
     }
@@ -710,6 +742,7 @@ Kirigami.ApplicationWindow {
         shareDialog.shareUrl = Source.shareUrl("song", track.id);
         shareDialog.shareText = "分享歌曲" + Source.quoted(track.name) + " - " + track.artist;
         shareDialog.cover = track.cover;
+        shareDialog.trackId = track.id;
         shareDialog.open();
     }
     function shareList(kind, id, title, cover) {
@@ -720,6 +753,7 @@ Kirigami.ApplicationWindow {
         shareDialog.shareUrl = Source.shareUrl(kind, id);
         shareDialog.shareText = "分享" + shareDialog.shareSubtitle + Source.quoted(title);
         shareDialog.cover = cover;
+        shareDialog.trackId = 0;
         shareDialog.open();
     }
 
@@ -772,6 +806,8 @@ Kirigami.ApplicationWindow {
     // 「我的」在登录前后是两个不同的页（引导 / 内容）：登录状态一变就换掉，不必切走再切回来
     onLoggedInChanged: if (root.page === "mine") root.pageChanged()
     Component.onCompleted: {
+        if (root.backend && root.backend.clipboard)
+            Clipboard.live = root.backend.clipboard;
         root.applyCommandLine();
         // 先换好数据源与队列，再推首页
         root.applyFixture();

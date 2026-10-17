@@ -1,85 +1,71 @@
 // 提示条：一句话（失败原因、操作结果），可带一个动作（「扫码登录」）。
-// 浮在播放条上方居中，不挡播放控制；与应用里其它浮层同一种面（系统底色、圆角、1px 边框、投影）。
-// 新消息直接替换旧的；指针停在上面时不消失。进出：淡入并略微上移（只用动效档位，系统关掉动画时就是瞬间）。
+// 用 KDE 原生的 Kirigami.InlineMessage（失败是 Error 配色，其余是 Information），浮在页头那一条的正中：
+// 眼睛在页面上方，不挡播放条的控制，也不压住页面内容的第一行。
+// 新消息直接替换旧的；指针停在上面时不消失，可以点 × 关掉。出现与消失由 InlineMessage 自己的动画负责。
 import QtQuick
-import QtQuick.Controls
-import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 
 Item {
     id: toast
 
-    property real bottomInset   // 播放条的高度：提示条落在它上面
-
     property string message
     property string actionText
     property var action: null
-    property bool shown: false
+    property bool failure: false
 
-    // 与 Kirigami.ApplicationWindow.showPassiveNotification 同样的参数：timeout 是 "short" / "long" 或毫秒
-    function show(message, timeout, actionText, action) {
+    // timeout 是 "short" / "long" 或毫秒（与 Kirigami.ApplicationWindow.showPassiveNotification 相同）；失败默认长一些
+    function show(message, timeout, actionText, action, failure) {
         toast.message = message;
         toast.actionText = actionText || "";
         toast.action = action || null;
-        hide.interval = typeof timeout === "number" ? timeout : timeout === "long" ? 6000 : 3500;
-        toast.shown = true;
+        toast.failure = failure === true;
+        hide.interval = typeof timeout === "number" ? timeout
+            : timeout === "long" || toast.failure ? 6000 : 3500;
+        bar.visible = true;
         hide.restart();
     }
 
     Timer {
         id: hide
-        running: toast.shown && !hover.hovered
-        onTriggered: toast.shown = false
+        running: bar.visible && !hover.hovered
+        onTriggered: bar.visible = false
     }
 
-    Kirigami.ShadowedRectangle {
-        id: surface
+    // InlineMessage 的 implicitWidth 不含一行文字的宽度（它按给定宽度折行），宽度按文字量出来：
+    // 文字 + 类型图标、关闭按钮与内边距 + 动作按钮
+    TextMetrics {
+        id: messageWidth
+        font: Kirigami.Theme.defaultFont
+        text: toast.message
+    }
+    TextMetrics {
+        id: actionWidth
+        font: Kirigami.Theme.defaultFont
+        text: toast.actionText
+    }
+
+    Kirigami.InlineMessage {
+        id: bar
+        // 页头一行（ScreenFrame：上边距 space4，高 height12）的正中
         anchors.horizontalCenter: parent.horizontalCenter
-        y: parent.height - toast.bottomInset - height - Tokens.space4 + (toast.shown ? 0 : Tokens.space2)
-        width: Math.min(row.implicitWidth + 2 * Tokens.space4, parent.width - 2 * Tokens.pageMargin)
-        height: Tokens.height10
-        radius: Tokens.radiusLg
-        color: Kirigami.Theme.backgroundColor
-        border.width: Tokens.line
-        border.color: Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, Kirigami.Theme.frameContrast)
-        shadow.size: Tokens.space2
-        shadow.yOffset: Tokens.space1
-        shadow.color: Qt.rgba(0, 0, 0, 0.3)
-        opacity: toast.shown ? 1 : 0
-        visible: opacity > 0
-        Behavior on opacity { NumberAnimation { duration: Tokens.motionBase; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut } }
-        Behavior on y { NumberAnimation { duration: Tokens.motionBase; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut } }
-
-        Kirigami.Theme.colorSet: Kirigami.Theme.View
-        Kirigami.Theme.inherit: false
-
-        HoverHandler { id: hover }
-
-        RowLayout {
-            id: row
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.leftMargin: Tokens.space4
-            anchors.rightMargin: toast.actionText ? Tokens.space1 : Tokens.space4
-            spacing: Tokens.space3
-            Label {
-                Layout.fillWidth: true
-                text: toast.message
-                font.pixelSize: Tokens.textBase
-                elide: Text.ElideRight
-            }
-            Button {
-                visible: toast.actionText.length > 0
-                flat: true
-                implicitHeight: Tokens.height8
-                text: toast.actionText
-                onClicked: {
-                    toast.shown = false;
-                    if (toast.action)
-                        toast.action();
-                }
+        y: Tokens.space4 + Math.max(0, (Tokens.height12 - height) / 2)
+        width: Math.min(Math.ceil(messageWidth.advanceWidth) + Tokens.iconMd + Tokens.height8 + 4 * Tokens.space3
+                        + (toast.actionText ? Math.ceil(actionWidth.advanceWidth) + 2 * Tokens.space4 + Tokens.space2 : 0),
+                        parent.width - 2 * Tokens.pageMargin)
+        visible: false
+        type: toast.failure ? Kirigami.MessageType.Error : Kirigami.MessageType.Information
+        text: toast.message
+        showCloseButton: true
+        actions: Kirigami.Action {
+            visible: toast.actionText.length > 0
+            text: toast.actionText
+            onTriggered: {
+                bar.visible = false;
+                if (toast.action)
+                    toast.action();
             }
         }
+
+        HoverHandler { id: hover }
     }
 }

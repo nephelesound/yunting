@@ -29,4 +29,6 @@ QtObject {
     function openPlaylist(id) { if (id > 0) playlistRequested(id); }
     signal inboxRequested()
     function openInbox() { inboxRequested(); }
+    signal aboutRequested()
+    function openAbout() { aboutRequested(); }
 }

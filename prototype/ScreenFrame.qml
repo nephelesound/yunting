@@ -112,10 +112,14 @@ Kirigami.Page {
                         font.pixelSize: Tokens.textSm
                         color: Source.sessionExpired ? Kirigami.Theme.neutralTextColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                     }
+                    Tag {
+                        visible: account.active && Source.account.vip
+                        text: "VIP"
+                        Layout.alignment: Qt.AlignVCenter
+                    }
                 }
             }
             Button {
-                Layout.rightMargin: -Tokens.space2
                 visible: !screen.loggedIn || Source.sessionExpired
                 implicitHeight: Tokens.height8
                 flat: true
@@ -125,6 +129,13 @@ Kirigami.Page {
                 text: Source.sessionExpired ? "重新登录" : "扫码登录"
                 font.pixelSize: Tokens.textSm
                 onClicked: screen.loginRequested()
+            }
+            // 关于：应用信息与反馈用的诊断信息（KDE 应用没有菜单栏时的惯常位置：页头最右）
+            IconButton {
+                Layout.rightMargin: -Tokens.space2   // 平铺按钮的图标与页边线对齐
+                icon.name: "help-about-symbolic"
+                text: "关于云听"
+                onClicked: Actions.openAbout()
             }
         }
 

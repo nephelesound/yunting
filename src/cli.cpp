@@ -4,6 +4,8 @@
 
 #include "apicli.h"
 #include "audioengine.h"
+#include "clipboardhelper.h"
+#include "diagnostics.h"
 #include "imagecache.h"
 #include "layershellhelper.h"
 #include "mpris.h"
@@ -16,6 +18,7 @@
 #include "store.h"
 #include "tray.h"
 
+#include <KLocalizedQmlContext>
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QDateTime>
@@ -63,6 +66,9 @@ struct CommandLine {
                                   "Allow explicit write commands (like / playlist selftests)"};
     QCommandLineOption like{"like", "Like/unlike a song: --like <songId> [on|off] --allow-write",
                             "songId"};
+    QCommandLineOption commentLike{"comment-like",
+                                   "Like/unlike a comment: --comment-like <songId>:<commentId> [on|off] --allow-write",
+                                   "comment"};
     QCommandLineOption playlistSelfTest{"playlist-selftest",
                                         "Create, fill, rename and delete a private test playlist, then exit"};
     QCommandLineOption subscribeSelfTest{"playlist-subscribe-selftest",
@@ -114,6 +120,7 @@ struct CommandLine {
         parser.addOption(importGtk4Cookies);
         parser.addOption(allowWrite);
         parser.addOption(like);
+        parser.addOption(commentLike);
         parser.addOption(playlistSelfTest);
         parser.addOption(subscribeSelfTest);
         parser.addOption(detail);
@@ -324,6 +331,57 @@ int runLike(const CommandLine &cli, Backend &backend)
     store.setLiked(songId, liked);
     if (rc == 2)
         loop.exec();
+    return rc;
+}
+
+int runCommentLike(const CommandLine &cli, Backend &backend)
+{
+    // 排查评论点赞风控：--comment-like 287398:9667444137 on --allow-write
+    NcmClient &client = backend.client;
+    Store &store = backend.store;
+    const QStringList parts = cli.parser.value(cli.commentLike).split(u':');
+    if (parts.size() != 2) {
+        std::fprintf(stderr, "expected songId:commentId\n");
+        return 1;
+    }
+    const double songId = parts.at(0).toDouble();
+    const double commentId = parts.at(1).toDouble();
+    if (songId <= 0 || commentId <= 0) {
+        std::fprintf(stderr, "invalid song/comment id\n");
+        return 1;
+    }
+    if (!client.hasMusicU()) {
+        std::fprintf(stderr, "not logged in\n");
+        return 1;
+    }
+    const QString mode = cli.parser.positionalArguments().value(0, QStringLiteral("on"));
+    const bool liked = mode.compare(QLatin1String("off"), Qt::CaseInsensitive) != 0;
+    QEventLoop loop;
+    int rc = 2;
+    QObject::connect(&store, &Store::commentLikeSucceeded, &loop,
+                     [&](double s, double c, bool state) {
+        if (s == songId && c == commentId) {
+            std::printf("%s %lld:%lld\n", state ? "liked" : "unliked",
+                        qlonglong(songId), qlonglong(commentId));
+            rc = 0;
+            loop.quit();
+        }
+    });
+    QObject::connect(&store, &Store::commentLikeFailed, &loop,
+                     [&](double s, double c, const QString &message) {
+        if (s == songId && c == commentId) {
+            std::fprintf(stderr, "comment like failed: %s\n", qPrintable(message));
+            rc = 1;
+            loop.quit();
+        }
+    });
+    QTimer::singleShot(8 * 1000, &loop, &QEventLoop::quit);
+    store.setCommentLiked(songId, commentId, liked);
+    loop.exec();
+    if (rc == 2) {
+        std::fprintf(stderr, "comment-like: no response within 8s (unknown; not a success)\n");
+        rc = 2;
+    }
     return rc;
 }
 
@@ -729,10 +787,14 @@ int runGui(const CommandLine &cli, QApplication &app, Backend &backend)
     const QString imageCacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/images";
     app.setOrganizationName(QStringLiteral("."));
     QQmlApplicationEngine engine;
+    // kirigami-addons 的页面（「关于」）用 i18nd() 取自己的译文；应用自己的界面不走 i18n
+    KLocalization::setupLocalizedContext(&engine);
     ImageCacheFactory imageCache(imageCacheDir);
     engine.setNetworkAccessManagerFactory(&imageCache);
-    // main.qml 用 root.backend.{store,audio,session,mpris,tray,layerShell,power} 取后端；QVariantMap 的 key 就是属性名
+    // main.qml 用 root.backend.{store,audio,session,mpris,tray,layerShell,power,clipboard,diagnostics} 取后端；QVariantMap 的 key 就是属性名
     LayerShellHelper layerShell;
+    ClipboardHelper clipboard;
+    Diagnostics diagnostics;
     bool qrAvailable = false;
 #ifdef YUNTING_QRCODE
     engine.addImageProvider(QStringLiteral("qrcode"), new QrCodeImageProvider);
@@ -743,8 +805,9 @@ int runGui(const CommandLine &cli, QApplication &app, Backend &backend)
                            {"session", QVariant::fromValue<QObject *>(&session)},
                            {"mpris", QVariant::fromValue<QObject *>(&mpris)},
                            {"tray", QVariant::fromValue<QObject *>(&tray)},
-                           {"layerShell", QVariant::fromValue<QObject *>(&layerShell)},
-                           {"power", QVariant::fromValue<QObject *>(&power)},
+                           {"layerShell", QVariant::fromValue<QObject *>(&layerShell)},                           {"power", QVariant::fromValue<QObject *>(&power)},
+                           {"clipboard", QVariant::fromValue<QObject *>(&clipboard)},
+                           {"diagnostics", QVariant::fromValue<QObject *>(&diagnostics)},
                            {"qr", qrAvailable}};
     engine.setInitialProperties({{"backend", backendMap}});
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
@@ -789,6 +852,8 @@ int run(QApplication &app)
         });
     }
 
+    // 接在上面的处理器之后：日志照常输出，另记一份最近的警告给「关于」页的诊断信息
+    Diagnostics::install();
     installQuitSignals();
 
     const bool anonymous = cli.parser.isSet(cli.anonymous);
@@ -825,7 +890,8 @@ int run(QApplication &app)
     if (cli.parser.isSet(cli.api))
         return runApi(cli, client);
 
-    if (cli.parser.isSet(cli.like) || cli.parser.isSet(cli.playlistSelfTest)
+    if (cli.parser.isSet(cli.like) || cli.parser.isSet(cli.commentLike)
+        || cli.parser.isSet(cli.playlistSelfTest)
         || cli.parser.isSet(cli.subscribeSelfTest)) {
         if (!cli.parser.isSet(cli.allowWrite)) {
             std::fprintf(stderr, "refusing write commands without --allow-write\n");
@@ -835,6 +901,8 @@ int run(QApplication &app)
 
     if (cli.parser.isSet(cli.like))
         return runLike(cli, backend);
+    if (cli.parser.isSet(cli.commentLike))
+        return runCommentLike(cli, backend);
     if (cli.parser.isSet(cli.searchUsers) || cli.parser.isSet(cli.searchRadios))
         return runSearch(cli, backend);
     if (cli.parser.isSet(cli.mv))

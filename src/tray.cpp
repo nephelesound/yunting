@@ -73,6 +73,11 @@ void Tray::setAssociatedWindow(QWindow *window)
     m_item->setAssociatedWindow(window);
 }
 
+void Tray::notify(const QString &message)
+{
+    m_item->showMessage(QGuiApplication::applicationDisplayName(), message, iconName());
+}
+
 void Tray::refreshTrackUi()
 {
     const QVariantMap t = m_audio->track();
