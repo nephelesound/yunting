@@ -86,9 +86,7 @@ signals:
     void albumChanged(double id, bool subscribed);
     void followFailed(const QString &action, const QString &message);
     void commentLikeFailed(double songId, double commentId, const QString &message);
-    // 只读信箱失败（登录失效 / 网络错误）；成功走 dataChanged
-    void inboxFailed(const QString &message);
-    // 只读/统计请求失败：key 与给用户看的一句话；成功走 dataChanged
+    // 按需请求失败（含信箱与私信对话）：请求时的 key 与给用户看的一句话；成功走 dataChanged
     void requestFailed(const QString &key, const QString &message);
 
 private slots:

@@ -489,6 +489,7 @@ void Store::requestMv(const QString &key, double mvId)
         cleared.insert("br", 0.0);
         cleared.insert("size", 0.0);
         cleared.insert("expires", 0.0);
+        cleared.insert("urlPending", true);   // 界面据此区分「地址在取」与「没有可播放的地址」
         put("mv", cleared, false);
     }
 
@@ -507,6 +508,7 @@ void Store::requestMv(const QString &key, double mvId)
         mv.insert("br", state->url.value("br", 0.0));
         mv.insert("size", state->url.value("size", 0.0));
         mv.insert("expires", state->url.value("expires", 0.0));
+        mv.insert("urlPending", false);
         put("mv", mv, false);
     };
 

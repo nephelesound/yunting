@@ -134,7 +134,7 @@ void Store::requestInbox(int offset)
                         [this, offset](const NcmClient::Response &response) {
         const QString failure = requestFailure(response);
         if (!failure.isEmpty()) {
-            emit inboxFailed(failure);
+            emit requestFailed(offset > 0 ? QStringLiteral("inbox:%1").arg(offset) : QStringLiteral("inbox"), failure);
             return;
         }
         const QJsonObject resp = response.doc.object();
@@ -168,7 +168,10 @@ void Store::requestInboxThread(double userId, qint64 before)
                         [this, userId, before](const NcmClient::Response &response) {
         const QString failure = requestFailure(response);
         if (!failure.isEmpty()) {
-            emit inboxFailed(failure);
+            // 按请求时的 key 报：界面按会话（与翻页位置）给重试
+            emit requestFailed(before > 0 ? QStringLiteral("inboxThread:%1:%2").arg(num(userId)).arg(before)
+                                          : QStringLiteral("inboxThread:%1").arg(num(userId)),
+                               failure);
             return;
         }
         const QJsonObject resp = response.doc.object();

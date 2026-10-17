@@ -639,8 +639,8 @@ int runStoreKey(const CommandLine &cli, Backend &backend)
     }
     QEventLoop loop;
     QObject::connect(&store, &Store::dataChanged, &loop, &QEventLoop::quit);
-    QObject::connect(&store, &Store::inboxFailed, &loop, [&loop](const QString &reason) {
-        std::fprintf(stderr, "store request failed: %s\n", qPrintable(reason));
+    QObject::connect(&store, &Store::requestFailed, &loop, [&loop](const QString &key, const QString &reason) {
+        std::fprintf(stderr, "store request failed: %s: %s\n", qPrintable(key), qPrintable(reason));
         loop.quit();
     });
     QTimer::singleShot(20 * 1000, &loop, &QEventLoop::quit);
@@ -673,8 +673,8 @@ int runInbox(const CommandLine &cli, Backend &backend)
                                       : QStringLiteral("inboxThread:") + uid;
     QEventLoop loop;
     QObject::connect(&store, &Store::dataChanged, &loop, &QEventLoop::quit);
-    QObject::connect(&store, &Store::inboxFailed, &loop, [&loop](const QString &reason) {
-        std::fprintf(stderr, "inbox failed: %s\n", qPrintable(reason));
+    QObject::connect(&store, &Store::requestFailed, &loop, [&loop](const QString &key, const QString &reason) {
+        std::fprintf(stderr, "inbox failed: %s: %s\n", qPrintable(key), qPrintable(reason));
         loop.quit();
     });
     QTimer::singleShot(20 * 1000, &loop, &QEventLoop::quit);

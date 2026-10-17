@@ -835,15 +835,24 @@ private slots:
             return m_store->data().value("mv").toMap().value("url").toString();
         };
 
+        const auto urlPending = [this] {
+            return m_store->data().value("mv").toMap().value("urlPending").toBool();
+        };
+
         m_store->request(QStringLiteral("mv:7"));
         QVERIFY(waitUntil([&] { return url() == QStringLiteral("http://media/1"); }));
+        QCOMPARE(urlPending(), false);
         QCOMPARE(detailRequests, 1);
         QCOMPARE(urlRequests, 1);
 
         QTest::qWait(1100);   // 越过第一份地址的 expi
 
+        // 再打开：旧地址立刻清掉，并标明新地址在取（界面不能把它当成「没有可播放的地址」）
         m_store->request(QStringLiteral("mv:7"));
+        QCOMPARE(url(), QString());
+        QCOMPARE(urlPending(), true);
         QVERIFY(waitUntil([&] { return url() == QStringLiteral("http://media/2"); }));
+        QCOMPARE(urlPending(), false);
         QCOMPARE(detailRequests, 1);   // 详情仍是缓存里的那份
         QCOMPARE(urlRequests, 2);
     }
