@@ -71,6 +71,16 @@ QtObject {
     readonly property int iconSm: 16
     readonly property int iconMd: 22
     readonly property int iconLg: 32
+    // Breeze 缺的或会误导的图标（来源与许可见 icons/LICENSES.txt）
+    // 已喜欢：实心红心（Breeze 只有空心的 love-symbolic，未喜欢用它）。红色写在 SVG 里：样式化的按钮不给文件图标上色。
+    // 「喜欢 / 赞」的红是固定的，不跟配色方案的 negative（那是「出错」的意思，有的方案里是品红）
+    readonly property url likedIcon: Qt.resolvedUrl("icons/heart-filled.svg")
+    readonly property color liked: "#da4453"
+    // 评论的赞：网易云用拇指，不用心（心是「喜欢歌曲」）
+    readonly property url upvoteIcon: Qt.resolvedUrl("icons/thumb-like-16-regular.svg")
+    readonly property url upvotedIcon: Qt.resolvedUrl("icons/thumb-like-16-filled.svg")
+    // 退出登录：Breeze 的 system-log-out 在 16 px 是一个「<」，读起来像「返回」
+    readonly property url logoutIcon: Qt.resolvedUrl("icons/arrow-exit-16-regular.svg")
 
     // 线宽：只有 1 与 2。播放条顶边那条进度线就是 2，同时充当内容区与播放条的分界
     readonly property int line: 1

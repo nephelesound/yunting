@@ -46,6 +46,7 @@ file(GLOB _app_qml RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/../prototype"
     CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/../prototype/*.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/../prototype/*.js"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../prototype/icons/*.svg"
     "${CMAKE_CURRENT_SOURCE_DIR}/../prototype/qmldir")
 list(FILTER _app_qml EXCLUDE REGEX "^(Snapshot\\.qml|Data\\.js|Personal\\.js|Fixtures\\.js)$")
 # qt_add_resources 的 FILES 接受绝对路径；RELATIVE 摘出的裸文件名会被qt_add_executable 误当源码解析
@@ -200,3 +201,6 @@ install(FILES ../data/io.github.nephelesound.Yunting.svg
         DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
 install(FILES ../data/ICON-LICENSE
         DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/yunting)
+install(FILES ../prototype/icons/LICENSES.txt
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/yunting
+        RENAME UI-ICONS-LICENSES)

@@ -53,7 +53,8 @@ Menu {
     MenuSeparator {}
 
     MenuItem {
-        icon.name: trackMenu.liked ? "emblem-favorite-symbolic" : "love"
+        icon.name: trackMenu.liked ? "" : "love-symbolic"
+        icon.source: trackMenu.liked ? Tokens.likedIcon : ""
         text: trackMenu.liked ? "取消喜欢" : "喜欢"
         onTriggered: Actions.toggleLike(trackMenu.track)
     }

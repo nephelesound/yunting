@@ -197,8 +197,9 @@ AbstractButton {
                 objectName: "likeButton"
                 anchors.centerIn: parent
                 visible: tile.liked || tile.hovered || tile.visualFocus || hovered
-                icon.name: tile.liked ? "emblem-favorite-symbolic" : "love-symbolic"
-                icon.color: tile.liked ? Kirigami.Theme.negativeTextColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                icon.name: tile.liked ? "" : "love-symbolic"
+                icon.source: tile.liked ? Tokens.likedIcon : ""
+                icon.color: tile.liked ? "transparent" : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                 text: tile.liked ? "取消喜欢" : "喜欢"
                 onClicked: Actions.toggleLike(tile.modelData)
             }

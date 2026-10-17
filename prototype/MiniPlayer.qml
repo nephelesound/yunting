@@ -81,8 +81,9 @@ Window {
 
         IconButton {
             enabled: mini.track !== null
-            icon.name: mini.liked ? "emblem-favorite-symbolic" : "love"
-            icon.color: mini.liked ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.textColor
+            icon.name: mini.liked ? "" : "love-symbolic"
+            icon.source: mini.liked ? Tokens.likedIcon : ""
+            icon.color: mini.liked ? "transparent" : Kirigami.Theme.textColor
             text: mini.liked ? "取消喜欢" : "喜欢"
             onClicked: mini.likeToggled()
         }

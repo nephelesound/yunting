@@ -137,8 +137,9 @@ Item {
             IconButton {
                 enabled: bar.active
                 // 喜欢 = 实心红心（与列表行里的小红心同一个图标与颜色）
-                icon.name: bar.liked ? "emblem-favorite-symbolic" : "love-symbolic"
-                icon.color: bar.liked ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.textColor
+                icon.name: bar.liked ? "" : "love-symbolic"
+                icon.source: bar.liked ? Tokens.likedIcon : ""
+                icon.color: bar.liked ? "transparent" : Kirigami.Theme.textColor
                 text: bar.liked ? "取消喜欢" : "喜欢"
                 onClicked: bar.likeToggled()
             }

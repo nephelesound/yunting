@@ -420,17 +420,15 @@ ScreenFrame {
                                     Kirigami.Icon {
                                         implicitWidth: Tokens.iconSm
                                         implicitHeight: Tokens.iconSm
-                                        source: commentLike.liked ? "emblem-favorite-symbolic" : "love-symbolic"
-                                        color: commentLike.liked ? Kirigami.Theme.negativeTextColor
-                                                                 : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                                        source: commentLike.liked ? Tokens.upvotedIcon : Tokens.upvoteIcon
+                                        color: commentLike.liked ? Tokens.liked : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                                         isMask: true
                                     }
                                     Label {
                                         text: Format.count(comment.modelData.likes)
                                         font.pixelSize: Tokens.textSm
                                         font.features: { "tnum": 1 }
-                                        color: commentLike.liked ? Kirigami.Theme.negativeTextColor
-                                                                 : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                                        color: commentLike.liked ? Tokens.liked : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                                     }
                                 }
                                 onClicked: {

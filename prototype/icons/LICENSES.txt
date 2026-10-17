@@ -1,0 +1,32 @@
+界面的补充图标。先用 Breeze（随系统主题）；Breeze 没有、或含义会误导的图标，用 Fluent UI System Icons
+的 16 px 版（按 16 px 网格绘制，笔画落在整像素上，与 Breeze 的线宽一致；每个图标都有 regular / filled 一对）。
+同一个控件的几种状态只用同一套图标。文件名保留上游的名字，便于对照与更新。
+
+heart-filled.svg
+  Breeze love-symbolic 的外轮廓填实。breeze-icons, LGPL-3.0-or-later, https://invent.kde.org/frameworks/breeze-icons
+
+thumb-like-16-regular.svg, thumb-like-16-filled.svg, arrow-exit-16-regular.svg
+  Fluent UI System Icons, https://github.com/microsoft/fluentui-system-icons
+  经 https://icones.js.org/ (Iconify) 取得，未改动路径。
+
+MIT License
+
+Copyright (c) 2020 Microsoft Corporation
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

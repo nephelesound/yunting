@@ -120,7 +120,7 @@ Popup {
                 }
                 Item { Layout.fillWidth: true }
                 DrawerAction {
-                    icon.name: "system-log-out"
+                    icon.source: Tokens.logoutIcon
                     text: "退出登录…"
                     onClicked: {
                         panel.close();
@@ -149,7 +149,7 @@ Popup {
             Kirigami.Icon {
                 implicitWidth: Tokens.iconSm
                 implicitHeight: Tokens.iconSm
-                source: action.icon.name
+                source: action.icon.name !== "" ? action.icon.name : action.icon.source
                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                 isMask: true
             }

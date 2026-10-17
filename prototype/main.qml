@@ -329,7 +329,7 @@ Kirigami.ApplicationWindow {
         customFooterActions: [
             Kirigami.Action {
                 text: "退出登录"
-                icon.name: "system-log-out"
+                icon.source: Tokens.logoutIcon
                 onTriggered: logoutDialog.accept()
             },
             Kirigami.Action {
