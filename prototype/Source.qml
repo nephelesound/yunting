@@ -108,6 +108,15 @@ QtObject {
         return [];
     }
 
+    // 评论总数：与热评同一次请求（换歌时取一次，缓存里有就不再发）
+    function commentTotal(songId) {
+        const c = source.d.comments;
+        if (c && c.songId === songId)
+            return c.total || 0;
+        source.need("comments:" + songId);
+        return 0;
+    }
+
     // 最新评论：分页按需取（comments:<songId>:<offset>，每页 20），data 里只放最近一页，
     // 这里按歌累积；只接「正好是下一页」的那页，迟到或重复的页不会打乱顺序
     // 分页累积（评论、歌手的全部歌曲共用）：acc = { owner, items, total, more, next, loading }。

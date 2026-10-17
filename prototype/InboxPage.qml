@@ -12,6 +12,8 @@ import "Format.js" as Format
 
 ScreenFrame {
     id: page
+    scroller: list
+    kept: ["peer"]
 
     property real currentId
     property real peer: 0   // 打开的那段对话的对方 uid

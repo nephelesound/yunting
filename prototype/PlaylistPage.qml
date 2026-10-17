@@ -11,6 +11,7 @@ import "Format.js" as Format
 
 ScreenFrame {
     id: page
+    scroller: tracks
 
     // { heading, cover, facts: [{ value, label }], description, tracks, ranked }
     property var list

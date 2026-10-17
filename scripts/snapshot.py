@@ -248,10 +248,12 @@ def write(name, header, parts):
 
 
 def hot_comments(song_id):
-    """热门评论：v2 接口按热度排序，最多 10 条；avatar 是用户头像（96 方图），replyCount 是楼中楼回复数。"""
+    """热门评论：v2 接口按热度排序，最多 10 条；avatar 是用户头像（96 方图），replyCount 是楼中楼回复数；
+    total 是这首歌的评论总数（播放条评论按钮上的数字）。"""
     resp = get(f"api/v2/resource/comments?threadId=R_SO_4_{song_id}&pageNo=1&pageSize=10&sortType=2")
     # v2 把热评放在 data.comments；保持接口顺序
     return {"songId": song_id,
+            "total": (resp.get("data") or {}).get("totalCount") or 0,
             "items": [{"user": (c.get("user") or {}).get("nickname") or "",
                        "userId": (c.get("user") or {}).get("userId") or 0,
                        "avatar": sized((c.get("user") or {}).get("avatarUrl"), 96),

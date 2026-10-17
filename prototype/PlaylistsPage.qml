@@ -9,6 +9,8 @@ import org.kde.kirigami as Kirigami
 
 ScreenFrame {
     id: page
+    scroller: grid
+    kept: ["pane"]
 
     property string pane: "owned"   // owned | subscribed
 

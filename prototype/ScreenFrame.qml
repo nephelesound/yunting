@@ -19,6 +19,51 @@ Kirigami.Page {
     signal leaveRequested()
     signal loginRequested()
 
+    // 返回这一页时恢复离开时的样子（页面每次导航都会重建）：页面把主滚动区交给 scroller，
+    // 把要记住的属性名放进 kept（枢轴 pane、搜索词等）。main.qml 离开时存 saveView()，回来时 restoreView()
+    property Flickable scroller: null
+    property var kept: []
+    function saveView() {
+        const props = {};
+        for (const name of screen.kept)
+            props[name] = screen[name];
+        return { props: props, y: screen.scroller ? screen.scroller.contentY - screen.scroller.originY : 0 };
+    }
+    function restoreView(view) {
+        if (!view)
+            return;
+        for (const name in view.props)
+            screen[name] = view.props[name];
+        screen.pendingY = view.y;
+        restoreTimeout.restart();
+        screen.applyPendingY();
+    }
+    // 内容是异步到的：内容够高了再滚过去，没到就等；用户先动了滚轮，或 3 秒还没到，就不再跳
+    property real pendingY: -1
+    function applyPendingY() {
+        const f = screen.scroller;
+        if (screen.pendingY < 0 || !f)
+            return;
+        const room = f.contentHeight - f.height;
+        if (room < screen.pendingY && restoreTimeout.running)
+            return;
+        f.contentY = f.originY + Math.max(0, Math.min(screen.pendingY, room));
+        screen.pendingY = -1;
+    }
+    onScrollerChanged: screen.applyPendingY()
+    Timer {
+        id: restoreTimeout
+        interval: 3000
+        onTriggered: screen.applyPendingY()
+    }
+    Connections {
+        target: screen.scroller
+        enabled: screen.pendingY >= 0
+        function onContentHeightChanged() { screen.applyPendingY(); }
+        function onHeightChanged() { screen.applyPendingY(); }
+        function onMovementStarted() { screen.pendingY = -1; }
+    }
+
     padding: 0
     background: null
     globalToolBarStyle: Kirigami.ApplicationHeaderStyle.None

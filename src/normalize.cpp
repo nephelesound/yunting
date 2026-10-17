@@ -217,7 +217,7 @@ QVariantMap ncmHotComments(const QJsonObject &resp, double songId)
     const QJsonObject data = resp.value("data").toObject();
     for (const QJsonValue &v : take(data.value("comments").toArray(), 10))
         items.append(ncmComment(v.toObject()));
-    return {{"songId", songId}, {"items", items}};
+    return {{"songId", songId}, {"total", data.value("totalCount").toDouble()}, {"items", items}};
 }
 
 // 歌单/推荐卡片：id/name/cover/count/reason 供现有磁贴；description/playCount/creator/updateTime

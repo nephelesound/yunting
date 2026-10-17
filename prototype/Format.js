@@ -69,6 +69,17 @@ function count(n) {
     return String(n);
 }
 
+// 图标角上的小数字（网易云评论按钮的写法）：千以下照写，再往上 999+、1w+…9w+、10w+，最多四个字符
+function corner(n) {
+    if (n >= 1e5)
+        return "10w+";
+    if (n >= 1e4)
+        return Math.floor(n / 1e4) + "w+";
+    if (n >= 1e3)
+        return "999+";
+    return n > 0 ? String(n) : "";
+}
+
 // 曲目的歌手，交给 LinkText：每位各自可点。旧数据没有 artists 时只有第一位带 id
 function artistLinks(track) {
     if (!track)

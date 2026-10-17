@@ -12,6 +12,8 @@ import "Format.js" as Format
 
 ScreenFrame {
     id: page
+    scroller: page.pane === "comments" ? commentList : null
+    kept: ["pane"]
 
     property var track
     property real elapsed

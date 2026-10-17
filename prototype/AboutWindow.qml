@@ -18,6 +18,8 @@ Kirigami.ApplicationWindow {
     pageStack.globalToolBar.style: Kirigami.ApplicationHeaderStyle.None
 
     pageStack.initialPage: FormCard.AboutPage {
+        // 「使用的库」是一长串卡片，对用户没用；版本信息在「复制诊断信息」里
+        showLibraries: false
         FormCard.FormHeader {
             title: "反馈问题"
         }

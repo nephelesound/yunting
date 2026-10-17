@@ -570,8 +570,9 @@ Kirigami.ApplicationWindow {
         Object.assign(next, ids || {});
         if (root.sameRoute(page, next.listKey, next.mvId, next.userId))
             return;
+        const view = root.saveCurrentView();
         let h = root.history.concat([{ page: root.page, listKey: root.listKey, mvId: root.mvId,
-                                       userId: root.userId, title: root.currentTitle() }]);
+                                       userId: root.userId, title: root.currentTitle(), view: view }]);
         // 来路是历史，不是无限日志；连续循环也只能保留最近 maxHistory 层。
         if (h.length > root.maxHistory)
             h = h.slice(h.length - root.maxHistory);
@@ -594,6 +595,26 @@ Kirigami.ApplicationWindow {
         root.mvId = prev.mvId || 0;
         root.userId = prev.userId || 0;
         root.page = prev.page;
+        root.restoreCurrentView(prev.view);
+    }
+    // 返回时回到离开时的样子（枢轴、搜索词、滚动位置）：页面每次导航都会重建，状态记在来路里。
+    // 顶层枢轴（推荐 / 我的 / 搜索）切换会清空来路，另记在 pivotViews 里
+    property var pivotViews: ({})
+    readonly property var pivotKeys: ["home", "mine", "search"]
+    function saveCurrentView() {
+        const item = pageStack.currentItem as ScreenFrame;
+        const view = item ? item.saveView() : null;
+        if (view && root.pivotKeys.indexOf(root.page) >= 0) {
+            const views = Object.assign({}, root.pivotViews);
+            views[root.page] = view;
+            root.pivotViews = views;
+        }
+        return view;
+    }
+    function restoreCurrentView(view) {
+        const item = pageStack.currentItem as ScreenFrame;
+        if (item)
+            item.restoreView(view);
     }
     function currentTitle() {
         const item = pageStack.currentItem as ScreenFrame;
@@ -602,8 +623,10 @@ Kirigami.ApplicationWindow {
     function switchPivot(key) {
         if (root.page === key && root.history.length === 0)
             return;
+        root.saveCurrentView();
         root.history = [];
         root.page = key;
+        root.restoreCurrentView(root.pivotViews[key]);
     }
     // 打开 / 关闭正在播放页都带共享封面转场：封面在播放条与正在播放页之间飞（只在有曲目时）
     function sceneRect(item) {
@@ -629,6 +652,16 @@ Kirigami.ApplicationWindow {
         flightWait.from = from;
         flightWait.tries = 0;
         flightWait.restart();
+    }
+    // 当前歌曲的评论：没在正在播放页就先过去（同样的封面转场），再切到「评论」
+    function openComments() {
+        if (!root.currentTrack)
+            return;
+        if (root.page !== "nowplaying")
+            root.toggleNowPlaying();
+        const page = root.pageStack.currentItem as NowPlayingPage;
+        if (page)
+            page.pane = "comments";
     }
     function nowPlayingView(): NowPlayingPage {
         const page = root.pageStack.currentItem as NowPlayingPage;
@@ -871,6 +904,7 @@ Kirigami.ApplicationWindow {
         onDesktopLyricsToggled: root.desktopLyricsShown = !root.desktopLyricsShown
         onMiniRequested: root.enterMini()
         onShareRequested: root.shareTrack(root.currentTrack)
+        onCommentsRequested: root.openComments()
         onFullscreenRequested: root.fullscreenShown = true
         liked: root.currentTrack !== null && Source.isLiked(root.currentTrack.id)
         nowPlayingShown: root.page === "nowplaying"

@@ -49,6 +49,7 @@ Item {
     signal desktopLyricsToggled()
     signal miniRequested()
     signal shareRequested()
+    signal commentsRequested()
     signal fullscreenRequested()
 
     property bool desktopLyricsShown
@@ -149,6 +150,15 @@ Item {
                 icon.name: "document-share"
                 text: "分享"
                 onClicked: bar.shareRequested()
+            }
+            // 评论：从哪一页都能直接到这首歌的评论（正在播放页的「评论」）
+            IconButton {
+                visible: !hud.compact
+                enabled: bar.active
+                icon.source: Tokens.commentsIcon
+                text: "评论"
+                corner: bar.active ? Format.corner(Source.commentTotal(bar.track.id)) : ""
+                onClicked: bar.commentsRequested()
             }
         }
 
@@ -299,6 +309,12 @@ Item {
                         icon.name: "document-share"
                         text: "分享当前歌曲"
                         onTriggered: bar.shareRequested()
+                    }
+                    MenuItem {
+                        enabled: bar.active
+                        icon.source: Tokens.commentsIcon
+                        text: "评论"
+                        onTriggered: bar.commentsRequested()
                     }
                     MenuItem {
                         icon.name: "view-fullscreen"

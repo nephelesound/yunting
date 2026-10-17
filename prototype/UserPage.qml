@@ -12,6 +12,10 @@ import "Format.js" as Format
 
 ScreenFrame {
     id: page
+    // 关注 / 粉丝的网格在 Repeater 里，显示着的那个自己报上来
+    property Flickable peopleView: null
+    scroller: page.pane === "playlists" ? playlists : page.pane === "rank" ? rankList : page.peopleView
+    kept: ["pane"]
 
     property real userId
     property real currentId
@@ -318,6 +322,8 @@ ScreenFrame {
                     required property var modelData
                     readonly property var list: people.modelData.key === "follows" ? page.follows : page.fans
                     visible: page.pane === people.modelData.key
+                    onVisibleChanged: if (visible) page.peopleView = people
+                    Component.onCompleted: if (visible) page.peopleView = people
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     readonly property int usable: width - Tokens.pageMargin

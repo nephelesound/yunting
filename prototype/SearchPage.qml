@@ -12,6 +12,8 @@ import "Format.js" as Format
 
 ScreenFrame {
     id: page
+    scroller: collections
+    kept: ["query", "collection"]
 
     property string query
     onQueryChanged: Source.search(page.query)

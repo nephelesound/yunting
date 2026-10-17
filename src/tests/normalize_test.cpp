@@ -154,6 +154,17 @@ private slots:
         QCOMPARE(nullFloor.value("replyCount").toDouble(), 0.0);
     }
 
+    // 热评带上这首歌的评论总数（data.totalCount）；没有时是 0
+    void hotCommentsCarryTheTotal()
+    {
+        const QJsonObject resp{{"data", QJsonObject{{"totalCount", 123456},
+                                                    {"comments", QJsonArray{QJsonObject{{"commentId", 1}}}}}}};
+        const QVariantMap hot = ncmHotComments(resp, 42);
+        QCOMPARE(hot.value("total").toDouble(), 123456.0);
+        QCOMPARE(hot.value("items").toList().size(), 1);
+        QCOMPARE(ncmHotComments(QJsonObject{}, 42).value("total").toDouble(), 0.0);
+    }
+
     void lrcTranslationMatchesTimestamp()
     {
         const QString lrc = QStringLiteral("[00:01.00]hello\n[00:03.50]world\n");

@@ -11,6 +11,8 @@ import "Format.js" as Format
 
 ScreenFrame {
     id: page
+    scroller: page.pane === "songs" ? tracks : albums
+    kept: ["pane"]
 
     property real artistId
     property real currentId
