@@ -5,7 +5,15 @@
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDBusObjectPath>
+#include <QGuiApplication>
 #include <QRegularExpression>
+
+namespace {
+QString serviceName()
+{
+    return QStringLiteral("org.mpris.MediaPlayer2.") + QCoreApplication::applicationName();
+}
+} // namespace
 
 // ── org.mpris.MediaPlayer2 ──
 class MprisBaseAdaptor : public QDBusAbstractAdaptor {
@@ -28,8 +36,8 @@ public:
     // Plasma 媒体弹窗里点曲目会调 Raise：窗口在 QML 手里，这里只发信号
     bool CanRaise() const { return true; }
     bool HasTrackList() const { return false; }
-    QString Identity() const { return QStringLiteral("云听"); }
-    QString DesktopEntry() const { return QStringLiteral("ncm-player"); }
+    QString Identity() const { return QGuiApplication::applicationDisplayName(); }
+    QString DesktopEntry() const { return QGuiApplication::desktopFileName(); }
     QStringList SupportedUriSchemes() const { return {}; }
     QStringList SupportedMimeTypes() const { return {}; }
 
@@ -90,14 +98,15 @@ public:
     bool CanSeek() const { return true; }
     bool CanControl() const { return true; }
 
-    // MPRIS 元数据：id 用 ncmtrack/<id>；长度是微秒
+    // MPRIS 元数据：id 用 /<应用名>/track/<id>；长度是微秒
     QVariantMap Metadata() const
     {
         const QVariantMap t = m_audio->track();
         if (t.isEmpty())
             return {};
         return {{QStringLiteral("mpris:trackid"),
-                 QVariant::fromValue(QDBusObjectPath(QStringLiteral("/org/ncmplayer/track/%1")
+                 QVariant::fromValue(QDBusObjectPath(QStringLiteral("/%1/track/%2")
+                                                        .arg(QCoreApplication::applicationName())
                                                         .arg(t.value("id").toLongLong())))},
                 {QStringLiteral("mpris:length"), qlonglong(t.value("dur").toDouble()) * 1000000ll},
                 // 封面：Plasma 媒体弹窗、锁屏都用它；换成 512 的尺寸参数
@@ -137,7 +146,7 @@ Mpris::Mpris(AudioEngine *audio, QObject *parent)
     m_player = new MprisPlayerAdaptor(this, audio);
 
     QDBusConnection bus = QDBusConnection::sessionBus();
-    m_registered = bus.registerService(QStringLiteral("org.mpris.MediaPlayer2.ncmplayer"));
+    m_registered = bus.registerService(serviceName());
     if (!m_registered) {
         // 已有实例在跑（或环境没有会话总线）：不注册，媒体键留给先到的实例
         qWarning() << "mpris service registration failed:" << bus.lastError().message();
@@ -173,7 +182,7 @@ Mpris::~Mpris()
 {
     if (m_registered) {
         QDBusConnection::sessionBus().unregisterObject(QStringLiteral("/org/mpris/MediaPlayer2"));
-        QDBusConnection::sessionBus().unregisterService(QStringLiteral("org.mpris.MediaPlayer2.ncmplayer"));
+        QDBusConnection::sessionBus().unregisterService(serviceName());
     }
 }
 

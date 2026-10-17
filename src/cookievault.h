@@ -1,7 +1,7 @@
 #pragma once
 // CookieVault：cookie jar 的存储层（DESIGN.md「凭据存储」）。
-// 主路是系统钥匙串（QtKeychain → Secret Service/KWallet）：服务名 NCM_KEYCHAIN_SERVICE
-// 或 "ncm-player"，键 "cookies"，值是紧凑 JSON。钥匙串不可用（无会话总线、后端出错、
+// 主路是系统钥匙串（QtKeychain → Secret Service/KWallet）：服务名 YUNTING_KEYCHAIN_SERVICE
+// 或应用名，键 "cookies"，值是紧凑 JSON。钥匙串不可用（无会话总线、后端出错、
 // 用户拒绝）时退回 600 权限的 cookies.json，每次运行至多提示一次；该文件也是钥匙串
 // 引入前的 legacy 落点，migrate() 把它导入钥匙串、写成功后才删除。
 // 操作串行执行（排队、逐个完成），每个操作的结果经对应信号恰好发出一次。

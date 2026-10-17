@@ -8,12 +8,10 @@
 #include <QWindow>
 
 namespace {
-constexpr char kAppId[] = "io.github.sudoskys.Yunting";
-
-// 图标：应用自己的主题图标（与应用 id 同名），包里没有时退回通用音频图标（DESIGN「Tray」）
+// 图标：应用自己的主题图标（与 .desktop 同名），包里没有时退回通用音频图标（DESIGN「Tray」）
 QString iconName()
 {
-    const QString own = QLatin1String(kAppId);
+    const QString own = QGuiApplication::desktopFileName();
     return QIcon::hasThemeIcon(own) ? own : QStringLiteral("multimedia-audio-player");
 }
 } // namespace
@@ -21,14 +19,14 @@ QString iconName()
 Tray::Tray(AudioEngine *audio, QObject *parent)
     : QObject(parent)
     , m_audio(audio)
-    // Id 是托盘宿主记忆配置的键，固定为应用 id，不随显示名变
-    , m_item(new KStatusNotifierItem(QLatin1String(kAppId), this))
+    // Id 是托盘宿主记忆配置的键，固定为应用 id（.desktop 名），不随显示名变
+    , m_item(new KStatusNotifierItem(QGuiApplication::desktopFileName(), this))
 {
-    m_item->setTitle(QStringLiteral("云听"));
+    m_item->setTitle(QGuiApplication::applicationDisplayName());
     m_item->setCategory(KStatusNotifierItem::ApplicationStatus);
     m_item->setIconByName(iconName());
 
-    // KStatusNotifierItem 自带默认菜单只有一行英文应用名（ncm-player）；
+    // KStatusNotifierItem 自带默认菜单只有一行应用名；
     // DESIGN 的菜单第一行就是当前曲目，移除默认行，完全自持（见下方 setStandardActionsEnabled）。
     QMenu *menu = m_item->contextMenu();
     const QList<QAction *> defaultActions = menu->actions();
@@ -81,7 +79,7 @@ void Tray::refreshTrackUi()
     const QString row = t.isEmpty() ? QStringLiteral("未在播放")
                                     : QStringLiteral("%1 — %2").arg(name, artist);
     m_trackAction->setText(row);
-    m_item->setToolTip(iconName(),t.isEmpty() ? QStringLiteral("云听") : name,
+    m_item->setToolTip(iconName(), t.isEmpty() ? QGuiApplication::applicationDisplayName() : name,
                        t.isEmpty() ? QStringLiteral("未在播放") : artist);
 }
 

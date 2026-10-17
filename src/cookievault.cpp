@@ -2,32 +2,24 @@
 
 #include <qt6keychain/keychain.h>
 
+#include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QLoggingCategory>
+#include <QStandardPaths>
 #include <utility>
 
-Q_LOGGING_CATEGORY(lcVault, "ncm.vault", QtWarningMsg)
-
-namespace {
-// legacy 明文 cookie 文件（钥匙串引入前的落点），respect XDG_DATA_HOME；
-// 也是钥匙串不可用时的后备落点
-QString fallbackJarPath()
-{
-    QString base = qEnvironmentVariable("XDG_DATA_HOME");
-    if (base.isEmpty())
-        base = QDir::home().filePath(".local/share");
-    return base + "/ncm-player/cookies.json";
-}
-} // namespace
+Q_LOGGING_CATEGORY(lcVault, "yunting.vault", QtWarningMsg)
 
 CookieVault::CookieVault(QObject *parent)
-    : QObject(parent), m_fallbackPath(fallbackJarPath()),
+    // 后备文件（也是钥匙串引入前的落点）在应用数据目录里，遵循 XDG_DATA_HOME
+    : QObject(parent),
+      m_fallbackPath(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/cookies.json"),
       m_service([] {
           // 开发与测试用别的服务名，不碰日常凭据（DESIGN.md「凭据存储」）
-          const QString override = qEnvironmentVariable("NCM_KEYCHAIN_SERVICE");
-          return override.isEmpty() ? QStringLiteral("ncm-player") : override;
+          const QString override = qEnvironmentVariable("YUNTING_KEYCHAIN_SERVICE");
+          return override.isEmpty() ? QCoreApplication::applicationName() : override;
       }()),
       m_key(QStringLiteral("cookies"))
 {

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(ncm-player VERSION 0.1 LANGUAGES CXX)
+project(yunting VERSION 0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -9,7 +9,7 @@ find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Qml Quick QuickControls2 N
 find_package(Qt6Keychain REQUIRED)
 find_package(KF6StatusNotifierItem REQUIRED)
 
-qt_add_executable(ncm-player
+qt_add_executable(yunting
     main.cpp
     ncmclient.h ncmclient.cpp
     cookievault.h cookievault.cpp
@@ -25,11 +25,11 @@ qt_add_executable(ncm-player
 )
 
 # 原型阶段：QML 直接从源码树加载（界面与后端并行演进）；装运时再改资源化
-target_compile_definitions(ncm-player PRIVATE
+target_compile_definitions(yunting PRIVATE
     PROTOTYPE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../prototype"
 )
 
-target_compile_options(ncm-player PRIVATE -Wall -Wextra)
+target_compile_options(yunting PRIVATE -Wall -Wextra)
 
 # 测试：只测有策略的深模块（QueryCache 的缓存与去重规则、AudioEngine 的音量刻度与钳制、
 # NcmClient 的重试、CookieVault 的后备文件规则）
@@ -59,9 +59,9 @@ add_test(NAME cookievault COMMAND cookievault_test)
 
 # 任何测试都碰不到用户的真实凭据与缓存：会话总线不可达（钥匙串因此走后备文件），数据与缓存目录在构建目录里
 set_tests_properties(querycache audioengine retry cookievault PROPERTIES ENVIRONMENT
-    "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent;XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/data;XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/cache;NCM_KEYCHAIN_SERVICE=ncm-player-test")
+    "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent;XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/data;XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/cache;YUNTING_KEYCHAIN_SERVICE=yunting-test")
 
-target_link_libraries(ncm-player PRIVATE
+target_link_libraries(yunting PRIVATE
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Qml Qt6::Quick Qt6::QuickControls2
     Qt6::Network Qt6::Multimedia Qt6::DBus
     Qt6Keychain::Qt6Keychain

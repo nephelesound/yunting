@@ -26,7 +26,7 @@ private slots:
         const QByteArray jar = R"({"MUSIC_U":"x","NMTID":"y"})";
 
         CookieVault vault;
-        QCOMPARE(vault.fallbackPath(), dir.filePath("ncm-player/cookies.json"));
+        QCOMPARE(vault.fallbackPath(), dir.filePath(QCoreApplication::applicationName() + "/cookies.json"));
         QEventLoop loop;
         connect(&vault, &CookieVault::saved, &loop, [&loop](bool ok) {
             QVERIFY(ok);
@@ -72,7 +72,7 @@ private slots:
         if (count == 0)
             loop.exec();
         QCOMPARE(count, 1);
-        QVERIFY(!QFile::exists(dir.filePath("ncm-player/cookies.json")));
+        QVERIFY(!QFile::exists(dir.filePath(QCoreApplication::applicationName() + "/cookies.json")));
     }
 };
 

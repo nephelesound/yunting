@@ -1,6 +1,7 @@
-# NCM Player — 常用操作
+# 云听 — 常用操作
 # Qt6 工具在 /usr/lib/qt6/bin（PATH 里的 qml/qmllint 是 Qt5 的，别用）
 
+APP       := build/app/yunting
 QML       ?= /usr/lib/qt6/bin/qml
 QMLLINT   ?= /usr/lib/qt6/bin/qmllint
 QMLFORMAT ?= /usr/lib/qt6/bin/qmlformat
@@ -12,22 +13,22 @@ app-build: prototype/Personal.js
 	cmake -S src -B build/app -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo >/dev/null
 	ninja -C build/app
 
-test: app-build ## 后端单元测试（QueryCache）
+test: app-build ## 后端单元测试
 	ctest --test-dir build/app --output-on-failure
 
 app: app-build ## 运行应用（实时接口 + 真实播放；登录态见 README）
-	build/app/ncm-player
+	$(APP)
 
 # 契约检查：C++ Store 的数据形状必须与 snapshot.py 的快照一致（登录与匿名两种会话各查一次）
 #（两次都用一次性的缓存目录：检查的是这次取到的形状，不受也不污染日常使用的缓存；
 #  匿名那次还要断开会话总线，否则会从钥匙串读到登录凭据）
 contract: app-build ## 检查 C++ Store 与快照的数据形状一致
 	rm -rf build/contract-cache build/contract-cache-anon build/contract-empty-home
-	XDG_CACHE_HOME=$(CURDIR)/build/contract-cache build/app/ncm-player --dump-store build/store.json
+	XDG_CACHE_HOME=$(CURDIR)/build/contract-cache $(APP) --dump-store build/store.json
 	python3 -I scripts/snapshot.py --out build/contract >/dev/null
 	python3 -I scripts/check_contract.py build/store.json build/contract/Data.js build/contract/Personal.js
 	mkdir -p build/contract-empty-home
-	DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent XDG_CACHE_HOME=$(CURDIR)/build/contract-cache-anon XDG_DATA_HOME=$(CURDIR)/build/contract-empty-home build/app/ncm-player --dump-store build/store-anon.json
+	DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent XDG_CACHE_HOME=$(CURDIR)/build/contract-cache-anon XDG_DATA_HOME=$(CURDIR)/build/contract-empty-home $(APP) --dump-store build/store-anon.json
 	python3 -I scripts/snapshot.py --anonymous --out build/contract-anon >/dev/null
 	python3 -I scripts/check_contract.py build/store-anon.json build/contract-anon/Data.js build/contract-anon/Personal.js
 

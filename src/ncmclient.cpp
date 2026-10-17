@@ -17,7 +17,7 @@
 #include <QTimer>
 #include <QUrl>
 
-Q_LOGGING_CATEGORY(lcNet, "ncm.net", QtWarningMsg)
+Q_LOGGING_CATEGORY(lcNet, "yunting.net", QtWarningMsg)
 
 namespace {
 constexpr auto Referer = "https://music.163.com";

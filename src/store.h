@@ -92,6 +92,6 @@ private:
     bool m_sessionExpired = false;
     QNetworkInformation *m_netInfo = nullptr;
     bool m_refreshOwed = false;      // 离线期间欠下的恢复刷新；到账后只还一次
-    QueryCache m_cache;              // 按需数据与首屏快照的缓存（~/.cache/ncm-player/queries.json）
+    QueryCache m_cache;              // 按需数据与首屏快照的缓存（~/.cache/yunting/queries.json）
     int m_pending = 0;               // 首屏在途请求计数
 };

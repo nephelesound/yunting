@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""契约检查：对比 ncm-player --dump-store 的 JSON 与 scripts/snapshot.py 写出的快照的键名与 JSON 类型。
+"""契约检查：对比 yunting --dump-store 的 JSON 与 scripts/snapshot.py 写出的快照的键名与 JSON 类型。
 
 用法: check_contract.py <dump.json> <Data.js> <Personal.js>
 参照快照与 dump 必须是同一种会话（都带 cookie，或都匿名：snapshot.py --anonymous --out DIR）。

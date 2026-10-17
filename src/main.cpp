@@ -29,8 +29,12 @@
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
-    // 不设组织名：缓存与数据目录就是 ~/.cache/ncm-player、~/.local/share/ncm-player，不多套一层
-    app.setApplicationName(QStringLiteral("ncm-player"));
+    // 应用的名字只在这里定义，其余地方都从 QCoreApplication / QGuiApplication 读：
+    //   applicationName：数据与缓存目录、MPRIS 总线名、钥匙串服务名（不设组织名，目录不多套一层）
+    //   desktopFileName：.desktop 文件名、托盘 Id、图标名
+    app.setApplicationName(QStringLiteral("yunting"));
+    app.setApplicationDisplayName(QStringLiteral("云听"));
+    app.setDesktopFileName(QStringLiteral("io.github.sudoskys.Yunting"));
 
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("NetEase Cloud Music client"));
@@ -53,9 +57,9 @@ int main(int argc, char *argv[])
     if (parser.isSet(verboseOption) || parser.isSet(shotOption)) {
         // 警告以上一律打印；--verbose 时再打开本应用的 ncm.* 调试分类（网络请求路径等）
         if (parser.isSet(verboseOption))
-            QLoggingCategory::setFilterRules(QStringLiteral("ncm.*.debug=true"));
+            QLoggingCategory::setFilterRules(QStringLiteral("yunting.*.debug=true"));
         qInstallMessageHandler([](QtMsgType type, const QMessageLogContext &ctx, const QString &msg) {
-            const bool ours = ctx.category && qstrncmp(ctx.category, "ncm.", 4) == 0;
+            const bool ours = ctx.category && qstrncmp(ctx.category, "yunting.", 8) == 0;
             if (ours || (type != QtDebugMsg && type != QtInfoMsg))
                 std::fprintf(stderr, "%s\n", qPrintable(msg));
         });
