@@ -8,6 +8,7 @@ set(CMAKE_AUTOMOC ON)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Qml Quick QuickControls2 Network Multimedia DBus)
 find_package(Qt6Keychain REQUIRED)
 find_package(KF6StatusNotifierItem REQUIRED)
+find_package(KF6CoreAddons QUIET)   # KSignalHandler；没有时 cli.cpp 用自管道
 find_package(OpenSSL REQUIRED COMPONENTS Crypto)
 find_package(LayerShellQt QUIET)
 find_package(PkgConfig QUIET)
@@ -18,7 +19,7 @@ endif()
 option(YUNTING_EXPERIMENTAL_EQ "Build QAudioBufferOutput + biquad EQ path" ON)
 
 qt_add_executable(yunting
-    main.cpp
+    main.cpp cli.h cli.cpp
     ncmclient.h ncmclient.cpp
     cookievault.h cookievault.cpp
     store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_comment.cpp store_user.cpp store_inbox.cpp store_stats.cpp store_notify.cpp store_social.cpp store_comment_extra.cpp store_lyrics_new.cpp store_on_demand.cpp
@@ -150,6 +151,10 @@ if (LayerShellQt_FOUND)
 endif()
 if (YUNTING_EXPERIMENTAL_EQ)
     target_compile_definitions(yunting PRIVATE YUNTING_EXPERIMENTAL_EQ=1)
+endif()
+if (KF6CoreAddons_FOUND)
+    target_compile_definitions(yunting PRIVATE YUNTING_KSIGNALHANDLER=1)
+    target_link_libraries(yunting PRIVATE KF6::CoreAddons)
 endif()
 if (QRENCODE_FOUND)
     target_sources(yunting PRIVATE qrcodeimage.h qrcodeimage.cpp)

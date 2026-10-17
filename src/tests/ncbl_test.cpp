@@ -40,6 +40,28 @@ private slots:
         QVERIFY(body.body.endsWith("--" + body.boundary.toUtf8() + "--\r\n"));
     }
 
+    void plvReportsPlayedLevelNotBestAvailable()
+    {
+        // 请求 lossless，服务器降档给了 higher：上报的是播放地址响应里的 higher
+        const QJsonObject urlItem{{"level", "higher"}, {"br", 192000}};
+        const Ncbl::PlayedLevel played = Ncbl::playedLevel(urlItem, QStringLiteral("lossless"));
+        QCOMPARE(played.level, QStringLiteral("higher"));
+        QCOMPARE(played.bitrate, 192000);
+
+        Ncbl::Song song;
+        song.id = 42;
+        song.level = played.level;
+        song.bitrate = played.bitrate;
+        const QJsonObject plv = Ncbl::plv(song, Ncbl::context({}));
+        QCOMPARE(plv.value("bitrate_level").toString(), QStringLiteral("higher"));
+        QCOMPARE(plv.value("bitrate").toInt(), 192000);
+
+        // 响应缺 level 时退回请求档位
+        const Ncbl::PlayedLevel fallback = Ncbl::playedLevel({}, QStringLiteral("hires"));
+        QCOMPARE(fallback.level, QStringLiteral("hires"));
+        QCOMPARE(fallback.bitrate, 999000);
+    }
+
     void plvAndPldCarryIdentityAndTime()
     {
         Ncbl::Song song;

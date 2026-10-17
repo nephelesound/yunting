@@ -69,3 +69,19 @@ check "comments page" 'len(d["commentPage"]["items"]) == 20' "${APP_CMD[@]}" --c
 check "mv" 'd["mv"]["url"] and d["mv"]["br"] > 0' "${APP_CMD[@]}" --mv 522365
 check "search users" 'd["searchUsers"]["items"]' "${APP_CMD[@]}" --search-users 林俊杰
 check "search radios" 'd["searchRadios"]["items"]' "${APP_CMD[@]}" --search-radios 林俊杰
+
+# 真引擎播放也不写账号：没有 --allow-write 时收听上报必须被拒绝。
+# 不用 check（输出不是 JSON），只断言退出码与 AudioEngine 的拒绝日志。
+AUDIO_OUT=/tmp/yunting-smoke-audio.out
+AUDIO_ERR=/tmp/yunting-smoke-audio.err
+if ! "${APP_CMD[@]}" --smoke-audio 108485 >"$AUDIO_OUT" 2>"$AUDIO_ERR"; then
+    echo "FAIL smoke-audio"
+    cat "$AUDIO_OUT" "$AUDIO_ERR"
+    exit 1
+fi
+if ! grep -q 'listening reports disabled' "$AUDIO_ERR"; then
+    echo "FAIL smoke-audio reported listening without --allow-write"
+    cat "$AUDIO_OUT" "$AUDIO_ERR"
+    exit 1
+fi
+echo "ok   smoke-audio reports nothing"

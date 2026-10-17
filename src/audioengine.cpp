@@ -6,9 +6,7 @@
 #include "eqaudiosink.h"
 #include <QAudioBufferOutput>
 #endif
-#ifdef YUNTING_NCBL
 #include "ncbl.h"
-#endif
 
 #include <QAudioOutput>
 #include <QCoreApplication>
@@ -419,8 +417,8 @@ void AudioEngine::resolveUrl(double songId)
     const QString cacheKey = QStringLiteral("%1:%2").arg(num(songId), level);
     const auto cached = m_urls.constFind(cacheKey);
     if (cached != m_urls.constEnd() && QDateTime::currentDateTimeUtc() < cached->expires) {
-        qCDebug(lcPerf).nospace() << "audio url cache track=" << songId << " level=" << level;
-        startSource(cached->url);
+        qCDebug(lcPerf).nospace() << "audio url cache track=" << songId << " level=" << cached->level;
+        startSource(cached->url, cached->level, cached->bitrate);
         return;
     }
     // 同一首歌、同一音质的取址已经在途（例如 A→B→A）：等那份回包，别再发一次，否则会重复 startSource
@@ -434,16 +432,19 @@ void AudioEngine::resolveUrl(double songId)
                                     {"level", level},
                                     {"encodeType", lossless ? QStringLiteral("flac") : QStringLiteral("mp3")}},
                         true,
-                        [this, songId, cacheKey](const QJsonDocument &doc, bool ok) {
+                        [this, songId, cacheKey, level](const QJsonDocument &doc, bool ok) {
         m_urlRequests.remove(cacheKey);
         const QJsonObject resp = body(doc);
         const QJsonObject item = ok && resp.value("code").toInt() == 200
             ? arr(resp, "data").at(0).toObject() : QJsonObject();
         const QString url = item.value("url").toString();
+        // 服务器可能降档给流（VIP/版权），上报必须用实际拿到的 level
+        const Ncbl::PlayedLevel played = Ncbl::playedLevel(item, level);
         if (!url.isEmpty()) {
             // 留一分钟余量，避免拿到即将失效的地址
             const int expi = item.value("expi").toInt(1200);
-            m_urls.insert(cacheKey, {url, QDateTime::currentDateTimeUtc().addSecs(std::max(0, expi - 60))});
+            m_urls.insert(cacheKey, {url, played.level, played.bitrate,
+                                     QDateTime::currentDateTimeUtc().addSecs(std::max(0, expi - 60))});
         }
         // 用户可能已经切到别的歌：迟到的地址只进缓存，不播
         if (m_track.value("id").toDouble() != songId)
@@ -453,15 +454,17 @@ void AudioEngine::resolveUrl(double songId)
             emit failed(QStringLiteral("暂时无法播放这首歌"));
             return;
         }
-        startSource(url);
+        startSource(url, played.level, played.bitrate);
     });
 }
 
-void AudioEngine::startSource(const QString &url)
+void AudioEngine::startSource(const QString &url, const QString &level, int bitrate)
 {
+    m_playedLevel = level;
+    m_playedBitrate = bitrate;
     qCDebug(lcPerf).nospace() << "audio url ready track="
                               << qlonglong(m_track.value("id").toDouble())
-                              << " level=" << effectiveLevel() << " ms=" << m_trackClock.elapsed();
+                              << " level=" << level << " ms=" << m_trackClock.elapsed();
     m_player->setSource(url);
     if (m_pendingSeek >= 0) {
         m_player->setPosition(m_pendingSeek);
@@ -474,7 +477,16 @@ void AudioEngine::startSource(const QString &url)
 
 void AudioEngine::scrobbleStart()
 {
-    if (m_scrobbleStarted || m_track.isEmpty() || !m_client->hasMusicU())
+    if (m_scrobbleStarted || m_track.isEmpty())
+        return;
+    if (!m_scrobblingAllowed) {
+        // CLI 播放默认只读；直接写 stderr，smoke 重定向时 Qt 警告可能被隐藏
+        std::fprintf(stderr, "listening reports disabled: pass --allow-write to enable\n");
+        std::fflush(stderr);
+        m_scrobbleStarted = true;
+        return;
+    }
+    if (!m_client->hasMusicU())
         return;
     m_scrobbleStarted = true;
     m_scrobbleRoundMode = m_scrobbleMode;
@@ -487,7 +499,8 @@ void AudioEngine::scrobbleStart()
 
 void AudioEngine::scrobbleFinish()
 {
-    if (!m_scrobbleStarted || m_scrobbleFinished || m_track.isEmpty() || !m_client->hasMusicU())
+    if (!m_scrobblingAllowed || !m_scrobbleStarted || m_scrobbleFinished
+        || m_track.isEmpty() || !m_client->hasMusicU())
         return;
     if (m_playClockRunning) {
         m_playedMs += m_playClock.elapsed();
@@ -525,18 +538,10 @@ void AudioEngine::scrobbleNcbl(int seconds)
 #ifdef YUNTING_NCBL
     if (!m_client->hasMusicU() || m_track.isEmpty())
         return;
-    const QString level = m_track.value("quality").toString();
-    const QString levelName = (level.isEmpty() || level == QLatin1String("auto"))
-        ? QStringLiteral("exhigh") : level;
-    int bitrate = 320000;
-    if (levelName == QLatin1String("hires") || levelName == QLatin1String("lossless"))
-        bitrate = 999000;
-    else if (levelName == QLatin1String("exhigh"))
-        bitrate = 320000;
-    else if (levelName == QLatin1String("higher"))
-        bitrate = 192000;
-    else if (levelName == QLatin1String("standard"))
-        bitrate = 128000;
+    // 播放地址响应里实际拿到的档位；拿不到时退回本次请求的档位，不用曲目元数据里的最高档
+    const Ncbl::PlayedLevel reportedLevel = m_playedLevel.isEmpty()
+        ? Ncbl::playedLevel({}, effectiveLevel())
+        : Ncbl::PlayedLevel{m_playedLevel, m_playedBitrate};
     const int rawFee = m_track.value("fee").toInt();
     const int fee = (rawFee == 1 || rawFee == 4 || rawFee == 8) ? rawFee : 0;
 
@@ -544,8 +549,8 @@ void AudioEngine::scrobbleNcbl(int seconds)
     song.id = m_track.value("id").toDouble();
     song.name = m_track.value("name").toString();
     song.artist = m_track.value("artist").toString();
-    song.bitrate = bitrate;
-    song.level = levelName;
+    song.bitrate = reportedLevel.bitrate;
+    song.level = reportedLevel.level;
     song.fee = fee;
     song.duration = qRound(duration());
     song.sourceId = num(song.id);

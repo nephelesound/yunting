@@ -72,6 +72,8 @@ public:
     QString outputDevice() const { return m_outputDeviceId; }
     QString scrobbleMode() const { return m_scrobbleMode; }
     void setScrobbleMode(const QString &mode);
+    // 收听上报默认关闭；显式允许写入（--allow-write）或界面启动时打开
+    void setScrobblingAllowed(bool allowed) { m_scrobblingAllowed = allowed; }
 
     void setTrack(const QVariantMap &track);
     void setPlaying(bool playing);
@@ -125,7 +127,7 @@ private:
     // 运行中切换输出后端：QMediaPlayer 不会在播放中重挂音频输出，重新打开同一 URL 并回到原位置
     void restartForOutput();
 #endif
-    void startSource(const QString &url);
+    void startSource(const QString &url, const QString &level, int bitrate);
     QString effectiveLevel() const;
     // 听歌打卡：startplay 写「最近播放」，play 写「听歌排行」；每首歌各一次
     void scrobbleStart();
@@ -135,6 +137,8 @@ private:
 
     struct CachedUrl {
         QString url;
+        QString level;   // 播放地址响应里服务器实际给的档位
+        int bitrate = 320000;
         QDateTime expires;
     };
     QHash<QString, CachedUrl> m_urls;   // songId:level → 地址，到 expi 前复用
@@ -157,6 +161,10 @@ private:
     bool m_muted = false;
     QString m_quality = QStringLiteral("auto");
     QString m_outputDeviceId;
+    // 这次播放实际拿到的档位与码率；NCBL 上报用，不是曲目的最高可用档位
+    QString m_playedLevel;
+    int m_playedBitrate = 320000;
+    bool m_scrobblingAllowed = false;
     QString m_scrobbleMode = QStringLiteral("legacy");
     QString m_scrobbleRoundMode;   // 开始时锁定，避免中途切模式导致只发一半
     QString m_scrobbleAccountToken; // 开始时锁定账号，换号后旧轮次不再上报
