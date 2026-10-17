@@ -7,6 +7,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
+import "Format.js" as Format
 
 ScreenFrame {
     id: page
@@ -154,7 +155,7 @@ ScreenFrame {
                     width: tracks.width - tracks.rightMargin
                     ranked: false   // 名次只给榜单；歌手的歌按热度排，但不是榜单名次
                     current: modelData.id === page.currentId
-                    locked: modelData.fee === 4 || (!page.vip && modelData.fee === 1)
+                    locked: Format.blockedBy(modelData, page.vip) !== ""
                     onActivated: index => page.activated(index)
                 }
 

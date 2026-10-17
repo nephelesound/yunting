@@ -7,6 +7,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
+import "Format.js" as Format
 
 ScreenFrame {
     id: page
@@ -175,7 +176,7 @@ ScreenFrame {
                 current: modelData.id === page.currentId
                 showReason: page.list.showReason || false
                 showAlbum: !(page.list.isAlbum || false)
-                locked: modelData.fee === 4 || (!page.vip && modelData.fee === 1)
+                locked: Format.blockedBy(modelData, page.vip) !== ""
                 menuContext: ({ playlistId: page.list.playlistId || 0 })
                 reordering: page.reordering
                 canMoveDown: index < (page.list.tracks || []).length - 1

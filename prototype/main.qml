@@ -58,6 +58,8 @@ Kirigami.ApplicationWindow {
         onBlocked: (track, reason) => {
             if (reason === "paid")
                 root.showPassiveNotification("「" + track.name + "」所在专辑需要单独购买");
+            else if (reason === "unavailable")
+                root.showPassiveNotification("「" + track.name + "」已下架或暂时没有版权，不能播放");
             else if (root.loggedIn)
                 root.showPassiveNotification("「" + track.name + "」是 VIP 曲目，开通会员后可播放");
             else

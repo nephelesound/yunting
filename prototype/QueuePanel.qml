@@ -7,6 +7,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
+import "Format.js" as Format
 
 Kirigami.OverlayDrawer {
     id: panel
@@ -92,7 +93,7 @@ Kirigami.OverlayDrawer {
     Kirigami.Theme.inherit: false
 
     function locked(track) {
-        return track.fee === 4 || (!panel.vip && track.fee === 1);
+        return Format.blockedBy(track, panel.vip) !== "";
     }
 
     component SectionLabel: Label {

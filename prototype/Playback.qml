@@ -1,6 +1,7 @@
 // 播放：队列、当前位置、播放模式与「哪些歌能放」的规则都在这里；声音由 engine 负责（原型是 SimEngine，
 // 应用里是 C++ AudioEngine）。界面只调用 play / next / previous，被拦下时收到 blocked 信号再决定怎么提示。
 import QtQuick
+import "Format.js" as Format
 
 QtObject {
     id: playback
@@ -15,12 +16,11 @@ QtObject {
 
     readonly property var current: playback.index >= 0 && playback.index < playback.queue.length ? playback.queue[playback.index] : null
 
-    // reason: "paid" 付费专辑 · "vip" 需要会员
+    // reason：见 Format.blockedBy（"vip" / "paid" / "unavailable"）
     signal blocked(var track, string reason)
 
-    // 付费专辑（fee=4）要单独购买，VIP 也不能播；VIP 曲（fee=1）要会员
     function playable(track) {
-        return track.fee !== 4 && (playback.vip || track.fee !== 1);
+        return Format.blockedBy(track, playback.vip) === "";
     }
 
     function play(tracks, i, origin) {
@@ -28,7 +28,7 @@ QtObject {
             return;
         const track = tracks[i];
         if (!playback.playable(track)) {
-            playback.blocked(track, track.fee === 4 ? "paid" : "vip");
+            playback.blocked(track, Format.blockedBy(track, playback.vip));
             return;
         }
         // 队列内切歌（next/previous/点队列里的一首）沿用原来的来源；换了一份列表就按传入的来源

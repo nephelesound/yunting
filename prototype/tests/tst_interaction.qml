@@ -255,6 +255,16 @@ Item {
         }
 
         // 正在播放的那一行滚出视野才出现定位按钮；点一下回到那一行，按钮随之消失
+        // 能不能播看后端按 privilege 给的 playable；后端只能按 fee 猜的「会员歌」，会员账号照样能播
+        function test_blockedByFollowsPrivilege() {
+            compare(Format.blockedBy({ playable: true, fee: 1 }, false), "");
+            compare(Format.blockedBy({ playable: false, blockedBy: "vip" }, false), "vip");
+            compare(Format.blockedBy({ playable: false, blockedBy: "vip" }, true), "");
+            compare(Format.blockedBy({ playable: false, blockedBy: "paid" }, true), "paid");
+            compare(Format.blockedBy({ playable: false, blockedBy: "unavailable" }, true), "unavailable");
+            compare(Format.blockedBy(null, false), "");
+        }
+
         // 曲目菜单：每位歌手各一项、按署名顺序排在专辑前；复制的链接与分享用同一个地址
         function test_trackMenuOffersEveryArtist() {
             const m = createTemporaryObject(trackMenuComponent, root, { player: ({}) });

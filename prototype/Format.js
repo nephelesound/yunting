@@ -24,6 +24,17 @@ function restriction(fee) {
     return fee === 1 ? "VIP" : fee === 4 ? "付费" : "";
 }
 
+// 当前账号为什么不能播这首歌："" 能播，"vip" 要会员，"paid" 要单独购买，"unavailable" 已下架/无版权。
+// 以接口的 privilege 为准（后端给出 playable / blockedBy）；歌曲没带 privilege 时后端只能按 fee 猜
+// 「会员歌」，所以会员账号不受 "vip" 限制
+function blockedBy(track, vip) {
+    if (!track || track.playable !== false)
+        return "";
+    if (track.blockedBy === "vip" && vip)
+        return "";
+    return track.blockedBy || "unavailable";
+}
+
 // 评论时间（毫秒时间戳）：今天只写时刻，今年写月日，更早写年月日；没有时间返回空串
 function commentTime(ms) {
     if (!ms)
