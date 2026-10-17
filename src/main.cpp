@@ -6,6 +6,7 @@
 #include "ncmclient.h"
 #include "session.h"
 #include "store.h"
+#include "tray.h"
 
 #include <QApplication>
 #include <QCommandLineParser>
@@ -133,6 +134,9 @@ int main(int argc, char *argv[])
     if (qEnvironmentVariableIsEmpty("QT_QUICK_CONTROLS_STYLE"))
         QQuickStyle::setStyle(QStringLiteral("org.kde.desktop"));
 
+    // 托盘只在有窗口的运行方式下创建（--dump-store / --smoke-audio 上面已返回，无窗口）
+    Tray tray(&audio);
+
     store.refresh();   // 首屏数据异步到达，QML 通过 data / personal 的 NOTIFY 自动更新
     // 钥匙串超时后才读出 jar（例如在等用户解锁钱包）：先按匿名起来，读出后再按登录态刷一次
     if (!client.isReady())
@@ -140,17 +144,21 @@ int main(int argc, char *argv[])
     QQmlApplicationEngine engine;
     ImageCacheFactory imageCache;
     engine.setNetworkAccessManagerFactory(&imageCache);
-    // main.qml 用 root.backend.{store,audio,session,mpris} 取后端；QVariantMap 的 key 就是属性名
+    // main.qml 用 root.backend.{store,audio,session,mpris,tray} 取后端；QVariantMap 的 key 就是属性名
     QVariantMap backend{{"store", QVariant::fromValue<QObject *>(&store)},
                         {"audio", QVariant::fromValue<QObject *>(&audio)},
                         {"session", QVariant::fromValue<QObject *>(&session)},
-                        {"mpris", QVariant::fromValue<QObject *>(&mpris)}};
+                        {"mpris", QVariant::fromValue<QObject *>(&mpris)},
+                        {"tray", QVariant::fromValue<QObject *>(&tray)}};
     engine.setInitialProperties({{"backend", backend}});
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
                      [] { QCoreApplication::exit(1); }, Qt::QueuedConnection);
     engine.load(QUrl::fromLocalFile(QStringLiteral(PROTOTYPE_DIR) + QStringLiteral("/main.qml")));
     if (engine.rootObjects().isEmpty())
         return 1;
+
+    // 窗口创建完成后关联托盘，左键从此显示/隐藏主窗口
+    tray.setAssociatedWindow(qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst()));
 
     if (parser.isSet(shotOption)) {
         // 等首屏数据与封面到齐再截（真实网络，给足时间）；同步 grabWindow，不依赖 grabToImage 回调

@@ -7,6 +7,7 @@ set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Qml Quick QuickControls2 Network Multimedia DBus)
 find_package(Qt6Keychain REQUIRED)
+find_package(KF6StatusNotifierItem REQUIRED)
 
 qt_add_executable(ncm-player
     main.cpp
@@ -20,6 +21,7 @@ qt_add_executable(ncm-player
     audioengine.h audioengine.cpp
     session.h session.cpp
     mpris.h mpris.cpp
+    tray.h tray.cpp
 )
 
 # 原型阶段：QML 直接从源码树加载（界面与后端并行演进）；装运时再改资源化
@@ -63,4 +65,5 @@ target_link_libraries(ncm-player PRIVATE
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Qml Qt6::Quick Qt6::QuickControls2
     Qt6::Network Qt6::Multimedia Qt6::DBus
     Qt6Keychain::Qt6Keychain
+    KF6::StatusNotifierItem
 )
