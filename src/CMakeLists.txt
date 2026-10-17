@@ -6,10 +6,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Qml Quick QuickControls2 Network Multimedia DBus)
+find_package(Qt6Keychain REQUIRED)
 
 qt_add_executable(ncm-player
     main.cpp
     ncmclient.h ncmclient.cpp
+    cookievault.h cookievault.cpp
     store.h store.cpp store_on_demand.cpp
     querycache.h querycache.cpp
     imagecache.h
@@ -27,7 +29,8 @@ target_compile_definitions(ncm-player PRIVATE
 
 target_compile_options(ncm-player PRIVATE -Wall -Wextra)
 
-# 测试：只测有策略的深模块（QueryCache 的缓存与去重规则、AudioEngine 的音量刻度与钳制）
+# 测试：只测有策略的深模块（QueryCache 的缓存与去重规则、AudioEngine 的音量刻度与钳制、
+# NcmClient 的重试、CookieVault 的后备文件规则）
 find_package(Qt6 REQUIRED COMPONENTS Test)
 enable_testing()
 qt_add_executable(querycache_test tests/querycache_test.cpp querycache.h querycache.cpp)
@@ -36,18 +39,28 @@ add_test(NAME querycache COMMAND querycache_test)
 
 # 音量/静音走 QAudioOutput，测试要能构造真实引擎（无窗口、无网络）
 qt_add_executable(audioengine_test tests/audioengine_test.cpp audioengine.h audioengine.cpp
-    ncmclient.h ncmclient.cpp json_util.h)
+    ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp json_util.h)
 target_compile_options(audioengine_test PRIVATE -Wall -Wextra)
-target_link_libraries(audioengine_test PRIVATE Qt6::Core Qt6::Test Qt6::Network Qt6::Multimedia)
+target_link_libraries(audioengine_test PRIVATE Qt6::Core Qt6::Test Qt6::Network Qt6::Multimedia Qt6Keychain::Qt6Keychain)
 add_test(NAME audioengine COMMAND audioengine_test)
 
 # 重试策略：seam 是本地 QTcpServer（I/O 边界），不 mock NcmClient 内部
-qt_add_executable(retry_test tests/retry_test.cpp ncmclient.h ncmclient.cpp)
+qt_add_executable(retry_test tests/retry_test.cpp ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp)
 target_compile_options(retry_test PRIVATE -Wall -Wextra)
-target_link_libraries(retry_test PRIVATE Qt6::Core Qt6::Network Qt6::Test)
+target_link_libraries(retry_test PRIVATE Qt6::Core Qt6::Network Qt6::Test Qt6Keychain::Qt6Keychain)
 add_test(NAME retry COMMAND retry_test)
+
+# CookieVault 只测后备文件路径（钥匙串要守护进程与用户确认，不进单测）
+qt_add_executable(cookievault_test tests/cookievault_test.cpp cookievault.h cookievault.cpp)
+target_link_libraries(cookievault_test PRIVATE Qt6::Core Qt6::Test Qt6Keychain::Qt6Keychain)
+add_test(NAME cookievault COMMAND cookievault_test)
+
+# 任何测试都碰不到用户的真实凭据与缓存：会话总线不可达（钥匙串因此走后备文件），数据与缓存目录在构建目录里
+set_tests_properties(querycache audioengine retry cookievault PROPERTIES ENVIRONMENT
+    "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent;XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/data;XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/cache;NCM_KEYCHAIN_SERVICE=ncm-player-test")
 
 target_link_libraries(ncm-player PRIVATE
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Qml Qt6::Quick Qt6::QuickControls2
     Qt6::Network Qt6::Multimedia Qt6::DBus
+    Qt6Keychain::Qt6Keychain
 )

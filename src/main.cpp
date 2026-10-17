@@ -62,10 +62,21 @@ int main(int argc, char *argv[])
 
     NcmClient client;
 
+    // QtKeychain 的读写是异步的：等 jar 从存储读出（钥匙串或后备文件）再继续。
+    // 兜底 10 秒防钥匙串守护进程挂死时永远起不来。
+    {
+        QEventLoop readyLoop;
+        QTimer timeout;
+        timeout.setSingleShot(true);
+        QObject::connect(&client, &NcmClient::ready, &readyLoop, &QEventLoop::quit);
+        QObject::connect(&timeout, &QTimer::timeout, &readyLoop, &QEventLoop::quit);
+        timeout.start(10 * 1000);
+        readyLoop.exec();
+    }
+
     if (parser.isSet(importOption)) {
-        const QString path = client.jarPath();
-        QDir().mkpath(QFileInfo(path).path());
-        const int n = NcmClient::importGtk4Cookies(path);
+        // 一次性导入：写进与启动同一个存储（钥匙串，或后备文件）。异步链在内部跑完。
+        const int n = client.importGtk4();
         if (n < 0) {
             std::fprintf(stderr, "import failed\n");
             return 1;
@@ -123,6 +134,9 @@ int main(int argc, char *argv[])
         QQuickStyle::setStyle(QStringLiteral("org.kde.desktop"));
 
     store.refresh();   // 首屏数据异步到达，QML 通过 data / personal 的 NOTIFY 自动更新
+    // 钥匙串超时后才读出 jar（例如在等用户解锁钱包）：先按匿名起来，读出后再按登录态刷一次
+    if (!client.isReady())
+        QObject::connect(&client, &NcmClient::ready, &store, &Store::refresh, Qt::SingleShotConnection);
     QQmlApplicationEngine engine;
     ImageCacheFactory imageCache;
     engine.setNetworkAccessManagerFactory(&imageCache);

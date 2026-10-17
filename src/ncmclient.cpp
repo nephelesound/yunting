@@ -1,47 +1,94 @@
 #include "ncmclient.h"
 
+#include "cookievault.h"
+
 #include <QDir>
+#include <QEventLoop>
 #include <QFile>
-#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonParseError>
+#include <QLoggingCategory>
 #include <QNetworkAccessManager>
 #include <QNetworkCookie>
-#include <QLoggingCategory>
-
-Q_LOGGING_CATEGORY(lcNet, "ncm.net", QtWarningMsg)
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QStandardPaths>
 #include <QTimer>
 #include <QUrl>
+
+Q_LOGGING_CATEGORY(lcNet, "ncm.net", QtWarningMsg)
 
 namespace {
 constexpr auto Referer = "https://music.163.com";
 constexpr auto UserAgent = "Mozilla/5.0 (X11; Linux x86_64) Chrome/140.0";
+
+// jar（MUSIC_U / __csrf / NMTID）与钥匙串条目之间的唯一序列化形式：紧凑 JSON 对象
+QByteArray jarToJson(const QMap<QString, QString> &jar)
+{
+    QJsonObject o;
+    for (auto it = jar.constBegin(); it != jar.constEnd(); ++it)
+        o.insert(it.key(), it.value());
+    return QJsonDocument(o).toJson(QJsonDocument::Compact);
+}
+
+QMap<QString, QString> jarFromJson(const QByteArray &json)
+{
+    const QJsonDocument doc = QJsonDocument::fromJson(json);
+    QMap<QString, QString> jar;
+    if (doc.isObject()) {
+        const QJsonObject o = doc.object();
+        for (auto it = o.constBegin(); it != o.constEnd(); ++it)
+            jar.insert(it.key(), it.value().toString());
+    }
+    return jar;
+}
+
+// 旧版 NcmClient 写的文件是 [{name: value}, …] 数组；迁移时兼容读取
+QMap<QString, QString> jarFromArrayFile(const QByteArray &json)
+{
+    const QJsonDocument doc = QJsonDocument::fromJson(json);
+    QMap<QString, QString> jar;
+    for (const QJsonValue &v : doc.array()) {
+        const QJsonObject o = v.toObject();
+        for (auto it = o.constBegin(); it != o.constEnd(); ++it)
+            jar.insert(it.key(), it.value().toString());
+    }
+    return jar;
+}
 } // namespace
 
 NcmClient::NcmClient(QObject *parent)
-    : QObject(parent), m_nam(new QNetworkAccessManager(this))
+    : QObject(parent), m_vault(new CookieVault(this)), m_nam(new QNetworkAccessManager(this))
 {
-    m_jarPath = qEnvironmentVariable("XDG_DATA_HOME");
-    if (m_jarPath.isEmpty())
-        m_jarPath = QDir::home().filePath(".local/share");
-    m_jarPath += "/ncm-player/cookies.json";
-    loadJar();
+    // legacy 明文文件 → 钥匙串（写成功才删文件），完成后才读最终存储；
+    // 读到 jar 即 ready()，main 在那之后才允许 Store 发请求
+    m_vault->migrate();
+    connect(m_vault, &CookieVault::loaded, this, [this](const QByteArray &data) {
+        // 读出之前 jar 只可能因登录或导入而非空（匿名下发的 cookie 在那之前不收）：那份更新，留着
+        if (m_jar.isEmpty()) {
+            m_jar = jarFromJson(data);
+            if (m_jar.isEmpty())
+                m_jar = jarFromArrayFile(data);   // 旧版 NcmClient 写的是数组形状
+        }
+        m_ready = true;
+        emit ready();
+    });
+    m_vault->load();
 }
 
-int NcmClient::importGtk4Cookies(const QString &targetPath)
+QMap<QString, QString> NcmClient::importGtk4Cookies()
 {
-    QFile src(QDir::home().filePath(".local/share/netease-cloud-music-gtk4/cookies.json"));
+    QFile src(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
+              + "/netease-cloud-music-gtk4/cookies.json");
     if (!src.open(QIODevice::ReadOnly)) {
         qWarning() << "cannot read gtk4 cookie file:" << src.errorString();
-        return -1;
+        return {};
     }
     const QJsonDocument doc = QJsonDocument::fromJson(src.readAll());
     if (!doc.isArray()) {
         qWarning() << "gtk4 cookie file is not a list";
-        return -1;
+        return {};
     }
     // 与 snapshot.py 相同的挑选规则：MUSIC_U、__csrf、NMTID；同名取最后一条
     QMap<QString, QString> jar;
@@ -52,48 +99,43 @@ int NcmClient::importGtk4Cookies(const QString &targetPath)
         if (name == "MUSIC_U" || name == "__csrf" || name == "NMTID")
             jar.insert(name, pair.mid(name.length() + 1));
     }
-    QFile dst(targetPath);
-    if (!dst.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        qWarning() << "cannot write cookie jar:" << dst.errorString();
+    return jar;
+}
+
+// 一次性导入：读 gtk4 文件 → 整包替换 jar → 存储写完才返回（main 的 --import-gtk4-cookies
+// 打印完个数就退出，必须等写落地）
+int NcmClient::importGtk4()
+{
+    const QMap<QString, QString> jar = importGtk4Cookies();
+    if (jar.isEmpty())
         return -1;
-    }
-    dst.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);   // 登录凭据：只给本人读写
-    QJsonArray out;
-    for (auto it = jar.constBegin(); it != jar.constEnd(); ++it)
-        out.append(QJsonObject{{it.key(), it.value()}});
-    dst.write(QJsonDocument(out).toJson());
-    return static_cast<int>(jar.size());
+    m_jar = jar;
+
+    QEventLoop loop;
+    bool stored = false;
+    connect(m_vault, &CookieVault::saved, &loop, [&](bool) {
+        stored = true;
+        loop.quit();
+    });
+    m_vault->save(jarToJson(m_jar));
+    if (!stored)   // 后备文件是同步发 saved 的；只有钥匙串路径才需要 exec
+        loop.exec();
+    return m_jar.size();
 }
 
-void NcmClient::loadJar()
+// jar 变了就存一份进 vault（钥匙串或后备文件）
+void NcmClient::persistJar()
 {
-    QFile f(m_jarPath);
-    if (!f.open(QIODevice::ReadOnly))
-        return;
-    const QJsonDocument doc = QJsonDocument::fromJson(f.readAll());
-    for (const QJsonValue &v : doc.array()) {
-        const QJsonObject o = v.toObject();
-        for (auto it = o.constBegin(); it != o.constEnd(); ++it)
-            m_jar.insert(it.key(), it.value().toString());
-    }
-}
-
-void NcmClient::saveJar() const
-{
-    QDir().mkpath(QFileInfo(m_jarPath).path());
-    QJsonArray out;
-    for (auto it = m_jar.constBegin(); it != m_jar.constEnd(); ++it)
-        out.append(QJsonObject{{it.key(), it.value()}});
-    QFile f(m_jarPath);
-    if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        f.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);   // 登录凭据：只给本人读写
-        f.write(QJsonDocument(out).toJson());
-    }
+    m_vault->save(jarToJson(m_jar));
 }
 
 // 响应里的 Set-Cookie 只保留我们用的三个（登录成功、令牌续期都走这里）；删除型 cookie（空值）忽略
 void NcmClient::keepSetCookies(QNetworkReply *reply)
 {
+    // 存储还没读出（钥匙串慢、在等用户解锁）时发出的请求都是匿名的：这时落盘会排在读之后，
+    // 用匿名 jar 盖掉存储里的登录凭据
+    if (!m_ready)
+        return;
     const auto cookies = reply->header(QNetworkRequest::SetCookieHeader).value<QList<QNetworkCookie>>();
     bool changed = false;
     for (const QNetworkCookie &c : cookies) {
@@ -108,7 +150,12 @@ void NcmClient::keepSetCookies(QNetworkReply *reply)
         }
     }
     if (changed)
-        saveJar();
+        persistJar();
+}
+
+QString NcmClient::fallbackPath() const
+{
+    return m_vault->fallbackPath();
 }
 
 bool NcmClient::hasMusicU() const
@@ -123,7 +170,7 @@ void NcmClient::adoptCookies(const QJsonDocument &jarDoc)
         for (auto it = o.constBegin(); it != o.constEnd(); ++it)
             m_jar.insert(it.key(), it.value().toString());
     }
-    saveJar();
+    persistJar();
 }
 
 QString NcmClient::cookieHeader(bool personal) const
