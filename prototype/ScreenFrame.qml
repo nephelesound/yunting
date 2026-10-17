@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
+import org.kde.kirigamiaddons.components as Components
 
 Kirigami.Page {
     id: screen
@@ -75,6 +76,14 @@ Kirigami.Page {
                 Layout.rightMargin: Tokens.space2
             }
 
+            // 头像：人物用圆形；图片没到或没有时，Avatar 自己显示名字首字
+            Components.Avatar {
+                visible: screen.loggedIn && !Source.sessionExpired
+                implicitWidth: Tokens.height7
+                implicitHeight: Tokens.height7
+                name: screen.loggedIn ? Source.account.name : ""
+                source: screen.loggedIn ? Source.sized(Source.account.avatar, 96) : ""
+            }
             Label {
                 text: Source.sessionExpired ? "登录已过期" : screen.loggedIn ? Source.account.name : "未登录"
                 font.pixelSize: Tokens.textSm
