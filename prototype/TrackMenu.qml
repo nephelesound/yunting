@@ -5,6 +5,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
+import "Format.js" as Format
 
 Menu {
     id: trackMenu
@@ -31,6 +32,12 @@ Menu {
 
     // 菜单宽度随最长一项走：超长的歌手名、专辑名截短，不让菜单横跨半个窗口
     function shorten(text) { return text.length > 24 ? text.slice(0, 23) + "…" : text; }
+    function indexOfItem(item) {
+        for (let i = 0; i < trackMenu.count; ++i)
+            if (trackMenu.itemAt(i) === item)
+                return i;
+        return trackMenu.count;
+    }
 
     MenuItem {
         icon.name: "media-playlist-play"
@@ -92,14 +99,20 @@ Menu {
 
     MenuSeparator {}
 
-    MenuItem {
-        enabled: trackMenu.track !== null && (trackMenu.track.artistId || 0) > 0
-        icon.name: "view-media-artist"
-        // 多位歌手时只有第一位有 id：菜单上写明是谁
-        text: trackMenu.track ? "歌手：" + trackMenu.shorten(trackMenu.track.artist.split(" / ")[0]) : ""
-        onTriggered: Actions.openArtist(trackMenu.track.artistId)
+    // 每位歌手一项，按署名顺序排在专辑前面（没有 id 的歌手打不开，不列）
+    Instantiator {
+        model: Format.artistLinks(trackMenu.track).filter(a => a.artistId > 0)
+        delegate: MenuItem {
+            required property var modelData
+            icon.name: "view-media-artist"
+            text: "歌手：" + trackMenu.shorten(modelData.text)
+            onTriggered: Actions.openArtist(modelData.artistId)
+        }
+        onObjectAdded: (index, object) => trackMenu.insertItem(trackMenu.indexOfItem(albumItem), object)
+        onObjectRemoved: (index, object) => trackMenu.removeItem(object)
     }
     MenuItem {
+        id: albumItem
         enabled: trackMenu.track !== null && (trackMenu.track.albumId || 0) > 0
         icon.name: "view-media-album-cover"
         text: trackMenu.track && trackMenu.track.album ? "专辑：" + trackMenu.shorten(trackMenu.track.album) : "专辑"
@@ -114,7 +127,7 @@ Menu {
         icon.name: "edit-copy"
         text: "复制歌曲链接"
         onTriggered: {
-            Clipboard.copy("https://music.163.com/song?id=" + trackMenu.track.id);
+            Clipboard.copy(Source.shareUrl("song", trackMenu.track.id));
             trackMenu.copied();
         }
     }

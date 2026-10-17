@@ -60,6 +60,7 @@ Item {
         }
     }
     Component { id: lyricsComponent; DesktopLyrics {} }
+    Component { id: trackMenuComponent; TrackMenu {} }
     // 假的 layer-shell：记下最后一次设的锚定边与边距；相对拖动由测试直接发 relativeMotion
     QtObject {
         id: fakeLayerShell
@@ -254,6 +255,21 @@ Item {
         }
 
         // 正在播放的那一行滚出视野才出现定位按钮；点一下回到那一行，按钮随之消失
+        // 曲目菜单：每位歌手各一项、按署名顺序排在专辑前；复制的链接与分享用同一个地址
+        function test_trackMenuOffersEveryArtist() {
+            const m = createTemporaryObject(trackMenuComponent, root, { player: ({}) });
+            m.show(root.track, {});
+            tryVerify(() => m.opened);
+            const texts = [];
+            for (let i = 0; i < m.count; ++i)
+                texts.push(m.itemAt(i).text || "");
+            const first = texts.indexOf("歌手：周杰伦");
+            const second = texts.indexOf("歌手：费玉清");
+            verify(first >= 0 && second === first + 1, texts.join(" | "));
+            compare(texts[second + 1], "专辑：叶惠美");
+            m.close();
+        }
+
         // 正在播放的高亮靠 id 相等：新歌的 id 超出 32 位整数，页面的 currentId 存成 int 会被截断、永远对不上
         function test_pagesKeepFullTrackIds() {
             const id = 18478568150;
