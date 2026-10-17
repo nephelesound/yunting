@@ -57,6 +57,22 @@ Kirigami.ApplicationWindow {
         target: playback.engine
         function onFailed(reason) { root.showPassiveNotification(reason); }
     }
+    // 私人漫游是一个流：放到倒数第二首时续取一批，取回来的接在队尾，不会放完一轮又从头循环
+    Connections {
+        target: playback
+        function onIndexChanged() {
+            if (playback.origin === "fm" && playback.index >= playback.queue.length - 2)
+                Source.moreFm();
+        }
+    }
+    Connections {
+        target: Source
+        function onFmTracksChanged() {
+            if (playback.origin === "fm")
+                playback.append(Source.fmTracks);
+        }
+    }
+
     // 红心是乐观更新：失败时 Store 已经改回，这里只说明原因
     Connections {
         target: root.backend ? root.backend.store : null
@@ -431,7 +447,7 @@ Kirigami.ApplicationWindow {
         else if (key === "fm") {
             if (Source.fmTracks.length === 0)
                 return;
-            playback.play(Source.fmTracks, 0);
+            playback.play(Source.fmTracks, 0, "fm");
             root.open("nowplaying");
         } else if (!root.loggedIn && key !== "similar")
             root.requestLogin();

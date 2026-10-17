@@ -19,6 +19,7 @@ Item {
         category: "session"
         property string queue: "[]"
         property int index: -1
+        property string origin: ""
         property real position: 0
         property real volume: 0.7
         property bool muted: false
@@ -41,6 +42,7 @@ Item {
         }
         if (queue.length > 0 && saved.index >= 0) {
             persisted.player.restore(queue, saved.index);
+            persisted.player.origin = saved.origin;
             engine.playing = false;
             engine.seek(saved.position);
         }
@@ -61,6 +63,7 @@ Item {
     // 恢复完成后才开始回写，避免启动途中的默认值把存档覆盖掉
     Binding { when: persisted.restored; target: saved; property: "queue"; value: JSON.stringify(persisted.player.queue.slice(0, persisted.maxQueue)) }
     Binding { when: persisted.restored; target: saved; property: "index"; value: persisted.player.index }
+    Binding { when: persisted.restored; target: saved; property: "origin"; value: persisted.player.origin }
     Binding { when: persisted.restored; target: saved; property: "position"; value: Math.floor(persisted.player.engine.position) }
     Binding { when: persisted.restored; target: saved; property: "volume"; value: persisted.player.engine.volume }
     Binding { when: persisted.restored; target: saved; property: "muted"; value: persisted.player.engine.muted }

@@ -156,8 +156,9 @@ QtObject {
     // 推荐歌单（首页第二排）
     readonly property var playlists: source.p.playlists
 
-    // 私人漫游：一个流，直接播放
+    // 私人漫游：一个流，直接播放；快放完时 moreFm 续取一批（追加到 fmTracks）
     readonly property var fmTracks: source.pe.fm.tracks
+    function moreFm() { source.need("fm:next"); }
 
     // 我的：最近播放、云盘、创建与收藏的歌单（缺字段时给稳定的空形状）
     readonly property var recent: source.p.recent || { total: 0, tracks: [] }

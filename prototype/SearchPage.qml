@@ -32,8 +32,11 @@ ScreenFrame {
     // 右栏：一类结果铺满可用的行列，不滚动
     property string collection: "artists"
     readonly property var collectionItems: page.result[page.collection] || []
-    readonly property int tileColumns: Math.max(1, Math.floor((page.half + Tokens.space2) / (Tokens.tileSm + Tokens.space2)))
-    readonly property int tileHeight: Tokens.tileSm + Tokens.space2 + Tokens.height12
+    // 列数按最小磁贴 104 算，磁贴再等分整栏：右缘正好落在页边线上
+    readonly property int tileColumns: Math.max(1, Math.floor((page.rightWidth + Tokens.space2) / (Tokens.tileSm + Tokens.space2)))
+    readonly property int tileWidth: Math.floor((page.rightWidth - (page.tileColumns - 1) * Tokens.space2) / page.tileColumns)
+    readonly property int rightWidth: body.width - page.half - Tokens.space6
+    readonly property int tileHeight: page.tileWidth + Tokens.space2 + Tokens.height12
     readonly property int tileRows: Math.max(1, Math.floor((page.listHeight + Tokens.space4) / (page.tileHeight + Tokens.space4)))
     function caption(item) {
         if (page.collection === "artists")
@@ -51,13 +54,27 @@ ScreenFrame {
         anchors.bottomMargin: Tokens.space6
         spacing: Tokens.space6
 
+        // 边输入边搜：停顿 500 毫秒才发请求（同一个词后端缓存 5 分钟）；回车立即搜；清空回到热门搜索。
+        // 不用 SearchField 自带的自动提交：默认 100 毫秒几乎每个键都发一次网络请求，延迟模式又要等 2 秒
+
         Kirigami.SearchField {
+            id: field
             Layout.preferredWidth: page.half
             implicitHeight: Tokens.height10
-            placeholderText: "搜索歌曲、歌手、歌单"
+            placeholderText: "搜索歌曲、歌手、专辑、歌单"
             text: page.query
             focus: true
-            onAccepted: page.query = text
+            autoAccept: false
+            onTextEdited: typing.restart()
+            onAccepted: {
+                typing.stop();
+                page.query = field.text.trim();
+            }
+            Timer {
+                id: typing
+                interval: 500
+                onTriggered: page.query = field.text.trim()
+            }
         }
 
         // 没有输入：热门搜索
@@ -173,7 +190,7 @@ ScreenFrame {
                         model: page.collectionItems.slice(0, page.tileColumns * page.tileRows)
                         delegate: MediaTile {
                             required property var modelData
-                            width: Tokens.tileSm
+                            width: page.tileWidth
                             title: modelData.name
                             caption: page.caption(modelData)
                             cover: modelData.cover

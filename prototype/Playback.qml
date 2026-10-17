@@ -11,6 +11,7 @@ QtObject {
     property var queue: []
     property int index: -1
     property int mode: 0            // 0 列表循环 · 1 单曲循环 · 2 随机
+    property string origin          // 队列从哪来："fm" = 私人漫游（快放完时续取），其余为空
 
     readonly property var current: playback.index >= 0 && playback.index < playback.queue.length ? playback.queue[playback.index] : null
 
@@ -22,7 +23,7 @@ QtObject {
         return track.fee !== 4 && (playback.vip || track.fee !== 1);
     }
 
-    function play(tracks, i) {
+    function play(tracks, i, origin) {
         if (i < 0 || i >= tracks.length)
             return;
         const track = tracks[i];
@@ -30,6 +31,9 @@ QtObject {
             playback.blocked(track, track.fee === 4 ? "paid" : "vip");
             return;
         }
+        // 队列内切歌（next/previous/点队列里的一首）沿用原来的来源；换了一份列表就按传入的来源
+        if (tracks !== playback.queue)
+            playback.origin = origin || "";
         playback.queue = tracks;
         playback.index = i;
         playback.engine.track = track;
@@ -73,6 +77,15 @@ QtObject {
         q.splice(at === "next" ? index + 1 : q.length, 0, track);
         playback.queue = q;
         playback.index = index;
+    }
+    // 续上来的歌接在队尾（已在队列里的不重复）；不改变正在播放的那首
+    function append(tracks) {
+        const ids = {};
+        for (const t of playback.queue)
+            ids[t.id] = true;
+        const fresh = tracks.filter(t => !ids[t.id]);
+        if (fresh.length > 0)
+            playback.queue = playback.queue.concat(fresh);
     }
     function playNext(track) { playback.insert(track, "next"); }
     function enqueue(track) { playback.insert(track, "end"); }
