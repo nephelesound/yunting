@@ -20,6 +20,10 @@ public:
     // 每次有值可用（缓存命中或新取到）都会调用；可能先给旧值、再给新值
     using Deliver = std::function<void(const QVariant &value)>;
 
+    // 落盘文件的格式版本。缓存里存的是解析好的结果（normalize.cpp 的输出），解析规则或数据形状一变，
+    // 旧文件里的值就不对了（歌词永不过期，会一直用下去）。改了解析就把它加一：版本不符的文件整份丢弃。
+    static constexpr int diskFormat = 2;
+
     explicit QueryCache(const QString &diskPath, QObject *parent = nullptr);
     ~QueryCache() override;
 

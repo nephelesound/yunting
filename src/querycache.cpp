@@ -21,6 +21,11 @@ QueryCache::~QueryCache()
         save();
 }
 
+namespace {
+// 文件里记格式版本的键；缓存的 key 都是「种类:参数」或首屏块名，不会以下划线开头
+constexpr char formatKey[] = "_format";
+} // namespace
+
 // 新鲜期：歌词不会变，永久；歌单与首屏 10 分钟；搜索 5 分钟。过期仍先给旧值再后台重取
 qint64 QueryCache::freshFor(const QString &key)
 {
@@ -116,7 +121,11 @@ void QueryCache::load()
     if (!f.open(QIODevice::ReadOnly))
         return;
     const QJsonObject root = QJsonDocument::fromJson(f.readAll()).object();
+    if (root.value(QLatin1String(formatKey)).toInt() != diskFormat)
+        return;   // 旧格式（或没写版本的旧文件）：整份不用，按需重取
     for (auto it = root.constBegin(); it != root.constEnd(); ++it) {
+        if (it.key() == QLatin1String(formatKey))
+            continue;
         const QJsonObject e = it.value().toObject();
         m_entries.insert(it.key(), {e.value("value").toVariant(),
                                     QDateTime::fromString(e.value("at").toString(), Qt::ISODate)});
@@ -137,7 +146,7 @@ void QueryCache::scheduleSave()
 
 void QueryCache::save() const
 {
-    QJsonObject root;
+    QJsonObject root{{QLatin1String(formatKey), diskFormat}};
     for (auto it = m_entries.constBegin(); it != m_entries.constEnd(); ++it)
         if (persistent(it.key()))
             root.insert(it.key(), QJsonObject{{"value", QJsonValue::fromVariant(it->value)},

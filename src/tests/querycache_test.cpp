@@ -27,7 +27,27 @@ class QueryCacheTest : public QObject {
         }
     };
 
+    // 预置一份当前格式的缓存文件：entries 是 "key": {...} 的 JSON 片段
+    static void writeCache(const QString &path, const QByteArray &entries)
+    {
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("{\"_format\": " + QByteArray::number(QueryCache::diskFormat) + ", " + entries + "}");
+    }
+
 private slots:
+
+    // 解析规则变了（旧版本或没写版本的文件）：整份丢弃，歌词这类永久缓存不会一直用旧的解析结果
+    void otherFormatFileIsDiscarded()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath("q.json");
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write(R"({"lyrics:7": {"value": "[00:36.19]la", "at": "2026-01-01T00:00:00Z"}})");
+        f.close();
+        QVERIFY(!QueryCache(path).peek("lyrics:7").isValid());
+    }
     void freshHitDoesNotFetchAgain()
     {
         QTemporaryDir dir;
@@ -61,10 +81,7 @@ private slots:
     {
         QTemporaryDir dir;
         const QString path = dir.filePath("q.json");
-        QFile f(path);
-        QVERIFY(f.open(QIODevice::WriteOnly));
-        f.write(R"({"playlist:1": {"value": "old", "at": "2000-01-01T00:00:00Z"}})");
-        f.close();
+        writeCache(path, R"("playlist:1": {"value": "old", "at": "2000-01-01T00:00:00Z"})");
 
         QueryCache cache(path);
         FakeFetch failing;
@@ -80,10 +97,7 @@ private slots:
     {
         QTemporaryDir dir;
         const QString path = dir.filePath("q.json");
-        QFile f(path);
-        QVERIFY(f.open(QIODevice::WriteOnly));
-        f.write(R"({"playlist:1": {"value": "old", "at": "2000-01-01T00:00:00Z"}})");
-        f.close();
+        writeCache(path, R"("playlist:1": {"value": "old", "at": "2000-01-01T00:00:00Z"})");
 
         QueryCache cache(path);
         FakeFetch fetch;

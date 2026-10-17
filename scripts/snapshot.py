@@ -81,11 +81,18 @@ def sized(url, px):
 def parse_lrc(lrc, tlyric=""):
     """LRC → [{t, text, tr}]；译文按取整到两位小数的时间戳对上，没有为 ""。"""
     def stamps(text):
+        """与 normalize.cpp 的 lrcStamps 同一规则：行首可挂多个时间戳（重复句共用一行），
+        小数点可写成冒号，逐字时间 <mm:ss.xx> 去掉；按时间排序，同一时间留先出现的一句。"""
         out = {}
-        for m in re.finditer(r"\[(\d+):(\d+(?:\.\d+)?)\](.*)", text):
-            if m[3].strip():
-                out.setdefault(round(int(m[1]) * 60 + float(m[2]), 2), m[3].strip())
-        return out
+        for raw in text.splitlines():
+            line, times = raw.strip(), []
+            while m := re.match(r"\[(\d+):(\d+)(?:[.:](\d+))?\]", line):
+                times.append(int(m[1]) * 60 + int(m[2]) + (float("0." + m[3]) if m[3] else 0))
+                line = line[m.end():]
+            body = re.sub(r"<\d+:\d+(?:[.:]\d+)?>", "", line).strip()
+            for t in times if body else []:
+                out.setdefault(round(t, 2), body)
+        return dict(sorted(out.items()))
     tr = stamps(tlyric)
     return [{"t": t, "text": text, "tr": tr.get(t, "")} for t, text in stamps(lrc).items()]
 

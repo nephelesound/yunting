@@ -4,7 +4,7 @@
 #include <QDate>
 #include <QDateTime>
 #include <QRegularExpression>
-#include <QSet>
+#include <QMap>
 #include <QStringList>
 #include <cmath>
 
@@ -198,39 +198,45 @@ QVariantList ncmTracks(const QJsonArray &items)
 }
 
 // 译文按取整到两位小数的时间戳对上同一句，没有为 ""
+namespace {
+// LRC 正文 → 按时间排好的（时间, 句子），同一时间只留文件里先出现的一句（与 snapshot.py 的 stamps() 同一规则）。
+// 一行开头可以挂多个时间戳：重复的句子（副歌）共用一行文字，[01:22.68][00:36.19]……，每个时间各算一句；
+// 小数点也有写成冒号的（[00:50:50]）；逐字时间 <00:12.34> 从正文里去掉。
+// [ar:]、[ti:] 这类标签行与网易的 JSON 署名行（{"t":0,"c":[…]}）不以时间戳开头，不算歌词。
+QMap<double, QString> lrcStamps(const QString &text)
+{
+    static const QRegularExpression stamp(QStringLiteral("^\\[(\\d+):(\\d+)(?:[.:](\\d+))?\\]"));
+    static const QRegularExpression wordTiming(QStringLiteral("<\\d+:\\d+(?:[.:]\\d+)?>"));
+    QMap<double, QString> out;
+    for (const QString &raw : text.split(u'\n')) {
+        QString line = raw.trimmed();
+        QList<double> times;
+        for (QRegularExpressionMatch m = stamp.match(line); m.hasMatch(); m = stamp.match(line)) {
+            const QString fraction = m.captured(3);
+            times.append(m.captured(1).toDouble() * 60 + m.captured(2).toDouble()
+                         + (fraction.isEmpty() ? 0 : (QStringLiteral("0.") + fraction).toDouble()));
+            line.remove(0, m.capturedLength());
+        }
+        const QString body = line.remove(wordTiming).trimmed();
+        if (body.isEmpty())
+            continue;
+        for (double t : std::as_const(times)) {
+            const double key = round(t * 100) / 100; // Python 的 round(..., 2)
+            if (!out.contains(key))
+                out.insert(key, body);
+        }
+    }
+    return out;
+}
+} // namespace
+
 QVariantList ncmParseLrc(const QString &lrc, const QString &tlyric)
 {
-    static const QRegularExpression pattern(
-        QStringLiteral("\\[(\\d+):(\\d+(?:\\.\\d+)?)\\](.*)"));
-    // 同一时间戳取先出现的一句（Python 的 dict setdefault）；键是取整后的时间戳
-    const auto stampKey = [](double t) { return QString::number(round(t * 100) / 100, 'f', 2); };
-    QHash<QString, QString> tr;
-    for (QRegularExpressionMatchIterator it = pattern.globalMatch(tlyric); it.hasNext();) {
-        const QRegularExpressionMatch m = it.next();
-        const QString line = m.captured(3).trimmed();
-        if (line.isEmpty())
-            continue;
-        const double t = m.captured(1).toDouble() * 60 + m.captured(2).toDouble();
-        if (!tr.contains(stampKey(t)))
-            tr.insert(stampKey(t), line);
-    }
+    const QMap<double, QString> tr = lrcStamps(tlyric);
+    const QMap<double, QString> lines = lrcStamps(lrc);
     QVariantList out;
-    QSet<QString> seen;
-    for (QRegularExpressionMatchIterator it = pattern.globalMatch(lrc); it.hasNext();) {
-        const QRegularExpressionMatch m = it.next();
-        const QString text = m.captured(3).trimmed();
-        if (text.isEmpty())
-            continue;
-        const double t = m.captured(1).toDouble() * 60 + m.captured(2).toDouble();
-        if (seen.contains(stampKey(t)))   // dict 键唯一：同时间戳只留第一句
-            continue;
-        seen.insert(stampKey(t));
-        out.append(QVariantMap{
-            {"t", QVariant(round(t * 100) / 100)}, // Python 的 round(..., 2)
-            {"text", text},
-            {"tr", tr.value(stampKey(t))},
-        });
-    }
+    for (auto it = lines.cbegin(); it != lines.cend(); ++it)
+        out.append(QVariantMap{{"t", it.key()}, {"text", it.value()}, {"tr", tr.value(it.key())}});
     return out;
 }
 

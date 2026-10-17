@@ -63,6 +63,32 @@ private slots:
         QCOMPARE(lines.at(0).toMap().value("tr").toString(), QStringLiteral("你好"));
         QCOMPARE(lines.at(1).toMap().value("t").toDouble(), 3.5);
     }
+
+    // 重复句共用一行：[01:22.68][00:36.19]副歌 → 两句，按时间排；正文里不留时间戳
+    void lrcMergedTimestampsExpandAndSort()
+    {
+        const QString lrc = QStringLiteral(
+            "[ar:歌手]\n"
+            "{\"t\":0,\"c\":[{\"tx\":\"作词: \"},{\"tx\":\"某人\"}]}\n"
+            "[00:10.00]开头\n"
+            "[01:22.68][00:36.19]We got a little problem\r\n"
+            "[00:50:50]冒号小数\n"
+            "[00:60.00]<00:60.00>逐<00:60.40>字\n");
+        const QString tr = QStringLiteral("[01:22.68][00:36.19]我们碰到了点小事\n");
+        const QVariantList lines = ncmParseLrc(lrc, tr);
+        QStringList texts;
+        QList<double> times;
+        for (const QVariant &v : lines) {
+            texts.append(v.toMap().value("text").toString());
+            times.append(v.toMap().value("t").toDouble());
+        }
+        QCOMPARE(texts, (QStringList{QStringLiteral("开头"), QStringLiteral("We got a little problem"),
+                                     QStringLiteral("冒号小数"), QStringLiteral("逐字"),
+                                     QStringLiteral("We got a little problem")}));
+        QCOMPARE(times, (QList<double>{10, 36.19, 50.5, 60, 82.68}));
+        QCOMPARE(lines.at(1).toMap().value("tr").toString(), QStringLiteral("我们碰到了点小事"));
+        QCOMPARE(lines.at(4).toMap().value("tr").toString(), QStringLiteral("我们碰到了点小事"));
+    }
 };
 
 QTEST_GUILESS_MAIN(NormalizeTest)
