@@ -386,6 +386,10 @@ Kirigami.ApplicationWindow {
         function onCommentLikeFailed(songId, commentId, message) {
             root.showPassiveNotification("评论点赞失败：" + message);
         }
+        function onRequestFailed(key, message) {
+            Source.markRequestFailed(key, message);
+            root.showPassiveNotification(message);
+        }
         function onPlaylistActionFailed(action, message) {
             console.warn(logUi, "playlist action failed:", action, message);
             // 只撤掉这次失败的那条；新建失败时才放弃「建好后要加入的歌」
@@ -842,6 +846,7 @@ Kirigami.ApplicationWindow {
         id: listPage
         PlaylistPage {
             list: root.openList
+            listKey: root.listKey
             loggedIn: root.loggedIn
             vip: root.vip
             parentText: root.parentName

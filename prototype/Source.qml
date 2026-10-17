@@ -29,6 +29,26 @@ QtObject {
         if (source.live)
             Qt.callLater(() => source.live.request(key));
     }
+    // 按需请求失败：Store 发来 requestFailed 后由 main 标记；页面可显示「重试」而不是一直转圈
+    property var requestFailures: ({})
+    function markRequestFailed(key, message) {
+        const f = Object.assign({}, source.requestFailures);
+        f[key] = message || "请求失败";
+        source.requestFailures = f;
+    }
+    function clearRequestFailure(key) {
+        if (!(key in source.requestFailures))
+            return;
+        const f = Object.assign({}, source.requestFailures);
+        delete f[key];
+        source.requestFailures = f;
+    }
+    function failure(key) { return source.requestFailures[key] || ""; }
+    function retryKey(key) {
+        source.clearRequestFailure(key);
+        source.need(key);
+    }
+
     // 连接与会话状态（live 才有；原型里可由截图 harness 用 simulate* 模拟）
     property bool simulateOffline: false
     property bool simulateExpired: false
@@ -184,8 +204,9 @@ QtObject {
     function searchFor(query) {
         const r = source.searchResult;
         if (!source.live || r.query === query)
-            return Object.assign({ pending: false }, r);
-        return { query: query, songs: [], artists: [], playlists: [], albums: [], pending: true };
+            return Object.assign({ pending: false, failed: false }, r);
+        return { query: query, songs: [], artists: [], playlists: [], albums: [], pending: true,
+                 failed: Boolean(source.failure("search:" + query)) };
     }
 
     // 一位小数且去掉多余的 .0：59.9 GB / 60 GB。取整会把将满显示成「60 / 60」
@@ -203,7 +224,8 @@ QtObject {
         if (a && (a.id === id || !source.live))
             return Object.assign({}, a, { description: source.unindent(a.description) });
         source.need("artist:" + id);
-        return { id: id, name: "", cover: "", alias: "", description: "", musicSize: 0, albumSize: 0, tracks: [], albums: [] };
+        return { id: id, name: "", cover: "", alias: "", description: "", musicSize: 0, albumSize: 0,
+                 tracks: [], albums: [], failed: Boolean(source.failure("artist:" + id)) };
     }
     function album(id) {
         const a = source.d.album;
@@ -221,7 +243,9 @@ QtObject {
         source.need("user:" + id);
         return { id: id, name: "", avatar: "", background: "", signature: "",
                  followed: false, follows: 0, followeds: 0, playlistCount: 0,
-                 level: 0, playlists: [] };
+                 vipType: 0, vipRights: {}, level: 0, listenSongs: 0,
+                 createTime: 0, mutual: false, playlists: [],
+                 failed: Boolean(source.failure("user:" + id)) };
     }
 
     // MV：data 里只放最近取回的一个，id 对上才用；没对上就向 live 要
@@ -265,7 +289,6 @@ QtObject {
         source.need("lyrics:" + trackId);
         return [];
     }
-
     // 封面 URL 换成需要的尺寸；没有封面就是空串，交给 Cover 显示占位
     function sized(url, px) {
         return url ? url.replace(/\?param=\d+y\d+$/, "?param=" + px + "y" + px) : "";
@@ -388,6 +411,7 @@ QtObject {
                          owned: owned,
                          subscribed: mine !== undefined && !mine.owned,
                          playlistId: owned ? id : 0,
+                         failed: Boolean(source.failure(key)),
                          emptyText: source.live ? "正在取回曲目…" : "这个歌单的曲目还没取到" };
             }
             if (key === "searchSongs") {
@@ -407,6 +431,7 @@ QtObject {
                 return { heading: al.name, cover: source.sized(al.cover, 560), tracks: al.tracks, facts: facts, isAlbum: true,
                          albumId: al.id, subscribed: al.subscribed === true,
                          description: source.unindent(al.description) || (al.company ? "发行：" + al.company : ""),
+                         failed: Boolean(source.failure(key)),
                          emptyText: source.live ? "正在取回曲目…" : "这张专辑的曲目还没取到" };
             }
             const pl = source.d.playlist;

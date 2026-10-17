@@ -171,10 +171,18 @@ ScreenFrame {
                     }
                 }
                 Label {
+                    id: searchEmpty
                     visible: page.result.songs.length === 0
-                    text: page.result.pending ? "正在搜索…" : "没有找到相关单曲"
+                    text: page.result.failed ? "搜索失败，点此重试"
+                        : page.result.pending ? "正在搜索…" : "没有找到相关单曲"
                     font.pixelSize: Tokens.textSm
+                    font.underline: page.result.failed
                     color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                    HoverHandler { enabled: page.result.failed; cursorShape: Qt.PointingHandCursor }
+                    TapHandler {
+                        enabled: page.result.failed
+                        onTapped: Source.retryKey("search:" + page.query)
+                    }
                 }
             }
 

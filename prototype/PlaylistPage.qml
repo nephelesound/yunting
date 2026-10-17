@@ -16,6 +16,7 @@ ScreenFrame {
     property var list
     property real currentId   // 正在播放的曲目 id；不在本列表里就没有高亮
     property bool vip
+    property string listKey   // 失败重试用：root.listKey
     // 自己的歌单可以进入排序模式：每行固定显示上移 / 下移，提交一次后退出
     property bool reordering: false
 
@@ -190,7 +191,12 @@ ScreenFrame {
                 width: parent.width - 2 * Tokens.pageMargin
                 visible: tracks.count === 0
                 icon.name: "view-media-playlist"
-                text: page.list.emptyText || "这里还没有歌"
+                text: page.list.failed ? "曲目取不到，点此重试" : (page.list.emptyText || "这里还没有歌")
+                HoverHandler { enabled: page.list.failed; cursorShape: Qt.PointingHandCursor }
+                TapHandler {
+                    enabled: page.list.failed
+                    onTapped: Source.retryKey(page.listKey || "")
+                }
             }
         }
     }

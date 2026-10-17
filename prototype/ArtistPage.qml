@@ -164,7 +164,13 @@ ScreenFrame {
                     width: parent.width - 2 * Tokens.pageMargin
                     visible: tracks.count === 0
                     icon.name: "view-media-artist"
-                    text: Source.live ? "正在取回歌手的歌…" : "这位歌手的歌还没取到"
+                    text: page.artist.failed ? "歌手的歌取不到，点此重试"
+                        : Source.live ? "正在取回歌手的歌…" : "这位歌手的歌还没取到"
+                    HoverHandler { enabled: page.artist.failed; cursorShape: Qt.PointingHandCursor }
+                    TapHandler {
+                        enabled: page.artist.failed
+                        onTapped: Source.retryKey("artist:" + page.artistId)
+                    }
                 }
             }
 
