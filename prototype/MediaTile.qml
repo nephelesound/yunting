@@ -98,7 +98,8 @@ AbstractButton {
                 horizontalAlignment: tile.round ? Text.AlignHCenter : Text.AlignLeft
                 font.pixelSize: Tokens.textBase
                 font.weight: Font.Medium
-                color: tile.locked ? Kirigami.Theme.disabledTextColor : Kirigami.Theme.textColor
+                // 锁定的入口仍然可点（点了去登录），不是禁用：标题照常用正文色，锁图标说明状态
+                color: Kirigami.Theme.textColor
                 elide: Text.ElideRight
             }
             Label {

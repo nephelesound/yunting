@@ -53,10 +53,17 @@ Menu {
         id: addTo
         title: "添加到歌单"
         icon.name: "list-add"
-        enabled: trackMenu.loggedIn
 
+        // 未登录时与「喜欢」一样引向登录，而不是灰掉
+        MenuItem {
+            visible: !trackMenu.loggedIn
+            height: visible ? implicitHeight : 0
+            icon.name: "view-barcode-qr"
+            text: "登录后可添加到歌单…"
+            onTriggered: trackMenu.loginRequested()
+        }
         Instantiator {
-            model: Source.addableLists
+            model: trackMenu.loggedIn ? Source.addableLists : []
             delegate: MenuItem {
                 required property var modelData
                 text: trackMenu.shorten(modelData.name)
@@ -65,8 +72,10 @@ Menu {
             onObjectAdded: (index, object) => addTo.insertItem(index, object)
             onObjectRemoved: (index, object) => addTo.removeItem(object)
         }
-        MenuSeparator { visible: Source.addableLists.length > 0 }
+        MenuSeparator { visible: trackMenu.loggedIn && Source.addableLists.length > 0 }
         MenuItem {
+            visible: trackMenu.loggedIn
+            height: visible ? implicitHeight : 0
             icon.name: "document-new"
             text: "新建歌单…"
             onTriggered: trackMenu.newPlaylistRequested(trackMenu.track)

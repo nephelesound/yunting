@@ -18,6 +18,7 @@ ScreenFrame {
     property int currentId
 
     signal trackActivated(int index)
+    signal allSongsRequested()
 
     currentPivot: "search"
 
@@ -38,7 +39,6 @@ ScreenFrame {
     readonly property int tileWidth: Math.floor((page.rightWidth - (page.tileColumns - 1) * Tokens.space2) / page.tileColumns)
     readonly property int rightWidth: body.width - page.half - Tokens.space6
     readonly property int tileHeight: page.tileWidth + Tokens.space2 + Tokens.height12
-    readonly property int tileRows: Math.max(1, Math.floor((page.listHeight + Tokens.space4) / (page.tileHeight + Tokens.space4)))
     function caption(item) {
         if (page.collection === "artists")
             return item.albums > 0 ? item.albums + " 张专辑" : "";
@@ -139,10 +139,11 @@ ScreenFrame {
             }
         }
 
-        // 有结果
+        // 有结果：左列单曲不滚动（放得下多少放多少，其余在「全部 N 首」里）；右栏结果磁贴可滚动
         RowLayout {
             visible: page.query.length > 0
             Layout.fillWidth: true
+            Layout.fillHeight: true
             spacing: Tokens.space6
 
             // 左：单曲
@@ -152,7 +153,11 @@ ScreenFrame {
                 Layout.maximumWidth: page.half
                 Layout.fillWidth: false
                 spacing: 0
-                GroupHeader { text: "单曲" }
+                GroupHeader {
+                    text: "单曲"
+                    actionText: page.result.songs.length > page.songRows ? "全部 " + page.result.songs.length + " 首" : ""
+                    onActionTriggered: page.allSongsRequested()
+                }
                 Repeater {
                     model: page.result.songs.slice(0, page.songRows)
                     delegate: TrackTile {
@@ -174,6 +179,7 @@ ScreenFrame {
             ColumnLayout {
                 Layout.alignment: Qt.AlignTop
                 Layout.fillWidth: true
+                Layout.fillHeight: true
                 spacing: 0
 
                 Pivot {
@@ -182,35 +188,46 @@ ScreenFrame {
                     current: page.collection
                     onActivated: key => page.collection = key
                 }
-                Grid {
+                // 与歌手页的专辑网格同一种排法：视图伸到窗口右缘，磁贴（列宽按页边线内算）止于页边线，
+                // 滚动条落在页边距里，不压磁贴
+                GridView {
                     id: collections
-                    columns: page.tileColumns
-                    spacing: Tokens.space2
-                    rowSpacing: Tokens.space4
-                    Repeater {
-                        model: page.collectionItems.slice(0, page.tileColumns * page.tileRows)
-                        delegate: MediaTile {
-                            required property var modelData
-                            width: page.tileWidth
-                            title: modelData.name
-                            caption: page.caption(modelData)
-                            cover: modelData.cover
-                            round: page.collection === "artists"
-                            onClicked: page.collection === "artists" ? Actions.openArtist(modelData.id)
-                                     : page.collection === "albums" ? Actions.openAlbum(modelData.id)
-                                     : Actions.openPlaylist(modelData.id)
-                        }
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.rightMargin: -Tokens.pageMargin
+                    cellWidth: page.tileWidth + Tokens.space2
+                    cellHeight: page.tileHeight + Tokens.space4
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    model: page.collectionItems
+                    ScrollBar.vertical: ScrollBar {}
+                    delegate: MediaTile {
+                        required property var modelData
+                        width: page.tileWidth
+                        title: modelData.name
+                        caption: page.caption(modelData)
+                        cover: modelData.cover
+                        round: page.collection === "artists"
+                        onClicked: page.collection === "artists" ? Actions.openArtist(modelData.id)
+                                 : page.collection === "albums" ? Actions.openAlbum(modelData.id)
+                                 : Actions.openPlaylist(modelData.id)
+                        // 歌单在哪里出现都是同一个菜单（这里能收藏）；歌手、专辑没有菜单
+                        onMenuRequested: if (page.collection === "playlists") Actions.playlistMenuRequested(modelData)
                     }
                 }
                 Label {
                     visible: page.collectionItems.length === 0
-                    text: page.collection === "artists" ? "没有找到相关歌手" : page.collection === "albums" ? "没有找到相关专辑" : "没有找到相关歌单"
+                    text: page.result.pending ? "正在搜索…"
+                        : page.collection === "artists" ? "没有找到相关歌手" : page.collection === "albums" ? "没有找到相关专辑" : "没有找到相关歌单"
                     font.pixelSize: Tokens.textSm
                     color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                 }
             }
         }
 
-        Item { Layout.fillHeight: true }
+        Item {
+            visible: page.query.length === 0
+            Layout.fillHeight: true
+        }
     }
 }

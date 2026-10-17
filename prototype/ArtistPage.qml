@@ -69,7 +69,7 @@ ScreenFrame {
                 font.pixelSize: Tokens.textSm
                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                 wrapMode: Text.Wrap
-                maximumLineCount: 4
+                maximumLineCount: 3   // 与列表页的说明同一个截断
                 elide: Text.ElideRight
             }
 
@@ -77,14 +77,15 @@ ScreenFrame {
                 Layout.topMargin: Tokens.space4
                 spacing: Tokens.space2
 
+                // 与列表页同一套主动作：放的就是右边列出来的这些（含滚动续取到的）
                 AccentButton {
-                    enabled: page.artist.tracks.length > 0
+                    enabled: page.songs.length > 0
                     icon.name: "media-playback-start"
-                    text: "播放热门"
+                    text: "播放全部"
                     onClicked: page.playAllRequested()
                 }
                 Button {
-                    enabled: page.artist.tracks.length > 1
+                    enabled: page.songs.length > 1
                     implicitHeight: Tokens.height8
                     flat: true
                     icon.name: "media-playlist-shuffle"
@@ -134,7 +135,7 @@ ScreenFrame {
 
                 delegate: TrackTile {
                     width: tracks.width - tracks.rightMargin
-                    ranked: true
+                    ranked: false   // 名次只给榜单；歌手的歌按热度排，但不是榜单名次
                     current: modelData.id === page.currentId
                     locked: modelData.fee === 4 || (!page.vip && modelData.fee === 1)
                     onActivated: index => page.activated(index)
@@ -180,7 +181,8 @@ ScreenFrame {
                     width: parent.width - Tokens.pageMargin
                     visible: albums.count === 0
                     icon.name: "view-media-album-cover"
-                    text: "还没有专辑"
+                    // 歌手数据还没回来时不说「没有」
+                    text: page.artist.name === "" && Source.live ? "正在取回专辑…" : "还没有专辑"
                 }
             }
         }

@@ -23,16 +23,17 @@ ScreenFrame {
 
     readonly property int textBlock: Tokens.space2 + Tokens.height12
     readonly property int headerBlock: Tokens.height10 + Tokens.space3
-    readonly property int columns: Math.max(3, Math.min(6, Math.floor((body.width + Tokens.space2) / (Tokens.tileLg + Tokens.space2))))
-    readonly property int tileByWidth: Math.floor((body.width - (columns - 1) * Tokens.space2) / columns)
+    // 磁贴边长先由高度定（两排都要放下），再取「刚好不超过它、又能把整行铺到右页边线」的列数：
+    // 高度紧时多放几列（多看到几个歌单），行的右缘始终落在页边线上
     readonly property int tileByHeight: Math.floor((body.height - Tokens.space6 - 2 * headerBlock - 2 * textBlock) / 2 / Tokens.space2) * Tokens.space2
-    readonly property int tile: Math.min(tileByWidth, tileByHeight)
+    readonly property int columns: Math.max(6, Math.ceil((body.width + Tokens.space2) / (page.tileByHeight + Tokens.space2)))
+    readonly property int tile: Math.floor((body.width - (columns - 1) * Tokens.space2) / columns)
     // 最近播放的行数：与「磁贴 + 两行字」同高
     readonly property int recentRows: Math.max(1, Math.floor((page.tile + page.textBlock + Tokens.space2) / (Tokens.trackRow + Tokens.space2)))
 
     readonly property var cloud: Source.cloud
     readonly property var entries: [
-        { key: "liked", title: "我喜欢的音乐", cover: Source.list("liked").cover, symbol: "love-symbolic", caption: Source.list("liked").facts[0].value + " 首" },
+        { key: "liked", title: "我喜欢的音乐", cover: Source.list("liked").cover, symbol: "love-symbolic", caption: Source.pe.liked.count > 0 ? Source.pe.liked.count + " 首" : "还没有红心歌曲" },
         { key: "cloud", title: "音乐云盘", symbol: "folder-cloud-symbolic",
           caption: page.cloud.count === 0 ? "还没有上传的歌"
                  : page.cloud.maxSize > 0 ? page.cloud.count + " 首  已用 " + Source.gigabytes(page.cloud.size) + " / " + Source.gigabytes(page.cloud.maxSize)

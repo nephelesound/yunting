@@ -9,6 +9,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.kirigamiaddons.components as Components
+import "Format.js" as Format
 
 ScreenFrame {
     id: page
@@ -34,12 +35,14 @@ ScreenFrame {
         ? Source.latestComments : null
     // 精彩评论也会出现在按时间排的分页里：同一条（用户 + 时间 + 内容）只在精彩评论里出现一次
     function commentKey(c) { return c.user + "\n" + c.time + "\n" + c.content; }
+    // 精彩评论只放 3 条（接口按点赞排好序），下面接按时间排的全部评论
+    readonly property var hotShown: page.comments.slice(0, 3)
     readonly property var commentRows: {
         const hotKeys = {};
-        for (const c of page.comments)
+        for (const c of page.hotShown)
             hotKeys[page.commentKey(c)] = true;
         const latest = (page.latest ? page.latest.items : []).filter(c => !hotKeys[page.commentKey(c)]);
-        return page.comments.map(c => Object.assign({ group: "hot" }, c))
+        return page.hotShown.map(c => Object.assign({ group: "hot" }, c))
             .concat(latest.map(c => Object.assign({ group: "latest" }, c)));
     }
     function startComments() {
@@ -231,6 +234,13 @@ ScreenFrame {
                             elide: Text.ElideRight
                         }
                         Label {
+                            text: Format.commentTime(comment.modelData.time)
+                            font.pixelSize: Tokens.textSm
+                            font.features: { "tnum": 1 }
+                            color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                        }
+                        Label {
+                            Layout.leftMargin: Tokens.space2
                             text: page.count(comment.modelData.likes) + " 赞"
                             font.pixelSize: Tokens.textSm
                             font.features: { "tnum": 1 }
@@ -250,14 +260,36 @@ ScreenFrame {
             }
         }
 
+        // 评论空着时：在取（10 秒内）/ 没取到（可点重试）/ 原型里就是没有。Store 失败不回调，只能靠超时判断
         Label {
+            id: commentsEmpty
+            readonly property bool waiting: page.pane === "comments" && page.commentRows.length === 0 && Source.live
+            property bool timedOut: false
+            onWaitingChanged: {
+                commentsEmpty.timedOut = false;
+                if (commentsEmpty.waiting)
+                    commentsTimeout.restart();
+            }
+            Timer { id: commentsTimeout; interval: 10000; onTriggered: commentsEmpty.timedOut = commentsEmpty.waiting }
+
             y: page.focusRow * page.pitch
             height: page.pitch
             visible: page.pane === "comments" && page.commentRows.length === 0
             verticalAlignment: Text.AlignVCenter
-            text: Source.live ? "正在取回评论…" : "暂无评论"
+            text: !Source.live ? "暂无评论" : commentsEmpty.timedOut ? "没取到评论，点此重试" : "正在取回评论…"
             font.pixelSize: Tokens.text2xl
-            color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+            font.underline: commentsEmpty.timedOut && retryHover.hovered
+            color: commentsEmpty.timedOut ? Kirigami.Theme.textColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+            HoverHandler { id: retryHover; enabled: commentsEmpty.timedOut; cursorShape: Qt.PointingHandCursor }
+            TapHandler {
+                enabled: commentsEmpty.timedOut
+                onTapped: {
+                    commentsEmpty.timedOut = false;
+                    commentsTimeout.restart();
+                    Source.need("comments:" + page.track.id);
+                    Source.moreComments(page.track.id);
+                }
+            }
         }
     }
 }

@@ -174,9 +174,9 @@ AbstractButton {
 
         // 时长列；悬停/聚焦时把时长换成行内动作，列宽不变、行不跳动：
         // 播放队列里是「移出」，其余是「更多」（曲目菜单）
+        // 右缘贴页边线（与左边的封面贴页边线对称，和页头、播放条的右缘同一条线）
         Item {
             id: endColumn
-            Layout.rightMargin: Tokens.space3
             Layout.preferredWidth: Math.max(durationLabel.implicitWidth, Tokens.height8)
             Layout.fillHeight: true
             readonly property bool showAction: tile.hovered || tile.visualFocus

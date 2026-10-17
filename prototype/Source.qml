@@ -345,6 +345,12 @@ QtObject {
                          playlistId: owned ? id : 0,
                          emptyText: source.live ? "正在取回曲目…" : "这个歌单的曲目还没取到" };
             }
+            if (key === "searchSongs") {
+                const r = source.searchResult;
+                return { heading: source.quoted(r.query) + "的单曲", cover: source.sized(source.firstCover(r.songs), 560),
+                         tracks: r.songs, facts: [source.songs(r.songs.length)], description: "",
+                         emptyText: "没有找到相关单曲" };
+            }
             if (key.startsWith("album:")) {
                 const al = source.album(Number(key.slice(6)));
                 const year = al.publishTime > 0 ? new Date(al.publishTime).getFullYear() : 0;

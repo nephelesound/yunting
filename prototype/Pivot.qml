@@ -27,10 +27,15 @@ Row {
             text: modelData.text
             font.pixelSize: Tokens.text2xl
             font.weight: Font.Light
-            opacity: active ? 1 : hover.hovered ? Tokens.fadedHover : Tokens.faded
+            // 键盘：非当前项进 Tab 顺序，回车 / 空格切换；聚焦时与悬停同样提亮，并加下划线
+            activeFocusOnTab: !tab.active
+            font.underline: tab.activeFocus
+            opacity: active ? 1 : hover.hovered || tab.activeFocus ? Tokens.fadedHover : Tokens.faded
             Behavior on opacity { NumberAnimation { duration: Tokens.motionFast } }
             Accessible.role: Accessible.PageTab
             Accessible.name: text
+            Keys.onReturnPressed: pivot.activated(tab.modelData.key)
+            Keys.onSpacePressed: pivot.activated(tab.modelData.key)
             HoverHandler { id: hover; enabled: !tab.active; cursorShape: Qt.PointingHandCursor }
             TapHandler { enabled: !tab.active; onTapped: pivot.activated(tab.modelData.key) }
         }

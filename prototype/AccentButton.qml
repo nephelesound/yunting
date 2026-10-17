@@ -12,12 +12,22 @@ Button {
     hoverEnabled: true
     opacity: enabled ? 1 : Tokens.fadedHover
 
+    // 悬停 / 按下与曲目行同一套档位：在强调色上叠一层前景色的 tintHover / tintPressed；
+    // 键盘焦点：外圈 2px 强调色描边，与实底之间隔 2px 背景色，才看得出来
     background: Rectangle {
         radius: Tokens.radius
-        color: button.down ? Qt.darker(Kirigami.Theme.highlightColor, 1.15)
-             : button.hovered ? Qt.lighter(Kirigami.Theme.highlightColor, 1.08)
-             : Kirigami.Theme.highlightColor
+        color: Qt.tint(Kirigami.Theme.highlightColor, Qt.alpha(Kirigami.Theme.highlightedTextColor,
+                       button.down ? Tokens.tintPressed : button.hovered ? Tokens.tintHover : 0))
         Behavior on color { ColorAnimation { duration: Tokens.motionFast } }
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: -2 * Tokens.lineStrong
+            visible: button.visualFocus
+            radius: Tokens.radiusMd
+            color: "transparent"
+            border.width: Tokens.lineStrong
+            border.color: Kirigami.Theme.highlightColor
+        }
     }
 
     contentItem: Row {

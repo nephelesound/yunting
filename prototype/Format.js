@@ -24,6 +24,19 @@ function restriction(fee) {
     return fee === 1 ? "VIP" : fee === 4 ? "付费" : "";
 }
 
+// 评论时间（毫秒时间戳）：今天只写时刻，今年写月日，更早写年月日；没有时间返回空串
+function commentTime(ms) {
+    if (!ms)
+        return "";
+    const d = new Date(ms);
+    const now = new Date();
+    const pad = n => (n < 10 ? "0" : "") + n;
+    if (d.toDateString() === now.toDateString())
+        return pad(d.getHours()) + ":" + pad(d.getMinutes());
+    const md = (d.getMonth() + 1) + "月" + d.getDate() + "日";
+    return d.getFullYear() === now.getFullYear() ? md : d.getFullYear() + "年" + md;
+}
+
 // 音质标签：Hi-Res / 无损；极高及以下不标（几乎所有歌都有，标了没信息量）
 function quality(q) {
     return q === "hires" ? "Hi-Res" : q === "lossless" ? "无损" : "";

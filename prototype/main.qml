@@ -18,7 +18,8 @@ Kirigami.ApplicationWindow {
     width: 1280
     height: 800
     minimumWidth: 800
-    minimumHeight: 560
+    // 680：排行榜的上带、列表页的固定窗格在这个高度以下会压进播放条（这些版面按设计不滚动）
+    minimumHeight: 680
 
     // 截图 harness 可从命令行覆盖（先给 listKey 再给 page）：
     //   page = home | charts | list | nowplaying | mine | search；listKey = daily | heart | radar | similar | liked | hot
@@ -415,11 +416,15 @@ Kirigami.ApplicationWindow {
         function onNewPlaylistRequested() { playlistNameDialog.ask(0, "", null); }
     }
 
-    // 歌单磁贴的菜单（「我的」与「全部歌单」）：自己建的可改名/删除（「我喜欢的音乐」除外），收藏的可取消收藏
+    // 歌单磁贴的菜单（「我的」「全部歌单」「搜索」）：自己建的可改名/删除（「我喜欢的音乐」除外），
+    // 别人的可收藏/取消收藏。归属与收藏状态按 id 从「我的歌单」里查，调用方只给 { id, name }
     Menu {
         id: playlistMenu
-        property var playlist: ({ id: 0, name: "", owned: false })
-        readonly property bool editable: playlistMenu.playlist.owned && playlistMenu.playlist.id !== (Source.pe.liked.id || 0)
+        property var playlist: ({ id: 0, name: "" })
+        readonly property var mine: Source.myPlaylists.find(pl => pl.id === playlistMenu.playlist.id)
+        readonly property bool owned: playlistMenu.mine !== undefined && playlistMenu.mine.owned
+        readonly property bool subscribed: playlistMenu.mine !== undefined && !playlistMenu.mine.owned
+        readonly property bool editable: playlistMenu.owned && playlistMenu.playlist.id !== (Source.pe.liked.id || 0)
         MenuItem {
             icon.name: "view-media-playlist"
             text: "打开"
@@ -441,13 +446,19 @@ Kirigami.ApplicationWindow {
             onTriggered: deleteDialog.ask(playlistMenu.playlist.id, playlistMenu.playlist.name)
         }
         MenuItem {
-            visible: !playlistMenu.playlist.owned
+            visible: !playlistMenu.owned
             height: visible ? implicitHeight : 0
-            icon.name: "bookmark-remove"
-            text: "取消收藏"
+            icon.name: playlistMenu.subscribed ? "bookmark-remove" : "bookmark-new"
+            text: playlistMenu.subscribed ? "取消收藏" : "收藏歌单"
             onTriggered: {
-                root.noteOnSuccess(playlistMenu.playlist.id, "取消收藏歌单", "已取消收藏「" + playlistMenu.playlist.name + "」");
-                Source.setPlaylistSubscribed(playlistMenu.playlist.id, false);
+                if (!root.loggedIn) {
+                    root.requestLogin();
+                    return;
+                }
+                const subscribe = !playlistMenu.subscribed;
+                root.noteOnSuccess(playlistMenu.playlist.id, subscribe ? "收藏歌单" : "取消收藏歌单",
+                                   (subscribe ? "已收藏「" : "已取消收藏「") + playlistMenu.playlist.name + "」");
+                Source.setPlaylistSubscribed(playlistMenu.playlist.id, subscribe);
             }
         }
     }
@@ -645,8 +656,8 @@ Kirigami.ApplicationWindow {
             parentText: root.parentName
             currentId: root.currentTrack ? root.currentTrack.id : 0
             onActivated: index => root.play(artistView.songs, index)
-            onPlayAllRequested: root.play(artistView.artist.tracks, 0)
-            onShuffleRequested: root.play(artistView.artist.tracks, Math.floor(Math.random() * artistView.artist.tracks.length))
+            onPlayAllRequested: root.play(artistView.songs, 0)
+            onShuffleRequested: root.play(artistView.songs, Math.floor(Math.random() * artistView.songs.length))
             onLeaveRequested: root.goBack()
             onLoginRequested: root.requestLogin()
         }
@@ -701,6 +712,7 @@ Kirigami.ApplicationWindow {
             onPivotActivated: key => root.switchPivot(key)
             onLoginRequested: root.requestLogin()
             onTrackActivated: index => root.play(Source.searchResult.songs, index)
+            onAllSongsRequested: root.open("list", "searchSongs")
         }
     }
 

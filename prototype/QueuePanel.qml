@@ -167,6 +167,11 @@ Kirigami.OverlayDrawer {
                     listItem: row
                     listView: list
                     onMoveRequested: (oldIndex, newIndex) => order.move(oldIndex, newIndex, 1)
+                    // 把手很小：悬停说明它能做什么，以及键盘的等价操作
+                    HoverHandler { id: handleHover }
+                    ToolTip.visible: handleHover.hovered
+                    ToolTip.delay: 600
+                    ToolTip.text: "拖动调整顺序（也可聚焦后按 Alt+↑/↓）"
                     onDropped: panel.commitMove(row.src, row.index)
                 }
                 TrackTile {

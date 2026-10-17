@@ -162,11 +162,20 @@ Item {
                 opacity: enabled ? 1 : Tokens.fadedHover
                 hoverEnabled: true
                 onClicked: bar.playPauseRequested()
+                // 与 AccentButton 同一套：叠前景色的悬停 / 按下档位；键盘焦点是隔 2px 的外圈
                 background: Rectangle {
                     radius: height / 2
-                    color: play.down ? Qt.darker(Kirigami.Theme.highlightColor, 1.15)
-                         : play.hovered ? Qt.lighter(Kirigami.Theme.highlightColor, 1.08)
-                         : Kirigami.Theme.highlightColor
+                    color: Qt.tint(Kirigami.Theme.highlightColor, Qt.alpha(Kirigami.Theme.highlightedTextColor,
+                                   play.down ? Tokens.tintPressed : play.hovered ? Tokens.tintHover : 0))
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.margins: -2 * Tokens.lineStrong
+                        visible: play.visualFocus
+                        radius: height / 2
+                        color: "transparent"
+                        border.width: Tokens.lineStrong
+                        border.color: Kirigami.Theme.highlightColor
+                    }
                 }
                 ToolTip.text: text
                 ToolTip.visible: hovered

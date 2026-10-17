@@ -57,13 +57,26 @@ Row {
             font.pixelSize: Tokens.text4xl
             font.weight: Font.Light
             elide: Text.ElideRight
-            opacity: active ? 1 : hover.hovered ? Tokens.fadedHover : Tokens.faded
+            // 键盘：非当前项进 Tab 顺序，回车 / 空格切换；聚焦时与悬停同样提亮，并加下划线
+            activeFocusOnTab: !item.active
+            font.underline: item.activeFocus
+            opacity: active ? 1 : hover.hovered || item.activeFocus ? Tokens.fadedHover : Tokens.faded
             Behavior on opacity { NumberAnimation { duration: Tokens.motionFast } }
+            Accessible.role: item.modelData.key === ".." ? Accessible.Link : Accessible.PageTab
+            Accessible.name: item.modelData.text
 
+            function activate() {
+                if (item.modelData.key === "..")
+                    title.parentActivated();
+                else
+                    title.pivotActivated(item.modelData.key);
+            }
+            Keys.onReturnPressed: item.activate()
+            Keys.onSpacePressed: item.activate()
             HoverHandler { id: hover; enabled: !item.active; cursorShape: Qt.PointingHandCursor }
             TapHandler {
                 enabled: !item.active
-                onTapped: item.modelData.key === ".." ? title.parentActivated() : title.pivotActivated(item.modelData.key)
+                onTapped: item.activate()
             }
         }
     }

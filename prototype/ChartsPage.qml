@@ -25,7 +25,8 @@ ScreenFrame {
     readonly property int pitch: Tokens.trackRow + Tokens.space2           // 56
     readonly property int headerHeight: Tokens.height10 + Tokens.space3      // 分组标题行 + 与内容的间距
     readonly property int moreWidth: 4 * (Tokens.tileSm + Tokens.space2) - Tokens.space2   // 440
-    readonly property bool wide: body.width >= 2 * 320 + Tokens.space2 + Tokens.space6 + page.moreWidth
+    // 宽版要放下两列官方榜卡（每张至少 2 个大磁贴宽）+ 更多榜单
+    readonly property bool wide: body.width >= 2 * (2 * Tokens.tileLg) + Tokens.space2 + Tokens.space6 + page.moreWidth
     // 宽：官方榜 2×2 卡、更多榜单 4×2 磁贴，都是 2 张卡高 = 4 个节距；窄：4×1 卡、2×4 磁贴 = 8 个节距
     readonly property int bandHeight: (page.wide ? 4 : 8) * page.pitch - Tokens.space2
     readonly property int hotRows: Math.max(0, Math.floor((body.height - page.headerHeight - page.bandHeight - Tokens.space6 - page.headerHeight + Tokens.space2) / page.pitch))
