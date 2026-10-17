@@ -19,6 +19,11 @@ ScreenFrame {
 
     heading: page.track ? page.track.name : ""
 
+    // 只铺页面区域（含页头），播放条保持原底色：进度线仍是唯一的分界
+    background: CoverAmbience {
+        cover: page.track ? page.track.cover : ""
+    }
+
     readonly property int pitch: Tokens.height12
     readonly property int rows: Math.floor((areaHeight - Tokens.space6) / pitch)
     readonly property int areaHeight: right.parent ? right.parent.height : 0

@@ -7,6 +7,7 @@ ArtistPage ArtistPage.qml
 PlaylistsPage PlaylistsPage.qml
 PagingFooter PagingFooter.qml
 PersonAvatar PersonAvatar.qml
+CoverAmbience CoverAmbience.qml
 AccentButton AccentButton.qml
 ChartCard ChartCard.qml
 ChartsPage ChartsPage.qml
