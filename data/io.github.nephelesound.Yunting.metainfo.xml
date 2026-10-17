@@ -21,4 +21,11 @@
       支持 MPRIS 媒体键与系统托盘。
     </p>
   </description>
+  <releases>
+    <release version="0.1.0" date="2026-10-18">
+      <description>
+        <p>首个公开版本。</p>
+      </description>
+    </release>
+  </releases>
 </component>

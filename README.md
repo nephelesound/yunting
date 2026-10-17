@@ -12,7 +12,6 @@
 ![Platform: Linux](https://img.shields.io/badge/platform-Linux-informational)
 ![Qt 6](https://img.shields.io/badge/Qt-6-41cd52)
 ![KDE Plasma](https://img.shields.io/badge/KDE-Plasma%206-1d99f3)
-[![AUR: yunting-git](https://img.shields.io/badge/AUR-yunting--git-1793d1)](https://aur.archlinux.org/packages/yunting-git)
 
 <img src="https://raw.githubusercontent.com/nephelesound/.github/main/assets/yunting/home.webp" width="860" alt="首页：个人推荐">
 
@@ -21,7 +20,7 @@
 ## 为什么是云听
 
 - **原生**：Qt Quick + Kirigami 渲染，没有 Electron、没有内嵌浏览器、没有本地 Node 服务。启动快，占用小，在 NVIDIA 上也不白屏。
-- **像 KDE 的一员**：跟随 Plasma 的配色、字体、图标与动画速度；托盘、MPRIS 媒体键与锁屏控件、KDE Connect 分享、系统电源管理都接好了。
+- **像 KDE 的一员**：跟随 Plasma 的配色、字体、图标与动画速度；托盘、MPRIS 媒体键与锁屏控件、系统通知、系统电源管理都接好了。
 - **个人推荐在前**：打开就是每日推荐、心动模式、私人漫游、私人雷达；排行榜和搜索各在一处，不抢位置。
 - **安静的界面**：排版先行，装饰只在有用的地方出现；看得出能点的就能点。
 
@@ -54,27 +53,32 @@
 - 播放队列可拖动排序，队列与播放位置在重启后恢复
 - 智能续播：本机记录完整播放、跳过与红心，队列快放完时按口味补歌；可随时关闭，不上传
 - 下一首地址预取，切歌等待更短
-- 每一行都有红心，一点即收藏；加到歌单、歌单排序与管理
+- 每一行都有红心，一点即收藏；连续点赞、关注与收藏会先合并为最后一次意图，避免连点触发风控
+- 加到歌单、歌单排序与管理
 - 评论：精彩评论与全部评论，可点赞
 
 **与桌面的集成**
 - MPRIS：媒体键、Plasma 媒体控件与锁屏控件
 - 托盘：关窗口后在托盘继续播放
 - 放歌时系统不自动睡眠（屏幕照常熄灭），看 MV 时屏幕常亮
-- 分享：复制链接或歌曲信息、手机扫码，或经 KDE 原生分享发到手机、邮件、Telegram
+- 分享：复制链接或歌曲信息、手机扫码、发到 Telegram 或邮件；还能生成一张带封面与歌词的分享图
 - 迷你播放器、全屏封面
 
 ## 安装
 
-### Arch Linux（AUR）
+### Arch Linux
+
+仓库里带了 PKGBUILD（跟主干构建的 `yunting-git`）：
 
 ```bash
-paru -S yunting-git    # 或 yay -S yunting-git
+git clone https://github.com/nephelesound/yunting.git
+cd yunting/packaging/aur
+makepkg -si
 ```
 
 ### 从源码构建
 
-依赖：Qt 6（Base、Declarative、Multimedia）、Kirigami、KStatusNotifierItem、Purpose、Prison、QtKeychain、OpenSSL；可选 LayerShellQt（Wayland 下的桌面歌词置顶）、libqrencode（分享二维码）、zstd。
+依赖：Qt 6（Base、Declarative、Multimedia）、Kirigami、Kirigami Addons、KCoreAddons、KI18n、KStatusNotifierItem、Prison、QtKeychain、OpenSSL；可选 LayerShellQt（Wayland 下的桌面歌词置顶）、libqrencode（分享二维码）、zstd。
 
 ```bash
 git clone https://github.com/nephelesound/yunting.git
@@ -103,7 +107,7 @@ make shots      # 各屏离屏截图（亮色、暗色、窄窗）
 
 Copyright © 2026 sudoskys. 云听是自由软件，按 [GNU 通用公共许可证](LICENSE) 第 3 版或（由你选择）任何更新的版本发布，不附带任何担保。需要 GPL 以外的授权（例如闭源的商业版本），请联系版权所有者。
 
-应用图标是 Microsoft Fluent Emoji 的 `musical-note`（MIT），许可见 [data/ICON-LICENSE](data/ICON-LICENSE)。
+应用图标是 Microsoft Fluent Emoji 的 `musical-note`（MIT），许可见 [data/ICON-LICENSE](data/ICON-LICENSE)；界面里补充的图标来源与许可见 [prototype/icons/LICENSES.txt](prototype/icons/LICENSES.txt)。
 
 ## 免责声明
 
