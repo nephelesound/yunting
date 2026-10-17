@@ -497,8 +497,11 @@ private slots:
     {
         m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
             if (req.path == "/weapi/v1/user/detail/42") {
+                // 等级与累计听歌在响应顶层，不在 profile 里（网易云 v1/user/detail 的实际形状）
                 respond(200, json(QJsonObject{
                     {"code", 200},
+                    {"level", 9},
+                    {"listenSongs", 1031},
                     {"profile", QJsonObject{{"userId", 42}, {"nickname", "Listener"},
                                             {"signature", "hi"}, {"follows", 3}, {"followeds", 4},
                                             {"playlistCount", 1}, {"avatarUrl", ""}}}}));
@@ -523,6 +526,8 @@ private slots:
         const QVariantMap u = m_store->data().value("user").toMap();
         QCOMPARE(u.value("id").toDouble(), 42.0);
         QCOMPARE(u.value("follows").toDouble(), 3.0);
+        QCOMPARE(u.value("level").toDouble(), 9.0);
+        QCOMPARE(u.value("listenSongs").toDouble(), 1031.0);
         QCOMPARE(u.value("playlists").toList().first().toMap().value("name").toString(), QStringLiteral("Public"));
     }
 

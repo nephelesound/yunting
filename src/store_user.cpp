@@ -40,6 +40,9 @@ void Store::requestUser(const QString &key, double uid)
                 const QJsonObject p = root.value("profile").toObject();
                 if (ok && root.value("code").toInt() == 200 && !p.isEmpty()) {
                     state->user = ncmProfile(p, 300, 800);
+                    // 等级与累计听歌在响应顶层，不在 profile 里
+                    state->user.insert("level", root.value("level").toDouble());
+                    state->user.insert("listenSongs", root.value("listenSongs").toDouble());
                     state->user.insert("playlists", QVariantList{});
                     state->detailOk = true;
                 }
