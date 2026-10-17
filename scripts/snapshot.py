@@ -6,7 +6,8 @@ prototype/Personal.js  个人数据（每日推荐、心动模式、私人漫游
                        有 netease-cloud-music-gtk4 的登录 cookie 时抓个人版；没有时写匿名替身（公共漫游、公共推荐歌单）。
 
 cookie 只在本进程内拼进请求头，不打印、不写盘。
-用法: scripts/snapshot.py [--anonymous]
+这里的归一化函数是数据形状的唯一定义：C++ Store 照它移植，scripts/check_contract.py 用它的输出做参照。
+用法: scripts/snapshot.py [--anonymous] [--out DIR]   （DIR 默认 prototype/）
 """
 import json
 import os
@@ -16,6 +17,7 @@ import time
 import urllib.request
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+OUT = sys.argv[sys.argv.index("--out") + 1] if "--out" in sys.argv else os.path.join(ROOT, "prototype")
 COOKIE_FILE = os.path.expanduser("~/.local/share/netease-cloud-music-gtk4/cookies.json")
 HOT_CHART = 3778678
 RADAR = 3136952023
@@ -99,10 +101,12 @@ def js(name, value):
     return f"var {name} = {json.dumps(value, ensure_ascii=False, indent=1)}\n"
 
 
-def write(path, header, parts):
-    with open(os.path.join(ROOT, path), "w") as f:
+def write(name, header, parts):
+    os.makedirs(OUT, exist_ok=True)
+    path = os.path.join(OUT, name)
+    with open(path, "w") as f:
         f.write(".pragma library\n\n// " + header + "\n\n" + "\n".join(parts))
-    print("wrote", path)
+    print("wrote", os.path.relpath(path, ROOT))
 
 
 def anonymous():
@@ -145,7 +149,7 @@ def anonymous():
     hot = get("api/hotsearchlist/get").get("data") or []
     hot_searches = [{"word": h.get("searchWord") or "", "note": h.get("content") or "", "score": h.get("score") or 0}
                     for h in hot[:20]]
-    write("prototype/Data.js", f"匿名接口快照（{time.strftime('%Y-%m-%d')}），由 scripts/snapshot.py 生成",
+    write("Data.js", f"匿名接口快照（{time.strftime('%Y-%m-%d')}），由 scripts/snapshot.py 生成",
           [js("toplists", toplists), js("playlist", playlist), js("tracks", tracks),
            js("lyricsTrackId", tracks[CURRENT]["id"]), js("lyrics", lyrics),
            js("search", search), js("hotSearches", hot_searches)])
@@ -153,8 +157,9 @@ def anonymous():
 
 
 def personal(hot_tracks):
+    # playlistDetails：按需加载的歌单曲目 { "<id>": { tracks, description } }，快照里为空，由应用的 Store 填
     data = {"account": None, "daily": None, "heart": None, "radar": None, "liked": None, "mine": [],
-            "recent": None, "cloud": None, "subscribed": []}
+            "recent": None, "cloud": None, "subscribed": [], "playlistDetails": {}}
     account = get("api/nuser/account/get", personal=True) if COOKIE else {}
     profile = account.get("profile") or {}
     uid = profile.get("userId")
@@ -223,7 +228,7 @@ def personal(hot_tracks):
     data["similar"] = {"seed": similar_seed, "tracks": [track(s) for s in similar]}
 
     kind = "个人数据" if uid else "匿名替身（未找到登录 cookie）"
-    write("prototype/Personal.js", f"{kind}快照（{time.strftime('%Y-%m-%d')}），由 scripts/snapshot.py 生成，不入库",
+    write("Personal.js", f"{kind}快照（{time.strftime('%Y-%m-%d')}），由 scripts/snapshot.py 生成，不入库",
           [js(k, v) for k, v in data.items()])
 
 

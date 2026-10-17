@@ -5,7 +5,25 @@ QML       ?= /usr/lib/qt6/bin/qml
 QMLLINT   ?= /usr/lib/qt6/bin/qmllint
 QMLFORMAT ?= /usr/lib/qt6/bin/qmlformat
 
-.PHONY: run lint fmt refs shots data
+.PHONY: run lint fmt refs shots data app app-build contract
+
+# ── 应用（C++ 后端 + QML 界面）──
+app-build: prototype/Personal.js
+	cmake -S src -B build/app -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo >/dev/null
+	ninja -C build/app
+
+app: app-build ## 运行应用（实时接口 + 真实播放；登录态见 README）
+	build/app/ncm-player
+
+# 契约检查：C++ Store 的数据形状必须与 snapshot.py 的快照一致（登录与匿名两种会话各查一次）
+contract: app-build ## 检查 C++ Store 与快照的数据形状一致
+	build/app/ncm-player --dump-store build/store.json
+	python3 -I scripts/snapshot.py --out build/contract >/dev/null
+	python3 -I scripts/check_contract.py build/store.json build/contract/Data.js build/contract/Personal.js
+	mkdir -p build/contract-empty-home
+	XDG_DATA_HOME=$(CURDIR)/build/contract-empty-home build/app/ncm-player --dump-store build/store-anon.json
+	python3 -I scripts/snapshot.py --anonymous --out build/contract-anon >/dev/null
+	python3 -I scripts/check_contract.py build/store-anon.json build/contract-anon/Data.js build/contract-anon/Personal.js
 
 # 离屏截图走 GPU（OpenGL）路径；默认的 software 后端不画 MultiEffect/ShadowedTexture，看到的不是真实效果
 SHOT_ENV = QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME=kde QT_QUICK_BACKEND=rhi QSG_RHI_BACKEND=opengl

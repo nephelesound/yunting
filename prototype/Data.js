@@ -6,29 +6,29 @@ var toplists = [
  {
   "id": 19723756,
   "name": "飙升榜",
-  "cover": "https://p1.music.126.net/rIi7Qzy2i2Y_1QD7cd0MYA==/109951170048506929.jpg?param=300y300",
-  "update": "每天更新",
+  "cover": "https://p2.music.126.net/rIi7Qzy2i2Y_1QD7cd0MYA==/109951170048506929.jpg?param=300y300",
+  "update": "更新92首",
   "count": 100,
   "preview": [
    {
-    "name": "全息恋人",
-    "artist": "栾一鸣Floscar"
+    "name": "back & forth",
+    "artist": "霓虹兔"
    },
    {
-    "name": "Just Give Me a Reason",
-    "artist": "P!nk/Nate Ruess"
+    "name": "予君书",
+    "artist": "危晋宇"
    },
    {
-    "name": "我爱你",
-    "artist": "王菲"
+    "name": "失物招领",
+    "artist": "徐秉龙"
    }
   ]
  },
  {
   "id": 3779629,
   "name": "新歌榜",
-  "cover": "https://p1.music.126.net/5guhqPBTcIrrhLBotgaT6w==/109951170048511751.jpg?param=300y300",
-  "update": "每天更新",
+  "cover": "https://p2.music.126.net/5guhqPBTcIrrhLBotgaT6w==/109951170048511751.jpg?param=300y300",
+  "update": "更新23首",
   "count": 100,
   "preview": [
    {
@@ -40,15 +40,15 @@ var toplists = [
     "artist": "李雨霏_晚饭"
    },
    {
-    "name": "浅粉红 baby pink",
-    "artist": "Gareth.T"
+    "name": "失物招领",
+    "artist": "刘学义"
    }
   ]
  },
  {
   "id": 2884035,
   "name": "原创榜",
-  "cover": "https://p1.music.126.net/BaP9nrocNTL3gGThysv4eQ==/109951170091896587.jpg?param=300y300",
+  "cover": "https://p2.music.126.net/BaP9nrocNTL3gGThysv4eQ==/109951170091896587.jpg?param=300y300",
   "update": "每周四更新",
   "count": 100,
   "preview": [
@@ -69,8 +69,8 @@ var toplists = [
  {
   "id": 3778678,
   "name": "热歌榜",
-  "cover": "https://p1.music.126.net/0SUEG8yDACfx0Bw2MYFv4Q==/109951170048519512.jpg?param=300y300",
-  "update": "每天更新",
+  "cover": "https://p2.music.126.net/0SUEG8yDACfx0Bw2MYFv4Q==/109951170048519512.jpg?param=300y300",
+  "update": "更新17首",
   "count": 200,
   "preview": [
    {
@@ -82,15 +82,15 @@ var toplists = [
     "artist": "马也_Crabbit"
    },
    {
-    "name": "红",
-    "artist": "罗言"
+    "name": "罗生门（Follow）",
+    "artist": "梨冻紧/Wiz_H张子豪"
    }
   ]
  },
  {
   "id": 71384707,
   "name": "网易云古典榜",
-  "cover": "https://p1.music.126.net/urByD_AmfBDBrs7fA9-O8A==/109951167976973225.jpg?param=300y300",
+  "cover": "https://p2.music.126.net/urByD_AmfBDBrs7fA9-O8A==/109951167976973225.jpg?param=300y300",
   "update": "每周四更新",
   "count": 100,
   "preview": []
@@ -99,7 +99,7 @@ var toplists = [
   "id": 1978921795,
   "name": "网易云电音榜",
   "cover": "https://p1.music.126.net/hXGObvXfsGtFjFvRhOYAkA==/109951170091888741.jpg?param=300y300",
-  "update": "刚刚更新",
+  "update": "每周五更新",
   "count": 50,
   "preview": []
  },
@@ -115,7 +115,7 @@ var toplists = [
   "id": 18478568150,
   "name": "小天才热歌榜",
   "cover": "https://p1.music.126.net/GmmRZwOmh-DFwtF3TVJJrw==/109951174096842449.jpg?param=300y300",
-  "update": "更新150首",
+  "update": "每天更新",
   "count": 150,
   "preview": []
  },
@@ -123,7 +123,7 @@ var toplists = [
   "id": 18176153161,
   "name": "实时分享榜",
   "cover": "https://p1.music.126.net/b2-_Xw-6DwDXWIn7RNuCYQ==/109951173652479140.jpg?param=300y300",
-  "update": "更新14首",
+  "update": "更新21首",
   "count": 100,
   "preview": []
  },
@@ -159,7 +159,7 @@ var playlist = {
  "cover": "https://p1.music.126.net/0SUEG8yDACfx0Bw2MYFv4Q==/109951170048519512.jpg?param=400y400",
  "description": "云音乐热歌榜：云音乐用户一周内收听所有线上歌曲官方TOP排行榜，每日更新。",
  "count": 200,
- "plays": 14191075328
+ "plays": 14191456256
 }
 
 var tracks = [
@@ -182,22 +182,13 @@ var tracks = [
   "cover": "http://p2.music.126.net/RfguLkQJ8aMVkiIaxdy70Q==/109951170483263672.jpg?param=120y120"
  },
  {
-  "id": 1918576268,
-  "name": "红",
-  "artist": "罗言",
-  "album": "When the world is came，take it！",
-  "dur": 161,
+  "id": 1456890009,
+  "name": "罗生门（Follow）",
+  "artist": "梨冻紧 / Wiz_H张子豪",
+  "album": "罗生门（Follow）",
+  "dur": 243,
   "fee": 8,
-  "cover": "http://p2.music.126.net/G-inyKjA-jO5MuOuV3g7Pg==/109951167027986653.jpg?param=120y120"
- },
- {
-  "id": 167691,
-  "name": "天龙八部之宿敌",
-  "artist": "许嵩",
-  "album": "天龙八部之宿敌",
-  "dur": 263,
-  "fee": 1,
-  "cover": "http://p2.music.126.net/Ezo6K3rPFowvnkDtxf-w6Q==/109951172321459335.jpg?param=120y120"
+  "cover": "http://p2.music.126.net/yN1ke1xYMJ718FiHaDWtYQ==/109951165076380471.jpg?param=120y120"
  },
  {
   "id": 3399839173,
@@ -209,15 +200,6 @@ var tracks = [
   "cover": "http://p2.music.126.net/H9iDvukTit_jx-fmhhvXUQ==/109951173482378749.jpg?param=120y120"
  },
  {
-  "id": 1851652156,
-  "name": "忘不掉的你",
-  "artist": "h3R3",
-  "album": "忘不掉的你",
-  "dur": 172,
-  "fee": 8,
-  "cover": "http://p2.music.126.net/4BCskpY6Rmm-QReHnY8W6Q==/109951166071009318.jpg?param=120y120"
- },
- {
   "id": 3342319503,
   "name": "明知故犯",
   "artist": "Max李玄",
@@ -225,177 +207,6 @@ var tracks = [
   "dur": 166,
   "fee": 8,
   "cover": "http://p2.music.126.net/H2DFRdwP2y5SuCAn-Tuikw==/109951172568091306.jpg?param=120y120"
- },
- {
-  "id": 2600493765,
-  "name": "恋人",
-  "artist": "李荣浩",
-  "album": "黑马",
-  "dur": 275,
-  "fee": 1,
-  "cover": "http://p2.music.126.net/0bk3Iqe2OZGBH2Iuyx7RzA==/109951170045577565.jpg?param=120y120"
- },
- {
-  "id": 3397415408,
-  "name": "回到你身边",
-  "artist": "h3R3",
-  "album": "回响",
-  "dur": 231,
-  "fee": 8,
-  "cover": "http://p2.music.126.net/yed2hVZZwFNeSkTynWPaJQ==/109951173491736376.jpg?param=120y120"
- },
- {
-  "id": 3432893870,
-  "name": "全息恋人",
-  "artist": "栾一鸣Floscar",
-  "album": "全息恋人",
-  "dur": 147,
-  "fee": 8,
-  "cover": "http://p2.music.126.net/oxXWRp9IKoKStlYHdx4YkA==/109951173900088235.jpg?param=120y120"
- },
- {
-  "id": 1456890009,
-  "name": "罗生门（Follow）",
-  "artist": "梨冻紧 / Wiz_H张子豪",
-  "album": "罗生门（Follow）",
-  "dur": 243,
-  "fee": 8,
-  "cover": "http://p2.music.126.net/yN1ke1xYMJ718FiHaDWtYQ==/109951165076380471.jpg?param=120y120"
- },
- {
-  "id": 1842728629,
-  "name": "如果呢",
-  "artist": "郑润泽",
-  "album": "如果呢",
-  "dur": 257,
-  "fee": 8,
-  "cover": "http://p2.music.126.net/-xMsNLpquZTmMZlIztTgHg==/109951165953469081.jpg?param=120y120"
- },
- {
-  "id": 3436855494,
-  "name": "自由的你",
-  "artist": "G.E.M.邓紫棋",
-  "album": "自由的你",
-  "dur": 296,
-  "fee": 8,
-  "cover": "http://p2.music.126.net/G4Vtk4Je9Sj8zB4KGlxprw==/109951174017350276.jpg?param=120y120"
- },
- {
-  "id": 3382908505,
-  "name": "玻璃",
-  "artist": "Gareth.T",
-  "album": "玻璃",
-  "dur": 185,
-  "fee": 1,
-  "cover": "http://p2.music.126.net/MSKoQP60up7v3y1P1d3JIQ==/109951173234747322.jpg?param=120y120"
- },
- {
-  "id": 2163210456,
-  "name": "两 难",
-  "artist": "加木",
-  "album": "两 难",
-  "dur": 170,
-  "fee": 8,
-  "cover": "http://p2.music.126.net/Qvenb5t_hL37b7hRfscjaw==/109951169686160429.jpg?param=120y120"
- },
- {
-  "id": 2097443876,
-  "name": "碎碎念",
-  "artist": "队长",
-  "album": "碎碎念",
-  "dur": 132,
-  "fee": 1,
-  "cover": "http://p2.music.126.net/RYIrCEYzgeAD85DJ0rgOQA==/109951169256300966.jpg?param=120y120"
- },
- {
-  "id": 287063,
-  "name": "我怀念的",
-  "artist": "孙燕姿",
-  "album": "逆光",
-  "dur": 289,
-  "fee": 1,
-  "cover": "http://p2.music.126.net/wF25xzePLml5EGUWM2eInw==/109951173219336672.jpg?param=120y120"
- },
- {
-  "id": 316157,
-  "name": "茶汤",
-  "artist": "郁可唯",
-  "album": "微加幸福",
-  "dur": 308,
-  "fee": 1,
-  "cover": "http://p2.music.126.net/ugJH-gpHKX6y6p-6MkIIsQ==/109951163187409545.jpg?param=120y120"
- },
- {
-  "id": 273114,
-  "name": "失眠",
-  "artist": "Suki刘舒妤",
-  "album": "Ladies Night",
-  "dur": 211,
-  "fee": 1,
-  "cover": "http://p2.music.126.net/-ruDNWFD1mMTGMNmNPzUIg==/109951173355316164.jpg?param=120y120"
- },
- {
-  "id": 215382,
-  "name": "雨过后的风景",
-  "artist": "Dizzy Dizzo (蔡诗芸)",
-  "album": "黑色彩虹",
-  "dur": 243,
-  "fee": 1,
-  "cover": "http://p2.music.126.net/6Y7tdO1ltV0khSYWLFHODQ==/109951173146696212.jpg?param=120y120"
- },
- {
-  "id": 1303464858,
-  "name": "于是",
-  "artist": "郑润泽",
-  "album": "于是",
-  "dur": 232,
-  "fee": 8,
-  "cover": "http://p2.music.126.net/PEGvmO3OqgGOkx4m9qxAJA==/109951163478499713.jpg?param=120y120"
- },
- {
-  "id": 3333988321,
-  "name": "一半一半",
-  "artist": "Top Barry / INDEcompany",
-  "album": "一半一半",
-  "dur": 235,
-  "fee": 8,
-  "cover": "http://p2.music.126.net/EgbPD3CwVQojZ4OWse4YrA==/109951172511748152.jpg?param=120y120"
- },
- {
-  "id": 2755710644,
-  "name": "左转灯 (1000 Times +1)",
-  "artist": "派伟俊 / mac ova seas",
-  "album": "左转灯 (1000 Times +1)",
-  "dur": 197,
-  "fee": 1,
-  "cover": "http://p2.music.126.net/ODlrxB8b_86bDZTuCXGK1w==/109951172153456358.jpg?param=120y120"
- },
- {
-  "id": 2741144144,
-  "name": "99",
-  "artist": "TizzyT",
-  "album": "99",
-  "dur": 282,
-  "fee": 8,
-  "cover": "http://p2.music.126.net/D-kiZM7mbHrqdB6X8Yoi8Q==/109951171947326885.jpg?param=120y120"
- },
- {
-  "id": 1472921626,
-  "name": "刻在我心底的名字",
-  "artist": "卢广仲",
-  "album": "刻在我心底的名字",
-  "dur": 320,
-  "fee": 1,
-  "cover": "http://p2.music.126.net/hP30WVUoRy-wE3c-prxr0g==/109951165256630492.jpg?param=120y120"
- },
- {
-  "id": 1827600686,
-  "name": "还是会想你",
-  "artist": "林达浪 / h3R3",
-  "album": "还是会想你",
-  "dur": 190,
-  "fee": 8,
-  "cover": "http://p2.music.126.net/9FhSEQtMhP-JP3_U84YfWQ==/109951165798773745.jpg?param=120y120"
  },
  {
   "id": 1391891631,
@@ -407,94 +218,76 @@ var tracks = [
   "cover": "http://p2.music.126.net/J6HaJjtgv-yVVjyUm-h-AA==/109951164373633387.jpg?param=120y120"
  },
  {
-  "id": 211520,
-  "name": "你不要那样看着我的眼睛",
-  "artist": "蔡琴",
-  "album": "你不要那样看着我的眼睛",
-  "dur": 273,
-  "fee": 8,
-  "cover": "http://p2.music.126.net/40K_TaZWVJXf-VlmjsZ98A==/109951174112375608.jpg?param=120y120"
- },
- {
-  "id": 21178386,
-  "name": "Whatever Happens",
-  "artist": "Michael Jackson",
-  "album": "Invincible",
-  "dur": 296,
-  "fee": 1,
-  "cover": "http://p2.music.126.net/Iik8WEA3vOyPWMHniVR47A==/109951165992940172.jpg?param=120y120"
- },
- {
-  "id": 316100,
-  "name": "雨爱",
-  "artist": "杨丞琳",
-  "album": "雨爱",
-  "dur": 260,
-  "fee": 1,
-  "cover": "http://p2.music.126.net/Qt6sfLxRCscFZVXhbQ4bfg==/109951172020385959.jpg?param=120y120"
- },
- {
-  "id": 2018733994,
-  "name": "遐想",
-  "artist": "郑润泽",
-  "album": "梦游",
-  "dur": 189,
-  "fee": 8,
-  "cover": "http://p2.music.126.net/Ws93IUrJGR_lK-QEsdKTWw==/109951168408373477.jpg?param=120y120"
- },
- {
-  "id": 2701139855,
-  "name": "颜色",
-  "artist": "Gareth.T",
-  "album": "颜色",
-  "dur": 211,
-  "fee": 1,
-  "cover": "http://p2.music.126.net/NBYS2W-x3p2IVNvHMcylMg==/109951170940524301.jpg?param=120y120"
- },
- {
-  "id": 2083785152,
-  "name": "唯一",
+  "id": 3436855494,
+  "name": "自由的你",
   "artist": "G.E.M.邓紫棋",
-  "album": "T.I.M.E.",
-  "dur": 253,
-  "fee": 1,
-  "cover": "http://p2.music.126.net/aJWtwvdYRXvKUpAE2C6NoA==/109951168919708423.jpg?param=120y120"
+  "album": "自由的你",
+  "dur": 296,
+  "fee": 8,
+  "cover": "http://p2.music.126.net/G4Vtk4Je9Sj8zB4KGlxprw==/109951174017350276.jpg?param=120y120"
  },
  {
-  "id": 2652647276,
-  "name": "我好想你 (苏打绿版)",
-  "artist": "苏打绿",
-  "album": "秋：故事 (苏打绿版)",
-  "dur": 329,
+  "id": 167691,
+  "name": "天龙八部之宿敌",
+  "artist": "许嵩",
+  "album": "天龙八部之宿敌",
+  "dur": 263,
   "fee": 1,
-  "cover": "http://p2.music.126.net/uNLLdw0Pxd2NT4Q_aP2tUQ==/109951170216075185.jpg?param=120y120"
+  "cover": "http://p2.music.126.net/Ezo6K3rPFowvnkDtxf-w6Q==/109951172321459335.jpg?param=120y120"
  },
  {
-  "id": 287719,
-  "name": "开始懂了",
+  "id": 2600493765,
+  "name": "恋人",
+  "artist": "李荣浩",
+  "album": "黑马",
+  "dur": 275,
+  "fee": 1,
+  "cover": "http://p2.music.126.net/0bk3Iqe2OZGBH2Iuyx7RzA==/109951170045577565.jpg?param=120y120"
+ },
+ {
+  "id": 2097443876,
+  "name": "碎碎念",
+  "artist": "队长",
+  "album": "碎碎念",
+  "dur": 132,
+  "fee": 1,
+  "cover": "http://p2.music.126.net/RYIrCEYzgeAD85DJ0rgOQA==/109951169256300966.jpg?param=120y120"
+ },
+ {
+  "id": 1842728629,
+  "name": "如果呢",
+  "artist": "郑润泽",
+  "album": "如果呢",
+  "dur": 257,
+  "fee": 8,
+  "cover": "http://p2.music.126.net/-xMsNLpquZTmMZlIztTgHg==/109951165953469081.jpg?param=120y120"
+ },
+ {
+  "id": 3382908505,
+  "name": "玻璃",
+  "artist": "Gareth.T",
+  "album": "玻璃",
+  "dur": 185,
+  "fee": 1,
+  "cover": "http://p2.music.126.net/MSKoQP60up7v3y1P1d3JIQ==/109951173234747322.jpg?param=120y120"
+ },
+ {
+  "id": 287063,
+  "name": "我怀念的",
   "artist": "孙燕姿",
-  "album": "我要的幸福",
-  "dur": 271,
+  "album": "逆光",
+  "dur": 289,
   "fee": 1,
-  "cover": "http://p2.music.126.net/1HJILQwc62AfvcXkGgVJHQ==/109951165549820772.jpg?param=120y120"
+  "cover": "http://p2.music.126.net/wF25xzePLml5EGUWM2eInw==/109951173219336672.jpg?param=120y120"
  },
  {
-  "id": 2740858325,
-  "name": "Star Crossing Night (feat. GALI)",
-  "artist": "徐明浩 / GALI",
-  "album": "Star Crossing Night (feat. GALI)",
-  "dur": 205,
-  "fee": 1,
-  "cover": "http://p2.music.126.net/fsz6GAKO1-khteFArDidjA==/109951171942679749.jpg?param=120y120"
- },
- {
-  "id": 28403111,
-  "name": "特别的人",
-  "artist": "方大同",
-  "album": "危险世界",
-  "dur": 259,
-  "fee": 1,
-  "cover": "http://p2.music.126.net/3Y0A55OzEnqKNiH5ODA54A==/109951172683046522.jpg?param=120y120"
+  "id": 1918576268,
+  "name": "红",
+  "artist": "罗言",
+  "album": "When the world is came，take it！",
+  "dur": 161,
+  "fee": 8,
+  "cover": "http://p2.music.126.net/G-inyKjA-jO5MuOuV3g7Pg==/109951167027986653.jpg?param=120y120"
  },
  {
   "id": 1403318151,
@@ -506,175 +299,630 @@ var tracks = [
   "cover": "http://p2.music.126.net/CBx2K_jEN3SNWwYztagPPw==/109951164485969446.jpg?param=120y120"
  },
  {
-  "id": 3416333610,
-  "name": "再见太难",
-  "artist": "利得汇",
-  "album": "再见太难",
-  "dur": 288,
-  "fee": 1,
-  "cover": "http://p2.music.126.net/zYhMh8fYisHvajzKiL8dzg==/109951174112624480.jpg?param=120y120"
+  "id": 1303464858,
+  "name": "于是",
+  "artist": "郑润泽",
+  "album": "于是",
+  "dur": 232,
+  "fee": 8,
+  "cover": "http://p2.music.126.net/PEGvmO3OqgGOkx4m9qxAJA==/109951163478499713.jpg?param=120y120"
  },
  {
-  "id": 3404238777,
-  "name": "周旋",
-  "artist": "王以太 / 艾热 AIR",
-  "album": "太热爱",
-  "dur": 290,
+  "id": 273114,
+  "name": "失眠",
+  "artist": "Suki刘舒妤",
+  "album": "Ladies Night",
+  "dur": 211,
+  "fee": 1,
+  "cover": "http://p2.music.126.net/-ruDNWFD1mMTGMNmNPzUIg==/109951173355316164.jpg?param=120y120"
+ },
+ {
+  "id": 1851652156,
+  "name": "忘不掉的你",
+  "artist": "h3R3",
+  "album": "忘不掉的你",
+  "dur": 172,
   "fee": 8,
-  "cover": "http://p2.music.126.net/rDv1qod6MDsYcEHKtxCdAA==/109951173532089932.jpg?param=120y120"
+  "cover": "http://p2.music.126.net/4BCskpY6Rmm-QReHnY8W6Q==/109951166071009318.jpg?param=120y120"
+ },
+ {
+  "id": 2163210456,
+  "name": "两 难",
+  "artist": "加木",
+  "album": "两 难",
+  "dur": 170,
+  "fee": 8,
+  "cover": "http://p2.music.126.net/Qvenb5t_hL37b7hRfscjaw==/109951169686160429.jpg?param=120y120"
+ },
+ {
+  "id": 3333988321,
+  "name": "一半一半",
+  "artist": "Top Barry / INDEcompany",
+  "album": "一半一半",
+  "dur": 235,
+  "fee": 8,
+  "cover": "http://p2.music.126.net/EgbPD3CwVQojZ4OWse4YrA==/109951172511748152.jpg?param=120y120"
+ },
+ {
+  "id": 316157,
+  "name": "茶汤",
+  "artist": "郁可唯",
+  "album": "微加幸福",
+  "dur": 308,
+  "fee": 1,
+  "cover": "http://p2.music.126.net/ugJH-gpHKX6y6p-6MkIIsQ==/109951163187409545.jpg?param=120y120"
+ },
+ {
+  "id": 215382,
+  "name": "雨过后的风景",
+  "artist": "Dizzy Dizzo (蔡诗芸)",
+  "album": "黑色彩虹",
+  "dur": 243,
+  "fee": 1,
+  "cover": "http://p2.music.126.net/6Y7tdO1ltV0khSYWLFHODQ==/109951173146696212.jpg?param=120y120"
+ },
+ {
+  "id": 2755710644,
+  "name": "左转灯 (1000 Times +1)",
+  "artist": "派伟俊 / mac ova seas",
+  "album": "左转灯 (1000 Times +1)",
+  "dur": 197,
+  "fee": 1,
+  "cover": "http://p2.music.126.net/ODlrxB8b_86bDZTuCXGK1w==/109951172153456358.jpg?param=120y120"
+ },
+ {
+  "id": 1827600686,
+  "name": "还是会想你",
+  "artist": "林达浪 / h3R3",
+  "album": "还是会想你",
+  "dur": 190,
+  "fee": 8,
+  "cover": "http://p2.music.126.net/9FhSEQtMhP-JP3_U84YfWQ==/109951165798773745.jpg?param=120y120"
+ },
+ {
+  "id": 3397415408,
+  "name": "回到你身边",
+  "artist": "h3R3",
+  "album": "回响",
+  "dur": 231,
+  "fee": 8,
+  "cover": "http://p2.music.126.net/yed2hVZZwFNeSkTynWPaJQ==/109951173491736376.jpg?param=120y120"
+ },
+ {
+  "id": 2018733994,
+  "name": "遐想",
+  "artist": "郑润泽",
+  "album": "梦游",
+  "dur": 189,
+  "fee": 8,
+  "cover": "http://p2.music.126.net/Ws93IUrJGR_lK-QEsdKTWw==/109951168408373477.jpg?param=120y120"
+ },
+ {
+  "id": 1472921626,
+  "name": "刻在我心底的名字",
+  "artist": "卢广仲",
+  "album": "刻在我心底的名字",
+  "dur": 320,
+  "fee": 1,
+  "cover": "http://p2.music.126.net/hP30WVUoRy-wE3c-prxr0g==/109951165256630492.jpg?param=120y120"
+ },
+ {
+  "id": 3432893870,
+  "name": "全息恋人",
+  "artist": "栾一鸣Floscar",
+  "album": "全息恋人",
+  "dur": 147,
+  "fee": 8,
+  "cover": "http://p2.music.126.net/oxXWRp9IKoKStlYHdx4YkA==/109951173900088235.jpg?param=120y120"
+ },
+ {
+  "id": 316100,
+  "name": "雨爱",
+  "artist": "杨丞琳",
+  "album": "雨爱",
+  "dur": 260,
+  "fee": 1,
+  "cover": "http://p2.music.126.net/Qt6sfLxRCscFZVXhbQ4bfg==/109951172020385959.jpg?param=120y120"
+ },
+ {
+  "id": 30612793,
+  "name": "多远都要在一起",
+  "artist": "G.E.M.邓紫棋",
+  "album": "新的心跳",
+  "dur": 216,
+  "fee": 1,
+  "cover": "http://p2.music.126.net/kVwk6b8Qdya8oDyGDcyAVA==/1364493930777368.jpg?param=120y120"
+ },
+ {
+  "id": 1359356908,
+  "name": "晚安",
+  "artist": "颜人中",
+  "album": "晚安",
+  "dur": 289,
+  "fee": 8,
+  "cover": "http://p2.music.126.net/-rC55JsnmEWvafJQsAZaWw==/109951170473693123.jpg?param=120y120"
+ },
+ {
+  "id": 28403111,
+  "name": "特别的人",
+  "artist": "方大同",
+  "album": "危险世界",
+  "dur": 259,
+  "fee": 1,
+  "cover": "http://p2.music.126.net/3Y0A55OzEnqKNiH5ODA54A==/109951172683046522.jpg?param=120y120"
+ },
+ {
+  "id": 1922888354,
+  "name": "苦茶子",
+  "artist": "Starling8 / DRODUMANA / FIVESTAR",
+  "album": "埋汰",
+  "dur": 170,
+  "fee": 8,
+  "cover": "http://p2.music.126.net/VjXYNoGC3lXajZDs0r35XQ==/109951167852652412.jpg?param=120y120"
+ },
+ {
+  "id": 167655,
+  "name": "幻听",
+  "artist": "许嵩",
+  "album": "梦游计",
+  "dur": 273,
+  "fee": 1,
+  "cover": "http://p2.music.126.net/7X3irAHmXIkyZKu1OzDZdQ==/109951172321460834.jpg?param=120y120"
+ },
+ {
+  "id": 2652647276,
+  "name": "我好想你 (苏打绿版)",
+  "artist": "苏打绿",
+  "album": "秋：故事 (苏打绿版)",
+  "dur": 329,
+  "fee": 1,
+  "cover": "http://p2.music.126.net/uNLLdw0Pxd2NT4Q_aP2tUQ==/109951170216075185.jpg?param=120y120"
+ },
+ {
+  "id": 2041026502,
+  "name": "愿与愁",
+  "artist": "林俊杰",
+  "album": "愿与愁",
+  "dur": 231,
+  "fee": 1,
+  "cover": "http://p2.music.126.net/vtnI8JpimWnZSzkXdmIB3w==/109951168558210782.jpg?param=120y120"
+ },
+ {
+  "id": 421423806,
+  "name": "小半",
+  "artist": "陈粒",
+  "album": "小梦大半",
+  "dur": 297,
+  "fee": 1,
+  "cover": "http://p2.music.126.net/HQxTggMCB7AHUXN-ZFEtmA==/1371091013186741.jpg?param=120y120"
+ },
+ {
+  "id": 287719,
+  "name": "开始懂了",
+  "artist": "孙燕姿",
+  "album": "我要的幸福",
+  "dur": 271,
+  "fee": 1,
+  "cover": "http://p2.music.126.net/1HJILQwc62AfvcXkGgVJHQ==/109951165549820772.jpg?param=120y120"
+ },
+ {
+  "id": 2083785152,
+  "name": "唯一",
+  "artist": "G.E.M.邓紫棋",
+  "album": "T.I.M.E.",
+  "dur": 253,
+  "fee": 1,
+  "cover": "http://p2.music.126.net/aJWtwvdYRXvKUpAE2C6NoA==/109951168919708423.jpg?param=120y120"
+ },
+ {
+  "id": 2701139855,
+  "name": "颜色",
+  "artist": "Gareth.T",
+  "album": "颜色",
+  "dur": 211,
+  "fee": 1,
+  "cover": "http://p2.music.126.net/NBYS2W-x3p2IVNvHMcylMg==/109951170940524301.jpg?param=120y120"
  }
 ]
 
-var lyricsTrackId = 1918576268
+var lyricsTrackId = 1456890009
 
 var lyrics = [
  {
   "t": 0.0,
-  "text": "作词 : 罗言"
+  "text": "作词 : 梨冻紧/Wiz_H张子豪"
  },
  {
   "t": 1.0,
-  "text": "作曲 : 罗言"
+  "text": "作曲 : 梨冻紧/Wiz_H张子豪"
  },
  {
-  "t": 15.64,
-  "text": "出品：网易飓风"
+  "t": 2.0,
+  "text": "编曲 : Wiz_H张子豪"
  },
  {
-  "t": 15.64,
-  "text": "营销：网易飓风"
+  "t": 3.0,
+  "text": "钢琴 : 梨冻紧"
  },
  {
-  "t": 15.64,
-  "text": "OP：唯迹文化"
+  "t": 4.0,
+  "text": "封面 : 蓝明初"
  },
  {
-  "t": 15.64,
-  "text": "爱上了一个人眼睛不说谎"
+  "t": 5.0,
+  "text": "混音 : 官硕"
  },
  {
-  "t": 18.89,
-  "text": "眼泪总偷偷的躲在眼眶"
+  "t": 6.0,
+  "text": "母带 : Mai＂ No Label Crew＂"
  },
  {
-  "t": 22.9,
-  "text": "感情是珍惜 其实名为“互相”"
+  "t": 7.0,
+  "text": "监制 : Mai＂ No Label Crew＂"
  },
  {
-  "t": 26.41,
-  "text": "中途离场就会独自悲伤"
+  "t": 8.0,
+  "text": "发行 : No Label Crew"
  },
  {
-  "t": 29.66,
-  "text": "我好像做到了我想要的样子"
+  "t": 9.0,
+  "text": "企划 : 苏文嫒 张琛"
  },
  {
-  "t": 35.67,
-  "text": "但却不能够再为你唱一首歌"
+  "t": 10.0,
+  "text": "制作人 : Wiz_H张子豪"
  },
  {
-  "t": 39.18,
-  "text": "唉 无休止的黄昏"
+  "t": 30.6,
+  "text": "我没转身"
  },
  {
-  "t": 46.18,
-  "text": "想起我的时候你总会说"
+  "t": 31.71,
+  "text": "一直走一直梦"
  },
  {
-  "t": 49.94,
-  "text": "我们一起去海边走走"
+  "t": 33.69,
+  "text": "一直疯一直没停留"
  },
  {
-  "t": 54.44,
-  "text": "粉色的天配软绵绵的云朵"
+  "t": 37.83,
+  "text": "那些美好的"
  },
  {
-  "t": 57.69,
-  "text": "几千公里也不算太颠簸"
+  "t": 39.27,
+  "text": "越靠近越沉溺"
  },
  {
-  "t": 61.19,
-  "text": "For tonight"
+  "t": 41.22,
+  "text": "越来越不想放手"
  },
  {
-  "t": 63.95,
-  "text": "（就在今晚）"
+  "t": 45.99,
+  "text": "Wherever you go"
  },
  {
-  "t": 64.95,
-  "text": "你也想我了但是你不说"
+  "t": 53.13,
+  "text": "Wherever you go"
  },
  {
-  "t": 69.21,
-  "text": "悲伤海"
+  "t": 61.26,
+  "text": "Follow"
  },
  {
-  "t": 72.71,
-  "text": "就像颗流星从这夜空划过"
+  "t": 62.04,
+  "text": "每到晚上理智变得感性"
  },
  {
-  "t": 76.47,
-  "text": "just for tonight"
+  "t": 64.44,
+  "text": "我编了这条短信"
  },
  {
-  "t": 80.73,
-  "text": "我不懂你的心思不想去猜"
+  "t": 65.67,
+  "text": "说不在乎不过是我嘴硬"
  },
  {
-  "t": 84.24,
-  "text": "而现在"
+  "t": 67.65,
+  "text": "总是期待你有什么反应"
  },
  {
-  "t": 88.5,
-  "text": "我做的一切好像都是应该"
+  "t": 69.48,
+  "text": "对你没法保持那份冷静"
  },
  {
-  "t": 92.52,
-  "text": "破镜如果不能被重圆治好"
+  "t": 71.22,
+  "text": "偷偷想着我们之间关系的远近"
  },
  {
-  "t": 96.77,
-  "text": "感情就会从裂缝中溜掉"
+  "t": 73.23,
+  "text": "我的心里没有任何的侥幸"
  },
  {
-  "t": 100.28,
-  "text": "分开时用最恶毒的话争吵"
+  "t": 74.85,
+  "text": "我知道我的爱对你来说就好像软禁"
  },
  {
-  "t": 105.54,
-  "text": "爱她下雪也宁愿光着脚"
+  "t": 76.74,
+  "text": "我们都闭口不提"
+ },
+ {
+  "t": 78.42,
+  "text": "这跨不过的距离"
+ },
+ {
+  "t": 80.04,
+  "text": "我们不停的一再复习着"
+ },
+ {
+  "t": 82.02,
+  "text": "那些感情里俗套的剧情"
+ },
+ {
+  "t": 83.76,
+  "text": "你那里是怎么样的天气"
+ },
+ {
+  "t": 85.74,
+  "text": "夜空是否还是那么透明"
+ },
+ {
+  "t": 87.51,
+  "text": "我说的又开始不着了边际"
+ },
+ {
+  "t": 89.52,
+  "text": "可是没有你我真的不行"
+ },
+ {
+  "t": 91.14,
+  "text": "就请你"
+ },
+ {
+  "t": 92.19,
+  "text": "把我当成贪得无厌"
+ },
+ {
+  "t": 94.11,
+  "text": "把我当作得寸进尺"
+ },
+ {
+  "t": 95.79,
+  "text": "每当难过表情在你脸上浮现"
+ },
+ {
+  "t": 97.65,
+  "text": "我也难过得像照着一面镜子"
+ },
+ {
+  "t": 99.51,
+  "text": "多么希望和你在一起的时间"
+ },
+ {
+  "t": 101.46,
+  "text": "那些快乐可以突然静止"
+ },
+ {
+  "t": 103.26,
+  "text": "多么希望时间可以快点"
+ },
+ {
+  "t": 104.97,
+  "text": "带我和你一起体验生老和病死"
+ },
+ {
+  "t": 106.77,
+  "text": "我想过下次会更好"
+ },
+ {
+  "t": 108.15,
+  "text": "也开始更加了解你的脾气"
+ },
+ {
+  "t": 110.31,
+  "text": "可是下次我们还是争吵"
+ },
+ {
+  "t": 112.02,
+  "text": "下次可能还是不留余地"
+ },
+ {
+  "t": 114.0,
+  "text": "我爱你不遗余力"
+ },
+ {
+  "t": 115.59,
+  "text": "在爱里不停期待奇迹"
+ },
+ {
+  "t": 117.57,
+  "text": "不忍看你这么痛苦"
+ },
+ {
+  "t": 119.25,
+  "text": "又不愿离去"
+ },
+ {
+  "t": 120.69,
+  "text": "and i will"
+ },
+ {
+  "t": 121.29,
+  "text": "Follow"
+ },
+ {
+  "t": 121.83,
+  "text": "一直走一直梦"
  },
  {
   "t": 123.66,
-  "text": "在这座城市里 我们的记忆"
+  "text": "一直疯一直没停留"
  },
  {
-  "t": 127.68,
-  "text": "不停变换扮演不同角色"
+  "t": 127.83,
+  "text": "那些美好的"
  },
  {
-  "t": 131.44,
-  "text": "那些猛烈的情绪 盘踞在我心底"
+  "t": 129.27,
+  "text": "越靠近越沉溺"
  },
  {
-  "t": 135.44,
-  "text": "在我脑海上演不同坎坷"
+  "t": 131.19,
+  "text": "越来越不想放手"
  },
  {
-  "t": 140.2,
-  "text": "Just for tonight"
+  "t": 135.6,
+  "text": "Wherever you go"
  },
  {
-  "t": 142.95,
-  "text": "我不懂你的心思不想去猜"
+  "t": 143.13,
+  "text": "Wherever you go"
  },
  {
-  "t": 146.96,
-  "text": "Just for tonight"
+  "t": 152.61,
+  "text": "Wherever you go"
  },
  {
-  "t": 151.21,
-  "text": "我做的一切好像都是应该"
+  "t": 154.44,
+  "text": "Wherever you go"
+ },
+ {
+  "t": 156.48,
+  "text": "一直都搞不定自己的情绪在你走后"
+ },
+ {
+  "t": 160.05,
+  "text": "Wherever you go"
+ },
+ {
+  "t": 161.88,
+  "text": "just want you to know"
+ },
+ {
+  "t": 163.95,
+  "text": "你知道我的心一直都在原地为你等候"
+ },
+ {
+  "t": 166.65,
+  "text": "其实对天气不感兴趣"
+ },
+ {
+  "t": 168.15,
+  "text": "想知道你会不会太冷"
+ },
+ {
+  "t": 170.28,
+  "text": "没法完成那份陪伴"
+ },
+ {
+  "t": 171.78,
+  "text": "孤独你会不会在忍"
+ },
+ {
+  "t": 173.79,
+  "text": "不知道想念你的痛苦"
+ },
+ {
+  "t": 175.5,
+  "text": "来的到底会不会太准"
+ },
+ {
+  "t": 177.36,
+  "text": "只知道当你不在床上"
+ },
+ {
+  "t": 179.25,
+  "text": "我总是睡得不会太稳"
+ },
+ {
+  "t": 181.53,
+  "text": "我们看惯了世间的罗生门"
+ },
+ {
+  "t": 183.45,
+  "text": "变得好像陌生人"
+ },
+ {
+  "t": 185.28,
+  "text": "两颗同样不安的心脏被塞进了同一个摩天轮"
+ },
+ {
+  "t": 189.03,
+  "text": "每次拥抱停留在清晨"
+ },
+ {
+  "t": 190.98,
+  "text": "窗外大雨在倾盆"
+ },
+ {
+  "t": 192.75,
+  "text": "我们好像巨大城市里面两个相爱的外星人"
+ },
+ {
+  "t": 196.53,
+  "text": "可我不想生活在套路里"
+ },
+ {
+  "t": 198.45,
+  "text": "想把心事都告诉你"
+ },
+ {
+  "t": 199.86,
+  "text": "我想要一直照顾你"
+ },
+ {
+  "t": 201.72,
+  "text": "又总害怕你耗不起"
+ },
+ {
+  "t": 204.54,
+  "text": "滴答的秒针又在"
+ },
+ {
+  "t": 206.16,
+  "text": "提醒我爱你几分"
+ },
+ {
+  "t": 208.23,
+  "text": "只要听到你的声音"
+ },
+ {
+  "t": 209.73,
+  "text": "我一定会为你转身"
+ },
+ {
+  "t": 211.74,
+  "text": "一直走一直梦"
+ },
+ {
+  "t": 213.66,
+  "text": "一直疯一直没停留"
+ },
+ {
+  "t": 217.86,
+  "text": "那些美好的"
+ },
+ {
+  "t": 219.27,
+  "text": "越靠近越沉溺"
+ },
+ {
+  "t": 221.22,
+  "text": "越来越不想放手"
+ },
+ {
+  "t": 225.66,
+  "text": "Wherever you go"
+ },
+ {
+  "t": 226.17,
+  "text": "Wherever you go"
+ },
+ {
+  "t": 226.92,
+  "text": "营销推广：贾皓然 欧阳慧琳 苏文嫒"
+ },
+ {
+  "t": 231.36,
+  "text": "本歌曲来自【青云 LAB】"
  }
 ]
 
@@ -709,20 +957,20 @@ var search = {
    "cover": ""
   },
   {
-   "id": 25794009,
-   "name": "裂缝中的阳光",
-   "artist": "林俊杰",
-   "album": "因你而在",
-   "dur": 228,
-   "fee": 1,
-   "cover": ""
-  },
-  {
    "id": 108931,
    "name": "美人鱼",
    "artist": "林俊杰",
    "album": "第二天堂",
    "dur": 254,
+   "fee": 1,
+   "cover": ""
+  },
+  {
+   "id": 25794009,
+   "name": "裂缝中的阳光",
+   "artist": "林俊杰",
+   "album": "因你而在",
+   "dur": 228,
    "fee": 1,
    "cover": ""
   },
@@ -754,20 +1002,20 @@ var search = {
    "cover": ""
   },
   {
-   "id": 3353437817,
-   "name": "我对缘分小心翼翼",
-   "artist": "林俊杰",
-   "album": "我对缘分小心翼翼",
-   "dur": 282,
-   "fee": 1,
-   "cover": ""
-  },
-  {
    "id": 1391477429,
    "name": "将故事写成我们",
    "artist": "林俊杰",
    "album": "将故事写成我们",
    "dur": 335,
+   "fee": 1,
+   "cover": ""
+  },
+  {
+   "id": 3353437817,
+   "name": "我对缘分小心翼翼",
+   "artist": "林俊杰",
+   "album": "我对缘分小心翼翼",
+   "dur": 282,
    "fee": 1,
    "cover": ""
   }
@@ -776,44 +1024,44 @@ var search = {
   {
    "id": 3684,
    "name": "林俊杰",
-   "cover": "https://p2.music.126.net/78q0jUUJ0h08GxAs2G-tCA==/109951168529051968.jpg?param=300y300",
+   "cover": "https://p1.music.126.net/78q0jUUJ0h08GxAs2G-tCA==/109951168529051968.jpg?param=300y300",
    "albums": 74
   },
   {
    "id": 7763,
    "name": "G.E.M.邓紫棋",
-   "cover": "https://p2.music.126.net/fq1O8ZRT5_FHzg_uLEtUQA==/109951167773880633.jpg?param=300y300",
+   "cover": "https://p1.music.126.net/fq1O8ZRT5_FHzg_uLEtUQA==/109951167773880633.jpg?param=300y300",
    "albums": 58
   },
   {
    "id": 122200643,
    "name": "Jay",
-   "cover": "https://p2.music.126.net/xKbPpPFIju2bok2RYqm3fA==/109951172494199647.jpg?param=300y300",
+   "cover": "https://p1.music.126.net/xKbPpPFIju2bok2RYqm3fA==/109951172494199647.jpg?param=300y300",
    "albums": 65
   },
   {
    "id": 52348016,
    "name": "何兵兵",
-   "cover": "https://p2.music.126.net/-o0B0EKqpW8C5KRd2547Vg==/109951167325066905.jpg?param=300y300",
+   "cover": "https://p1.music.126.net/-o0B0EKqpW8C5KRd2547Vg==/109951167325066905.jpg?param=300y300",
    "albums": 61
   },
   {
    "id": 123552101,
    "name": "林俊杰66",
-   "cover": "https://p2.music.126.net/AVJG1ta5_G_Kdy8pFs49Ew==/109951172924275261.jpg?param=300y300",
+   "cover": "https://p1.music.126.net/AVJG1ta5_G_Kdy8pFs49Ew==/109951172924275261.jpg?param=300y300",
    "albums": 1
   },
   {
    "id": 37055271,
    "name": "林俊杰Rinsixken",
-   "cover": "https://p2.music.126.net/_g2mxWHn_VnVgMkiMxGMZQ==/109951165530882890.jpg?param=300y300",
+   "cover": "https://p1.music.126.net/_g2mxWHn_VnVgMkiMxGMZQ==/109951165530882890.jpg?param=300y300",
    "albums": 5
   }
  ],
  "playlists": [
   {
    "id": 7694176632,
-   "name": "听·林俊杰热门精选|可惜没如果(Live)",
+   "name": "听·林俊杰热门精选|过",
    "cover": "http://p1.music.126.net/dm-HpaXr7BT8AUnfYPV6Sg==/109951170281527979.jpg?imageView=1&thumbnail=800y800&enlarge=1%7CimageView=1&watermark&type=1&image=b2JqL3c1bkRrTUtRd3JMRGpEekNtOE9tLzc4MDU5Njc1Nzk2L2FmNGIvMjAyNjAyODE3NTA1MS94ODI1MTc2OTU5Mzg1MTcyOS5wbmc=&dx=0&dy=0%7Cwatermark&type=1&image=b2JqL3dvbkRsc0tVd3JMQ2xHakNtOEt4LzI3NjEwNDk3MDYyL2VlOTMvOTIxYS82NjE4LzdhMDc5ZDg0NTYyMDAwZmVkZWJmMjVjYjE4NjhkOWEzLnBuZw==&dx=0&dy=0%7CimageView=1?param=300y300",
    "count": 40,
    "creator": "云音乐艺人精选"
@@ -826,18 +1074,18 @@ var search = {
    "creator": "小翅膀的羽毛"
   },
   {
-   "id": 12595295194,
-   "name": "林俊杰 | 我们约定「JJ20」世界巡回演唱会见！",
-   "cover": "http://p1.music.126.net/oqOiLLYktKlEpuLz0CkbWQ==/109951171971994058.jpg?param=300y300",
-   "count": 94,
-   "creator": "微雨染尘埃"
-  },
-  {
    "id": 7313232896,
    "name": "邓紫棋，林俊杰,薛之谦，李荣浩，陈奕迅",
    "cover": "http://p1.music.126.net/TRS7UY4TWGpmaEkg47R-mw==/109951172868732102.jpg?param=300y300",
    "count": 225,
    "creator": "瞄准月亮I"
+  },
+  {
+   "id": 10107003214,
+   "name": "细数JJ林俊杰的高品质好歌",
+   "cover": "http://p1.music.126.net/qs4HrlXm641rtjNUPk5Qrw==/109951169634094700.jpg?param=300y300",
+   "count": 84,
+   "creator": "小羊同学c"
   },
   {
    "id": 2962459258,
@@ -847,11 +1095,11 @@ var search = {
    "creator": "郭慢慢11"
   },
   {
-   "id": 4991390164,
-   "name": "林俊杰 免费",
-   "cover": "http://p1.music.126.net/rOGKhiwz4D94Tmwh8tzJiw==/109951164968002193.jpg?param=300y300",
-   "count": 44,
-   "creator": "Irene_lox"
+   "id": 14060780481,
+   "name": "90后怀旧：孙燕姿 陈奕迅 林俊杰 五月天",
+   "cover": "http://p1.music.126.net/NH3XBR5-IQvRPiUFQ2XEcQ==/109951171972071573.jpg?param=300y300",
+   "count": 82,
+   "creator": "以上皆非-"
   }
  ],
  "albums": [
@@ -859,43 +1107,43 @@ var search = {
    "id": 404060139,
    "name": "Rise Without A Sound",
    "artist": "林俊杰",
-   "cover": "http://p1.music.126.net/_jktwb0bnnR_OdXAXPcVzQ==/109951174111387616.jpg?param=300y300",
+   "cover": "http://p2.music.126.net/_jktwb0bnnR_OdXAXPcVzQ==/109951174111387616.jpg?param=300y300",
    "year": 2026
   },
   {
    "id": 95357380,
    "name": "交换余生",
    "artist": "林俊杰",
-   "cover": "http://p1.music.126.net/CTvZ6cIrZ3uZdXbzedrufw==/109951169697336752.jpg?param=300y300",
+   "cover": "http://p2.music.126.net/CTvZ6cIrZ3uZdXbzedrufw==/109951169697336752.jpg?param=300y300",
    "year": 2020
   },
   {
    "id": 36997258,
    "name": "黑夜问白天",
    "artist": "林俊杰",
-   "cover": "http://p1.music.126.net/KuwDoBa5kE_TEDt5l1EnuA==/109951169697339183.jpg?param=300y300",
+   "cover": "http://p2.music.126.net/KuwDoBa5kE_TEDt5l1EnuA==/109951169697339183.jpg?param=300y300",
    "year": 2017
   },
   {
    "id": 3438282,
    "name": "和自己对话",
    "artist": "林俊杰",
-   "cover": "http://p1.music.126.net/JRxqmFNVw9tc6kCGsyvVbA==/109951169682587779.jpg?param=300y300",
+   "cover": "http://p2.music.126.net/JRxqmFNVw9tc6kCGsyvVbA==/109951169682587779.jpg?param=300y300",
    "year": 2015
-  },
-  {
-   "id": 79214796,
-   "name": "新地球",
-   "artist": "林俊杰",
-   "cover": "http://p1.music.126.net/xH5uX9f5ymnPgPD5E25myA==/109951164081863001.jpg?param=300y300",
-   "year": 2014
   },
   {
    "id": 37085119,
    "name": "伟大的渺小",
    "artist": "林俊杰",
-   "cover": "http://p1.music.126.net/577Gt_GgbymKIIpv8XS78Q==/109951169697341100.jpg?param=300y300",
+   "cover": "http://p2.music.126.net/577Gt_GgbymKIIpv8XS78Q==/109951169697341100.jpg?param=300y300",
    "year": 2017
+  },
+  {
+   "id": 163678212,
+   "name": "重拾_快乐",
+   "artist": "林俊杰",
+   "cover": "http://p2.music.126.net/KoBXh31YzOk_cEhAlBm_BQ==/109951168573329172.jpg?param=300y300",
+   "year": 2023
   }
  ]
 }
@@ -904,101 +1152,101 @@ var hotSearches = [
  {
   "word": "我不难过",
   "note": "",
-  "score": 127021
- },
- {
-  "word": "不说",
-  "note": "",
-  "score": 66212
- },
- {
-  "word": "自由的你",
-  "note": "邓紫棋全新单曲",
-  "score": 69547
+  "score": 109320
  },
  {
   "word": "天龙八部之宿敌",
   "note": "",
-  "score": 89198
+  "score": 75818
  },
  {
-  "word": "Whatever Happens",
-  "note": "",
-  "score": 36045
- },
- {
-  "word": "全息恋人",
-  "note": "",
-  "score": 46352
- },
- {
-  "word": "雨爱",
-  "note": "",
-  "score": 46351
- },
- {
-  "word": "我爱你",
-  "note": "",
-  "score": 44943
- },
- {
-  "word": "升本后醒来",
-  "note": "",
-  "score": 38782
- },
- {
-  "word": "我好想你",
-  "note": "",
-  "score": 36836
- },
- {
-  "word": "谁",
-  "note": "",
-  "score": 32457
- },
- {
-  "word": "情歌",
-  "note": "",
-  "score": 32506
- },
- {
-  "word": "刻在我心底的名字",
-  "note": "",
-  "score": 34694
- },
- {
-  "word": "你不要那样看着我的眼睛",
-  "note": "",
-  "score": 35081
- },
- {
-  "word": "不死鸟",
-  "note": "",
-  "score": 36010
- },
- {
-  "word": "孙燕姿",
-  "note": "",
-  "score": 21592
- },
- {
-  "word": "浴室",
-  "note": "",
-  "score": 20671
+  "word": "偷心",
+  "note": "爆火外网的小众中文歌",
+  "score": 70074
  },
  {
   "word": "琵琶曲",
   "note": "",
-  "score": 28880
+  "score": 58339
+ },
+ {
+  "word": "全息恋人",
+  "note": "",
+  "score": 47121
+ },
+ {
+  "word": "雨爱",
+  "note": "",
+  "score": 47120
+ },
+ {
+  "word": "茶汤",
+  "note": "",
+  "score": 39989
+ },
+ {
+  "word": "不死鸟",
+  "note": "",
+  "score": 39555
+ },
+ {
+  "word": "升本后醒来",
+  "note": "",
+  "score": 38557
+ },
+ {
+  "word": "给未来的自己",
+  "note": "",
+  "score": 37851
+ },
+ {
+  "word": "你不要那样看着我的眼睛",
+  "note": "",
+  "score": 37850
+ },
+ {
+  "word": "琵琶行",
+  "note": "",
+  "score": 31478
+ },
+ {
+  "word": "不说",
+  "note": "",
+  "score": 34734
  },
  {
   "word": "甲乙丙丁",
   "note": "",
-  "score": 23968
+  "score": 34602
  },
  {
-  "word": "坏女孩",
+  "word": "海屿你",
   "note": "",
-  "score": 27530
+  "score": 32665
+ },
+ {
+  "word": "孙燕姿",
+  "note": "",
+  "score": 23051
+ },
+ {
+  "word": "谁",
+  "note": "",
+  "score": 20226
+ },
+ {
+  "word": "失眠",
+  "note": "",
+  "score": 23809
+ },
+ {
+  "word": "不值得",
+  "note": "",
+  "score": 20442
+ },
+ {
+  "word": "我爱你",
+  "note": "",
+  "score": 30191
  }
 ]

@@ -30,6 +30,18 @@ QtObject {
             source.need("search:" + query);
     }
 
+    // 个人字段在未登录时是 null，登录后也是逐个到达（账号先到，每日推荐等稍后）：
+    // 一律换成同形的空值，入口与列表照常渲染成「还没有」，不必在每处判空
+    readonly property var pe: ({
+        daily: source.p.daily || { date: "", tracks: [] },
+        heart: source.p.heart || { seed: null, tracks: [] },
+        radar: source.p.radar || { cover: "", description: "", tracks: [] },
+        similar: source.p.similar || { seed: null, tracks: [] },
+        liked: source.p.liked || { count: 0, tracks: [] },
+        fm: source.p.fm || { tracks: [] },
+        playlistDetails: source.p.playlistDetails || {},
+    })
+
     // ── 账号 ──
     readonly property var account: source.p.account   // null = 没有登录快照
 
@@ -42,7 +54,7 @@ QtObject {
     readonly property var playlists: source.p.playlists
 
     // ── 私人漫游：一个流，直接播放 ──
-    readonly property var fmTracks: source.p.fm.tracks
+    readonly property var fmTracks: source.pe.fm.tracks
 
     // ── 我的：最近播放、云盘、创建与收藏的歌单（缺字段时给稳定的空形状）──
     readonly property var recent: source.p.recent || { total: 0, tracks: [] }
@@ -76,7 +88,7 @@ QtObject {
 
     // ── 首页第一排：为你推荐的入口。每项 { key, title, caption, cover | symbol, locked } ──
     function homeEntries(loggedIn) {
-        const p = source.p;
+        const p = source.pe;
         const fm = p.fm.tracks;
         const similar = p.similar;
         const fmEntry = fm.length > 0
@@ -120,7 +132,7 @@ QtObject {
 
     // ── 列表页：{ heading, cover, facts, description, tracks, ranked, emptyText } ──
     function list(key) {
-        const p = source.p;
+        const p = source.pe;
         switch (key) {
         case "daily": return {
             heading: "每日推荐", cover: source.sized(source.firstCover(p.daily.tracks), 560), tracks: p.daily.tracks,
