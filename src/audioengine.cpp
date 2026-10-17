@@ -4,6 +4,8 @@
 
 #include <QAudioOutput>
 #include <QCoreApplication>
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QMediaPlayer>
 #include <QTimer>
 #include <QUrlQuery>
@@ -36,9 +38,15 @@ AudioEngine::AudioEngine(NcmClient *client, QObject *parent)
     });
     connect(m_player, &QMediaPlayer::mediaStatusChanged, this, [this](QMediaPlayer::MediaStatus status) {
         if (status == QMediaPlayer::EndOfMedia) {
+            scrobbleFinish();
             setPlaying(false);
             emit finished();
         }
+    });
+    // 真正开始出声才打卡：地址还在解析时不算听过
+    connect(m_player, &QMediaPlayer::playbackStateChanged, this, [this](QMediaPlayer::PlaybackState state) {
+        if (state == QMediaPlayer::PlayingState)
+            scrobbleStart();
     });
     connect(m_player, &QMediaPlayer::errorOccurred, this, [this](QMediaPlayer::Error, const QString &errorString) {
         if (m_failed)
@@ -64,8 +72,12 @@ void AudioEngine::setTrack(const QVariantMap &track)
 {
     if (track == m_track)
         return;
+    // 切歌前把上一首的收听时长上报（位置 >= 1 秒才算）
+    scrobbleFinish();
     m_track = track;
     m_failed = false;
+    m_scrobbleStarted = false;
+    m_scrobbleFinished = false;
     m_player->stop();
     m_player->setSource(QUrl());
     emit trackChanged();
@@ -86,6 +98,8 @@ void AudioEngine::setPlaying(bool playing)
         // 地址还没取到时只记意图，resolveUrl 落地后开播
     } else {
         m_player->pause();
+        // 暂停也结算一次；恢复后不会重复上报
+        scrobbleFinish();
     }
     emit playingChanged();
 }
@@ -134,8 +148,13 @@ void AudioEngine::resolveUrl(double songId)
         startSource(cached->url);
         return;
     }
+    // 曲目元数据带 lossless / hires 时直接要 999k（flac）；服务器没有更高档会自行回落到 320k。
+    // 元数据缺失（云盘、旧结构）仍用 320k，避免为普通曲目多发一次高码率请求。
+    const QString quality = m_track.value("quality").toString();
+    const QString br = quality == QLatin1String("lossless") || quality == QLatin1String("hires")
+        ? QStringLiteral("999000") : QStringLiteral("320000");
     m_client->get("api/song/enhance/player/url",
-                  query({{"ids", QStringLiteral("[%1]").arg(num(songId))}, {"br", "320000"}}), true,
+                  query({{"ids", QStringLiteral("[%1]").arg(num(songId))}, {"br", br}}), true,
                   [this, songId](const QJsonDocument &doc, bool ok) {
         const QJsonObject item = ok ? arr(body(doc), "data").at(0).toObject() : QJsonObject();
         const QString url = item.value("url").toString();
@@ -168,6 +187,53 @@ void AudioEngine::startSource(const QString &url)
         m_player->play();
 }
 
+void AudioEngine::scrobbleStart()
+{
+    if (m_scrobbleStarted || m_track.isEmpty() || !m_client->hasMusicU())
+        return;
+    m_scrobbleStarted = true;
+    sendWeblog("startplay", 0);
+    emit scrobbled(m_track);
+}
+
+void AudioEngine::scrobbleFinish()
+{
+    if (!m_scrobbleStarted || m_scrobbleFinished || m_track.isEmpty() || !m_client->hasMusicU())
+        return;
+    int seconds = qRound(position());
+    if (seconds <= 0 && m_player->mediaStatus() == QMediaPlayer::EndOfMedia)
+        seconds = qRound(duration());
+    if (seconds <= 0)
+        return;
+    m_scrobbleFinished = true;
+    sendWeblog("play", seconds);
+}
+
+void AudioEngine::sendWeblog(const char *action, int seconds)
+{
+    const double sourceId = m_track.value("sourceId").toDouble();
+    QJsonObject json{
+        {"id", m_track.value("id").toDouble()},
+        {"type", QStringLiteral("song")},
+        {"mainsite", QStringLiteral("1")},
+        {"mainsiteWeb", QStringLiteral("1")},
+        {"content", QStringLiteral("id=%1").arg(num(sourceId))},
+    };
+    if (QLatin1String(action) == QLatin1String("play")) {
+        json.insert("download", 0);
+        json.insert("end", QStringLiteral("playend"));
+        json.insert("sourceId", num(sourceId));
+        json.insert("time", seconds);
+        json.insert("wifi", 0);
+        json.insert("source", QStringLiteral("list"));
+    }
+    const QJsonArray logs{QJsonObject{{"action", QString::fromLatin1(action)}, {"json", json}}};
+    const QString logsJson = QString::fromUtf8(QJsonDocument(logs).toJson(QJsonDocument::Compact));
+    QUrlQuery form;
+    form.addQueryItem(QStringLiteral("logs"), logsJson);
+    m_client->postForm(QStringLiteral("api/feedback/weblog"), form, true, nullptr);
+}
+
 int AudioEngine::smokeTest(double songId, int seconds)
 {
     QVariantMap track{{"id", songId}, {"dur", 0}};
@@ -193,6 +259,8 @@ int AudioEngine::smokeTest(double songId, int seconds)
     });
     report->start(1000);
 
-    QTimer::singleShot(seconds * 1000, this, [] { QCoreApplication::exit(0); });
+    // 先结算打卡再退出，给请求留 2 秒发出（smoke 用来验证「最近播放」确实被写）
+    QTimer::singleShot(seconds * 1000, this, [this] { scrobbleFinish(); });
+    QTimer::singleShot((seconds + 2) * 1000, this, [] { QCoreApplication::exit(0); });
     return 0;
 }

@@ -59,11 +59,17 @@ signals:
     void finished();
     // 取不到播放地址等；reason 是给用户看的中文句子
     void failed(const QString &reason);
+    // 已向服务器上报 startplay；Store 据此把曲目插到「最近播放」首位
+    void scrobbled(const QVariantMap &track);
 
 private:
     // fee=8 免费曲匿名也能拿 320k；data[0].url 为空即 failed
     void resolveUrl(double songId);
     void startSource(const QString &url);
+    // 听歌打卡：startplay 写「最近播放」，play 写「听歌排行」；每首歌各一次
+    void scrobbleStart();
+    void scrobbleFinish();
+    void sendWeblog(const char *action, int seconds);
 
     struct CachedUrl {
         QString url;
@@ -81,4 +87,6 @@ private:
     double m_volume = 0.7;
     bool m_muted = false;
     double m_pendingSeek = -1;
+    bool m_scrobbleStarted = false;
+    bool m_scrobbleFinished = false;
 };

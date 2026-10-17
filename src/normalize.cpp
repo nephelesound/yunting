@@ -61,10 +61,13 @@ QVariantMap ncmTrack(const QJsonObject &s, const QString &reason)
     const QString quality = truthy(s, "hr") || truthy(s, "hrMusic") ? QStringLiteral("hires")
         : truthy(s, "sq") || truthy(s, "sqMusic") ? QStringLiteral("lossless") : QString();
 
+    const QJsonObject firstArtist = artists.isEmpty() ? QJsonObject() : artists.first().toObject();
     return {
         {"id", numOr(s, "id")},
         {"name", textOr(s, "name")},
         {"artist", names.join(QStringLiteral(" / "))},
+        {"artistId", firstArtist.value("id").toDouble()},
+        {"albumId", album.value("id").toDouble()},
         {"album", textOr(album, "name")},
         {"dur", std::floor(dt / 1000)}, // Python 的 // 1000
         {"fee", numOr(s, "fee")},
@@ -85,6 +88,8 @@ QVariantMap ncmCloudTrack(const QJsonObject &item)
         {"id", numOr(item, "songId")},
         {"name", textOr(item, "songName", textOr(item, "fileName"))},
         {"artist", textOr(item, "artist")},
+        {"artistId", 0.0},
+        {"albumId", 0.0},
         {"album", textOr(item, "album")},
         {"dur", 0},
         {"fee", 0},
@@ -122,7 +127,7 @@ QVariantMap ncmPlaylistCard(const QJsonObject &p, const char *coverKey)
         {"name", textOr(p, "name")},
         {"cover", ncmSized(p.value(QLatin1String(coverKey)), 300)},
         {"count", count},
-        // copywriter 是推荐理由（首页磁贴的信息气味），没有时退回曲目数——这个回退在 QML 里做
+        // copywriter 是推荐理由（首页磁贴的信息气味），没有时退回曲目数，这个回退在 QML 里做
         {"reason", textOr(p, "copywriter")},
     };
 }
@@ -162,6 +167,19 @@ QVariantMap ncmSearchAlbum(const QJsonObject &a)
         {"artist", textOr(a.value("artist").toObject(), "name")},
         {"cover", ncmSized(a.value("picUrl"), 300)},
         {"year", ms > 0 ? date.year() : 0},
+    };
+}
+
+QVariantMap ncmSearchMv(const QJsonObject &m)
+{
+    return {
+        {"id", numOr(m, "id")},
+        {"name", textOr(m, "name")},
+        {"cover", ncmSized(m.value("cover"), 300)},
+        {"artist", textOr(m, "artistName")},
+        {"artistId", numOr(m, "artistId")},
+        {"duration", std::floor(numOr(m, "duration") / 1000)},
+        {"playCount", numOr(m, "playCount")},
     };
 }
 

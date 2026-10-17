@@ -28,6 +28,8 @@ public:
     // 首屏数据由 Store 的请求管线逐块拼成，不是一次 fetch：Store 自己写（remember）、启动时先读（peek）
     QVariant peek(const QString &key) const;
     void remember(const QString &key, const QVariant &value);
+    // 退出登录：丢掉所有含个人数据的结果（歌单详情、搜索历史之外的缓存也一并清掉）
+    void clear();
 
 private:
     struct Entry {
@@ -45,4 +47,5 @@ private:
     QHash<QString, Entry> m_entries;
     QHash<QString, QList<Deliver>> m_waiting;   // 在途 key → 等结果的人
     bool m_saveScheduled = false;
+    quint64 m_generation = 0;   // clear() 之后，旧请求的回包不再写回
 };

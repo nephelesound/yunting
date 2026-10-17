@@ -30,10 +30,11 @@ void Session::setState(const QString &state)
 void Session::start()
 {
     m_timer->stop();
-    setState(QStringLiteral("waiting"));
-    emit qrContentChanged(); // 取到 unikey 前先清空旧码
-    m_qrContent.clear();
     m_unikey.clear();
+    // 先清码再通知：否则 QML 会短暂绑定到上一次的二维码
+    m_qrContent.clear();
+    emit qrContentChanged();
+    setState(QStringLiteral("waiting"));
 
     m_client->get("api/login/qrcode/unikey", QUrlQuery(), false,
                   [this](const QJsonDocument &doc, bool ok) {

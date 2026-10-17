@@ -1,6 +1,8 @@
 #include "ncmclient.h"
 
 #include "cookievault.h"
+#include "crypto.h"
+#include "json_util.h"
 
 #include <QDir>
 #include <QEventLoop>
@@ -58,9 +60,13 @@ QMap<QString, QString> jarFromArrayFile(const QByteArray &json)
 }
 } // namespace
 
-NcmClient::NcmClient(QObject *parent)
+NcmClient::NcmClient(QObject *parent, bool loadCookies)
     : QObject(parent), m_vault(new CookieVault(this)), m_nam(new QNetworkAccessManager(this))
 {
+    if (!loadCookies) {
+        m_ready = true;
+        return;
+    }
     // legacy 明文文件 → 钥匙串（写成功才删文件），完成后才读最终存储；
     // 读到 jar 即 ready()，main 在那之后才允许 Store 发请求
     m_vault->migrate();
@@ -171,6 +177,97 @@ void NcmClient::adoptCookies(const QJsonDocument &jarDoc)
             m_jar.insert(it.key(), it.value().toString());
     }
     persistJar();
+}
+
+void NcmClient::clearAuthCookies()
+{
+    for (const char *name : {"MUSIC_U", "__csrf", "NMTID"})
+        m_jar.remove(QLatin1String(name));
+    persistJar();
+}
+
+// POST 的共同部分：写请求不重试，重复发送会产生副作用（红心、打卡、改歌单）。
+void NcmClient::postRaw(const QUrl &url, const QByteArray &body, const QString &cookie,
+                        GetCallback callback, bool keepCookies)
+{
+    QNetworkRequest req(url);
+    req.setRawHeader("Referer", Referer);
+    req.setRawHeader("User-Agent", UserAgent);
+    req.setHeader(QNetworkRequest::ContentTypeHeader,
+                  QStringLiteral("application/x-www-form-urlencoded"));
+    req.setTransferTimeout(15 * 1000);
+    req.setAttribute(QNetworkRequest::CookieLoadControlAttribute, QNetworkRequest::Manual);
+    req.setAttribute(QNetworkRequest::CookieSaveControlAttribute, QNetworkRequest::Manual);
+    if (!cookie.isEmpty())
+        req.setRawHeader("Cookie", cookie.toUtf8());
+
+    qCDebug(lcNet).noquote() << "POST" << url.path();
+    QNetworkReply *reply = m_nam->post(req, body);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, callback, keepCookies] {
+        reply->deleteLater();
+        const bool networkError = isNetworkError(*reply);
+        QJsonDocument doc;
+        bool ok = false;
+        if (reply->error() == QNetworkReply::NoError) {
+            QJsonParseError parseError;
+            const QByteArray raw = reply->readAll();
+            doc = QJsonDocument::fromJson(raw, &parseError);
+            ok = parseError.error == QJsonParseError::NoError;
+            if (!ok)
+                qWarning() << "bad JSON from" << reply->url().toString(QUrl::RemoveQuery)
+                           << raw.left(200);
+        } else {
+            qWarning() << "write failed:" << reply->error()
+                       << reply->url().toString(QUrl::RemoveQuery);
+        }
+        if (keepCookies)
+            keepSetCookies(reply);
+        emit requestFinished(ok, networkError);
+        if (callback)
+            callback(doc, ok);
+    });
+}
+
+void NcmClient::postWeapi(const QString &path, const QJsonObject &payload, bool personal,
+                          GetCallback callback, bool keepCookies)
+{
+    const QString csrf = m_jar.value(QStringLiteral("__csrf"));
+    QJsonObject body = payload;
+    if (!csrf.isEmpty())
+        body.insert(QStringLiteral("csrf_token"), csrf);
+
+    QUrl url(m_apiBase + QStringLiteral("weapi/") + path);
+    if (!csrf.isEmpty()) {
+        QUrlQuery q;
+        q.addQueryItem(QStringLiteral("csrf_token"), csrf);
+        url.setQuery(q);
+    }
+
+    // 写接口除了登录 cookie 还要带客户端标识：缺 os/appver 时服务器回 -460「网络环境风险」。
+    QString cookie = cookieHeader(personal);
+    cookie += (cookie.isEmpty() ? QString() : QStringLiteral("; "))
+        + QStringLiteral("os=pc; appver=3.1.17; osver=10");
+
+    const QByteArray form = ncm::weapiForm(body).toLatin1();
+    if (form.isEmpty()) {
+        // 加密失败属于本机错误：不发请求，交给调用方显示可读原因
+        if (callback)
+            callback({}, false);
+        return;
+    }
+    postRaw(url, form, cookie, callback, keepCookies);
+}
+
+void NcmClient::postForm(const QString &path, const QUrlQuery &form, bool personal,
+                         GetCallback callback)
+{
+    // 鉴权上下文是 Web cookie（MUSIC_U）：只能走 /api 明文或 /weapi，统一用 os=pc，
+    // 不混用 macOS/Android 客户端专有标识或 /eapi 接口。
+    QString cookie = cookieHeader(personal);
+    if (personal)
+        cookie += (cookie.isEmpty() ? QString() : QStringLiteral("; "))
+            + QStringLiteral("os=pc; appver=3.1.17; osver=10");
+    postRaw(QUrl(m_apiBase + path), ncm::formEncoded(form), cookie, callback);
 }
 
 QString NcmClient::cookieHeader(bool personal) const

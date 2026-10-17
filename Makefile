@@ -6,7 +6,7 @@ QML       ?= /usr/lib/qt6/bin/qml
 QMLLINT   ?= /usr/lib/qt6/bin/qmllint
 QMLFORMAT ?= /usr/lib/qt6/bin/qmlformat
 
-.PHONY: run lint fmt refs shots data app app-build contract test
+.PHONY: run lint fmt refs shots data app app-build contract test smoke-readonly
 
 # 应用（C++ 后端 + QML 界面，QML 编进可执行文件的资源）
 app-build:
@@ -22,6 +22,9 @@ app: app-build ## 运行应用（实时接口 + 真实播放；登录态见 READ
 # 契约检查：C++ Store 的数据形状必须与 snapshot.py 的快照一致（登录与匿名两种会话各查一次）
 #（两次都用一次性的缓存目录：检查的是这次取到的形状，不受也不污染日常使用的缓存；
 #  匿名那次还要断开会话总线，否则会从钥匙串读到登录凭据）
+smoke-readonly: app-build ## 匿名只读 smoke：CLI + 歌手/专辑/评论/MV/用户/电台
+	scripts/smoke-readonly.sh
+
 contract: app-build ## 检查 C++ Store 与快照的数据形状一致
 	rm -rf build/contract-cache build/contract-cache-anon build/contract-empty-home
 	XDG_CACHE_HOME=$(CURDIR)/build/contract-cache $(APP) --dump-store build/store.json

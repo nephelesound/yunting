@@ -58,7 +58,10 @@ void QueryCache::query(const QString &key, const Fetcher &fetch, const Deliver &
         return;
     }
     m_waiting.insert(key, {deliver});
-    fetch([this, key](const QVariant &value, bool ok) {
+    const quint64 generation = m_generation;
+    fetch([this, key, generation](const QVariant &value, bool ok) {
+        if (generation != m_generation)
+            return;                      // 期间退出登录：旧请求的结果属于上一个账号
         const QList<Deliver> waiters = m_waiting.take(key);
         if (!ok)
             return;                      // 失败：保留旧值（已经给过了）
@@ -80,6 +83,14 @@ void QueryCache::remember(const QString &key, const QVariant &value)
     m_entries.insert(key, {value, QDateTime::currentDateTimeUtc()});
     if (persistent(key))
         scheduleSave();
+}
+
+void QueryCache::clear()
+{
+    ++m_generation;
+    m_entries.clear();
+    m_waiting.clear();
+    scheduleSave();
 }
 
 void QueryCache::load()

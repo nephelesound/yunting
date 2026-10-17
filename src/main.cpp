@@ -1,5 +1,6 @@
 // 应用入口：装配 NcmClient / Store / AudioEngine / Session / Mpris，注入 prototype/main.qml。
 // QML 编进可执行文件的 Qt 资源（qrc:/qt/qml/org/sudoskys/yunting/），资源清单见 CMakeLists.txt。
+#include "apicli.h"
 #include "audioengine.h"
 #include "imagecache.h"
 #include "mpris.h"
@@ -12,6 +13,7 @@
 #include <QCommandLineParser>
 #include <QDir>
 #include <QEventLoop>
+#include <QDateTime>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
@@ -22,9 +24,41 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickWindow>
+#include <QSet>
+#include <QStandardPaths>
 #include <QTimer>
 #include <QUrl>
 #include <cstdio>
+#include <functional>
+
+namespace {
+// CLI 只读调试：等某个 data 槽位落地，打印 `{ <key>: value }`。缓存命中会同步触发
+// dataChanged，所以先 request 再决定是否进事件循环。
+int waitForStoreData(Store &store, const QString &requestKey, const QString &dataKey,
+                     const std::function<bool(const QVariantMap &)> &match)
+{
+    QEventLoop loop;
+    int rc = 2;
+    bool printed = false;
+    QObject::connect(&store, &Store::dataChanged, &loop, [&] {
+        if (printed)
+            return;
+        const QVariant value = store.data().value(dataKey);
+        if (!value.isValid() || value.isNull() || !match(value.toMap()))
+            return;
+        printed = true;
+        const QJsonObject out{{dataKey, QJsonValue::fromVariant(value)}};
+        std::printf("%s", QJsonDocument(out).toJson(QJsonDocument::Indented).constData());
+        rc = 0;
+        loop.quit();
+    });
+    QTimer::singleShot(20 * 1000, &loop, &QEventLoop::quit);
+    store.request(requestKey);
+    if (rc == 2)
+        loop.exec();
+    return rc;
+}
+} // namespace
 
 int main(int argc, char *argv[])
 {
@@ -45,11 +79,45 @@ int main(int argc, char *argv[])
                                    "songId");
     QCommandLineOption importOption("import-gtk4-cookies",
                                     "Import MUSIC_U/__csrf/NMTID from netease-cloud-music-gtk4 once");
+    QCommandLineOption writeOption("allow-write", "Allow explicit write commands (like / playlist selftests)");
+    QCommandLineOption likeOption("like", "Like/unlike a song: --like <songId> [on|off] --allow-write", "songId");
+    QCommandLineOption playlistSelfTestOption("playlist-selftest",
+                                              "Create, fill, rename and delete a private test playlist, then exit");
+    QCommandLineOption subscribeSelfTestOption("playlist-subscribe-selftest",
+                                               "Subscribe and unsubscribe one public playlist, then exit");
+    QCommandLineOption detailOption("detail", "Fetch one artist/album and print JSON: --detail artist:6452",
+                                    "key");
+    QCommandLineOption commentsOption("comments", "Fetch one comments page: --comments <songId>[:offset]",
+                                      "song");
+    QCommandLineOption artistSongsOption("artist-songs",
+                                         "Fetch one artist songs page: --artist-songs <artistId>[:offset]",
+                                         "artist");
+    QCommandLineOption mvOption("mv", "Fetch one MV (detail + play URL): --mv <mvId>", "mv");
+    QCommandLineOption searchUsersOption("search-users", "Search users: --search-users <query>", "query");
+    QCommandLineOption searchRadiosOption("search-radios", "Search radio stations: --search-radios <query>", "query");
+    QCommandLineOption apiOption("api",
+                                 "Inspect/debug backend API: --api list | --api get <path> [key=value...]",
+                                 "command");
+    QCommandLineOption apiPersonalOption("api-personal", "Send stored cookies with --api get");
+    QCommandLineOption anonymousOption("anonymous", "Skip keychain/cookies (read-only debugging)");
     QCommandLineOption verboseOption("verbose", "Print Qt/QML warnings to stderr (this machine's logging config may hide them)");
     QCommandLineOption shotOption("screenshot", "Load the UI, wait for live data, save a PNG of the window and exit", "file");
     parser.addOption(dumpOption);
     parser.addOption(smokeOption);
     parser.addOption(importOption);
+    parser.addOption(writeOption);
+    parser.addOption(likeOption);
+    parser.addOption(playlistSelfTestOption);
+    parser.addOption(subscribeSelfTestOption);
+    parser.addOption(detailOption);
+    parser.addOption(commentsOption);
+    parser.addOption(artistSongsOption);
+    parser.addOption(mvOption);
+    parser.addOption(searchUsersOption);
+    parser.addOption(searchRadiosOption);
+    parser.addOption(apiOption);
+    parser.addOption(apiPersonalOption);
+    parser.addOption(anonymousOption);
     parser.addOption(verboseOption);
     parser.addOption(shotOption);
     parser.process(app);
@@ -65,18 +133,21 @@ int main(int argc, char *argv[])
         });
     }
 
-    NcmClient client;
+    const bool anonymous = parser.isSet(anonymousOption);
+    NcmClient client(nullptr, !anonymous);
 
     // QtKeychain 的读写是异步的：等 jar 从存储读出（钥匙串或后备文件）再继续。
     // 兜底 10 秒防钥匙串守护进程挂死时永远起不来。
     {
-        QEventLoop readyLoop;
-        QTimer timeout;
-        timeout.setSingleShot(true);
-        QObject::connect(&client, &NcmClient::ready, &readyLoop, &QEventLoop::quit);
-        QObject::connect(&timeout, &QTimer::timeout, &readyLoop, &QEventLoop::quit);
-        timeout.start(10 * 1000);
-        readyLoop.exec();
+        if (!client.isReady()) {
+            QEventLoop readyLoop;
+            QTimer timeout;
+            timeout.setSingleShot(true);
+            QObject::connect(&client, &NcmClient::ready, &readyLoop, &QEventLoop::quit);
+            QObject::connect(&timeout, &QTimer::timeout, &readyLoop, &QEventLoop::quit);
+            timeout.start(10 * 1000);
+            readyLoop.exec();
+        }
     }
 
     if (parser.isSet(importOption)) {
@@ -94,6 +165,8 @@ int main(int argc, char *argv[])
     AudioEngine audio(&client);
     Session session(&client, &store);
     Mpris mpris(&audio);
+    // 打卡成功后本地「最近播放」立即更新；服务端数据仍是权威，下次 refresh 会覆盖
+    QObject::connect(&audio, &AudioEngine::scrobbled, &store, &Store::notePlayed);
 
     if (parser.isSet(dumpOption)) {
         store.waitForInitial();
@@ -130,6 +203,287 @@ int main(int argc, char *argv[])
         return 0;
     }
 
+    if (parser.isSet(apiOption)) {
+        return runApiCommand(client, parser.value(apiOption), parser.positionalArguments(),
+                             parser.isSet(apiPersonalOption));
+    }
+
+    if (parser.isSet(likeOption) || parser.isSet(playlistSelfTestOption)
+        || parser.isSet(subscribeSelfTestOption)) {
+        if (!parser.isSet(writeOption)) {
+            std::fprintf(stderr, "refusing write commands without --allow-write\n");
+            return 1;
+        }
+    }
+
+    if (parser.isSet(likeOption)) {
+        // 只用于验证 weapi 写链路：--like 108485 on / --like 108485 off
+        const double songId = parser.value(likeOption).toDouble();
+        const QString mode = parser.positionalArguments().value(0, QStringLiteral("on"));
+        const bool liked = mode.compare(QLatin1String("off"), Qt::CaseInsensitive) != 0;
+        if (songId <= 0) {
+            std::fprintf(stderr, "invalid song id\n");
+            return 1;
+        }
+        if (!client.hasMusicU()) {
+            std::fprintf(stderr, "not logged in\n");
+            return 1;
+        }
+        // 先加载首屏，trackById 才能找到 287398；也让本地歌单卡片的计数/曲目检查有意义
+        store.waitForInitial();
+        QEventLoop loop;
+        int rc = 2;
+        QObject::connect(&store, &Store::likeSucceeded, &loop, [&](double id, bool state) {
+            if (id == songId) {
+                rc = 0;
+                std::printf("%s %lld\n", state ? "liked" : "unliked", qlonglong(songId));
+                loop.quit();
+            }
+        });
+        QObject::connect(&store, &Store::likeFailed, &loop,
+                         [&](double id, bool, const QString &message) {
+            if (id == songId) {
+                rc = 1;
+                std::fprintf(stderr, "%s\n", qPrintable(message));
+                loop.quit();
+            }
+        });
+        QTimer::singleShot(20 * 1000, &loop, &QEventLoop::quit);
+        store.setLiked(songId, liked);
+        if (rc == 2)
+            loop.exec();
+        return rc;
+    }
+
+    if (parser.isSet(searchUsersOption) || parser.isSet(searchRadiosOption)) {
+        const bool users = parser.isSet(searchUsersOption);
+        const QString q = parser.value(users ? searchUsersOption : searchRadiosOption);
+        if (q.isEmpty()) {
+            std::fprintf(stderr, "empty query\n");
+            return 1;
+        }
+        const QString kind = users ? QStringLiteral("searchUsers") : QStringLiteral("searchRadios");
+        const QString key = (users ? QStringLiteral("searchUsers:") : QStringLiteral("searchRadios:")) + q;
+        return waitForStoreData(store, key, kind, [&](const QVariantMap &result) {
+            return result.value("query").toString() == q;
+        });
+    }
+
+    if (parser.isSet(mvOption)) {
+        const double mvId = parser.value(mvOption).toDouble();
+        if (mvId <= 0) {
+            std::fprintf(stderr, "expected <mvId>\n");
+            return 1;
+        }
+        return waitForStoreData(store, QStringLiteral("mv:%1").arg(qlonglong(mvId)),
+                                QStringLiteral("mv"), [&](const QVariantMap &mv) {
+            return mv.value("id").toDouble() == mvId;
+        });
+    }
+
+    if (parser.isSet(artistSongsOption)) {
+        const QStringList parts = parser.value(artistSongsOption).split(u':');
+        const double artistId = parts.value(0).toDouble();
+        const int offset = parts.value(1).toInt();
+        if (artistId <= 0 || offset < 0) {
+            std::fprintf(stderr, "expected <artistId>[:offset]\n");
+            return 1;
+        }
+        return waitForStoreData(store,
+                                QStringLiteral("artistSongs:%1:%2").arg(qlonglong(artistId)).arg(offset),
+                                QStringLiteral("artistSongs"), [&](const QVariantMap &page) {
+            return page.value("artistId").toDouble() == artistId
+                && page.value("offset").toInt() == offset;
+        });
+    }
+
+    if (parser.isSet(commentsOption)) {
+        const QStringList parts = parser.value(commentsOption).split(u':');
+        const double songId = parts.value(0).toDouble();
+        const int offset = parts.value(1).toInt();
+        if (songId <= 0 || offset < 0) {
+            std::fprintf(stderr, "expected <songId>[:offset]\n");
+            return 1;
+        }
+        return waitForStoreData(store,
+                                QStringLiteral("comments:%1:%2").arg(qlonglong(songId)).arg(offset),
+                                QStringLiteral("commentPage"), [&](const QVariantMap &page) {
+            return page.value("songId").toDouble() == songId
+                && page.value("offset").toInt() == offset;
+        });
+    }
+
+    if (parser.isSet(detailOption)) {
+        const QString key = parser.value(detailOption);
+        const QString kind = key.section(u':', 0, 0);
+        const double id = key.section(u':', 1).toDouble();
+        if ((kind != QLatin1String("artist") && kind != QLatin1String("album")) || id <= 0) {
+            std::fprintf(stderr, "expected artist:<id> or album:<id>\n");
+            return 1;
+        }
+        return waitForStoreData(store, key, kind, [&](const QVariantMap &value) {
+            return value.value("id").toDouble() == id;
+        });
+    }
+
+    if (parser.isSet(subscribeSelfTestOption)) {
+        if (!client.hasMusicU()) {
+            std::fprintf(stderr, "not logged in\n");
+            return 1;
+        }
+        store.waitForInitial();
+        QSet<double> subscribed;
+        for (const QVariant &v : store.personal().value("subscribed").toList())
+            subscribed.insert(v.toMap().value("id").toDouble());
+        double pid = 0;
+        for (const QVariant &v : store.personal().value("playlists").toList()) {
+            const QVariantMap card = v.toMap();
+            const double id = card.value("id").toDouble();
+            if (id > 0 && !subscribed.contains(id)) {
+                pid = id;
+                std::printf("candidate %lld %s\n", qlonglong(pid), qPrintable(card.value("name").toString()));
+                break;
+            }
+        }
+        if (pid <= 0) {
+            std::fprintf(stderr, "no unsubscribed public playlist found\n");
+            return 2;
+        }
+        QEventLoop loop;
+        int rc = 2;
+        int step = 0;
+        const auto has = [&] {
+            for (const QVariant &v : store.personal().value("subscribed").toList())
+                if (v.toMap().value("id").toDouble() == pid)
+                    return true;
+            return false;
+        };
+        QObject::connect(&store, &Store::playlistChanged, &loop, [&](double id) {
+            if (id != pid)
+                return;
+            if (step == 0) {
+                if (!has()) {
+                    std::fprintf(stderr, "subscribe landed but local subscribed is missing\n");
+                    loop.quit();
+                    return;
+                }
+                step = 1;
+                std::printf("subscribed\n");
+                store.setPlaylistSubscribed(pid, false);
+            } else if (step == 1) {
+                if (has()) {
+                    std::fprintf(stderr, "unsubscribe landed but local subscribed still has it\n");
+                    loop.quit();
+                    return;
+                }
+                std::printf("unsubscribed, local=ok\n");
+                rc = 0;
+                loop.quit();
+            }
+        });
+        QObject::connect(&store, &Store::playlistActionFailed, &loop,
+                         [&](const QString &action, const QString &message) {
+            std::fprintf(stderr, "%s: %s\n", qPrintable(action), qPrintable(message));
+            loop.quit();
+        });
+        QTimer::singleShot(30 * 1000, &loop, &QEventLoop::quit);
+        store.setPlaylistSubscribed(pid, true);
+        loop.exec();
+        if (rc != 0 && has()) {
+            // 失败也尽量取消订阅，账号回到原状
+            QEventLoop cleanup;
+            QObject::connect(&store, &Store::playlistChanged, &cleanup, [&](double id) {
+                if (id == pid)
+                    cleanup.quit();
+            });
+            QTimer::singleShot(5 * 1000, &cleanup, &QEventLoop::quit);
+            store.setPlaylistSubscribed(pid, false);
+            cleanup.exec();
+        }
+        return rc;
+    }
+
+    if (parser.isSet(playlistSelfTestOption)) {
+        // 端到端验证歌单写接口；只创建一个私有测试歌单，最后删除，账号回到原状。
+        if (!client.hasMusicU()) {
+            std::fprintf(stderr, "not logged in\n");
+            return 1;
+        }
+        // 先加载首屏，trackById 才能找到 287398；也让本地歌单卡片的计数/曲目检查有意义
+        store.waitForInitial();
+        QEventLoop loop;
+        int rc = 2;
+        int step = 0;
+        double pid = 0;
+        bool localOk = true;
+        const auto cardIn = [&](const char *key) -> QVariantMap {
+            for (const QVariant &v : store.personal().value(QLatin1String(key)).toList()) {
+                QVariantMap card = v.toMap();
+                if (card.value("id").toDouble() == pid)
+                    return card;
+            }
+            return {};
+        };
+        const QString name = QStringLiteral("云听自检 %1").arg(QDateTime::currentSecsSinceEpoch());
+        QObject::connect(&store, &Store::playlistCreated, &loop, [&](double id, const QString &) {
+            if (step != 0) return;
+            pid = id;
+            step = 1;
+            localOk = localOk && !cardIn("mine").isEmpty();
+            std::printf("created %lld\n", qlonglong(pid));
+            store.addSongToPlaylist(pid, 287398);
+        });
+        QObject::connect(&store, &Store::playlistChanged, &loop, [&](double id) {
+            if (id != pid) return;
+            if (step == 1) {
+                step = 2;
+                const QVariantMap card = cardIn("mine");
+                localOk = localOk && card.value("count").toDouble() == 1
+                    && !card.value("tracks").toList().isEmpty();
+                std::printf("added\n");
+                store.removeSongFromPlaylist(pid, 287398);
+            } else if (step == 2) {
+                step = 3;
+                const QVariantMap card = cardIn("mine");
+                localOk = localOk && card.value("count").toDouble() == 0
+                    && card.value("tracks").toList().isEmpty();
+                std::printf("removed\n");
+                store.renamePlaylist(pid, name + QStringLiteral(" renamed"));
+            } else if (step == 3) {
+                step = 4;
+                localOk = localOk && cardIn("mine").value("name").toString().endsWith(QStringLiteral(" renamed"));
+                std::printf("renamed\n");
+                store.deletePlaylist(pid);
+            } else if (step == 4) {
+                localOk = localOk && cardIn("mine").isEmpty();
+                std::printf("deleted, local=%s\n", localOk ? "ok" : "bad");
+                rc = localOk ? 0 : 1;
+                loop.quit();
+            }
+        });
+        QObject::connect(&store, &Store::playlistActionFailed, &loop,
+                         [&](const QString &action, const QString &message) {
+            std::fprintf(stderr, "%s: %s\n", qPrintable(action), qPrintable(message));
+            rc = 1;
+            loop.quit();
+        });
+        QTimer::singleShot(45 * 1000, &loop, &QEventLoop::quit);
+        store.createPlaylist(name, true);
+        loop.exec();
+        if (rc != 0 && pid > 0) {
+            // 失败也尽量删除测试歌单，避免留下垃圾；等请求真正落地再退出
+            QEventLoop cleanup;
+            QObject::connect(&store, &Store::playlistChanged, &cleanup, [&](double id) {
+                if (id == pid)
+                    cleanup.quit();
+            });
+            QTimer::singleShot(5 * 1000, &cleanup, &QEventLoop::quit);
+            store.deletePlaylist(pid);
+            cleanup.exec();
+        }
+        return rc;
+    }
+
     if (parser.isSet(smokeOption)) {
         // 无窗口：事件循环跑在 QCoreApplication 节奏上，AudioEngine 自己打印状态
         const int rc = audio.smokeTest(parser.value(smokeOption).toDouble(), 6);
@@ -148,8 +502,13 @@ int main(int argc, char *argv[])
     // 钥匙串超时后才读出 jar（例如在等用户解锁钱包）：先按匿名起来，读出后再按登录态刷一次
     if (!client.isReady())
         QObject::connect(&client, &NcmClient::ready, &store, &Store::refresh, Qt::SingleShotConnection);
+    // QML 的 Settings 要求 organizationName，否则 QSettings 初始化失败（队列/窗口大小无法恢复）。
+    // "." 让它与不设组织名时落在同一层：~/.config/yunting.conf，而不会多套一层 yunting/。
+    // 放在这里而不是开头：之前构造的 Store / CookieVault / 图片缓存已拿到不带组织名的 XDG 路径。
+    const QString imageCacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/images";
+    app.setOrganizationName(QStringLiteral("."));
     QQmlApplicationEngine engine;
-    ImageCacheFactory imageCache;
+    ImageCacheFactory imageCache(imageCacheDir);
     engine.setNetworkAccessManagerFactory(&imageCache);
     // main.qml 用 root.backend.{store,audio,session,mpris,tray} 取后端；QVariantMap 的 key 就是属性名
     QVariantMap backend{{"store", QVariant::fromValue<QObject *>(&store)},

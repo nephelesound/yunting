@@ -6,7 +6,8 @@
 #include "ncmclient.h"
 #include "normalize.h"
 
-#include <QUrl>
+#include <QDateTime>
+#include <QSet>
 #include <QUrlQuery>
 #include <memory>
 
@@ -25,6 +26,25 @@ void Store::maybeFetchSimilar()
     });
 }
 
+// 私人漫游续取：接口每次给一小批新歌，追加到 personal.fm.tracks（按 id 去重）。
+// 每次都要新的一批，所以不经 QueryCache；失败时什么都不改，界面下次快放完时再要
+void Store::requestMoreFm()
+{
+    fetch("api/v1/radio/get", {}, true, [this](const QJsonDocument &doc, bool ok) {
+        if (!ok)
+            return;
+        QVariantList tracks = m_personal.value("fm").toMap().value("tracks").toList();
+        QSet<double> seen;
+        for (const QVariant &t : std::as_const(tracks))
+            seen.insert(t.toMap().value("id").toDouble());
+        for (const QVariant &t : ncmTracks(arr(body(doc), "data"))) {
+            if (!seen.contains(t.toMap().value("id").toDouble()))
+                tracks.append(t);
+        }
+        put("fm", QVariantMap{{"tracks", tracks}}, true);
+    });
+}
+
 void Store::request(const QString &key)
 {
     const QString arg = key.section(u':', 1);
@@ -32,10 +52,30 @@ void Store::request(const QString &key)
         requestLyrics(key, arg.toDouble());
     else if (key.startsWith(QLatin1String("playlist:")))
         requestPlaylist(key, arg.toDouble());
+    else if (key.startsWith(QLatin1String("searchUsers:")))
+        requestSearchUsers(key, arg);
+    else if (key.startsWith(QLatin1String("searchRadios:")))
+        requestSearchRadios(key, arg);
     else if (key.startsWith(QLatin1String("search:")))
         requestSearch(key, arg);
-    else if (key.startsWith(QLatin1String("comments:")))
-        requestComments(key, arg.toDouble());
+    else if (key.startsWith(QLatin1String("comments:"))) {
+        const QStringList parts = key.split(u':');
+        if (parts.size() >= 3)
+            requestCommentPage(key, parts.at(1).toDouble(), parts.at(2).toInt());
+        else
+            requestComments(key, parts.value(1).toDouble());
+    }
+    else if (key.startsWith(QLatin1String("artistSongs:"))) {
+        const QStringList parts = key.split(u':');
+        requestArtistSongs(key, parts.value(1).toDouble(), parts.value(2).toInt());
+    } else if (key.startsWith(QLatin1String("artist:")))
+        requestArtist(key, arg.toDouble());
+    else if (key.startsWith(QLatin1String("mv:")))
+        requestMv(key, arg.toDouble());
+    else if (key.startsWith(QLatin1String("album:")))
+        requestAlbum(key, arg.toDouble());
+    else if (key == QLatin1String("fm:next"))
+        requestMoreFm();
     else
         qWarning() << "unknown store key:" << key.section(u':', 0, 0);
 }
@@ -64,18 +104,28 @@ void Store::requestPlaylist(const QString &key, double playlistId)
 {
     m_cache.query(key,
         [this, playlistId](QueryCache::Done done) {
-            m_client->get("api/v6/playlist/detail", query({{"id", num(playlistId)}, {"n", "30"}}), true,
-                          [done](const QJsonDocument &doc, bool ok) {
-                const QJsonObject pl = body(doc).value("playlist").toObject();
-                done(QVariantMap{{"tracks", ncmTracks(take(arr(pl, "tracks"), 30))},
-                                 {"description", ncmFirstLine(pl.value("description").toString())}},
-                     ok && !pl.isEmpty());
+            fetchPlaylistTracks(playlistId, true,
+                                [done, playlistId](const QVariantList &tracks, const QJsonObject &pl, bool ok) {
+                if (!ok || pl.isEmpty()) {
+                    done({}, false);
+                    return;
+                }
+                done(QVariantMap{{"tracks", tracks},
+                                 {"description", ncmFirstLine(pl.value("description").toString())},
+                                 {"name", pl.value("name").toString()},
+                                 {"cover", ncmSized(pl.value("coverImgUrl"), 400)},
+                                 {"count", pl.value("trackCount").toDouble()},
+                                 {"id", playlistId}},
+                     true);
             });
         },
         [this, playlistId](const QVariant &detail) {
             QVariantMap details = m_personal.value("playlistDetails").toMap();
             details.insert(num(playlistId), detail);
             put("playlistDetails", details, true);
+            // 推荐歌单的卡片也换成完整曲目：从列表页返回后再点一次不用重新等
+            patchPlaylistCard(playlistId, detail.toMap().value("tracks").toList(),
+                              detail.toMap().value("description").toString());
         });
 }
 
@@ -84,22 +134,42 @@ void Store::requestSearch(const QString &key, const QString &raw)
 {
     m_cache.query(key,
         [this, raw](QueryCache::Done done) {
-            const QString s = QString::fromUtf8(QUrl::toPercentEncoding(raw));
             struct Pending {
                 QVariantMap result;
-                int left = 4;
+                int left = 5;
                 bool ok = true;
             };
             auto pending = std::make_shared<Pending>();
             pending->result = QVariantMap{{"query", raw}};
-            const auto part = [this, s, pending, done](const char *type, const char *limit, const char *field,
-                                                       std::function<QVariant(const QJsonObject &)> pick) {
-                m_client->get("api/search/get", query({{"s", s}, {"type", type}, {"limit", limit}}), false,
-                              [pending, done, field, pick](const QJsonDocument &doc, bool ok) {
+            const auto part = [this, raw, pending, done](const char *type, const char *limit, const char *field,
+                                                          std::function<QVariant(const QJsonObject &)> pick) {
+                m_client->get("api/search/get", query({{"s", raw}, {"type", type}, {"limit", limit}}), false,
+                              [this, pending, done, field, pick](const QJsonDocument &doc, bool ok) {
                     pending->result.insert(QLatin1String(field), pick(body(doc).value("result").toObject()));
                     pending->ok = pending->ok && ok;
-                    if (--pending->left == 0)
+                    if (--pending->left != 0)
+                        return;
+
+                    // 搜索接口的单曲没有专辑封面（album.picUrl 为 null），用歌曲详情补齐封面、音质、MV。
+                    // 详情失败时保留搜索接口的原值，搜索本身仍然可用。
+                    const QVariantList songs = pending->result.value("songs").toList();
+                    QList<double> ids;
+                    ids.reserve(songs.size());
+                    for (const QVariant &v : songs)
+                        ids.append(v.toMap().value("id").toDouble());
+                    fetchSongDetails(ids, false,
+                                     [pending, done, songs](const QHash<double, QVariantMap> &details, bool detailsOk) {
+                        if (detailsOk && !details.isEmpty()) {
+                            QVariantList enriched;
+                            enriched.reserve(songs.size());
+                            for (const QVariant &v : songs) {
+                                const QVariantMap original = v.toMap();
+                                enriched.append(details.value(original.value("id").toDouble(), original));
+                            }
+                            pending->result.insert(QStringLiteral("songs"), enriched);
+                        }
                         done(pending->result, pending->ok);
+                    });
                 });
             };
             const auto list = [](const QJsonObject &r, const char *k, QVariantMap (*fn)(const QJsonObject &)) {
@@ -108,12 +178,50 @@ void Store::requestSearch(const QString &key, const QString &raw)
                     out.append(fn(v.toObject()));
                 return QVariant(out);
             };
-            part("1", "10", "songs", [](const QJsonObject &r) { return QVariant(ncmTracks(arr(r, "songs"))); });
-            part("100", "6", "artists", [list](const QJsonObject &r) { return list(r, "artists", ncmSearchArtist); });
-            part("1000", "6", "playlists", [list](const QJsonObject &r) { return list(r, "playlists", ncmSearchPlaylist); });
-            part("10", "6", "albums", [list](const QJsonObject &r) { return list(r, "albums", ncmSearchAlbum); });
+            // 单曲给 100 首（页面自己按高度截）；艺人/歌单/专辑各 30 个，足够一屏与「更多」展开
+            part("1", "100", "songs", [](const QJsonObject &r) { return QVariant(ncmTracks(arr(r, "songs"))); });
+            part("100", "30", "artists", [list](const QJsonObject &r) { return list(r, "artists", ncmSearchArtist); });
+            part("1000", "30", "playlists", [list](const QJsonObject &r) { return list(r, "playlists", ncmSearchPlaylist); });
+            part("10", "30", "albums", [list](const QJsonObject &r) { return list(r, "albums", ncmSearchAlbum); });
+            part("1004", "12", "mvs", [list](const QJsonObject &r) { return list(r, "mvs", ncmSearchMv); });
         },
         [this](const QVariant &result) { put("search", result, false); });
+}
+
+// 全部评论分页：按时间倒序（接口 comments 数组），每页 20 条，10 分钟缓存
+void Store::requestCommentPage(const QString &key, double songId, int offset)
+{
+    m_cache.query(key,
+        [this, songId, offset](QueryCache::Done done) {
+            m_client->get(QStringLiteral("api/v1/resource/comments/R_SO_4_%1").arg(qlonglong(songId)),
+                          query({{"limit", "20"}, {"offset", QString::number(offset)}}), false,
+                          [done, songId, offset](const QJsonDocument &doc, bool ok) {
+                const QJsonObject resp = body(doc);
+                QVariantList items;
+                for (const QJsonValue &v : arr(resp, "comments")) {
+                    const QJsonObject c = v.toObject();
+                    const QJsonObject user = c.value("user").toObject();
+                    items.append(QVariantMap{
+                        {"user", user.value("nickname").toString()},
+                        {"avatar", ncmSized(user.value("avatarUrl"), 96)},
+                        {"content", c.value("content").toString()},
+                        {"likes", c.value("likedCount").toDouble()},
+                        {"time", c.value("time").toDouble()},
+                        {"id", c.value("commentId").toDouble()},
+                        {"parentId", c.value("parentCommentId").toDouble()},
+                    });
+                }
+                const double total = resp.value("total").toDouble();
+                done(QVariantMap{{"songId", songId},
+                                 {"offset", offset},
+                                 {"total", total},
+                                 {"more", resp.value("more").toBool()
+                                              || (total > 0 && offset + items.size() < total)},
+                                 {"items", items}},
+                     ok && resp.value("code").toInt() == 200);
+            });
+        },
+        [this](const QVariant &page) { put("commentPage", page, false); });
 }
 
 // 热门评论：写回 data.comments（10 分钟新鲜期，落盘）；保持接口顺序，最多 10 条
@@ -129,4 +237,272 @@ void Store::requestComments(const QString &key, double songId)
             });
         },
         [this](const QVariant &comments) { put("comments", comments, false); });
+}
+
+
+// 歌手页：热歌 50 首 + 专辑列表（一次 200 张；普通歌手够用）。两个请求独立，
+// 专辑失败仍返回歌手与热歌，页面不会整页空白。
+void Store::requestArtist(const QString &key, double artistId)
+{
+    m_cache.query(key,
+        [this, artistId](QueryCache::Done done) {
+            struct State {
+                QVariantMap artist;
+                QVariantList albums;
+                int left = 2;
+                bool artistOk = false;
+            };
+            auto state = std::make_shared<State>();
+            const auto finish = [state, done] {
+                if (!state->artistOk) {
+                    done({}, false);
+                    return;
+                }
+                state->artist.insert("albums", state->albums);
+                done(state->artist, true);
+            };
+
+            m_client->get(QStringLiteral("api/v1/artist/%1").arg(qlonglong(artistId)), {}, false,
+                          [state, finish](const QJsonDocument &doc, bool ok) {
+                const QJsonObject a = body(doc).value("artist").toObject();
+                if (ok && !a.isEmpty()) {
+                    QVariantList aliases;
+                    for (const QJsonValue &v : arr(a, "alias"))
+                        aliases.append(v.toString());
+                    state->artist = QVariantMap{
+                        {"id", a.value("id").toDouble()},
+                        {"name", a.value("name").toString()},
+                        {"cover", ncmSized(a.value("picUrl"), 400)},
+                        {"alias", aliases.isEmpty() ? QString() : aliases.first().toString()},
+                        {"description", a.value("briefDesc").toString()},
+                        {"followed", a.value("followed").toBool()},
+                        {"musicSize", a.value("musicSize").toDouble()},
+                        {"albumSize", a.value("albumSize").toDouble()},
+                        {"tracks", ncmTracks(arr(body(doc), "hotSongs"))},
+                    };
+                    state->artistOk = true;
+                }
+                if (--state->left == 0)
+                    finish();
+            });
+
+            m_client->get(QStringLiteral("api/artist/albums/%1").arg(qlonglong(artistId)),
+                          query({{"limit", "200"}, {"offset", "0"}}), false,
+                          [state, finish](const QJsonDocument &doc, bool ok) {
+                if (ok) {
+                    for (const QJsonValue &v : arr(body(doc), "hotAlbums")) {
+                        const QJsonObject a = v.toObject();
+                        const double ms = a.value("publishTime").toDouble();
+                        state->albums.append(QVariantMap{
+                            {"id", a.value("id").toDouble()},
+                            {"name", a.value("name").toString()},
+                            {"cover", ncmSized(a.value("picUrl"), 300)},
+                            {"year", ms > 0 ? QDateTime::fromSecsSinceEpoch(qlonglong(ms / 1000)).date().year() : 0},
+                            {"count", a.value("size").toDouble()},
+                        });
+                    }
+                }
+                if (--state->left == 0)
+                    finish();
+            });
+        },
+        [this](const QVariant &artist) { put("artist", artist, false); });
+}
+
+// 专辑页：专辑信息 + 完整曲目（接口一次返回全部）
+void Store::requestAlbum(const QString &key, double albumId)
+{
+    m_cache.query(key,
+        [this, albumId](QueryCache::Done done) {
+            m_client->get(QStringLiteral("api/v1/album/%1").arg(qlonglong(albumId)), {}, false,
+                          [done](const QJsonDocument &doc, bool ok) {
+                const QJsonObject resp = body(doc);
+                const QJsonObject a = resp.value("album").toObject();
+                if (!ok || a.isEmpty()) {
+                    done({}, false);
+                    return;
+                }
+                const QJsonArray artists = arr(a, "artists");
+                const QJsonObject first = artists.isEmpty() ? a.value("artist").toObject()
+                                                            : artists.first().toObject();
+                done(QVariantMap{
+                         {"id", a.value("id").toDouble()},
+                         {"name", a.value("name").toString()},
+                         {"artist", first.value("name").toString()},
+                         {"artistId", first.value("id").toDouble()},
+                         {"cover", ncmSized(a.value("picUrl"), 400)},
+                         {"description", a.value("description").toString()},
+                         {"company", a.value("company").toString()},
+                         {"subscribed", a.value("isSub").toBool()},
+                         {"publishTime", a.value("publishTime").toDouble()},
+                         {"tracks", ncmTracks(arr(resp, "songs"))},
+                     },
+                     true);
+            });
+        },
+        [this](const QVariant &album) { put("album", album, false); });
+}
+
+
+// 歌手全部歌曲分页：歌手页先用 artist:<id> 的热歌 50 首，往下翻时用这个 key。
+// 排序固定按热度；接口一次 50 首，total/more 由响应给出。
+void Store::requestArtistSongs(const QString &key, double artistId, int offset)
+{
+    m_cache.query(key,
+        [this, artistId, offset](QueryCache::Done done) {
+            m_client->get(QStringLiteral("api/v1/artist/songs"),
+                          query({{"id", num(artistId)}, {"limit", "50"},
+                                 {"offset", QString::number(offset)}, {"order", "hot"}}), false,
+                          [done, artistId, offset](const QJsonDocument &doc, bool ok) {
+                const QJsonObject resp = body(doc);
+                const QVariantList tracks = ncmTracks(arr(resp, "songs"));
+                const double total = resp.value("total").toDouble();
+                done(QVariantMap{{"artistId", artistId},
+                                 {"offset", offset},
+                                 {"total", total},
+                                 {"more", resp.value("more").toBool()
+                                              || (total > 0 && offset + tracks.size() < total)},
+                                 {"tracks", tracks}},
+                     ok && resp.value("code").toInt() == 200);
+            });
+        },
+        [this](const QVariant &page) { put("artistSongs", page, false); });
+}
+
+
+// MV：详情 + 播放地址（均为 Web /weapi，两请求并发；地址失败仍返回详情）
+void Store::requestMv(const QString &key, double mvId)
+{
+    m_cache.query(key,
+        [this, mvId](QueryCache::Done done) {
+            struct State {
+                QVariantMap mv;
+                QString url;
+                double br = 0;
+                double size = 0;
+                double expires = 0;
+                bool detailOk = false;
+                int left = 2;
+            };
+            auto state = std::make_shared<State>();
+            const auto finish = [state, done] {
+                if (--state->left != 0)
+                    return;
+                if (!state->detailOk) {
+                    done({}, false);
+                    return;
+                }
+                state->mv.insert("url", state->url);
+                state->mv.insert("br", state->br);
+                state->mv.insert("size", state->size);
+                state->mv.insert("expires", state->expires);
+                done(state->mv, true);
+            };
+
+            m_client->postWeapi("v1/mv/detail", QJsonObject{{"id", num(mvId)}}, true,
+                                [state, finish](const QJsonDocument &doc, bool ok) {
+                const QJsonObject root = body(doc);
+                const QJsonObject d = root.value("data").toObject();
+                if (ok && root.value("code").toInt() == 200 && !d.isEmpty()) {
+                    state->detailOk = true;
+                    state->mv = QVariantMap{
+                        {"id", d.value("id").toDouble()},
+                        {"name", d.value("name").toString()},
+                        {"cover", ncmSized(d.value("cover"), 400)},
+                        {"artist", d.value("artistName").toString()},
+                        {"artistId", d.value("artistId").toDouble()},
+                        {"duration", std::floor(d.value("duration").toDouble() / 1000)},
+                        {"playCount", d.value("playCount").toDouble()},
+                        {"subCount", d.value("subCount").toDouble()},
+                        {"shareCount", d.value("shareCount").toDouble()},
+                        {"commentCount", d.value("commentCount").toDouble()},
+                        {"publishTime", d.value("publishTime").toString()},
+                        {"description", d.value("desc").toString()},
+                        {"subscribed", root.value("subed").toBool()},
+                        {"url", QString{}},
+                        {"br", 0.0},
+                        {"size", 0.0},
+                        {"expires", 0.0},
+                    };
+                }
+                finish();
+            });
+
+            m_client->postWeapi("song/enhance/play/mv/url", QJsonObject{{"id", num(mvId)}, {"r", 1080}}, true,
+                                [state, finish](const QJsonDocument &doc, bool ok) {
+                const QJsonObject root = body(doc);
+                const QJsonObject d = root.value("data").toObject();
+                if (ok && root.value("code").toInt() == 200 && !d.isEmpty()) {
+                    if (d.value("code").toInt() == 200) {
+                        state->url = d.value("url").toString();
+                        state->br = d.value("r").toDouble();
+                        state->size = d.value("size").toDouble();
+                        state->expires = d.value("expi").toDouble();
+                    }
+                }
+                finish();
+            });
+        },
+        [this](const QVariant &mv) { put("mv", mv, false); });
+}
+
+
+// 用户搜索：Cloudsearch 的 userprofiles；与主搜索分开按需取，避免每次搜索多发请求
+void Store::requestSearchUsers(const QString &key, const QString &raw)
+{
+    m_cache.query(key,
+        [this, raw](QueryCache::Done done) {
+            m_client->get("api/cloudsearch/pc",
+                          query({{"s", raw}, {"type", "1002"}, {"limit", "20"}, {"offset", "0"}}), false,
+                          [done, raw](const QJsonDocument &doc, bool ok) {
+                const QJsonObject resp = body(doc);
+                QVariantList items;
+                for (const QJsonValue &v : arr(resp.value("result").toObject(), "userprofiles")) {
+                    const QJsonObject u = v.toObject();
+                    items.append(QVariantMap{
+                        {"id", u.value("userId").toDouble()},
+                        {"name", u.value("nickname").toString()},
+                        {"cover", ncmSized(u.value("avatarUrl"), 300)},
+                        {"followed", u.value("followed").toBool()},
+                        {"fans", u.value("followeds").toDouble()},
+                        {"follows", u.value("follows").toDouble()},
+                        {"playlists", u.value("playlistCount").toDouble()},
+                        {"signature", u.value("signature").toString()},
+                    });
+                }
+                done(QVariantMap{{"query", raw}, {"items", items}},
+                     ok && resp.value("code").toInt() == 200);
+            });
+        },
+        [this](const QVariant &result) { put("searchUsers", result, false); });
+}
+
+// 电台搜索：Cloudsearch 的 djRadios
+void Store::requestSearchRadios(const QString &key, const QString &raw)
+{
+    m_cache.query(key,
+        [this, raw](QueryCache::Done done) {
+            m_client->get("api/cloudsearch/pc",
+                          query({{"s", raw}, {"type", "1009"}, {"limit", "20"}, {"offset", "0"}}), false,
+                          [done, raw](const QJsonDocument &doc, bool ok) {
+                const QJsonObject resp = body(doc);
+                QVariantList items;
+                for (const QJsonValue &v : arr(resp.value("result").toObject(), "djRadios")) {
+                    const QJsonObject r = v.toObject();
+                    items.append(QVariantMap{
+                        {"id", r.value("id").toDouble()},
+                        {"name", r.value("name").toString()},
+                        {"cover", ncmSized(r.value("picUrl"), 300)},
+                        {"description", r.value("desc").toString()},
+                        {"host", r.value("dj").toObject().value("nickname").toString()},
+                        {"programCount", r.value("programCount").toDouble()},
+                        {"subCount", r.value("subCount").toDouble()},
+                        {"playCount", r.value("playCount").toDouble()},
+                    });
+                }
+                done(QVariantMap{{"query", raw}, {"items", items}},
+                     ok && resp.value("code").toInt() == 200);
+            });
+        },
+        [this](const QVariant &result) { put("searchRadios", result, false); });
 }

@@ -6,7 +6,7 @@
 #include <QNetworkDiskCache>
 #include <QNetworkRequest>
 #include <QQmlNetworkAccessManagerFactory>
-#include <QStandardPaths>
+#include <utility>
 
 class ImageCacheFactory : public QQmlNetworkAccessManagerFactory {
     class CachingManager : public QNetworkAccessManager {
@@ -23,13 +23,19 @@ class ImageCacheFactory : public QQmlNetworkAccessManagerFactory {
     };
 
 public:
+    explicit ImageCacheFactory(QString cacheDir)
+        : m_cacheDir(std::move(cacheDir)) {}
+
     QNetworkAccessManager *create(QObject *parent) override
     {
         auto *nam = new CachingManager(parent);
         auto *cache = new QNetworkDiskCache(nam);
-        cache->setCacheDirectory(QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/images");
+        cache->setCacheDirectory(m_cacheDir);
         cache->setMaximumCacheSize(512LL * 1024 * 1024);
         nam->setCache(cache);
         return nam;
     }
+
+private:
+    QString m_cacheDir;
 };

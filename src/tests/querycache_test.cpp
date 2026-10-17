@@ -107,6 +107,31 @@ private slots:
         QVERIFY(!cache.peek("playlist:9").isValid());
     }
 
+    void clearDropsPersonalData()
+    {
+        QTemporaryDir dir;
+        QueryCache cache(dir.filePath("q.json"));
+        cache.remember("playlist:1", "private");
+        cache.remember("lyrics:1", "public");
+        cache.clear();
+        QVERIFY(!cache.peek("playlist:1").isValid());
+        QVERIFY(!cache.peek("lyrics:1").isValid());
+    }
+
+    void clearIgnoresInFlightResult()
+    {
+        QTemporaryDir dir;
+        QueryCache cache(dir.filePath("q.json"));
+        FakeFetch fetch;
+        fetch.hold = true;
+        int delivered = 0;
+        cache.query("playlist:1", fetch.fn(), [&](const QVariant &) { ++delivered; });
+        cache.clear();
+        fetch.pending("old account", true);
+        QCOMPARE(delivered, 0);
+        QVERIFY(!cache.peek("playlist:1").isValid());
+    }
+
     void lyricsSurviveRestartButSearchDoesNot()
     {
         QTemporaryDir dir;

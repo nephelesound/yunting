@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# 只读 smoke：匿名会话，不读钥匙串、不写账号。覆盖 CLI + 核心数据端点。
+set -euo pipefail
+
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+APP=${APP:-"$ROOT/build/app/yunting"}
+APP_CMD=("$APP" --anonymous)
+CACHE=${SMOKE_CACHE:-"$ROOT/build/smoke-readonly-cache"}
+DATA=${SMOKE_DATA:-"$ROOT/build/smoke-readonly-home"}
+OUT=${SMOKE_OUT:-"$ROOT/build/smoke-readonly-last.json"}
+mkdir -p "$CACHE" "$DATA"
+
+export DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent
+export XDG_CACHE_HOME="$CACHE"
+export XDG_DATA_HOME="$DATA"
+export YUNTING_KEYCHAIN_SERVICE=yunting-smoke
+
+fail() {
+    echo "FAIL $1"
+    [ -f "$OUT" ] && cat "$OUT"
+    exit 1
+}
+
+# check <label> <JSON 断言> <command...>
+# 断言里用 d 指向解析后的 JSON；只写固定表达式，不接收外部输入。
+check() {
+    local label=$1 expr=$2
+    shift 2
+    if ! "$@" >"$OUT" 2>/tmp/yunting-smoke.err; then
+        echo "FAIL $label"
+        cat /tmp/yunting-smoke.err
+        exit 1
+    fi
+    if ! python3 - "$OUT" "$expr" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert eval(sys.argv[2], {"d": d}), sys.argv[2]
+PY
+    then
+        fail "$label"
+    fi
+    echo "ok   $label"
+}
+
+"$APP" --api list | grep -q 'api/v1/artist/<id>'
+echo "ok   api list"
+
+check "api artist" 'd["hotSongs"]' "${APP_CMD[@]}" --api get api/v1/artist/6452
+check "artist detail" 'd["artist"]["tracks"] and d["artist"]["albums"]' "${APP_CMD[@]}" --detail artist:6452
+check "album detail" 'd["album"]["tracks"]' "${APP_CMD[@]}" --detail album:32311
+check "artist songs" 'len(d["artistSongs"]["tracks"]) == 50' "${APP_CMD[@]}" --artist-songs 6452:100
+check "comments page" 'len(d["commentPage"]["items"]) == 20' "${APP_CMD[@]}" --comments 108485:20
+check "mv" 'd["mv"]["url"] and d["mv"]["br"] > 0' "${APP_CMD[@]}" --mv 522365
+check "search users" 'd["searchUsers"]["items"]' "${APP_CMD[@]}" --search-users 林俊杰
+check "search radios" 'd["searchRadios"]["items"]' "${APP_CMD[@]}" --search-radios 林俊杰

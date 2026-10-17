@@ -16,6 +16,7 @@ QVariantMap ncmPlaylistCard(const QJsonObject &p, const char *coverKey);
 QVariantMap ncmSearchArtist(const QJsonObject &a);
 QVariantMap ncmSearchPlaylist(const QJsonObject &p);
 QVariantMap ncmSearchAlbum(const QJsonObject &a);
+QVariantMap ncmSearchMv(const QJsonObject &m);
 QVariantList ncmTracks(const QJsonArray &items);
 // 热门评论：data.comments 的取数形状（snapshot.py 的 hot_comments）
 QVariantMap ncmHotComments(const QJsonObject &resp, double songId);

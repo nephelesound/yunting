@@ -56,6 +56,8 @@ def track(s, reason=""):
         "id": s["id"],
         "name": s["name"],
         "artist": " / ".join(a["name"] for a in artists),
+        "artistId": artists[0].get("id") or 0 if artists else 0,
+        "albumId": album.get("id") or 0,
         "album": album.get("name") or "",
         "dur": (s.get("dt") or s.get("duration") or 0) // 1000,
         "fee": s.get("fee", 0),
@@ -91,7 +93,34 @@ def cloud_track(item):
     if item.get("simpleSong"):
         return track(item["simpleSong"])
     return {"id": item.get("songId") or 0, "name": item.get("songName") or item.get("fileName") or "",
-            "artist": item.get("artist") or "", "album": item.get("album") or "", "dur": 0, "fee": 0, "cover": ""}
+            "artist": item.get("artist") or "", "artistId": 0, "albumId": 0,
+            "album": item.get("album") or "", "dur": 0, "fee": 0,
+            "cover": "", "alias": "", "quality": "", "mv": 0, "reason": ""}
+
+
+def song_details(ids, personal=True):
+    """批量歌曲详情：搜索接口的单曲没有封面，歌单接口只回前 1000 首，都用它补齐。"""
+    out = {}
+    ids = list(dict.fromkeys(i for i in ids if i))
+    for start in range(0, len(ids), 250):
+        c = "[" + ",".join('{"id":%s}' % i for i in ids[start:start + 250]) + "]"
+        resp = get("api/v3/song/detail?c=" + urllib.parse.quote(c, safe=""), personal=personal)
+        for s in resp.get("songs") or []:
+            out[s["id"]] = track(s)
+    return out
+
+
+def complete_playlist(pl, personal=True):
+    """playlist.tracks 最多约 1000 条，trackIds 是完整的；按原顺序补齐并跳过已下架曲目。"""
+    loaded = [track(s) for s in pl.get("tracks") or []]
+    ids = [t.get("id") for t in pl.get("trackIds") or []]
+    if not ids:
+        return loaded
+    by_id = {t["id"]: t for t in loaded}
+    missing = [i for i in ids if i and i not in by_id]
+    if missing:
+        by_id.update(song_details(missing, personal=personal))
+    return [by_id[i] for i in ids if i and i in by_id]
 
 
 def playlist_card(p, cover_key):
@@ -108,6 +137,12 @@ def search_artist(a):
 def search_playlist(p):
     return {"id": p["id"], "name": p["name"], "cover": sized(p.get("coverImgUrl"), 300),
             "count": p.get("trackCount") or 0, "creator": (p.get("creator") or {}).get("nickname") or ""}
+
+
+def search_mv(m):
+    return {"id": m["id"], "name": m["name"], "cover": sized(m.get("cover"), 300),
+            "artist": m.get("artistName") or "", "artistId": m.get("artistId") or 0,
+            "duration": (m.get("duration") or 0) // 1000, "playCount": m.get("playCount") or 0}
 
 
 def search_album(a):
@@ -144,8 +179,8 @@ def hot_comments(song_id):
 
 def anonymous():
     top = get("api/toplist/detail")["list"]
-    hot = get(f"api/v6/playlist/detail?id={HOT_CHART}&n=40")["playlist"]
-    tracks = [track(s) for s in hot["tracks"][:40]]
+    hot = get(f"api/v6/playlist/detail?id={HOT_CHART}&n=1000")["playlist"]
+    tracks = complete_playlist(hot, personal=False)
     lyric = get(f"api/song/lyric?id={tracks[CURRENT]['id']}&lv=1&tv=-1")
     lyrics = parse_lrc(lyric.get("lrc", {}).get("lyric", ""),
                        (lyric.get("tlyric") or {}).get("lyric") or "")
@@ -169,12 +204,15 @@ def anonymous():
         "plays": hot["playCount"],
     }
     q = urllib.parse.quote("林俊杰")
+    found_songs = [track(s) for s in get(f"api/search/get?s={q}&type=1&limit=100")["result"]["songs"]]
+    details = song_details([s["id"] for s in found_songs], personal=False)
     search = {
         "query": "林俊杰",
-        "songs": [track(s) for s in get(f"api/search/get?s={q}&type=1&limit=10")["result"]["songs"]],
-        "artists": [search_artist(a) for a in get(f"api/search/get?s={q}&type=100&limit=6")["result"]["artists"]],
-        "playlists": [search_playlist(p) for p in get(f"api/search/get?s={q}&type=1000&limit=6")["result"]["playlists"]],
-        "albums": [search_album(a) for a in get(f"api/search/get?s={q}&type=10&limit=6")["result"]["albums"]],
+        "songs": [details.get(s["id"], s) for s in found_songs],
+        "artists": [search_artist(a) for a in get(f"api/search/get?s={q}&type=100&limit=30")["result"]["artists"]],
+        "playlists": [search_playlist(p) for p in get(f"api/search/get?s={q}&type=1000&limit=30")["result"]["playlists"]],
+        "albums": [search_album(a) for a in get(f"api/search/get?s={q}&type=10&limit=30")["result"]["albums"]],
+        "mvs": [search_mv(m) for m in get(f"api/search/get?s={q}&type=1004&limit=12")["result"]["mvs"]],
     }
     hot = get("api/hotsearchlist/get").get("data") or []
     hot_searches = [{"word": h.get("searchWord") or "", "note": h.get("content") or "", "score": h.get("score") or 0}
@@ -183,7 +221,9 @@ def anonymous():
           [js("toplists", toplists), js("playlist", playlist), js("tracks", tracks),
            js("lyricsTrackId", tracks[CURRENT]["id"]), js("lyrics", lyrics),
            js("comments", hot_comments(tracks[CURRENT]["id"])),
-           js("search", search), js("hotSearches", hot_searches)])
+           js("commentPage", None), js("searchUsers", None), js("searchRadios", None),
+           js("search", search), js("hotSearches", hot_searches),
+           js("artist", None), js("artistSongs", None), js("album", None), js("mv", None)])
     return tracks
 
 
@@ -206,49 +246,58 @@ def personal(hot_tracks):
         data["daily"] = {"date": time.strftime("%m月%d日").lstrip("0"), "day": time.strftime("%d").lstrip("0"),
                          "tracks": [track(s, reasons.get(s["id"], "")) for s in daily["dailySongs"][:30]]}
 
-        lists = get(f"api/user/playlist?uid={uid}&limit=30&offset=0", personal=True)["playlist"]
+        lists = get(f"api/user/playlist?uid={uid}&limit=1000&offset=0", personal=True)["playlist"]
         # 全部红心曲目 id（播放条与行内小红心用）；没有红心时接口也可能回 null
         data["likedIds"] = get(f"api/song/like/get?uid={uid}", personal=True).get("ids") or []
         liked_list = lists[0]
-        liked = get(f"api/v6/playlist/detail?id={liked_list['id']}&n=30", personal=True)["playlist"]
-        data["liked"] = {"id": liked["id"], "count": liked["trackCount"], "tracks": [track(s) for s in liked["tracks"][:30]]}
+        liked = get(f"api/v6/playlist/detail?id={liked_list['id']}&n=1000", personal=True)["playlist"]
+        data["liked"] = {"id": liked["id"], "count": liked["trackCount"],
+                         "tracks": complete_playlist(liked, personal=True)}
         data["mine"] = [playlist_card(p, "coverImgUrl") for p in lists[1:]
-                        if (p.get("creator") or {}).get("userId") == uid][:12]
+                        if (p.get("creator") or {}).get("userId") == uid]
 
         seed = data["liked"]["tracks"][0]
         heart = get(f"api/playmode/intelligence/list?songId={seed['id']}&type=fromPlayAll"
                     f"&playlistId={liked_list['id']}&startMusicId={seed['id']}&count=1", personal=True)
         data["heart"] = {"seed": seed, "tracks": [track(x["songInfo"]) for x in heart.get("data") or []][:30]}
 
-        radar = get(f"api/v6/playlist/detail?id={RADAR}&n=30", personal=True)["playlist"]
+        radar = get(f"api/v6/playlist/detail?id={RADAR}&n=1000", personal=True)["playlist"]
         data["radar"] = {"id": radar["id"], "name": "私人雷达", "description": radar["name"],
-                         "cover": sized(radar.get("coverImgUrl"), 300), "tracks": [track(s) for s in radar["tracks"][:30]]}
+                         "cover": sized(radar.get("coverImgUrl"), 300),
+                         "tracks": complete_playlist(radar, personal=True)}
 
         recommended = get("api/v1/discovery/recommend/resource", personal=True).get("recommend") or []
         data["playlists"] = [playlist_card(p, "picUrl") for p in recommended]
-        # 前 6 个推荐歌单补 30 首试听曲目和一句简介；其余保持空，原型里点开再取
+        # 前 6 个推荐歌单补完整曲目和一句简介；其余保持空，原型里点开再取
         for card in data["playlists"][:6]:
-            pl = get(f"api/v6/playlist/detail?id={card['id']}&n=30", personal=True)["playlist"]
-            card["tracks"] = [track(s) for s in pl["tracks"][:30]]
+            pl = get(f"api/v6/playlist/detail?id={card['id']}&n=1000", personal=True)["playlist"]
+            card["tracks"] = complete_playlist(pl, personal=True)
             card["description"] = (pl.get("description") or "").split("\n")[0]
         for card in data["playlists"][6:]:
             card["tracks"] = []
             card["description"] = ""
 
-        record = get("api/play-record/song/list?limit=30", personal=True).get("data") or {}
+        record = get("api/play-record/song/list?limit=300", personal=True).get("data") or {}
         data["recent"] = {"total": record.get("total") or 0,
-                          "tracks": [track(x["data"]) for x in (record.get("list") or [])][:30]}
+                          "tracks": [track(x["data"]) for x in (record.get("list") or [])]}
 
-        cloud_resp = get("api/v1/cloud/get?limit=30&offset=0", personal=True)
-        cloud_items = cloud_resp.get("data") or []
+        cloud_items, cloud_offset = [], 0
+        cloud_resp = {}
+        while cloud_offset < 1000:
+            cloud_resp = get(f"api/v1/cloud/get?limit=200&offset={cloud_offset}", personal=True)
+            page = cloud_resp.get("data") or []
+            cloud_items.extend(page)
+            cloud_offset += len(page)
+            if not page or cloud_offset >= (cloud_resp.get("count") or 0):
+                break
         data["cloud"] = {"count": cloud_resp.get("count") or 0,
                          "size": cloud_resp.get("size") or 0,
                          "maxSize": int(cloud_resp.get("maxSize") or 0),
-                         "tracks": [cloud_track(x) for x in cloud_items][:30]}
+                         "tracks": [cloud_track(x) for x in cloud_items]}
 
         # 收藏（非自己创建）的歌单，与 mine 同款磁贴
         data["subscribed"] = [playlist_card(p, "coverImgUrl") for p in lists[1:]
-                              if (p.get("creator") or {}).get("userId") != uid][:12]
+                              if (p.get("creator") or {}).get("userId") != uid]
 
         similar_seed = seed
     else:

@@ -2,13 +2,15 @@
 // NcmClient 是唯一的网络边界：所有对 music.163.com 的 /api/ 明文请求都从这里发。
 // 端点返回 JSON；归一化（snapshot.py 的形状）不在这里做，Store 负责。
 // cookie jar 的存取走 CookieVault（钥匙串，后备 600 文件）：构造时先迁移 legacy
-// 文件再读存储，读到 jar 后发 ready()——之前不得发个人请求。
+// 文件再读存储，读到 jar 后发 ready()，在那之前不得发个人请求。
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <functional>
 #include <QMap>
 #include <QObject>
 #include <QSet>
 #include <QString>
+#include <QUrl>
 #include <QUrlQuery>
 
 class CookieVault;
@@ -20,7 +22,8 @@ class NcmClient : public QObject {
 public:
     using GetCallback = std::function<void(const QJsonDocument &doc, bool ok)>;
 
-    explicit NcmClient(QObject *parent = nullptr);
+    // loadCookies=false 用于 --anonymous / 只读调试：不碰钥匙串，立即 ready
+explicit NcmClient(QObject *parent = nullptr, bool loadCookies = true);
 
     // 从 netease-cloud-music-gtk4 的 cookies.json 挑出 MUSIC_U / __csrf / NMTID。
     // 空表 = 读不了或格式不对。
@@ -39,11 +42,21 @@ public:
     // 登录成功（803）等场景：把 {name: value} 数组合并进 jar 并存储
     void adoptCookies(const QJsonDocument &jarDoc);
 
+    // 退出登录：移除 MUSIC_U / __csrf / NMTID 并落盘；匿名设备 cookie 不保留（我们只用这三个）
+    void clearAuthCookies();
+
     // GET https://music.163.com/<path>?<query>，完成后回调一次；失败时 doc 为空、ok=false。
     // 网络错误、超时与 HTTP 5xx 自动重试，最多 3 次，间隔 0.5 / 1 / 2 秒；4xx 与业务码不重试。
     // 语义层的在途去重在 Store.request（key 在它那里才知道）；这里每个请求都发。
     // 依赖 jar 的个人请求必须在 ready() 之后。
     void get(const QString &path, const QUrlQuery &query, bool personal, GetCallback callback);
+
+    // POST https://music.163.com/weapi/<path>，payload 经 weapi 加密（AES-CBC 两次 + RSA）。
+    // 写操作不重试：重复提交红心/建歌单并不幂等。失败时 doc 为空、ok=false。
+    void postWeapi(const QString &path, const QJsonObject &payload, bool personal, GetCallback callback,
+                   bool keepCookies = true);
+    // 明文 /api/ 表单 POST（听歌打卡 /api/feedback/weblog 用），同样不重试。
+    void postForm(const QString &path, const QUrlQuery &form, bool personal, GetCallback callback);
 
     // 测试接缝：把 API 指到本地 QTcpServer。默认 music.163.com。
     void setApiBase(const QString &base);
@@ -64,6 +77,8 @@ private:
     void startGet(const QString &path, const QUrlQuery &query, bool personal,
                   int attempt, bool retrying, GetCallback callback);
     static bool isNetworkError(const QNetworkReply &reply);
+    void postRaw(const QUrl &url, const QByteArray &body, const QString &cookie, GetCallback callback,
+                 bool keepCookies = true);
     void persistJar();
     void keepSetCookies(class QNetworkReply *reply);
     // 同 snapshot.py 的 cookie_header()：只带这三个；空 value 跳过
