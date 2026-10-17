@@ -13,15 +13,22 @@
 
 Q_LOGGING_CATEGORY(lcVault, "yunting.vault", QtWarningMsg)
 
+namespace {
+// 开发与测试用 YUNTING_KEYCHAIN_SERVICE 换一个服务名，不碰日常使用的存储。
+// 换名要同时换掉后备文件：否则迁移会读走并删除日常的那个文件
+QString serviceOverride()
+{
+    return qEnvironmentVariable("YUNTING_KEYCHAIN_SERVICE");
+}
+} // namespace
+
 CookieVault::CookieVault(QObject *parent)
     // 后备文件（也是钥匙串引入前的落点）在应用数据目录里，遵循 XDG_DATA_HOME
     : QObject(parent),
-      m_fallbackPath(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/cookies.json"),
-      m_service([] {
-          // 开发与测试用别的服务名，不碰日常凭据（DESIGN.md「凭据存储」）
-          const QString override = qEnvironmentVariable("YUNTING_KEYCHAIN_SERVICE");
-          return override.isEmpty() ? QCoreApplication::applicationName() : override;
-      }()),
+      m_fallbackPath(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+                     + (serviceOverride().isEmpty() ? QStringLiteral("/cookies.json")
+                                                    : "/cookies-" + serviceOverride() + ".json")),
+      m_service(serviceOverride().isEmpty() ? QCoreApplication::applicationName() : serviceOverride()),
       m_key(QStringLiteral("cookies"))
 {
 }

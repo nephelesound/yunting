@@ -3,7 +3,9 @@
 // 可能的用户确认，不进单测（由 --dump-store 的手工验证覆盖）。
 #include "../cookievault.h"
 
+#include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QTemporaryDir>
 #include <QTest>
 
@@ -17,6 +19,27 @@ private slots:
     void initTestCase()
     {
         qputenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent");
+    }
+
+    // 换服务名（开发、测试）时后备文件也换掉：迁移不能读走、删掉日常使用的那个文件
+    void serviceOverrideLeavesTheDailyFileAlone()
+    {
+        QTemporaryDir dir;
+        qputenv("XDG_DATA_HOME", dir.path().toUtf8());
+        const QString daily = dir.filePath(QCoreApplication::applicationName() + "/cookies.json");
+        QVERIFY(QDir().mkpath(QFileInfo(daily).path()));
+        QFile f(daily);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write(R"({"MUSIC_U":"daily"})");
+        f.close();
+
+        qputenv("YUNTING_KEYCHAIN_SERVICE", "yunting-test");
+        CookieVault vault;
+        qunsetenv("YUNTING_KEYCHAIN_SERVICE");
+        QVERIFY(vault.fallbackPath() != daily);
+        vault.migrate();
+        QTest::qWait(200);   // 迁移经钥匙串任务异步结束（总线不可用，很快失败）
+        QVERIFY2(QFile::exists(daily), "换了服务名的迁移删掉了日常的凭据文件");
     }
 
     void fallbackFileRoundTrip()

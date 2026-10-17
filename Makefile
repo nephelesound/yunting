@@ -16,7 +16,7 @@ app-build:
 test: app-build ## 后端单元测试
 	ctest --test-dir build/app --output-on-failure
 
-qmltest: ## 界面交互测试（悬停、点击、滚轮；用快照数据）
+qmltest: prototype/Personal.js ## 界面交互测试（悬停、点击、滚轮；用快照数据）
 	QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME=kde /usr/lib/qt6/bin/qmltestrunner -input prototype/tests
 
 app: app-build ## 运行应用（实时接口 + 真实播放；登录态见 README）
@@ -88,8 +88,10 @@ shots: build/qmlshot/qmlshot build/dark/kdeglobals prototype/Personal.js ## 各�
 run: ## 运行界面原型
 	$(QML) prototype/main.qml
 
-lint: ## 静态检查（QML）
-	$(QMLLINT) -I $(CURDIR)/prototype $(CURDIR)/prototype/*.qml # 相对路径下 qmllint 会误报 qmldir 里的单例未声明
+# qmllint 默认有警告也返回 0：--max-warnings 0 让任何警告都算失败。原型的 Snapshot.qml 引用快照文件，所以先要有快照。
+# 相对路径下 qmllint 会误报 qmldir 里的单例未声明，所以用绝对路径
+lint: prototype/Personal.js ## 静态检查（QML）
+	$(QMLLINT) --max-warnings 0 -I $(CURDIR)/prototype $(CURDIR)/prototype/*.qml
 
 fmt: ## 格式化（QML）
 	$(QMLFORMAT) -i prototype/*.qml

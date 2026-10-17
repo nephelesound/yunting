@@ -31,7 +31,7 @@ ScreenFrame {
 
     readonly property int pitch: Tokens.height12
     readonly property int rows: Math.floor((areaHeight - Tokens.space6) / pitch)
-    readonly property int areaHeight: right.parent ? right.parent.height : 0
+    readonly property int areaHeight: rightHalf.parent ? rightHalf.parent.height : 0
     // 封面占奇数行，中线正好穿过某一行的中心，当前句就停在那一行；留两行给封面下方的事实
     readonly property int coverRows: { const n = Math.min(7, page.rows - 2); return n % 2 ? n : n - 1; }
     readonly property int coverTopRow: Math.max(1, Math.floor((page.rows - page.coverRows - 1) / 2))
@@ -94,7 +94,7 @@ ScreenFrame {
 
     // 右半
     Item {
-        id: right
+        id: rightHalf
         x: parent.width / 2
         width: parent.width / 2 - Tokens.pageMargin
         height: page.rows * page.pitch

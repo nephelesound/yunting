@@ -558,8 +558,8 @@ Kirigami.ApplicationWindow {
         flightWait.tries = 0;
         flightWait.restart();
     }
-    function nowPlayingView() {
-        const page = root.pageStack.currentItem;
+    function nowPlayingView(): NowPlayingPage {
+        const page = root.pageStack.currentItem as NowPlayingPage;
         return root.page === "nowplaying" && page && page.coverItem ? page : null;
     }
     // 截图 harness（startOverlay=flight）：转场结束后记下两端位置与封面是否已显示
