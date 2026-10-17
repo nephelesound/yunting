@@ -24,11 +24,47 @@ double numOr(const QJsonObject &o, const char *key, double fallback = 0)
     return v.isDouble() ? v.toDouble() : fallback;
 }
 
-// Python 的 x 真值：null、缺失都算「没有」，对象与非零数字算「有」
+// Python 的 x 真值：null、缺失、false、0 算「没有」，对象与非零数字算「有」
 bool truthy(const QJsonObject &o, const char *key)
 {
     const QJsonValue v = o.value(QLatin1String(key));
-    return !v.isNull() && !v.isUndefined() && (!v.isDouble() || v.toDouble() != 0);
+    if (v.isBool())
+        return v.toBool();
+    if (v.isDouble())
+        return v.toDouble() != 0;
+    return !v.isNull() && !v.isUndefined();
+}
+
+struct Playability {
+    bool playable;
+    QString blockedBy;
+};
+
+// privilege 是接口对「当前账号」的回答：st<0 已下架，cs 云盘，pl>0 能播。
+// pl 为 0 时用 fee/payed 说明被什么挡住；没有 privilege（如相似歌曲、搜索旧接口）才退回 fee。
+Playability trackPlayability(const QJsonObject &song, const QJsonObject &privilege)
+{
+    const QJsonObject p = privilege.isEmpty() ? song.value("privilege").toObject() : privilege;
+    if (p.isEmpty()) {
+        const double fee = numOr(song, "fee");
+        if (fee == 4)
+            return {false, QStringLiteral("paid")};
+        if (fee == 1)
+            return {false, QStringLiteral("vip")};
+        return {true, QString()};
+    }
+    const double fee = p.contains("fee") ? numOr(p, "fee") : numOr(song, "fee");
+    if (numOr(p, "st") < 0)
+        return {false, QStringLiteral("unavailable")};
+    if (truthy(p, "cs"))
+        return {true, QString()};
+    if (numOr(p, "pl") > 0)
+        return {true, QString()};
+    if (fee == 1)
+        return {false, QStringLiteral("vip")};
+    if (fee == 4 && !truthy(p, "payed"))
+        return {false, QStringLiteral("paid")};
+    return {false, QStringLiteral("unavailable")};
 }
 } // namespace
 
@@ -39,6 +75,11 @@ QString ncmSized(const QJsonValue &url, int px)
 }
 
 QVariantMap ncmTrack(const QJsonObject &s, const QString &reason)
+{
+    return ncmTrack(s, QJsonObject{}, reason);
+}
+
+QVariantMap ncmTrack(const QJsonObject &s, const QJsonObject &privilege, const QString &reason)
 {
     // 新旧两种歌曲结构（ar/al/dt 与 artists/album/duration）
     const QJsonArray artists = s.value("ar").isArray() ? s.value("ar").toArray()
@@ -66,6 +107,7 @@ QVariantMap ncmTrack(const QJsonObject &s, const QString &reason)
         : truthy(s, "sq") || truthy(s, "sqMusic") ? QStringLiteral("lossless") : QString();
 
     const QJsonObject firstArtist = artists.isEmpty() ? QJsonObject() : artists.first().toObject();
+    const Playability play = trackPlayability(s, privilege);
     return {
         {"id", numOr(s, "id")},
         {"name", textOr(s, "name")},
@@ -80,6 +122,8 @@ QVariantMap ncmTrack(const QJsonObject &s, const QString &reason)
         {"alias", alias},
         {"quality", quality},
         {"mv", numOr(s, "mv") != 0 ? numOr(s, "mv") : numOr(s, "mvid")},
+        {"playable", play.playable},
+        {"blockedBy", play.blockedBy},
         // 推荐理由只有每日推荐带（data.recommendReasons 里 songId 对上的那条），其余为空
         {"reason", reason},
     };
@@ -87,8 +131,13 @@ QVariantMap ncmTrack(const QJsonObject &s, const QString &reason)
 
 QVariantMap ncmCloudTrack(const QJsonObject &item)
 {
-    if (item.value("simpleSong").isObject())
-        return ncmTrack(item.value("simpleSong").toObject());
+    // 云盘是账号自己的上传，接口不给 playable 时也必须能播
+    if (item.value("simpleSong").isObject()) {
+        QVariantMap track = ncmTrack(item.value("simpleSong").toObject());
+        track.insert("playable", true);
+        track.insert("blockedBy", QString());
+        return track;
+    }
     return {
         {"id", numOr(item, "songId")},
         {"name", textOr(item, "songName", textOr(item, "fileName"))},
@@ -103,6 +152,8 @@ QVariantMap ncmCloudTrack(const QJsonObject &item)
         {"alias", QString()},
         {"quality", QString()},
         {"mv", 0},
+        {"playable", true},
+        {"blockedBy", QString()},
         {"reason", QString()},
     };
 }
@@ -245,11 +296,27 @@ QVariantMap ncmSearchMv(const QJsonObject &m)
     };
 }
 
-QVariantList ncmTracks(const QJsonArray &items)
+QHash<double, QJsonObject> ncmPrivilegeIndex(const QJsonArray &privileges)
 {
+    QHash<double, QJsonObject> out;
+    out.reserve(privileges.size());
+    for (const QJsonValue &v : privileges) {
+        const QJsonObject p = v.toObject();
+        if (!p.isEmpty())
+            out.insert(p.value("id").toDouble(), p);
+    }
+    return out;
+}
+
+QVariantList ncmTracks(const QJsonArray &items, const QJsonArray &privileges)
+{
+    const QHash<double, QJsonObject> byId = ncmPrivilegeIndex(privileges);
     QVariantList out;
-    for (const QJsonValue &v : items)
-        out.append(ncmTrack(v.toObject()));
+    out.reserve(items.size());
+    for (const QJsonValue &v : items) {
+        const QJsonObject song = v.toObject();
+        out.append(ncmTrack(song, byId.value(song.value("id").toDouble())));
+    }
     return out;
 }
 

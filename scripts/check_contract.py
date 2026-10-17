@@ -35,6 +35,10 @@ EMPTY_OK = {
 # 首屏必有的列表；全空说明 dump 时没有网络（或请求全部失败），不是形状问题
 FIRST_SCREEN = ("toplists", "tracks", "hotSearches")
 
+# 每首归一化曲目（有 id 与 fee）都必须带这两个字段。两侧同时漏掉时通用 walk 比不出来，
+# 所以单独点一次名，避免可播性字段悄悄从某一边消失。
+TRACK_FIELDS = ("playable", "blockedBy")
+
 
 def kind(value):
     t = type(value)
@@ -47,6 +51,10 @@ def walk(a, b, path, out):
         out.append(f"{path}: expected {ta} got {tb}")
         return
     if isinstance(a, dict):
+        if "id" in a and "fee" in a:
+            for key in TRACK_FIELDS:
+                if key not in a and key not in b:
+                    out.append(f"{path}.{key}: missing from both sides")
         for k in sorted(set(a) | set(b)):
             if k not in a:
                 out.append(f"{path}.{k}: expected missing got {kind(b[k])}")

@@ -10,6 +10,7 @@ cookie 只在本进程内拼进请求头，不打印、不写盘。
 用法: scripts/snapshot.py [--anonymous] [--out DIR]   （DIR 默认 prototype/）
 """
 import json
+import math
 import os
 import re
 import sys
@@ -47,11 +48,52 @@ def get(path, personal=False):
         return json.load(r)
 
 
-def track(s, reason=""):
+def number(value):
+    """JSON 数字；null、缺失、非数字都归 0（与 normalize.cpp 的 numOr 一致）。"""
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else 0
+
+
+def truthy(value):
+    """与 normalize.cpp 的 truthy 一致：对象/数组/字符串算有，null/缺失/0 算没有。"""
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    return True
+
+
+def playability(song, privilege=None):
+    """与 normalize.cpp 的 trackPlayability 同一规则：privilege 决定，没带才退回 fee。"""
+    privilege = privilege or song.get("privilege") or {}
+    if not privilege:
+        fee = number(song.get("fee"))
+        if fee == 4:
+            return False, "paid"
+        if fee == 1:
+            return False, "vip"
+        return True, ""
+    fee = number(privilege.get("fee")) if "fee" in privilege else number(song.get("fee"))
+    if number(privilege.get("st")) < 0:
+        return False, "unavailable"
+    if truthy(privilege.get("cs")):
+        return True, ""
+    if number(privilege.get("pl")) > 0:
+        return True, ""
+    if fee == 1:
+        return False, "vip"
+    if fee == 4 and not truthy(privilege.get("payed")):
+        return False, "paid"
+    return False, "unavailable"
+
+
+def track(s, reason="", privilege=None):
     """新旧两种歌曲结构（ar/al/dt 与 artists/album/duration）统一成原型用的字段。"""
     artists = s.get("ar") or s.get("artists") or []
     album = s.get("al") or s.get("album") or {}
     alias = s.get("alia") or s.get("alias") or s.get("tns") or s.get("transNames") or [""]
+    playable, blocked = playability(s, privilege)
     return {
         "id": s["id"],
         "name": s["name"],
@@ -62,15 +104,28 @@ def track(s, reason=""):
         "albumId": album.get("id") or 0,
         "album": album.get("name") or "",
         "dur": (s.get("dt") or s.get("duration") or 0) // 1000,
-        "fee": s.get("fee", 0),
+        "fee": number(s.get("fee")),
         "cover": sized(album.get("picUrl"), 120),
         # 别名/译名取第一项（新结构 alia，旧结构 alias，再退 tns/transNames）；quality 看有没有更高一档音频
         "alias": alias[0],
         "quality": "hires" if (s.get("hr") or s.get("hrMusic")) else ("lossless" if (s.get("sq") or s.get("sqMusic")) else ""),
         "mv": s.get("mv") or s.get("mvid") or 0,
+        "playable": playable,
+        "blockedBy": blocked,
         # 推荐理由只有每日推荐带（data.recommendReasons 里 songId 对上的那条），其余为空
         "reason": reason,
     }
+
+
+def privilege_index(privileges):
+    return {p.get("id"): p for p in privileges or [] if isinstance(p, dict)}
+
+
+def tracks(items, privileges=(), reasons=None):
+    """接口常把 privileges 与 songs 分开发：按 id 对上后再归一化。"""
+    reasons = reasons or {}
+    index = privilege_index(privileges)
+    return [track(s, reasons.get(s.get("id")) or "", index.get(s.get("id"))) for s in items]
 
 
 def sized(url, px):
@@ -91,7 +146,8 @@ def parse_lrc(lrc, tlyric=""):
                 line = line[m.end():]
             body = re.sub(r"<\d+:\d+(?:[.:]\d+)?>", "", line).strip()
             for t in times if body else []:
-                out.setdefault(round(t, 2), body)
+                # C++ 的 std::round(t * 100) / 100（正数四舍五入），不是 Python 的银行家舍入
+                out.setdefault(math.floor(t * 100 + 0.5) / 100, body)
         return dict(sorted(out.items()))
     tr = stamps(tlyric)
     return [{"t": t, "text": text, "tr": tr.get(t, "")} for t, text in stamps(lrc).items()]
@@ -100,11 +156,14 @@ def parse_lrc(lrc, tlyric=""):
 def cloud_track(item):
     """云盘条目：有 simpleSong 用它（新结构），否则用条目自己的 songName/artist/album 字段。"""
     if item.get("simpleSong"):
-        return track(item["simpleSong"])
+        t = track(item["simpleSong"])
+        t["playable"], t["blockedBy"] = True, ""
+        return t
     return {"id": item.get("songId") or 0, "name": item.get("songName") or item.get("fileName") or "",
             "artist": item.get("artist") or "", "artistId": 0, "artists": [], "albumId": 0,
             "album": item.get("album") or "", "dur": 0, "fee": 0,
-            "cover": "", "alias": "", "quality": "", "mv": 0, "reason": ""}
+            "cover": "", "alias": "", "quality": "", "mv": 0,
+            "playable": True, "blockedBy": "", "reason": ""}
 
 
 def song_details(ids, personal=True):
@@ -114,14 +173,16 @@ def song_details(ids, personal=True):
     for start in range(0, len(ids), 250):
         c = "[" + ",".join('{"id":%s}' % i for i in ids[start:start + 250]) + "]"
         resp = get("api/v3/song/detail?c=" + urllib.parse.quote(c, safe=""), personal=personal)
+        index = privilege_index(resp.get("privileges") or [])
         for s in resp.get("songs") or []:
-            out[s["id"]] = track(s)
+            out[s["id"]] = track(s, privilege=index.get(s.get("id")))
     return out
 
 
-def complete_playlist(pl, personal=True):
+def complete_playlist(pl, personal=True, privileges=()):
     """playlist.tracks 最多约 1000 条，trackIds 是完整的；按原顺序补齐并跳过已下架曲目。"""
-    loaded = [track(s) for s in pl.get("tracks") or []]
+    index = privilege_index(privileges)
+    loaded = [track(s, privilege=index.get(s.get("id"))) for s in pl.get("tracks") or []]
     ids = [t.get("id") for t in pl.get("trackIds") or []]
     if not ids:
         return loaded
@@ -171,7 +232,7 @@ def search_album(a):
     ms = a.get("publishTime") or 0
     return {"id": a["id"], "name": a["name"], "artist": (a.get("artist") or {}).get("name") or "",
             "cover": sized(a.get("picUrl"), 300),
-            "year": time.gmtime(ms / 1000).tm_year if ms > 0 else 0}
+            "year": time.localtime(ms // 1000).tm_year if ms > 0 else 0}
 
 
 def js(name, value):
@@ -210,8 +271,9 @@ def hot_comments(song_id):
 
 def anonymous():
     top = get("api/toplist/detail")["list"]
-    hot = get(f"api/v6/playlist/detail?id={HOT_CHART}&n=1000")["playlist"]
-    tracks = complete_playlist(hot, personal=False)
+    hot_resp = get(f"api/v6/playlist/detail?id={HOT_CHART}&n=1000")
+    hot = hot_resp["playlist"]
+    tracks = complete_playlist(hot, personal=False, privileges=hot_resp.get("privileges") or [])
     lyric = get(f"api/song/lyric?id={tracks[CURRENT]['id']}&lv=1&tv=-1")
     lyrics = parse_lrc(lyric.get("lrc", {}).get("lyric", ""),
                        (lyric.get("tlyric") or {}).get("lyric") or "")
@@ -286,46 +348,60 @@ def personal(hot_tracks):
                            "mutual": bool(profile.get("mutual")),
                            "avatar": sized(profile.get("avatarUrl"), 96),
                            "background": sized(profile.get("backgroundUrl"), 1200)}
-        daily = get("api/v3/discovery/recommend/songs", personal=True)["data"]
+        daily_resp = get("api/v3/discovery/recommend/songs", personal=True)
+        daily = daily_resp["data"]
         # 推荐理由按 songId 对上：data.recommendReasons 里每条 { songId, reason }
         reasons = {r.get("songId"): r.get("reason") or "" for r in daily.get("recommendReasons") or []}
+        daily_priv = daily.get("privileges") or daily_resp.get("privileges") or []
         data["daily"] = {"date": time.strftime("%m月%d日").lstrip("0"), "day": time.strftime("%d").lstrip("0"),
-                         "tracks": [track(s, reasons.get(s["id"], "")) for s in daily["dailySongs"][:30]]}
+                         "tracks": tracks(daily["dailySongs"][:30], daily_priv, reasons)}
 
         lists = get(f"api/user/playlist?uid={uid}&limit=1000&offset=0", personal=True)["playlist"]
         # 全部红心曲目 id（播放条与行内小红心用）；没有红心时接口也可能回 null
         data["likedIds"] = get(f"api/song/like/get?uid={uid}", personal=True).get("ids") or []
         liked_list = lists[0]
-        liked = get(f"api/v6/playlist/detail?id={liked_list['id']}&n=1000", personal=True)["playlist"]
+        liked_resp = get(f"api/v6/playlist/detail?id={liked_list['id']}&n=1000", personal=True)
+        liked = liked_resp["playlist"]
         data["liked"] = {"id": liked["id"], "count": liked["trackCount"],
-                         "tracks": complete_playlist(liked, personal=True)}
+                         "tracks": complete_playlist(liked, personal=True,
+                                                     privileges=liked_resp.get("privileges") or [])}
         data["mine"] = [playlist_card(p, "coverImgUrl") for p in lists[1:]
                         if (p.get("creator") or {}).get("userId") == uid]
 
         seed = data["liked"]["tracks"][0]
         heart = get(f"api/playmode/intelligence/list?songId={seed['id']}&type=fromPlayAll"
                     f"&playlistId={liked_list['id']}&startMusicId={seed['id']}&count=1", personal=True)
-        data["heart"] = {"seed": seed, "tracks": [track(x["songInfo"]) for x in heart.get("data") or []][:30]}
+        heart_priv = privilege_index(heart.get("privileges") or [])
+        data["heart"] = {"seed": seed,
+                         "tracks": [track(x["songInfo"], privilege=heart_priv.get(x["songInfo"].get("id")))
+                                    for x in (heart.get("data") or [])[:30]]}
 
-        radar = get(f"api/v6/playlist/detail?id={RADAR}&n=1000", personal=True)["playlist"]
+        radar_resp = get(f"api/v6/playlist/detail?id={RADAR}&n=1000", personal=True)
+        radar = radar_resp["playlist"]
         data["radar"] = {"id": radar["id"], "name": "私人雷达", "description": radar["name"],
                          "cover": sized(radar.get("coverImgUrl"), 300),
-                         "tracks": complete_playlist(radar, personal=True)}
+                         "tracks": complete_playlist(radar, personal=True,
+                                                     privileges=radar_resp.get("privileges") or [])}
 
         recommended = get("api/v1/discovery/recommend/resource", personal=True).get("recommend") or []
         data["playlists"] = [playlist_card(p, "picUrl") for p in recommended]
         # 前 6 个推荐歌单补完整曲目和一句简介；其余保持空，原型里点开再取
         for card in data["playlists"][:6]:
-            pl = get(f"api/v6/playlist/detail?id={card['id']}&n=1000", personal=True)["playlist"]
-            card["tracks"] = complete_playlist(pl, personal=True)
+            pl_resp = get(f"api/v6/playlist/detail?id={card['id']}&n=1000", personal=True)
+            pl = pl_resp["playlist"]
+            card["tracks"] = complete_playlist(pl, personal=True,
+                                               privileges=pl_resp.get("privileges") or [])
             card["description"] = (pl.get("description") or "").split("\n")[0]
         for card in data["playlists"][6:]:
             card["tracks"] = []
             card["description"] = ""
 
-        record = get("api/play-record/song/list?limit=300", personal=True).get("data") or {}
+        recent_resp = get("api/play-record/song/list?limit=300", personal=True)
+        record = recent_resp.get("data") or {}
+        recent_priv = privilege_index(record.get("privileges") or recent_resp.get("privileges") or [])
         data["recent"] = {"total": record.get("total") or 0,
-                          "tracks": [track(x["data"]) for x in (record.get("list") or [])]}
+                          "tracks": [track(x["data"], privilege=recent_priv.get(x["data"].get("id")))
+                                     for x in (record.get("list") or [])]}
 
         cloud_items, cloud_offset = [], 0
         cloud_resp = {}
@@ -355,9 +431,9 @@ def personal(hot_tracks):
 
     # 公共接口：没登录也能取（登录后漫游是个人的）
     fm = get("api/v1/radio/get", personal=True).get("data") or []
-    data["fm"] = {"tracks": [track(s) for s in fm]}
+    data["fm"] = {"tracks": tracks(fm)}
     similar = get(f"api/v1/discovery/simiSong?songid={similar_seed['id']}&limit=20").get("songs") or []
-    data["similar"] = {"seed": similar_seed, "tracks": [track(s) for s in similar]}
+    data["similar"] = {"seed": similar_seed, "tracks": tracks(similar)}
 
     kind = "个人数据" if uid else "匿名替身（未找到登录 cookie）"
     write("Personal.js", f"{kind}快照（{time.strftime('%Y-%m-%d')}），由 scripts/snapshot.py 生成，不入库",
@@ -365,4 +441,7 @@ def personal(hot_tracks):
 
 
 if __name__ == "__main__":
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print(__doc__)
+        sys.exit(0)
     personal(anonymous())

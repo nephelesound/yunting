@@ -212,12 +212,16 @@ void Store::fetchDaily()
                 const QJsonObject o = r.toObject();
                 reasons.insert(o.value("songId").toDouble(), o.value("reason").toString());
             }
-            QVariantList tracks;
-            const QJsonArray dailySongs = take(arr(data, "dailySongs"), 30);
-            tracks.reserve(dailySongs.size());
-            for (const QJsonValue &s : dailySongs) {
-                const QJsonObject song = s.toObject();
-                tracks.append(ncmTrack(song, reasons.value(song.value("id").toDouble())));
+            // 每日推荐的 privileges 与 dailySongs 分开发（data 或顶层），按 id 对上后
+            // 再把推荐理由补进同一条曲目
+            QJsonArray privileges = arr(data, "privileges");
+            if (privileges.isEmpty())
+                privileges = arr(body(doc), "privileges");
+            QVariantList tracks = ncmTracks(take(arr(data, "dailySongs"), 30), privileges);
+            for (QVariant &v : tracks) {
+                QVariantMap track = v.toMap();
+                track.insert("reason", reasons.value(track.value("id").toDouble()));
+                v = track;
             }
             put("daily", QVariantMap{
                              {"date", date},
@@ -277,9 +281,13 @@ void Store::fetchHeart(const QVariantMap &seed, const QJsonObject &likedList)
                  {"startMusicId", seed.value("id").toString()},
                  {"count", "1"}}), true,
           [this, seed](const QJsonDocument &doc, bool /*ok*/) {
+        const QJsonObject resp = body(doc);
+        const QHash<double, QJsonObject> privileges = ncmPrivilegeIndex(arr(resp, "privileges"));
         QVariantList tracks;
-        for (const QJsonValue &x : arr(body(doc), "data"))
-            tracks.append(ncmTrack(x.toObject().value("songInfo").toObject()));
+        for (const QJsonValue &x : arr(resp, "data")) {
+            const QJsonObject song = x.toObject().value("songInfo").toObject();
+            tracks.append(ncmTrack(song, privileges.value(song.value("id").toDouble())));
+        }
         put("heart", QVariantMap{{"seed", seed}, {"tracks", tracks.mid(0, 30)}}, true);
         // radar / tail 由 fetchAccount 独立发起，不挂在这条链尾
     });
@@ -325,10 +333,17 @@ void Store::fetchTail()
 
     fetch("api/play-record/song/list", query({{"limit", "300"}}), true,
           [this](const QJsonDocument &doc, bool /*ok*/) {
-        const QJsonObject record = body(doc).value("data").toObject();
+        const QJsonObject resp = body(doc);
+        const QJsonObject record = resp.value("data").toObject();
+        QJsonArray privilegeList = arr(record, "privileges");
+        if (privilegeList.isEmpty())
+            privilegeList = arr(resp, "privileges");
+        const QHash<double, QJsonObject> privileges = ncmPrivilegeIndex(privilegeList);
         QVariantList tracks;
-        for (const QJsonValue &x : arr(record, "list"))
-            tracks.append(ncmTrack(x.toObject().value("data").toObject()));
+        for (const QJsonValue &x : arr(record, "list")) {
+            const QJsonObject song = x.toObject().value("data").toObject();
+            tracks.append(ncmTrack(song, privileges.value(song.value("id").toDouble())));
+        }
         put("recent", QVariantMap{{"total", record.value("total").toDouble()},
                                   {"tracks", tracks}}, true);
     });
