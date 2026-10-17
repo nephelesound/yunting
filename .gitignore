@@ -13,7 +13,8 @@ prototype/Personal.js
 *.jpeg
 *.webp
 
-# 内部笔记：只在本地，不进公开仓库（参考库也在 docs/ 下，用 `make refs` 按 SHA 复原）
-BACKEND.md
-PROGRESS.md
+# 文档：公开的只有 README；其余 Markdown（设计、开发手册、进度笔记）只在本地。
+# 参考库也在 docs/ 下，用 `make refs` 按 SHA 复原
+*.md
+!README.md
 docs/
