@@ -119,6 +119,14 @@ Menu {
         text: trackMenu.track && trackMenu.track.album ? "专辑：" + trackMenu.shorten(trackMenu.track.album) : "专辑"
         onTriggered: Actions.openAlbum(trackMenu.track.albumId)
     }
+    // 这首歌有 MV（曲目数据里的 mv id）：从这里直接去看，不必再去搜
+    MenuItem {
+        visible: trackMenu.track !== null && (trackMenu.track.mv || 0) > 0
+        height: visible ? implicitHeight : 0
+        icon.name: "video-symbolic"
+        text: "播放 MV"
+        onTriggered: Actions.openMv(trackMenu.track.mv)
+    }
     MenuItem {
         icon.name: "document-share"
         text: "分享…"
