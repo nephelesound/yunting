@@ -580,6 +580,8 @@ Kirigami.ApplicationWindow {
             playback.engine.muted = false;
         }
         onMuteToggled: playback.engine.muted = !playback.engine.muted
+        quality: playback.engine.quality
+        onQualityRequested: q => playback.engine.quality = q
         liked: root.currentTrack !== null && Source.isLiked(root.currentTrack.id)
         nowPlayingShown: root.page === "nowplaying"
         onPlayPauseRequested: playback.engine.toggle()

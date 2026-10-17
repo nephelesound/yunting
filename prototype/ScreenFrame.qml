@@ -4,7 +4,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
-import org.kde.kirigamiaddons.components as Components
 
 Kirigami.Page {
     id: screen
@@ -100,13 +99,12 @@ Kirigami.Page {
                 contentItem: RowLayout {
                     spacing: Tokens.space2
                     // 头像：人物用圆形；没有图片时用通用人像图标（中文名取首字母会显示成乱码）
-                    Components.Avatar {
+                    PersonAvatar {
                         visible: account.active
                         implicitWidth: Tokens.height7
                         implicitHeight: Tokens.height7
                         name: screen.loggedIn ? Source.account.name : ""
                         source: screen.loggedIn ? Source.sized(Source.account.avatar, 96) : ""
-                        initialsMode: Components.Avatar.InitialsMode.UseIcon
                     }
                     Label {
                         id: accountName

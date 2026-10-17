@@ -8,7 +8,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
-import org.kde.kirigamiaddons.components as Components
 import "Format.js" as Format
 
 ScreenFrame {
@@ -214,13 +213,12 @@ ScreenFrame {
                     Layout.fillWidth: true
                     spacing: Tokens.space3
 
-                    Components.Avatar {
+                    PersonAvatar {
                         Layout.alignment: Qt.AlignTop
                         implicitWidth: Tokens.height8
                         implicitHeight: Tokens.height8
                         name: comment.modelData.user
                         source: comment.modelData.avatar || ""
-                        initialsMode: Components.Avatar.InitialsMode.UseIcon
                     }
                     ColumnLayout {
                         Layout.fillWidth: true

@@ -37,6 +37,11 @@ function commentTime(ms) {
     return d.getFullYear() === now.getFullYear() ? md : d.getFullYear() + "年" + md;
 }
 
+// 播放音质档位（AudioEngine.quality）的显示名
+function qualityLevel(level) {
+    return ({ auto: "自动", standard: "标准", higher: "较高", exhigh: "极高", lossless: "无损", hires: "Hi-Res" })[level] || "自动";
+}
+
 // 音质标签：Hi-Res / 无损；极高及以下不标（几乎所有歌都有，标了没信息量）
 function quality(q) {
     return q === "hires" ? "Hi-Res" : q === "lossless" ? "无损" : "";

@@ -5,6 +5,8 @@
 //      播放模式是一个按钮循环切换 列表循环 → 单曲循环 → 随机（三者互斥，不做成两个各自开关的按钮）
 //   右＝已播/总长 · 歌词 · 音量
 // 左右两端挂在页边线上：封面左缘 = pageMargin，最后一个图标的图形右缘 = 窗宽 − pageMargin。
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -22,6 +24,7 @@ Item {
     property int mode: 0 // 0 列表循环 · 1 单曲循环 · 2 随机
     property real volume: 0.7
     property bool muted: false
+    property string quality: "auto"   // auto · standard · higher · exhigh · lossless · hires
 
     readonly property var modes: [
         { icon: "media-playlist-repeat-symbolic", text: "列表循环" },
@@ -39,6 +42,7 @@ Item {
     signal modeRequested(int mode)
     signal volumeRequested(real volume)
     signal muteToggled()
+    signal qualityRequested(string quality)
 
     // 没有曲目或时长未知时进度为 0、不能拖动，传输控件整体禁用
     readonly property real duration: bar.track ? bar.track.dur : 0
@@ -192,6 +196,34 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             spacing: Tokens.space1
 
+            // 音质：当前档位的小字按钮，点开是单选菜单（「这首歌怎么在播」与时间放在一起）
+            Button {
+                id: qualityButton
+                implicitHeight: Tokens.height8
+                flat: true
+                text: Format.qualityLevel(bar.quality)
+                font.pixelSize: Tokens.textSm
+                font.features: { "tnum": 1 }
+                Accessible.name: "音质：" + text
+                ToolTip.text: "播放音质"
+                ToolTip.visible: hovered
+                ToolTip.delay: 600
+                onClicked: qualityMenu.popup(qualityButton, 0, -qualityMenu.implicitHeight - Tokens.space2)
+
+                Menu {
+                    id: qualityMenu
+                    Repeater {
+                        model: ["auto", "standard", "higher", "exhigh", "lossless", "hires"]
+                        delegate: MenuItem {
+                            required property string modelData
+                            text: Format.qualityLevel(modelData) + (modelData === "auto" ? "（按曲目最高可用）" : "")
+                            checkable: true
+                            checked: bar.quality === modelData
+                            onTriggered: bar.qualityRequested(modelData)
+                        }
+                    }
+                }
+            }
             Label {
                 Layout.rightMargin: Tokens.space3
                 visible: bar.duration > 0
