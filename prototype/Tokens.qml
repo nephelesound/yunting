@@ -45,6 +45,9 @@ QtObject {
     readonly property real coverScrim: 0.6
     // 桌面歌词悬停时的深色底：压在任意壁纸上，白字仍可读，又不挡住桌面
     readonly property real desktopBacking: 0.45
+    // 桌面歌词：隔着一段距离看的字，三档（当前句 / 第二行）；填色可选系统强调色或这几种在任意壁纸上都醒目的颜色
+    readonly property var desktopLyricSizes: [[text2xl, textBase], [text4xl, text2xl], [48, text4xl]]
+    readonly property var desktopLyricColors: ["#4fc3f7", "#ff8a80", "#69f0ae", "#ffd740"]
 
     // 动效：时长一律取 Kirigami.Units，桌面平台插件会按 Plasma「动画速度」(AnimationDurationFactor) 缩放，
     // 用户关掉动画时它们就是 0，减弱动效不用另写分支。

@@ -14,5 +14,7 @@ public:
 
     Q_INVOKABLE void makeOverlay(QWindow *window, int anchors, int margin,
                                  bool keyboardOnDemand, const QString &scope);
+    // 改已是 overlay 的窗口离锚定边的距离：overlay 不能被合成器拖动，移动靠改边距
+    Q_INVOKABLE void setOverlayMargins(QWindow *window, int left, int top, int right, int bottom);
     Q_INVOKABLE void release(QWindow *window);
 };

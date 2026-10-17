@@ -591,6 +591,8 @@ Kirigami.ApplicationWindow {
         visible: root.desktopLyricsShown
         track: root.currentTrack
         elapsed: playback.engine.position
+        playing: playback.engine.playing
+        persist: root.backend !== null
         layerShell: root.backend && root.backend.layerShell ? root.backend.layerShell : null
         onCloseRequested: root.desktopLyricsShown = false
     }

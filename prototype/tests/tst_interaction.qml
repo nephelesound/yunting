@@ -20,6 +20,14 @@ Item {
     Component { id: nowPlayingComponent; NowPlayingPage { width: root.width; height: root.height } }
     Component { id: spyComponent; SignalSpy {} }
     Component { id: queueComponent; QueuePanel {} }
+    Component { id: lyricsComponent; DesktopLyrics {} }
+    // 假的 layer-shell：只记下最后一次设的边距
+    QtObject {
+        id: fakeLayerShell
+        property var margins: null
+        function makeOverlay(window, anchors, margin, keyboard, scope) {}
+        function setOverlayMargins(window, left, top, right, bottom) { margins = [left, top, right, bottom]; }
+    }
     TextEdit { id: pasteTarget; visible: false }
 
     SignalSpy { id: artistSpy; target: Actions; signalName: "artistRequested" }
@@ -110,6 +118,44 @@ Item {
             panel.currentIndex = 1;                        // 切到下一首：B 离开「接下来」
             tryVerify(() => names() === "XD");
             verify(list.itemAtIndex(1) === rowD, "切歌后其余行原地保留");
+        }
+
+        // 桌面歌词：当前句按进度填色；播放时在两次引擎进度之间也连续前进；位置夹在屏幕内
+        function desktopLyrics(props) {
+            const track = { id: Source.d.lyricsTrackId, name: "歌", artist: "歌手", cover: "", dur: 300 };
+            const w = createTemporaryObject(lyricsComponent, root, Object.assign({ track: track, layerShell: fakeLayerShell }, props));
+            tryVerify(() => w.lines.length > 3);
+            return w;
+        }
+
+        function test_desktopLyricsFillFollowsTheLine() {
+            const probe = desktopLyrics({});
+            const lines = probe.lines;
+            const mid = (lines[2].t + lines[3].t) / 2;
+            const w = desktopLyrics({ elapsed: mid, playing: false });
+            compare(w.index, 2);
+            fuzzyCompare(w.fill, 0.5, 0.01);
+        }
+
+        function test_desktopLyricsFillMovesBetweenEngineUpdates() {
+            const probe = desktopLyrics({});
+            const w = desktopLyrics({ elapsed: probe.lines[2].t, playing: false });
+            w.visible = true;
+            const before = w.fill;
+            w.playing = true;                 // 引擎进度不变，逐帧时钟照样往前走
+            tryVerify(() => w.fill > before + 0.01, 2000);
+            w.playing = false;                // 暂停：回到引擎的值
+            fuzzyCompare(w.clock, w.elapsed, 0.001);
+        }
+
+        function test_desktopLyricsPlacementStaysOnScreen() {
+            const w = desktopLyrics({});
+            w.placeDefault();                 // 默认：水平居中
+            fuzzyCompare(w.left, (w.screenWidth - w.width) / 2, 1);
+            w.place(-5000, 99999);            // 拖出屏幕左上：夹回来，不是回到居中
+            compare(w.left, 0);
+            compare(w.bottomGap, w.screenHeight - w.height);
+            compare(fakeLayerShell.margins, [0, 0, 0, w.screenHeight - w.height]);
         }
 
         function lyricsPage() {
