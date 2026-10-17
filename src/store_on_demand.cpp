@@ -57,40 +57,82 @@ void Store::requestMoreFm()
 
 void Store::request(const QString &key)
 {
-    const QString arg = key.section(u':', 1);
-    if (key.startsWith(QLatin1String("lyrics:")))
-        requestLyrics(key, arg.toDouble());
-    else if (key.startsWith(QLatin1String("playlist:")))
-        requestPlaylist(key, arg.toDouble());
-    else if (key.startsWith(QLatin1String("searchUsers:")))
-        requestSearchUsers(key, arg);
-    else if (key.startsWith(QLatin1String("searchRadios:")))
-        requestSearchRadios(key, arg);
-    else if (key.startsWith(QLatin1String("search:")))
-        requestSearch(key, arg);
-    else if (key.startsWith(QLatin1String("comments:"))) {
-        const QStringList parts = key.split(u':');
-        if (parts.size() >= 3)
-            requestCommentPage(key, parts.at(1).toDouble(), parts.at(2).toInt());
-        else
-            requestComments(key, parts.value(1).toDouble());
+    // 按 key 前缀分派。新增按需接口只在这里加一行（以及 store.h / 数据骨架 / 快照）。
+    using Handler = std::function<void(Store &, const QString &)>;
+    static const QList<QPair<QString, Handler>> routes = {
+        {QStringLiteral("lyrics:"), [](Store &s, const QString &k) {
+             s.requestLyrics(k, k.section(u':', 1).toDouble()); }},
+        {QStringLiteral("playlist:"), [](Store &s, const QString &k) {
+             s.requestPlaylist(k, k.section(u':', 1).toDouble()); }},
+        {QStringLiteral("searchUsers:"), [](Store &s, const QString &k) {
+             s.requestSearchUsers(k, k.section(u':', 1)); }},
+        {QStringLiteral("searchRadios:"), [](Store &s, const QString &k) {
+             s.requestSearchRadios(k, k.section(u':', 1)); }},
+        {QStringLiteral("search:"), [](Store &s, const QString &k) {
+             s.requestSearch(k, k.section(u':', 1)); }},
+        {QStringLiteral("comments:"), [](Store &s, const QString &k) {
+             const QStringList parts = k.split(u':');
+             if (parts.size() >= 3)
+                 s.requestCommentPage(k, parts.at(1).toDouble(), parts.at(2).toInt());
+             else
+                 s.requestComments(k, parts.value(1).toDouble()); }},
+        {QStringLiteral("artistSongs:"), [](Store &s, const QString &k) {
+             const QStringList parts = k.split(u':');
+             s.requestArtistSongs(k, parts.value(1).toDouble(), parts.value(2).toInt()); }},
+        {QStringLiteral("artist:"), [](Store &s, const QString &k) {
+             s.requestArtist(k, k.section(u':', 1).toDouble()); }},
+        {QStringLiteral("user:"), [](Store &s, const QString &k) {
+             s.requestUser(k, k.section(u':', 1).toDouble()); }},
+        {QStringLiteral("mv:"), [](Store &s, const QString &k) {
+             s.requestMv(k, k.section(u':', 1).toDouble()); }},
+        {QStringLiteral("album:"), [](Store &s, const QString &k) {
+             s.requestAlbum(k, k.section(u':', 1).toDouble()); }},
+        {QStringLiteral("inboxThread:"), [](Store &s, const QString &k) {
+             const QStringList parts = k.split(u':');
+             s.requestInboxThread(parts.value(1).toDouble(), parts.value(2).toLongLong()); }},
+        {QStringLiteral("inbox:"), [](Store &s, const QString &k) {
+             s.requestInbox(k.section(u':', 1).toInt()); }},
+        {QStringLiteral("inbox"), [](Store &s, const QString &k) {
+             if (k == QLatin1String("inbox")) s.requestInbox(0); }},
+        {QStringLiteral("listen:total"), [](Store &s, const QString &k) {
+             if (k == QLatin1String("listen:total")) s.requestListenTotal(); }},
+        {QStringLiteral("listen:week"), [](Store &s, const QString &) {
+             s.requestListenRealtime(QStringLiteral("week")); }},
+        {QStringLiteral("listen:month"), [](Store &s, const QString &) {
+             s.requestListenRealtime(QStringLiteral("month")); }},
+        {QStringLiteral("listenRank:"), [](Store &s, const QString &k) {
+             s.requestListenRank(k.section(u':', 1)); }},
+        {QStringLiteral("notifications"), [](Store &s, const QString &k) {
+             if (k == QLatin1String("notifications")) s.requestNotifications(); }},
+        {QStringLiteral("userFollows:"), [](Store &s, const QString &k) {
+             const QStringList parts = k.split(u':');
+             s.requestUserFollows(parts.value(1).toDouble(), parts.value(2).toInt()); }},
+        {QStringLiteral("userFolloweds:"), [](Store &s, const QString &k) {
+             const QStringList parts = k.split(u':');
+             s.requestUserFolloweds(parts.value(1).toDouble(), parts.value(2).toInt()); }},
+        {QStringLiteral("userLevel"), [](Store &s, const QString &k) {
+             if (k == QLatin1String("userLevel")) s.requestUserLevel(); }},
+        {QStringLiteral("userSubcount"), [](Store &s, const QString &k) {
+             if (k == QLatin1String("userSubcount")) s.requestUserSubcount(); }},
+        {QStringLiteral("commentReplies:"), [](Store &s, const QString &k) {
+             const QStringList parts = k.split(u':');
+             s.requestCommentReplies(parts.value(1).toDouble(), parts.value(2).toDouble(),
+                                     parts.value(3).toLongLong()); }},
+        {QStringLiteral("lyricsNew:"), [](Store &s, const QString &k) {
+             s.requestLyricsNew(k.section(u':', 1).toDouble()); }},
+        {QStringLiteral("fm:next"), [](Store &s, const QString &k) {
+             if (k == QLatin1String("fm:next")) s.requestMoreFm(); }},
+    };
+
+    for (const auto &route : routes) {
+        if (key != route.first && !key.startsWith(route.first))
+            continue;
+        route.second(*this, key);
+        return;
     }
-    else if (key.startsWith(QLatin1String("artistSongs:"))) {
-        const QStringList parts = key.split(u':');
-        requestArtistSongs(key, parts.value(1).toDouble(), parts.value(2).toInt());
-    } else if (key.startsWith(QLatin1String("artist:")))
-        requestArtist(key, arg.toDouble());
-    else if (key.startsWith(QLatin1String("user:")))
-        requestUser(key, arg.toDouble());
-    else if (key.startsWith(QLatin1String("mv:")))
-        requestMv(key, arg.toDouble());
-    else if (key.startsWith(QLatin1String("album:")))
-        requestAlbum(key, arg.toDouble());
-    else if (key == QLatin1String("fm:next"))
-        requestMoreFm();
-    else
-        qWarning() << "unknown store key:" << key.section(u':', 0, 0);
+    qWarning() << "unknown store key:" << key.section(u':', 0, 0);
 }
+
 
 // 歌词：单槽（lyricsTrackId + lyrics），QML 只看当前这首；缓存按歌分开，切回来直接命中
 void Store::requestLyrics(const QString &key, double songId)
@@ -216,21 +258,8 @@ void Store::requestCommentPage(const QString &key, double songId, int offset)
                           [done, songId, offset](const QJsonDocument &doc, bool ok) {
                 const QJsonObject resp = body(doc);
                 QVariantList items;
-                for (const QJsonValue &v : arr(resp, "comments")) {
-                    const QJsonObject c = v.toObject();
-                    const QJsonObject user = c.value("user").toObject();
-                    items.append(QVariantMap{
-                        {"user", user.value("nickname").toString()},
-                        {"userId", user.value("userId").toDouble()},
-                        {"avatar", ncmSized(user.value("avatarUrl"), 96)},
-                        {"content", c.value("content").toString()},
-                        {"likes", c.value("likedCount").toDouble()},
-                        {"time", c.value("time").toDouble()},
-                        {"id", c.value("commentId").toDouble()},
-                        {"parentId", c.value("parentCommentId").toDouble()},
-                        {"liked", c.value("liked").toBool()},
-                    });
-                }
+                for (const QJsonValue &v : arr(resp, "comments"))
+                    items.append(ncmComment(v.toObject()));
                 const double total = resp.value("total").toDouble();
                 done(QVariantMap{{"songId", songId},
                                  {"offset", offset},

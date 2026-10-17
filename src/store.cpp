@@ -48,6 +48,19 @@ Store::Store(NcmClient *client, QObject *parent)
         {"album", nullVariant()},
         {"mv", nullVariant()},
         {"user", nullVariant()},
+        // 只读信箱：私密数据只进内存，不写首屏快照
+        {"inbox", nullVariant()},
+        {"inboxThread", nullVariant()},
+        {"listenTotal", nullVariant()},
+        {"listenRealtime", nullVariant()},
+        {"listenRank", nullVariant()},
+        {"notifications", nullVariant()},
+        {"userFollows", nullVariant()},
+        {"userFolloweds", nullVariant()},
+        {"userLevel", nullVariant()},
+        {"userSubcount", nullVariant()},
+        {"commentReplies", nullVariant()},
+        {"lyricsNew", nullVariant()},
     };
     m_personal = QVariantMap{
         {"account", nullVariant()},
@@ -66,6 +79,11 @@ Store::Store(NcmClient *client, QObject *parent)
         {"playlistDetails", QVariantMap{}},
     };
     m_emptyPersonal = m_personal;
+    m_client->setCallbackContext(this);
+    // QueryCache 的失败只在这里汇总成 QML 可消费的通用失败信号；成功仍走 dataChanged
+    connect(&m_cache, &QueryCache::fetchFailed, this, [this](const QString &key) {
+        emit requestFailed(key, QStringLiteral("网络不可用，请稍后再试"));
+    });
     restoreScreen();
     // 换账号检测只认 userId：昵称会重复（「音乐爱好者」），不能当身份
     if (m_client->hasMusicU())
@@ -169,6 +187,17 @@ void Store::refresh()
 
 void Store::resetPersonal()
 {
+    // 私信与账号绑定：退出 / 换账号时不能留在内存里
+    put("inbox", nullVariant(), false);
+    put("inboxThread", nullVariant(), false);
+    put("notifications", nullVariant(), false);
+    put("userLevel", nullVariant(), false);
+    put("userSubcount", nullVariant(), false);
+    put("listenTotal", nullVariant(), false);
+    put("listenRealtime", nullVariant(), false);
+    put("listenRank", nullVariant(), false);
+    put("userFollows", nullVariant(), false);
+    put("userFolloweds", nullVariant(), false);
     m_personal = m_emptyPersonal;
     m_cache.remember(personalKey(), m_personal);
     emit personalChanged();

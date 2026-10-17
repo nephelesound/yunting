@@ -148,6 +148,7 @@ private:
     QString m_outputDeviceId;
     QString m_scrobbleMode = QStringLiteral("legacy");
     QString m_scrobbleRoundMode;   // 开始时锁定，避免中途切模式导致只发一半
+    QString m_scrobbleAccountToken; // 开始时锁定账号，换号后旧轮次不再上报
     QVariantList m_eqGains = QVariantList(10, 0.0);
     double m_bassBoost = 0;
     double m_stereoWidth = 1;
@@ -155,5 +156,9 @@ private:
     bool m_scrobbleStarted = false;
     bool m_scrobbleFinished = false;
     QElapsedTimer m_trackClock;
+    // 真实出声时间：暂停不计、seek 不增加；legacy 与 NCBL 都用它结算
+    QElapsedTimer m_playClock;
+    qint64 m_playedMs = 0;
+    bool m_playClockRunning = false;
     bool m_firstAudioLogged = false;
 };

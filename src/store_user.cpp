@@ -39,19 +39,8 @@ void Store::requestUser(const QString &key, double uid)
                 const QJsonObject root = body(doc);
                 const QJsonObject p = root.value("profile").toObject();
                 if (ok && root.value("code").toInt() == 200 && !p.isEmpty()) {
-                    state->user = QVariantMap{
-                        {"id", p.value("userId").toDouble()},
-                        {"name", p.value("nickname").toString()},
-                        {"avatar", ncmSized(p.value("avatarUrl"), 300)},
-                        {"background", ncmSized(p.value("backgroundUrl"), 800)},
-                        {"signature", p.value("signature").toString()},
-                        {"followed", p.value("followed").toBool()},
-                        {"follows", p.value("follows").toDouble()},
-                        {"followeds", p.value("followeds").toDouble()},
-                        {"playlistCount", p.value("playlistCount").toDouble()},
-                        {"level", p.value("level").toDouble()},
-                        {"playlists", QVariantList{}},
-                    };
+                    state->user = ncmProfile(p, 300, 800);
+                    state->user.insert("playlists", QVariantList{});
                     state->detailOk = true;
                 }
                 finish();

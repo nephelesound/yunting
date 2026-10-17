@@ -107,35 +107,83 @@ QVariantMap ncmCloudTrack(const QJsonObject &item)
     };
 }
 
+QVariantMap ncmProfile(const QJsonObject &p, int avatarPx, int backgroundPx)
+{
+    return {
+        {"id", p.value("userId").toDouble()},
+        {"name", p.value("nickname").toString()},
+        {"avatar", ncmSized(p.value("avatarUrl"), avatarPx)},
+        {"background", ncmSized(p.value("backgroundUrl"), backgroundPx)},
+        {"signature", p.value("signature").toString()},
+        {"followed", p.value("followed").toBool()},
+        {"follows", p.value("follows").toDouble()},
+        {"followeds", p.value("followeds").toDouble()},
+        {"playlistCount", p.value("playlistCount").toDouble()},
+        {"vipType", p.value("vipType").toDouble()},
+        {"vipRights", p.value("vipRights").toObject().toVariantMap()},
+        {"level", p.value("level").toDouble()},
+        {"listenSongs", p.value("listenSongs").toDouble()},
+        {"createTime", p.value("createTime").toDouble()},
+        {"mutual", p.value("mutual").toBool()},
+    };
+}
+
+QVariantMap ncmComment(const QJsonObject &c)
+{
+    const QJsonObject user = c.value("user").toObject();
+    QVariantList replied;
+    for (const QJsonValue &v : c.value("beReplied").toArray()) {
+        const QJsonObject r = v.toObject();
+        const QJsonObject ru = r.value("user").toObject();
+        replied.append(QVariantMap{
+            {"id", r.value("beRepliedCommentId").toDouble()},
+            {"content", textOr(r, "content")},
+            {"userId", ru.value("userId").toDouble()},
+            {"user", textOr(ru, "nickname")},
+        });
+    }
+    return {
+        {"user", textOr(user, "nickname")},
+        {"userId", user.value("userId").toDouble()},
+        {"avatar", ncmSized(user.value("avatarUrl"), 96)},
+        {"content", textOr(c, "content")},
+        {"likes", c.value("likedCount").toDouble()},
+        {"time", c.value("time").toDouble()},
+        {"id", c.value("commentId").toDouble()},
+        {"liked", c.value("liked").toBool()},
+        // 楼中楼：parentId 指向父评论；beReplied 是被引用的那条，前端据此画「回复 @某人」
+        {"parentId", c.value("parentCommentId").toDouble()},
+        {"beReplied", replied},
+    };
+}
+
 QVariantMap ncmHotComments(const QJsonObject &resp, double songId)
 {
     // 实测热评在顶层 hotComments（不在 data 里），保持接口给的顺序，最多 10 条
     QVariantList items;
-    for (const QJsonValue &v : take(resp.value("hotComments").toArray(), 10)) {
-        const QJsonObject c = v.toObject();
-        const QJsonObject user = c.value("user").toObject();
-        items.append(QVariantMap{
-            {"user", textOr(user, "nickname")},
-            {"userId", user.value("userId").toDouble()},
-            {"avatar", ncmSized(user.value("avatarUrl"), 96)},
-            {"content", textOr(c, "content")},
-            {"likes", c.value("likedCount").toDouble()},
-            {"time", c.value("time").toDouble()},
-            {"id", c.value("commentId").toDouble()},
-            {"liked", c.value("liked").toBool()},
-        });
-    }
+    for (const QJsonValue &v : take(resp.value("hotComments").toArray(), 10))
+        items.append(ncmComment(v.toObject()));
     return {{"songId", songId}, {"items", items}};
 }
 
+// 歌单/推荐卡片：id/name/cover/count/reason 供现有磁贴；description/playCount/creator/updateTime
+// 是给详情/悬停信息预留的只读字段，不改变页面当前用法。
 QVariantMap ncmPlaylistCard(const QJsonObject &p, const char *coverKey)
 {
     const double count = numOr(p, "trackCount");
+    const QJsonObject creator = p.value("creator").toObject();
     return {
         {"id", numOr(p, "id")},
         {"name", textOr(p, "name")},
         {"cover", ncmSized(p.value(QLatin1String(coverKey)), 300)},
         {"count", count},
+        // 卡片只补只读展示字段；详情页需要的曲目仍由 playlistDetails 提供
+        {"description", ncmFirstLine(p.value("description").toString())},
+        {"playCount", p.value("playCount").toDouble()},
+        {"creatorId", creator.value("userId").toDouble()},
+        {"creatorName", textOr(creator, "nickname")},
+        {"updateTime", p.value("updateTime").toDouble()},
+        {"subscribed", p.value("subscribed").toBool()},
         // copywriter 是推荐理由（首页磁贴的信息气味），没有时退回曲目数，这个回退在 QML 里做
         {"reason", textOr(p, "copywriter")},
     };
@@ -154,14 +202,19 @@ QVariantMap ncmSearchArtist(const QJsonObject &a)
     };
 }
 
+// 搜索结果里的歌单：保留 creator 字段兼容旧界面，同时补 creatorId/description/playCount。
 QVariantMap ncmSearchPlaylist(const QJsonObject &p)
 {
+    const QJsonObject creator = p.value("creator").toObject();
     return {
         {"id", numOr(p, "id")},
         {"name", textOr(p, "name")},
         {"cover", ncmSized(p.value("coverImgUrl"), 300)},
         {"count", numOr(p, "trackCount")},
-        {"creator", textOr(p.value("creator").toObject(), "nickname")},
+        {"creator", textOr(creator, "nickname")},
+        {"creatorId", creator.value("userId").toDouble()},
+        {"description", ncmFirstLine(p.value("description").toString())},
+        {"playCount", p.value("playCount").toDouble()},
     };
 }
 

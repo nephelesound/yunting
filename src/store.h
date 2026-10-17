@@ -86,6 +86,10 @@ signals:
     void albumChanged(double id, bool subscribed);
     void followFailed(const QString &action, const QString &message);
     void commentLikeFailed(double songId, double commentId, const QString &message);
+    // 只读信箱失败（登录失效 / 网络错误）；成功走 dataChanged
+    void inboxFailed(const QString &message);
+    // 只读/统计请求失败：key 与给用户看的一句话；成功走 dataChanged
+    void requestFailed(const QString &key, const QString &message);
 
 private slots:
     // NcmClient 每个请求的落地真相：收敛 online / sessionExpired 与欠账刷新
@@ -148,6 +152,24 @@ private:
     void requestMoreFm();
     void requestMv(const QString &key, double mvId);
     void requestUser(const QString &key, double uid);
+    // -- 只读信箱：data.inbox / data.inboxThread；不落盘，退出/换号清空
+    void requestInbox(int offset);
+    void requestInboxThread(double userId, qint64 before);
+    // -- 听歌足迹：data.listenTotal / listenRealtime / listenRank；仅登录后
+    void requestListenTotal();
+    void requestListenRealtime(const QString &type);
+    void requestListenRank(const QString &type);
+    // -- 通知计数：data.notifications；前端按分类做角标
+    void requestNotifications();
+    // -- 社交：关注/粉丝/等级/收藏计数；列表只读，不做关注写
+    void requestUserFollows(double uid, int offset);
+    void requestUserFolloweds(double uid, int offset);
+    void requestUserLevel();
+    void requestUserSubcount();
+    // -- 评论楼中楼：data.commentReplies；只读
+    void requestCommentReplies(double songId, double commentId, qint64 before);
+    // -- 新版歌词：data.lyricsNew；yrc/klyric/romalrc + 普通 LRC
+    void requestLyricsNew(double songId);
     // 首屏的 stale-while-revalidate：启动时先放上次的值，refresh() 的结果陆续覆盖
     void restoreScreen();
     QString personalKey() const;

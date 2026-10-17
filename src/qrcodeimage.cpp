@@ -3,6 +3,8 @@
 #include <QUrl>
 #include <qrencode.h>
 
+#include <algorithm>
+
 QrCodeImageProvider::QrCodeImageProvider()
     : QQuickImageProvider(QQuickImageProvider::Image)
 {

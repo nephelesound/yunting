@@ -453,11 +453,11 @@ private slots:
     {
         m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
             if (req.path.startsWith("/api/v1/resource/hotcomments/")) {
-                respond(200, R"json({"code":200,"hotComments":[
-                    {"commentId":500,"content":"a","likedCount":10,"liked":false,"time":1,
-                     "user":{"userId":7,"nickname":"u"}},
-                    {"commentId":501,"content":"b","likedCount":20,"liked":true,"time":2,
-                     "user":{"userId":8,"nickname":"v"}}]})json");
+                respond(200, "{\"code\":200,\"hotComments\":["
+                             "{\"commentId\":500,\"content\":\"a\",\"likedCount\":10,"
+                             "\"liked\":false,\"time\":1,\"user\":{\"userId\":7,\"nickname\":\"u\"}},"
+                             "{\"commentId\":501,\"content\":\"b\",\"likedCount\":20,"
+                             "\"liked\":true,\"time\":2,\"user\":{\"userId\":8,\"nickname\":\"v\"}}]}");
                 return;
             }
             if (req.path == "/weapi/v1/comment/like") {
@@ -521,6 +521,130 @@ private slots:
         QCOMPARE(u.value("id").toDouble(), 42.0);
         QCOMPARE(u.value("follows").toDouble(), 3.0);
         QCOMPARE(u.value("playlists").toList().first().toMap().value("name").toString(), QStringLiteral("Public"));
+    }
+
+    // 只读信箱：会话与历史都归一化到 data.inbox / data.inboxThread
+    void readsInboxAndThread()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/weapi/msg/private/users") {
+                const QJsonObject track{{"id", 9}, {"name", "s"}, {"ar", QJsonArray{}},
+                                        {"al", QJsonObject{}}, {"dt", 1000}};
+                const QJsonObject payload{{"msg", "hello"}, {"song", track}};
+                respond(200, json(QJsonObject{
+                    {"code", 200}, {"more", false}, {"newMsgCount", 3},
+                    {"msgs", QJsonArray{QJsonObject{
+                        {"fromUser", QJsonObject{{"userId", 7}, {"nickname", "Peer"}, {"avatarUrl", "http://a"}}},
+                        {"toUser", QJsonObject{{"userId", 1}, {"nickname", "Me"}, {"avatarUrl", "http://m"}}},
+                        {"lastMsg", QString::fromUtf8(QJsonDocument(payload).toJson(QJsonDocument::Compact))},
+                        {"lastMsgTime", 123}, {"lastMsgId", 55}, {"newMsgCount", 3},
+                        {"user", QJsonObject{{"msgCount", 8}}},
+                    }}}}));
+                return;
+            }
+            if (req.path == "/weapi/msg/private/history") {
+                respond(200, json(QJsonObject{
+                    {"code", 200}, {"more", false},
+                    {"msgs", QJsonArray{QJsonObject{
+                        {"id", 55},
+                        {"fromUser", QJsonObject{{"userId", 7}, {"nickname", "Peer"}, {"avatarUrl", "http://a"}}},
+                        {"toUser", QJsonObject{{"userId", 1}, {"nickname", "Me"}}},
+                        {"msg", "{\"msg\":\"hello\"}"}, {"time", 123},
+                    }}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        m_store->request(QStringLiteral("inbox"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("inbox").toMap().value("items").toList().size() == 1;
+        }));
+        const QVariantMap c = m_store->data().value("inbox").toMap().value("items").toList().first().toMap();
+        QCOMPARE(c.value("userId").toDouble(), 7.0);
+        QCOMPARE(c.value("name").toString(), QStringLiteral("Peer"));
+        QCOMPARE(c.value("unread").toDouble(), 3.0);
+        QCOMPARE(c.value("kind").toString(), QStringLiteral("song"));
+
+        m_store->request(QStringLiteral("inboxThread:7"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("inboxThread").toMap().value("items").toList().size() == 1;
+        }));
+        const QVariantMap m = m_store->data().value("inboxThread").toMap().value("items").toList().first().toMap();
+        QCOMPARE(m.value("fromUserId").toDouble(), 7.0);
+        QCOMPARE(m.value("mine").toBool(), false);
+        QCOMPARE(m.value("message").toMap().value("text").toString(), QStringLiteral("hello"));
+    }
+
+    // 统计 / 通知 / 等级 / 逐字歌词 / 楼中楼：归一化字段与请求 key 的回归
+    void readOnlyExtrasNormalize()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/content/activity/listen/data/total") {
+                respond(200, json(QJsonObject{{"code", 200},
+                                               {"data", QJsonObject{{"totalDuration", 7200}}}}));
+                return;
+            }
+            if (req.path == "/api/pl/count") {
+                respond(200, json(QJsonObject{{"code", 200}, {"msg", 2}, {"comment", 3},
+                                               {"event", 0}, {"follow", 0}, {"notice", 0},
+                                               {"forward", 0}, {"newProgramCount", 0}}));
+                return;
+            }
+            if (req.path == "/api/user/level") {
+                respond(200, json(QJsonObject{{"code", 200},
+                                               {"data", QJsonObject{{"level", 9}, {"nowPlayCount", 10},
+                                                                    {"nextPlayCount", 20}, {"progress", 0.5}}}}));
+                return;
+            }
+            if (req.path == "/api/song/lyric/v1") {
+                respond(200, json(QJsonObject{{"code", 200},
+                                               {"lrc", QJsonObject{{"lyric", "[00:01.00]hello"}}},
+                                               {"tlyric", QJsonObject{{"lyric", ""}}},
+                                               {"yrc", QJsonObject{{"lyric", ""}}},
+                                               {"klyric", QJsonObject{{"lyric", ""}}},
+                                               {"romalrc", QJsonObject{{"lyric", ""}}}}));
+                return;
+            }
+            if (req.path == "/weapi/resource/comment/floor/get") {
+                respond(200, json(QJsonObject{{"code", 200},
+                                               {"data", QJsonObject{{"comments", QJsonArray{
+                                                   QJsonObject{{"commentId", 2}, {"content", "reply"},
+                                                               {"likedCount", 0}, {"liked", false},
+                                                               {"time", 2}, {"parentCommentId", 1},
+                                                               {"user", QJsonObject{{"userId", 9}, {"nickname", "u"}}}}}}}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("listen:total"));
+        m_store->request(QStringLiteral("notifications"));
+        m_store->request(QStringLiteral("userLevel"));
+        m_store->request(QStringLiteral("lyricsNew:1"));
+        m_store->request(QStringLiteral("commentReplies:1:1"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("listenTotal").toMap().value("seconds").toDouble() == 7200
+                && m_store->data().value("notifications").toMap().value("total").toInt() == 5
+                && m_store->data().value("userLevel").toMap().value("level").toInt() == 9
+                && m_store->data().value("lyricsNew").toMap().value("lines").toList().size() == 1
+                && m_store->data().value("commentReplies").toMap().value("items").toList().size() == 1;
+        }));
+        const QVariantMap reply = m_store->data().value("commentReplies").toMap()
+                                      .value("items").toList().first().toMap();
+        QCOMPARE(reply.value("parentId").toDouble(), 1.0);
+        QCOMPARE(reply.value("userId").toDouble(), 9.0);
+    }
+
+    // 按需请求失败必须发 requestFailed，页面才能从「加载中」切到「重试」
+    void failedOnDemandRequestNotifies()
+    {
+        m_api->handler = [](const FakeApi::Request &, const FakeApi::Responder &respond) {
+            respond(500, "{\"code\":500}");
+        };
+        QSignalSpy failed(m_store, &Store::requestFailed);
+        m_store->request(QStringLiteral("playlist:999"));
+        QVERIFY(waitUntil([&] { return failed.count() == 1; }));
+        QCOMPARE(failed.first().at(0).toString(), QStringLiteral("playlist:999"));
     }
 };
 

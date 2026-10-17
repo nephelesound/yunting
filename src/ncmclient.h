@@ -8,6 +8,7 @@
 #include <functional>
 #include <QMap>
 #include <QObject>
+#include <QPointer>
 #include <QSet>
 #include <QString>
 #include <QUrl>
@@ -62,8 +63,15 @@ explicit NcmClient(QObject *parent = nullptr, bool loadCookies = true);
     // 不参与 Store 的 online 计数；失败只回调一次，不重试。
     void postClientLog(const QByteArray &multipart, const QString &boundary,
                        const QString &cookie, GetCallback callback);
+    void postClientLogAttempt(const QByteArray &multipart, const QString &boundary,
+                              const QString &cookie, GetCallback callback, int attempt);
     // NCBL 需要的 cookie jar（只读快照；不要在调用方打印）
     QMap<QString, QString> cookieJar() const { return m_jar; }
+
+    // Store 的回调生命周期：Store 先于本对象销毁时，晚到的回包不再回调。
+    // 只应由 Store 设置；不设置时（CLI / 测试）所有回调照常。
+    void setCallbackContext(QObject *context);
+    bool callbackContextAlive() const;
 
     // 测试接缝：把 API 指到本地 QTcpServer。默认 music.163.com。
     void setApiBase(const QString &base);
@@ -98,6 +106,8 @@ private:
     QNetworkAccessManager *m_nam;
     QString m_apiBase = QStringLiteral("https://music.163.com/");
     QMap<QString, QString> m_jar;
-    bool m_ready = false;     // 存储已读出：可以发请求
+    bool m_ready = false;
+    bool m_contextSet = false;
+    QPointer<QObject> m_callbackContext;     // 存储已读出：可以发请求
     bool m_persist = true;    // jar 变了写回存储；匿名调试（不读存储）时绝不写，否则匿名 jar 会盖掉登录凭据
 };

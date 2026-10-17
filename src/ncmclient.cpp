@@ -244,7 +244,7 @@ void NcmClient::postRaw(const QUrl &url, const QByteArray &body, const QString &
         if (keepCookies)
             keepSetCookies(reply);
         emit requestFinished(ok, networkError);
-        if (callback)
+        if (callback && callbackContextAlive())
             callback(doc, ok);
     });
 }
@@ -269,7 +269,7 @@ void NcmClient::postWeapi(const QString &path, const QJsonObject &payload, bool 
     const QByteArray form = ncm::weapiForm(body).toLatin1();
     if (form.isEmpty()) {
         // 加密失败属于本机错误：不发请求，交给调用方显示可读原因
-        if (callback)
+        if (callback && callbackContextAlive())
             callback({}, false);
         return;
     }
@@ -305,6 +305,12 @@ QString NcmClient::cookieHeader(bool personal) const
 void NcmClient::postClientLog(const QByteArray &multipart, const QString &boundary,
                                  const QString &cookie, GetCallback callback)
 {
+    postClientLogAttempt(multipart, boundary, cookie, callback, 0);
+}
+
+void NcmClient::postClientLogAttempt(const QByteArray &multipart, const QString &boundary,
+                                        const QString &cookie, GetCallback callback, int attempt)
+{
     QNetworkRequest request(QUrl(QStringLiteral(
         "https://clientlog3.music.163.com/api/clientlog/encrypt/upload?multiupload=true")));
     request.setHeader(QNetworkRequest::ContentTypeHeader,
@@ -318,18 +324,41 @@ void NcmClient::postClientLog(const QByteArray &multipart, const QString &bounda
     request.setRawHeader("Accept-Language", "zh-CN,zh;q=0.8");
     request.setRawHeader("Cookie", cookie.toUtf8());
     QNetworkReply *reply = m_nam->post(request, multipart);
-    connect(reply, &QNetworkReply::finished, this, [reply, callback] {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, callback, multipart, boundary,
+                                                       cookie, attempt] {
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const bool retryable = attempt < 2
+            && (reply->error() == QNetworkReply::NoError ? status >= 500
+                                                         : isNetworkError(*reply));
+        if (retryable && callbackContextAlive()) {
+            reply->deleteLater();
+            QTimer::singleShot(200 * (attempt + 1), this, [this, multipart, boundary, cookie,
+                                                             callback, attempt] {
+                postClientLogAttempt(multipart, boundary, cookie, callback, attempt + 1);
+            });
+            return;
+        }
         const QByteArray bytes = reply->readAll();
         const QJsonDocument doc = QJsonDocument::fromJson(bytes);
         const bool ok = reply->error() == QNetworkReply::NoError && doc.isObject();
         if (!ok)
             qWarning() << "clientlog upload failed:" << reply->errorString()
-                       << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
-                       << bytes.left(300);
-        if (callback)
+                       << status << bytes.left(300);
+        if (callback && callbackContextAlive())
             callback(ok ? doc : QJsonDocument(), ok);
         reply->deleteLater();
     });
+}
+
+void NcmClient::setCallbackContext(QObject *context)
+{
+    m_callbackContext = context;
+    m_contextSet = context != nullptr;
+}
+
+bool NcmClient::callbackContextAlive() const
+{
+    return !m_contextSet || !m_callbackContext.isNull();
 }
 
 void NcmClient::setApiBase(const QString &base)

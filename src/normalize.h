@@ -20,6 +20,10 @@ QVariantMap ncmSearchMv(const QJsonObject &m);
 QVariantList ncmTracks(const QJsonArray &items);
 // 热门评论：data.comments 的取数形状（snapshot.py 的 hot_comments）
 QVariantMap ncmHotComments(const QJsonObject &resp, double songId);
+// 单条评论：热评、分页、楼中楼共用同一套字段，避免三个地方各写一份、字段漂移
+QVariantMap ncmComment(const QJsonObject &c);
+// 账户与用户主页共用的 profile 映射：avatar/background 尺寸由调用方决定
+QVariantMap ncmProfile(const QJsonObject &p, int avatarPx, int backgroundPx);
 QVariantList ncmParseLrc(const QString &lrc, const QString &tlyric);
 // ncmParseLrc 的反向：把 {t, text, tr} 写回 LRC；有译文时同一时间戳再写一行（通行的双语 LRC 写法，
 // MPRIS 的 xesam:asText 交给歌词组件时用）

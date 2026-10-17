@@ -13,7 +13,7 @@ app-build:
 	cmake -S src -B build/app -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo >/dev/null
 	ninja -C build/app
 
-test: app-build ## 后端单元测试
+test: app-build qmltest ## 后端单元测试 + QML 交互测试
 	ctest --test-dir build/app --output-on-failure
 
 qmltest: prototype/Personal.js ## 界面交互测试（悬停、点击、滚轮；用快照数据）

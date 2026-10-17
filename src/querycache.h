@@ -37,6 +37,9 @@ public:
     // 退出登录：丢掉所有含个人数据的结果（歌单详情、搜索历史之外的缓存也一并清掉）
     void clear();
 
+signals:
+    void fetchFailed(const QString &key);
+
 private:
     struct Entry {
         QVariant value;

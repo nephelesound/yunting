@@ -19,6 +19,7 @@
 #include <QMediaPlayer>
 #include <QTimer>
 #include <QUrlQuery>
+#include <QPointer>
 #include <algorithm>
 #include <cstdio>
 
@@ -75,6 +76,10 @@ AudioEngine::AudioEngine(NcmClient *client, QObject *parent)
     // 真正开始出声才打卡：地址还在解析时不算听过
     connect(m_player, &QMediaPlayer::playbackStateChanged, this, [this](QMediaPlayer::PlaybackState state) {
         if (state == QMediaPlayer::PlayingState) {
+            if (!m_playClockRunning) {
+                m_playClock.start();
+                m_playClockRunning = true;
+            }
             if (!m_firstAudioLogged && !m_track.isEmpty()) {
                 m_firstAudioLogged = true;
                 qCDebug(lcPerf).nospace() << "audio first track="
@@ -82,6 +87,9 @@ AudioEngine::AudioEngine(NcmClient *client, QObject *parent)
                                           << " ms=" << m_trackClock.elapsed();
             }
             scrobbleStart();
+        } else if (m_playClockRunning) {
+            m_playedMs += m_playClock.elapsed();
+            m_playClockRunning = false;
         }
     });
     connect(m_player, &QMediaPlayer::errorOccurred, this, [this](QMediaPlayer::Error, const QString &errorString) {
@@ -115,6 +123,8 @@ void AudioEngine::setTrack(const QVariantMap &track)
     m_failed = false;
     m_scrobbleStarted = false;
     m_scrobbleFinished = false;
+    m_playedMs = 0;
+    m_playClockRunning = false;
     m_firstAudioLogged = false;
     m_trackClock.start();
     m_player->stop();
@@ -392,6 +402,7 @@ void AudioEngine::scrobbleStart()
         return;
     m_scrobbleStarted = true;
     m_scrobbleRoundMode = m_scrobbleMode;
+    m_scrobbleAccountToken = m_client->cookieJar().value(QStringLiteral("MUSIC_U"));
     // NCBL 只在结算时上传 PLV/PLD；本地「最近播放」两种模式都要立即更新
     if (m_scrobbleRoundMode != QLatin1String("ncbl"))
         sendWeblog("startplay", 0);
@@ -402,7 +413,16 @@ void AudioEngine::scrobbleFinish()
 {
     if (!m_scrobbleStarted || m_scrobbleFinished || m_track.isEmpty() || !m_client->hasMusicU())
         return;
-    int seconds = qRound(position());
+    if (m_playClockRunning) {
+        m_playedMs += m_playClock.elapsed();
+        m_playClockRunning = false;
+    }
+    // 换号后旧轮次不能写到新账号
+    if (m_client->cookieJar().value(QStringLiteral("MUSIC_U")) != m_scrobbleAccountToken) {
+        m_scrobbleFinished = true;
+        return;
+    }
+    int seconds = int(m_playedMs / 1000);
     if (seconds <= 0 && m_player->mediaStatus() == QMediaPlayer::EndOfMedia)
         seconds = qRound(duration());
     if (seconds <= 0)
@@ -480,15 +500,20 @@ void AudioEngine::scrobbleNcbl(int seconds)
                 return true;
         return false;
     };
+    QPointer<AudioEngine> self(this);
     m_client->postClientLog(plv.body, plv.boundary, context.cookie,
-                            [this, check, plv, pld, context](const QJsonDocument &doc, bool ok) {
+                            [self, check, plv, pld, context](const QJsonDocument &doc, bool ok) {
+        if (!self)
+            return;
         if (!check(plv, doc, ok)) {
             qWarning() << "NCBL PLV upload failed:" << doc.object().value("code").toInt();
             return;
         }
         qCDebug(lcPerf) << "NCBL PLV accepted";
-        m_client->postClientLog(pld.body, pld.boundary, context.cookie,
-                                [check, pld](const QJsonDocument &doc, bool ok) {
+        self->m_client->postClientLog(pld.body, pld.boundary, context.cookie,
+                                      [self, check, pld](const QJsonDocument &doc, bool ok) {
+            if (!self)
+                return;
             if (!check(pld, doc, ok))
                 qWarning() << "NCBL PLD upload failed:" << doc.object().value("code").toInt();
             else

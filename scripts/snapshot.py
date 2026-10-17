@@ -134,8 +134,16 @@ def complete_playlist(pl, personal=True):
 
 def playlist_card(p, cover_key):
     # copywriter 是推荐理由（「根据你喜欢的单曲《X》推荐」），首页磁贴用它当信息气味；没有时退回曲目数
+    creator = p.get("creator") or {}
     return {"id": p["id"], "name": p["name"], "cover": sized(p.get(cover_key), 300),
-            "count": p.get("trackCount") or 0, "reason": p.get("copywriter") or ""}
+            "count": p.get("trackCount") or 0,
+            "description": (p.get("description") or "").split("\n")[0],
+            "playCount": p.get("playCount") or 0,
+            "creatorId": creator.get("userId") or 0,
+            "creatorName": creator.get("nickname") or "",
+            "updateTime": p.get("updateTime") or 0,
+            "subscribed": bool(p.get("subscribed")),
+            "reason": p.get("copywriter") or ""}
 
 
 def search_artist(a):
@@ -144,8 +152,13 @@ def search_artist(a):
 
 
 def search_playlist(p):
+    creator = p.get("creator") or {}
     return {"id": p["id"], "name": p["name"], "cover": sized(p.get("coverImgUrl"), 300),
-            "count": p.get("trackCount") or 0, "creator": (p.get("creator") or {}).get("nickname") or ""}
+            "count": p.get("trackCount") or 0,
+            "creator": creator.get("nickname") or "",
+            "creatorId": creator.get("userId") or 0,
+            "description": (p.get("description") or "").split("\n")[0],
+            "playCount": p.get("playCount") or 0}
 
 
 def search_mv(m):
@@ -185,7 +198,13 @@ def hot_comments(song_id):
                        "likes": c.get("likedCount") or 0,
                        "time": c.get("time") or 0,
                        "id": c.get("commentId") or 0,
-                       "liked": bool(c.get("liked"))}
+                       "liked": bool(c.get("liked")),
+                       "parentId": c.get("parentCommentId") or 0,
+                       "beReplied": [{"id": (r.get("beRepliedCommentId") or 0),
+                                      "content": r.get("content") or "",
+                                      "userId": ((r.get("user") or {}).get("userId") or 0),
+                                      "user": ((r.get("user") or {}).get("nickname") or "")}
+                                     for r in (c.get("beReplied") or [])]}
                       for c in (resp.get("hotComments") or [])[:10]]}
 
 
@@ -235,7 +254,10 @@ def anonymous():
            js("comments", hot_comments(tracks[CURRENT]["id"])),
            js("commentPage", None), js("searchUsers", None), js("searchRadios", None),
            js("search", search), js("hotSearches", hot_searches),
-           js("artist", None), js("artistSongs", None), js("album", None), js("mv", None), js("user", None)])
+           js("artist", None), js("artistSongs", None), js("album", None), js("mv", None), js("user", None), js("inbox", None), js("inboxThread", None),
+           js("listenTotal", None), js("listenRealtime", None), js("listenRank", None),
+           js("notifications", None), js("userFollows", None), js("userFolloweds", None),
+           js("userLevel", None), js("userSubcount", None), js("commentReplies", None), js("lyricsNew", None)])
     return tracks
 
 
@@ -249,7 +271,19 @@ def personal(hot_tracks):
     uid = profile.get("userId")
 
     if uid:
-        data["account"] = {"name": profile["nickname"], "vip": (profile.get("vipType") or 0) > 0,
+        data["account"] = {"id": uid, "name": profile["nickname"],
+                           "vip": (profile.get("vipType") or 0) > 0,
+                           "vipType": profile.get("vipType") or 0,
+                           "vipRights": profile.get("vipRights") or {},
+                           "level": profile.get("level") or 0,
+                           "listenSongs": profile.get("listenSongs") or 0,
+                           "signature": profile.get("signature") or "",
+                           "followed": bool(profile.get("followed")),
+                           "follows": profile.get("follows") or 0,
+                           "followeds": profile.get("followeds") or 0,
+                           "playlistCount": profile.get("playlistCount") or 0,
+                           "createTime": profile.get("createTime") or 0,
+                           "mutual": bool(profile.get("mutual")),
                            "avatar": sized(profile.get("avatarUrl"), 96),
                            "background": sized(profile.get("backgroundUrl"), 1200)}
         daily = get("api/v3/discovery/recommend/songs", personal=True)["data"]

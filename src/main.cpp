@@ -124,6 +124,12 @@ int main(int argc, char *argv[])
     QCommandLineOption scrobbleModeOption("scrobble-mode",
                                           "Listening log: legacy (web) or ncbl (PC client PLV/PLD)",
                                           "mode");
+    QCommandLineOption inboxOption("inbox",
+                                   "Read-only mailbox; optional user ID for one conversation",
+                                   "uid", QString());
+    QCommandLineOption storeKeyOption("store-key",
+                                      "Debug: request one Store key and print data/personal",
+                                      "key");
     parser.addOption(dumpOption);
     parser.addOption(smokeOption);
     parser.addOption(audioQualityOption);
@@ -146,6 +152,8 @@ int main(int argc, char *argv[])
     parser.addOption(eqPresetOption);
     parser.addOption(soakOption);
     parser.addOption(scrobbleModeOption);
+    parser.addOption(inboxOption);
+    parser.addOption(storeKeyOption);
     parser.process(app);
 
     if (parser.isSet(verboseOption) || parser.isSet(shotOption)) {
@@ -573,6 +581,61 @@ int main(int argc, char *argv[])
             QCoreApplication::quit();
         });
         return app.exec();
+    }
+
+    if (parser.isSet(storeKeyOption)) {
+        if (!client.isReady()) {
+            QEventLoop ready;
+            QObject::connect(&client, &NcmClient::ready, &ready, &QEventLoop::quit);
+            QTimer::singleShot(15 * 1000, &ready, &QEventLoop::quit);
+            ready.exec();
+        }
+        QEventLoop loop;
+        QObject::connect(&store, &Store::dataChanged, &loop, &QEventLoop::quit);
+        QObject::connect(&store, &Store::inboxFailed, &loop, [&loop](const QString &reason) {
+            std::fprintf(stderr, "store request failed: %s\n", qPrintable(reason));
+            loop.quit();
+        });
+        QTimer::singleShot(20 * 1000, &loop, &QEventLoop::quit);
+        store.request(parser.value(storeKeyOption));
+        loop.exec();
+        const QJsonObject out{
+            {"data", QJsonObject::fromVariantMap(store.data())},
+            {"personal", QJsonObject::fromVariantMap(store.personal())},
+        };
+        std::printf("%s", QJsonDocument(out).toJson(QJsonDocument::Indented).constData());
+        return 0;
+    }
+
+    if (parser.isSet(inboxOption)) {
+        if (!client.hasMusicU()) {
+            std::fprintf(stderr, "not logged in\n");
+            return 1;
+        }
+        if (!client.isReady()) {
+            QEventLoop ready;
+            QObject::connect(&client, &NcmClient::ready, &ready, &QEventLoop::quit);
+            QTimer::singleShot(15 * 1000, &ready, &QEventLoop::quit);
+            ready.exec();
+        }
+        const QString uid = parser.value(inboxOption);
+        const QString key = uid.isEmpty() ? QStringLiteral("inbox")
+                                          : QStringLiteral("inboxThread:") + uid;
+        QEventLoop loop;
+        QObject::connect(&store, &Store::dataChanged, &loop, &QEventLoop::quit);
+        QObject::connect(&store, &Store::inboxFailed, &loop, [&loop](const QString &reason) {
+            std::fprintf(stderr, "inbox failed: %s\n", qPrintable(reason));
+            loop.quit();
+        });
+        QTimer::singleShot(20 * 1000, &loop, &QEventLoop::quit);
+        store.request(key);
+        loop.exec();
+        const QJsonObject out{
+            {"inbox", QJsonObject::fromVariantMap(store.data().value("inbox").toMap())},
+            {"inboxThread", QJsonObject::fromVariantMap(store.data().value("inboxThread").toMap())},
+        };
+        std::printf("%s", QJsonDocument(out).toJson(QJsonDocument::Indented).constData());
+        return 0;
     }
 
     if (parser.isSet(smokeOption)) {

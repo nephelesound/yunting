@@ -77,8 +77,10 @@ void QueryCache::query(const QString &key, const Fetcher &fetch, const Deliver &
         if (generation != m_generation)
             return;                      // 期间退出登录：旧请求的结果属于上一个账号
         const QList<Deliver> waiters = m_waiting.take(key);
-        if (!ok)
-            return;                      // 失败：保留旧值（已经给过了）
+        if (!ok) {
+            emit fetchFailed(key);       // 失败：保留旧值，通知界面可重试
+            return;
+        }
         m_entries.insert(key, {value, QDateTime::currentDateTimeUtc()});
         qCDebug(lcPerf).nospace() << "cache fetch kind=" << kind << " ok=" << ok
                                   << " ms=" << timer.elapsed();
