@@ -13,6 +13,7 @@ ScreenFrame {
     id: page
     scroller: page.pane === "songs" ? tracks : albums
     kept: ["pane"]
+    background: PageAmbience { cover: page.artist.cover || "" }
 
     property real artistId
     property real currentId

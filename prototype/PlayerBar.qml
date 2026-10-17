@@ -103,7 +103,8 @@ Item {
         RowLayout {
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            width: Math.min(Tokens.trackColumn, transport.x - Tokens.space6)
+            // 至多一栏宽（400）：歌名、红心、分享、评论都放得下；窄窗口时让给中间的传输控件
+            width: Math.min(Tokens.measureMax, transport.x - Tokens.space6)
             spacing: Tokens.space3
 
             CoverButton {

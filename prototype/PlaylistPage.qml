@@ -12,6 +12,7 @@ import "Format.js" as Format
 ScreenFrame {
     id: page
     scroller: tracks
+    background: PageAmbience { cover: page.list.cover }
 
     // { heading, cover, facts: [{ value, label }], description, tracks, ranked }
     property var list

@@ -9,6 +9,7 @@ PlaylistsPage PlaylistsPage.qml
 PagingFooter PagingFooter.qml
 PersonAvatar PersonAvatar.qml
 CoverAmbience CoverAmbience.qml
+PageAmbience PageAmbience.qml
 CoverFlight CoverFlight.qml
 DesktopLyrics DesktopLyrics.qml
 MiniPlayer MiniPlayer.qml

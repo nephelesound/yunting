@@ -6,6 +6,7 @@
 // corner：图标右上角的小数字（评论数，网易云的写法）：不是徽章，没有底色，按钮按数字的宽度变宽，不压到旁边。
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 
 ToolButton {
@@ -14,10 +15,12 @@ ToolButton {
     property string glyph
     property string corner
 
-    implicitWidth: leftPadding + Tokens.iconSm + rightPadding
+    implicitWidth: Tokens.height8
     implicitHeight: Tokens.height8
     padding: Tokens.space2
-    rightPadding: button.corner ? Math.ceil(cornerLabel.implicitWidth) + Tokens.space1 : Tokens.space2
+    // 角上的数字伸到按钮外面（按钮本身保持方形：Breeze 的按钮底按方形居中画图标，改内边距会画出两个图标），
+    // 在布局里多要出数字的宽度，不压到旁边
+    Layout.rightMargin: button.corner ? Math.ceil(cornerLabel.implicitWidth) - Tokens.space1 : 0
     icon.width: Tokens.iconSm
     icon.height: Tokens.iconSm
     display: AbstractButton.IconOnly
