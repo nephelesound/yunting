@@ -2,6 +2,14 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.2] - 2026-10-17
+
+### 变化
+- 桌面歌词的控制条改成 KDE 的标准工具栏：系统原生的按钮与配色，开关用原生的勾选状态，唱到的字的颜色改成一个菜单。歌词本身与平滑拖动不变。
+
+### 修复
+- 桌面歌词与迷你窗的透明区域在部分环境下被画成黑色。
+
 ## [0.2.1] - 2026-10-17
 
 ### 修复
@@ -34,6 +42,7 @@
 - 分享：链接、二维码、Telegram 与邮件，以及带封面与歌词的分享图。
 - 「关于」窗口与「复制诊断信息」，方便反馈问题。
 
+[0.2.2]: https://github.com/nephelesound/yunting/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/nephelesound/yunting/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/nephelesound/yunting/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/nephelesound/yunting/releases/tag/v0.1.0
