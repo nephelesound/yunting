@@ -24,6 +24,7 @@ ScreenFrame {
     property string rankType: "week"    // week | month
 
     readonly property var user: Source.user(page.userId)
+    readonly property bool restricted: page.user.restricted === true
     // 自己的主页：账号的去处都在这里（页头的头像与名字直接跳过来），关注的位置换成退出登录
     readonly property bool own: page.userId > 0 && Source.account !== null && Source.account.id === page.userId
     readonly property var rank: Source.listenRank(page.rankType)
@@ -34,6 +35,8 @@ ScreenFrame {
 
     // 听歌排行、关注、粉丝后端不缓存：切到那一栏（或换周 / 月）时要一次，已经有了就不再要
     function load() {
+        if (!(page.userId > 0))
+            return;
         if (page.pane === "rank" && page.own && page.rank.pending)
             Source.need("listenRank:" + page.rankType);
         else if (page.pane === "follows" && page.follows.pending)
@@ -106,7 +109,8 @@ ScreenFrame {
                 spacing: Tokens.space2
                 Label {
                     Layout.fillWidth: true
-                    text: page.user.name || (Source.live ? "正在取回用户…" : "用户")
+                    text: page.user.name || (page.restricted ? "该用户设置了隐私"
+                                                              : Source.live ? "正在取回用户…" : "用户")
                     font.pixelSize: Tokens.text2xl
                     font.weight: Font.Light
                     elide: Text.ElideRight
@@ -245,8 +249,10 @@ ScreenFrame {
                 PaneMessage {
                     visible: playlists.count === 0
                     icon.name: "view-media-playlist"
-                    pending: page.user.id <= 0 || page.user.name === ""
-                    failed: page.user.failed === true
+                    pending: !page.restricted && (page.user.id <= 0 || page.user.name === "")
+                    failed: page.user.failed === true && !page.restricted
+                    restricted: page.restricted
+                    restrictedText: "对方设置了隐私，无法查看公开歌单"
                     retryKey: "user:" + page.userId
                     emptyText: "还没有公开歌单"
                 }

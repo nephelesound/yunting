@@ -21,7 +21,7 @@ ScreenFrame {
 
     heading: page.mv.name || "MV"
     // 播放地址是签名的、会过期：每次打开都向后端要一次（详情仍走缓存，地址重新取）
-    Component.onCompleted: Source.need("mv:" + page.mvId)
+    Component.onCompleted: if (page.mvId > 0) Source.need("mv:" + page.mvId)
     Component.onDestruction: if (page.player) page.player.stop()
 
     Item {

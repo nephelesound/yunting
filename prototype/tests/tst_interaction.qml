@@ -316,6 +316,20 @@ Item {
             verify(message.text.indexOf("隐私") >= 0);
         }
 
+        // 退栈时 id 会短暂变成 0：Source 这一层就不能把 user:0 / artist:0 发给后端。
+        function test_zeroIdsDoNotRequest() {
+            const saved = Source.live;
+            const calls = [];
+            Source.live = { request: key => calls.push(key) };
+            Source.user(0);
+            Source.artist(0);
+            Source.album(0);
+            Source.mv(0);
+            Source.list("playlist:0");
+            Source.live = saved;
+            compare(calls.length, 0);
+        }
+
         // 评论点赞从页面转发到后端时，参数不能丢（songId, commentId, 目标状态）。
         function test_commentLikeForwardsToLive() {
             const calls = [];

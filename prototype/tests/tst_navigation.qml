@@ -52,6 +52,18 @@ Item {
             window.close();
         }
 
+        // 页面持有进入时的路由参数；退栈时 root 参数归零不能把页面重新指向 0 号用户。
+        function test_pageOwnsRouteParams() {
+            const window = makeWindow();
+            window.open("user", "", { userId: 42 });
+            tryVerify(() => window.pageStack.currentItem !== null && window.page === "user");
+            const page = window.pageStack.currentItem;
+            compare(page.userId, 42);
+            window.userId = 0;
+            compare(page.userId, 42, "page keeps its own userId");
+            window.close();
+        }
+
         function test_switching_user_replaces_content_not_history_depth() {
             const window = makeWindow();
             window.history = [];

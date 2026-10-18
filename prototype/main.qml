@@ -424,9 +424,9 @@ Kirigami.ApplicationWindow {
             if (key.startsWith("lyricsNew:"))
                 return;
             Source.markRequestFailed(key, message);
-            // 普通歌词页自己有「歌词没取到，点此重试」，不再额外弹全局网络错误。
-            if (!key.startsWith("lyrics:"))
-                root.fail(message);
+            // 页面数据失败由各页自己的占位/重试说明（离线状态另在 ScreenFrame 顶部）；
+            // 这里不再把被动加载失败弹成全局「网络不可用」。
+            console.warn(logUi, "request failed:", key.split(":")[0], message);
         }
         function onPlaylistActionFailed(action, message) {
             console.warn(logUi, "playlist action failed:", action, message);
@@ -841,8 +841,19 @@ Kirigami.ApplicationWindow {
                                     charts: chartsPage, list: listPage, artist: artistPage, playlists: playlistsPage,
                                     nowplaying: nowPlayingPage, mv: mvPage, user: userPage, inbox: inboxPage })
     onPageChanged: {
+        // 路由参数作为页面的初始属性交给页面实例：返回 / 换页时不再把 root 上的
+        // 临时 0 绑进仍然存活的页面（曾经因此请求过 /user/detail/0）。
+        const params = {};
+        if (root.page === "list")
+            params.listKey = root.listKey;
+        else if (root.page === "artist")
+            params.artistId = Number(root.listKey.slice(7));
+        else if (root.page === "user")
+            params.userId = root.userId;
+        else if (root.page === "mv")
+            params.mvId = root.mvId;
         pageStack.clear();
-        pageStack.push(root.pages[root.page]);
+        pageStack.push(root.pages[root.page], params);
     }
     // 「我的」在登录前后是两个不同的页（引导 / 内容）：登录状态一变就换掉，不必切走再切回来
     onLoggedInChanged: if (root.page === "mine") root.pageChanged()
@@ -863,11 +874,9 @@ Kirigami.ApplicationWindow {
         const start = args.indexOf("--");
         if (start < 0)
             return;
-        for (const pair of args.slice(start + 1)) {
-            const eq = pair.indexOf("=");
-            const key = pair.slice(0, eq);
-            const value = pair.slice(eq + 1);
-            const kind = eq > 0 && key in root ? typeof root[key] : "";
+        const deferred = {};
+        const apply = (key, value) => {
+            const kind = key in root ? typeof root[key] : "";
             try {
                 if (kind === "string")
                     root[key] = value;
@@ -876,11 +885,29 @@ Kirigami.ApplicationWindow {
                 else if (kind === "number" && !isNaN(Number(value)))
                     root[key] = Number(value);
                 else
-                    console.warn(logUi, "ignored command-line argument:", pair);
+                    console.warn(logUi, "ignored command-line argument:", key);
             } catch (e) {
                 console.warn(logUi, "cannot set", key, "from command line:", e.message);
             }
+        };
+        for (const pair of args.slice(start + 1)) {
+            const eq = pair.indexOf("=");
+            if (eq <= 0) {
+                console.warn(logUi, "ignored command-line argument:", pair);
+                continue;
+            }
+            const key = pair.slice(0, eq);
+            const value = pair.slice(eq + 1);
+            // page 触发的 pageChanged 会立即建页；路由参数必须先就位，否则页面拿到 0。
+            if (key === "page" || key === "startOverlay")
+                deferred[key] = value;
+            else
+                apply(key, value);
         }
+        if ("page" in deferred)
+            apply("page", deferred.page);
+        if ("startOverlay" in deferred)
+            apply("startOverlay", deferred.startOverlay);
     }
 
     Kirigami.Theme.colorSet: Kirigami.Theme.View
@@ -954,8 +981,8 @@ Kirigami.ApplicationWindow {
     Component {
         id: listPage
         PlaylistPage {
-            list: root.openList
-            listKey: root.listKey
+            listKey: ""
+            list: Source.list(listKey)
             loggedIn: root.loggedIn
             vip: root.vip
             parentText: root.parentName
@@ -986,7 +1013,7 @@ Kirigami.ApplicationWindow {
         id: artistPage
         ArtistPage {
             id: artistView
-            artistId: Number(root.listKey.slice(7))
+            artistId: 0
             pane: root.artistPane
             loggedIn: root.loggedIn
             vip: root.vip
@@ -1010,7 +1037,7 @@ Kirigami.ApplicationWindow {
     Component {
         id: userPage
         UserPage {
-            userId: root.userId
+            userId: 0
             currentId: root.currentTrack ? root.currentTrack.id : 0
             loggedIn: root.loggedIn
             parentText: root.parentName
@@ -1033,7 +1060,7 @@ Kirigami.ApplicationWindow {
     Component {
         id: mvPage
         MvPage {
-            mvId: root.mvId
+            mvId: 0
             loggedIn: root.loggedIn
             parentText: root.parentName
             onLeaveRequested: root.goBack()

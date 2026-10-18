@@ -236,38 +236,58 @@ QtObject {
     function unindent(text) {
         return (text || "").replace(/^[\s　]+/gm, "");
     }
+    function emptyArtist(id, failed) {
+        return { id: id, name: "", cover: "", alias: "", description: "", musicSize: 0, albumSize: 0,
+                 tracks: [], albums: [], failed: failed };
+    }
     function artist(id) {
+        if (!(id > 0))
+            return emptyArtist(0, false);
         const a = source.d.artist;
         if (a && (a.id === id || !source.live))
             return Object.assign({}, a, { description: source.unindent(a.description) });
         source.need("artist:" + id);
-        return { id: id, name: "", cover: "", alias: "", description: "", musicSize: 0, albumSize: 0,
-                 tracks: [], albums: [], failed: Boolean(source.failure("artist:" + id)) };
+        return emptyArtist(id, Boolean(source.failure("artist:" + id)));
+    }
+    function emptyAlbum(id, failed) {
+        return { id: id, name: "", artist: "", artistId: 0, cover: "", description: "", company: "",
+                 publishTime: 0, tracks: [], failed: failed };
     }
     function album(id) {
+        if (!(id > 0))
+            return emptyAlbum(0, false);
         const a = source.d.album;
         if (a && (a.id === id || !source.live))
             return a;
         source.need("album:" + id);
-        return { id: id, name: "", artist: "", artistId: 0, cover: "", description: "", company: "", publishTime: 0, tracks: [] };
+        return emptyAlbum(id, Boolean(source.failure("album:" + id)));
     }
 
     // 用户主页：data 里只放最近取回的一个；资料 + 公开歌单
+    function emptyUser(id, failed) {
+        return { id: id, name: "", avatar: "", background: "", signature: "",
+                 followed: false, follows: 0, followeds: 0, playlistCount: 0,
+                 vipType: 0, vipRights: {}, level: 0, listenSongs: 0,
+                 createTime: 0, mutual: false, playlists: [], restricted: false,
+                 failed: failed };
+    }
     function user(id) {
+        // 页面退栈时 userId 会短暂变成 0：这里绝不能发 user:0 请求
+        if (!(id > 0))
+            return emptyUser(0, false);
         const u = source.d.user;
         if (u && (u.id === id || !source.live))
             return u;
         source.need("user:" + id);
-        return { id: id, name: "", avatar: "", background: "", signature: "",
-                 followed: false, follows: 0, followeds: 0, playlistCount: 0,
-                 vipType: 0, vipRights: {}, level: 0, listenSongs: 0,
-                 createTime: 0, mutual: false, playlists: [],
-                 failed: Boolean(source.failure("user:" + id)) };
+        return emptyUser(id, Boolean(source.failure("user:" + id)));
     }
 
     // 下面几种数据后端不经缓存、不去重：这里只读不要，由页面在打开那一栏时 need 一次
     // 关注 / 粉丝：kind 是 userFollows | userFolloweds；data 里只放最近取回的一个人的
     function people(kind, uid) {
+        if (!(uid > 0))
+            return { userId: 0, items: [], more: false, pending: false, moreFailed: false,
+                     restricted: false, restrictedMessage: "", failed: false };
         const key = kind + ":" + uid;
         const restricted = source.restriction(key);
         const l = source.d[kind];
@@ -338,13 +358,18 @@ QtObject {
     readonly property var level: source.d.userLevel || null
 
     // MV：data 里只放最近取回的一个，id 对上才用；没对上就向 live 要
+    function emptyMv(id, failed) {
+        return { id: id, name: "", cover: "", artist: "", artistId: 0, duration: 0, url: "",
+                 playCount: 0, subscribed: false, description: "", failed: failed };
+    }
     function mv(id) {
+        if (!(id > 0))
+            return emptyMv(0, false);
         const m = source.d.mv;
         if (m && (m.id === id || !source.live))
             return m;
         source.need("mv:" + id);
-        return { id: id, name: "", cover: "", artist: "", artistId: 0, duration: 0, url: "",
-                 playCount: 0, subscribed: false, description: "" };
+        return emptyMv(id, Boolean(source.failure("mv:" + id)));
     }
 
     // 写操作：都交给 live（Store），结果经 Store 的信号回来；原型里不写任何地方
@@ -507,6 +532,10 @@ QtObject {
             if (key.startsWith("playlist:")) {
                 // 卡片可能来自推荐歌单、我的歌单或排行榜；都没有时用按需取回的详情（它自带名称与封面）
                 const id = Number(key.slice(9));
+                if (!(id > 0))
+                    return { heading: "", cover: "", tracks: [], facts: [], description: "",
+                             listId: 0, owned: false, subscribed: false, playlistId: 0,
+                             failed: false, emptyText: "歌单不存在" };
                 const detail = (p.playlistDetails || {})[id] || {};
                 const card = source.playlists.concat(source.myPlaylists, source.toplists).find(pl => pl.id === id)
                     || { id: id, name: detail.name || "", cover: detail.cover || "", count: detail.count || 0 };
