@@ -99,13 +99,13 @@ prototype/Personal.js:
 
 shots: build/qmlshot/qmlshot build/stock/kdeglobals build/dark/kdeglobals prototype/Personal.js ## 各屏截图到 build/shots/（本机配色、发行版默认的浅色与深色、窄窗）
 	@mkdir -p build/shots
-	@for s in $(SHOTS); do \
-		n=$${s%%:*}; props=$$(echo $${s#*:} | tr , ' '); \
-		$(SHOT_ENV) build/qmlshot/qmlshot prototype/main.qml build/shots/$$n.png $(SHOT_SIZE) -- $$props || exit 1; \
-		$(SHOT_ENV) XDG_CONFIG_HOME=$(CURDIR)/build/stock build/qmlshot/qmlshot prototype/main.qml build/shots/$$n-stock.png $(SHOT_SIZE) -- $$props || exit 1; \
-		$(SHOT_ENV) XDG_CONFIG_HOME=$(CURDIR)/build/dark build/qmlshot/qmlshot prototype/main.qml build/shots/$$n-dark.png $(SHOT_SIZE) -- $$props || exit 1; \
-		$(SHOT_ENV) build/qmlshot/qmlshot prototype/main.qml build/shots/$$n-narrow.png 960 700 -- $$props || exit 1; \
-	done
+	@# 每屏一个进程、各核并行：两百多张逐张渲染要好几分钟。任何一张失败，xargs 非零退出
+	@printf '%s\n' $(SHOTS) | xargs -P $$(nproc) -I{} sh -c '\
+		n=$${1%%:*}; props=$$(echo $${1#*:} | tr , " "); \
+		$(SHOT_ENV) build/qmlshot/qmlshot prototype/main.qml build/shots/$$n.png $(SHOT_SIZE) -- $$props && \
+		$(SHOT_ENV) XDG_CONFIG_HOME=$(CURDIR)/build/stock build/qmlshot/qmlshot prototype/main.qml build/shots/$$n-stock.png $(SHOT_SIZE) -- $$props && \
+		$(SHOT_ENV) XDG_CONFIG_HOME=$(CURDIR)/build/dark build/qmlshot/qmlshot prototype/main.qml build/shots/$$n-dark.png $(SHOT_SIZE) -- $$props && \
+		$(SHOT_ENV) build/qmlshot/qmlshot prototype/main.qml build/shots/$$n-narrow.png 960 700 -- $$props' _ {}
 
 run: ## 运行界面原型
 	$(QML) prototype/main.qml
