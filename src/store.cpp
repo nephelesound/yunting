@@ -68,6 +68,7 @@ Store::Store(NcmClient *client, QObject *parent)
         {"tracks", QVariantList{}},
         {"lyricsTrackId", 0.0},
         {"lyrics", QVariantList{}},
+        {"lyricsPureMusic", false},
         {"search", QVariantMap{{"query", QString{}}, {"songs", QVariantList{}},
                                {"artists", QVariantList{}}, {"playlists", QVariantList{}},
                                {"albums", QVariantList{}}, {"mvs", QVariantList{}}}},

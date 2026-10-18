@@ -107,6 +107,7 @@ var worst = {
         tracks: worstTracks.slice(0, 200),
         lyricsTrackId: 903,   // 原型的「正在播放」是热歌榜第 3 首
         lyrics: worstLyrics,
+        lyricsPureMusic: false,
         comments: worstComments,
         artist: worstArtist,
         album: worstAlbum,
@@ -139,7 +140,7 @@ var worst = {
 };
 
 var empty = {
-    data: { toplists: [], playlist: { id: 0, name: "空歌单", cover: "", description: "", count: 0, plays: 0 }, tracks: [], lyricsTrackId: 0, lyrics: [],
+    data: { toplists: [], playlist: { id: 0, name: "空歌单", cover: "", description: "", count: 0, plays: 0 }, tracks: [], lyricsTrackId: 0, lyrics: [], lyricsPureMusic: false,
             hotSearches: [], search: { query: "没有结果的搜索词", songs: [], artists: [], playlists: [], albums: [] } },
     personal: {
         account: { name: "新用户", vip: false, avatar: "" },
@@ -165,6 +166,7 @@ var one = {
         tracks: oneTrack,
         lyricsTrackId: 990,
         lyrics: [{ t: 0, text: "只有一句" }],
+        lyricsPureMusic: false,
         hotSearches: [{ word: "雨", note: "", score: 1 }],
         search: { query: "雨", songs: oneTrack, artists: [{ id: 1, name: "A", cover: C2, albums: 1 }], playlists: [{ id: 1, name: "雨", cover: C2, count: 1, creator: "Jo" }], albums: [] },
     },

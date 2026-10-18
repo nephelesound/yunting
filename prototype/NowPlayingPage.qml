@@ -355,16 +355,19 @@ ScreenFrame {
             onClicked: lyrics.resume()
         }
 
-        // 没有歌词时说清楚是哪种：没取到（可点重试）/ 还在取 / 这首真的没有
+        // 没有歌词时说清楚是哪种：没取到（可点重试）/ 还在取 / 纯音乐 / 这首真的没有
         LinkText {
+            objectName: "lyricsEmpty"
             readonly property bool failed: page.track !== null && Boolean(Source.failure("lyrics:" + page.track.id))
             readonly property bool loading: page.track !== null && Source.live !== null && Source.d.lyricsTrackId !== page.track.id
+            readonly property bool pureMusic: page.track !== null
+                && Source.d.lyricsTrackId === page.track.id && Source.d.lyricsPureMusic === true
             y: page.focusRow * page.pitch
             height: page.pitch
             visible: page.pane === "lyrics" && page.lines.length === 0
             verticalAlignment: Text.AlignVCenter
             parts: [{ text: !page.track ? "还没有在播放的歌" : failed ? "歌词没取到，点此重试"
-                          : loading ? "正在取回歌词…" : "暂无歌词",
+                          : loading ? "正在取回歌词…" : pureMusic ? "纯音乐，请欣赏" : "暂无歌词",
                       link: failed }]
             font.pixelSize: Tokens.text2xl
             color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)

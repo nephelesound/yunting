@@ -154,7 +154,7 @@ void Store::request(const QString &key)
 }
 
 
-// 歌词：单槽（lyricsTrackId + lyrics），QML 只看当前这首；缓存按歌分开，切回来直接命中
+// 歌词：单槽（lyricsTrackId + lyrics + lyricsPureMusic），QML 只看当前这首；缓存按歌分开，切回来直接命中
 void Store::requestLyrics(const QString &key, double songId)
 {
     if (!(songId > 0))
@@ -167,22 +167,28 @@ void Store::requestLyrics(const QString &key, double songId)
                 const QJsonObject resp = body(doc);
                 const QString lrc = resp.value("lrc").toObject().value("lyric").toString();
                 const QString tlyric = resp.value("tlyric").toObject().value("lyric").toString();
-                const bool noLyrics = resp.value("pureMusic").toBool()
+                // 纯音乐（pureMusic，旧接口叫 nolyric）：空歌词是正确结果，不是没取到；
+                // 界面据此说「纯音乐，请欣赏」。标记随歌词一起缓存，命中缓存时也能还原。
+                const bool pureMusic = resp.value("pureMusic").toBool()
                     || resp.value("nolyric").toBool();
                 // 网易偶尔会回「HTTP 200 + code 200 + 空 lrc」而不是错误；这种空包不能当成
                 // 「这首歌没有歌词」永久缓存，否则会一直显示「暂无歌词」。纯音乐/明确无歌词才落盘。
-                if (lrc.isEmpty() && tlyric.isEmpty() && !noLyrics) {
+                if (lrc.isEmpty() && tlyric.isEmpty() && !pureMusic) {
                     done({}, false);
                     return;
                 }
-                done(ncmParseLrc(lrc, tlyric), ok && businessOk(resp));
+                done(QVariantMap{{"lines", ncmParseLrc(lrc, tlyric)},
+                                 {"pureMusic", pureMusic}},
+                     ok && businessOk(resp));
             });
         },
-        [this, songId, token](const QVariant &lines) {
+        [this, songId, token](const QVariant &lyrics) {
             if (!m_requests.current(QStringLiteral("lyrics"), token))
                 return;
+            const QVariantMap fetched = lyrics.toMap();
             put("lyricsTrackId", songId, false);
-            put("lyrics", lines, false);
+            put("lyrics", fetched.value("lines"), false);
+            put("lyricsPureMusic", fetched.value("pureMusic"), false);
         });
 }
 

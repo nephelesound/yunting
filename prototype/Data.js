@@ -5017,6 +5017,8 @@ var lyrics = [
  }
 ]
 
+var lyricsPureMusic = false
+
 var comments = {
  "songId": 1456890009,
  "items": [

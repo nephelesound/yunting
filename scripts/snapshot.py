@@ -280,6 +280,8 @@ def anonymous():
     lyric = get(f"api/song/lyric?id={tracks[CURRENT]['id']}&lv=1&tv=-1")
     lyrics = parse_lrc(lyric.get("lrc", {}).get("lyric", ""),
                        (lyric.get("tlyric") or {}).get("lyric") or "")
+    # 与 Store 一致：接口说这首本身没有歌词（pureMusic，旧字段 nolyric）
+    pure_music = bool(lyric.get("pureMusic") or lyric.get("nolyric"))
     toplists = [
         {
             "id": t["id"],
@@ -316,6 +318,7 @@ def anonymous():
     write("Data.js", f"匿名接口快照（{time.strftime('%Y-%m-%d')}），由 scripts/snapshot.py 生成",
           [js("toplists", toplists), js("playlist", playlist), js("tracks", tracks),
            js("lyricsTrackId", tracks[CURRENT]["id"]), js("lyrics", lyrics),
+           js("lyricsPureMusic", pure_music),
            js("comments", hot_comments(tracks[CURRENT]["id"])),
            js("commentPage", None), js("searchUsers", None), js("searchRadios", None),
            js("search", search), js("hotSearches", hot_searches),

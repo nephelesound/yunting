@@ -474,5 +474,23 @@ Item {
             pasteTarget.paste();
             verify(pasteTarget.text.indexOf(p.page.lines[1].text) === 0);
         }
+
+        // 纯音乐：歌词为空不是「没取到」，页面上说「纯音乐，请欣赏」
+        function test_pureMusicSaysSoInsteadOfNoLyrics() {
+            const saved = Source.snapshot;
+            Source.snapshot = {
+                data: Object.assign({}, saved.data, { lyricsTrackId: 8080, lyrics: [], lyricsPureMusic: true }),
+                personal: saved.personal,
+            };
+            try {
+                const page = createTemporaryObject(nowPlayingComponent, root, {
+                    track: { id: 8080, name: "纯音乐", artist: "A", cover: "", dur: 100 }, elapsed: 0 });
+                const empty = findChild(page, "lyricsEmpty");
+                tryVerify(() => empty !== null && empty.visible);
+                compare(empty.parts[0].text, "纯音乐，请欣赏");
+            } finally {
+                Source.snapshot = saved;
+            }
+        }
     }
 }

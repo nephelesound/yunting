@@ -2,6 +2,11 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.5.5] - 2026-10-18
+
+### 修复
+- 纯音乐不再显示「暂无歌词」：接口明确标记纯音乐（`pureMusic` / `nolyric`）时，歌词页显示「纯音乐，请欣赏」。标记随歌词一起缓存，切回这首歌仍然正确。
+
 ## [0.5.4] - 2026-10-18
 
 ### 修复
@@ -110,6 +115,7 @@
 - 分享：链接、二维码、Telegram 与邮件，以及带封面与歌词的分享图。
 - 「关于」窗口与「复制诊断信息」，方便反馈问题。
 
+[0.5.5]: https://github.com/nephelesound/yunting/compare/v0.5.4...v0.5.5
 [0.5.2]: https://github.com/nephelesound/yunting/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/nephelesound/yunting/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/nephelesound/yunting/compare/v0.4.2...v0.5.0

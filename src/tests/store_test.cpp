@@ -207,6 +207,7 @@ private slots:
         m_store->request(QStringLiteral("lyrics:10"));
         QVERIFY(waitUntil([&] { return lyricRequests >= 2; }));
         QVERIFY(waitUntil([&] { return m_store->data().value("lyrics").toList().size() == 1; }));
+        QVERIFY(!m_store->data().value("lyricsPureMusic").toBool());
     }
 
     // 明确的纯音乐：空歌词是正确结果，永久缓存后第二次不再请求
@@ -225,9 +226,30 @@ private slots:
         m_store->request(QStringLiteral("lyrics:11"));
         QVERIFY(waitUntil([&] { return lyricRequests >= 1; }));
         QVERIFY(waitUntil([&] { return m_store->data().value("lyricsTrackId").toDouble() == 11; }));
+        QVERIFY(m_store->data().value("lyricsPureMusic").toBool());
         m_store->request(QStringLiteral("lyrics:11"));
         QTest::qWait(150);
         QCOMPARE(lyricRequests, 1);   // 命中的是永久缓存
+        QVERIFY(m_store->data().value("lyrics").toList().isEmpty());
+        QVERIFY(m_store->data().value("lyricsPureMusic").toBool());   // 标记也在缓存里
+    }
+
+    // 旧接口用 nolyric 表示同一件事：歌曲本身没有歌词
+    void nolyricEmptyLyricsIsPureMusic()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/song/lyric") {
+                respond(200, "{\"code\":200,\"nolyric\":true,\"lrc\":{\"lyric\":\"\"}}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("lyrics:12"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("lyricsTrackId").toDouble() == 12
+                && m_store->data().value("lyricsPureMusic").toBool();
+        }));
         QVERIFY(m_store->data().value("lyrics").toList().isEmpty());
     }
 
