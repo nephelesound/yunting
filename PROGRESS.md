@@ -111,7 +111,7 @@
 - [ ] 评论写 / 翻页 UI
 - [ ] 云盘上传 / 导入 / 删除
 - [ ] 播客 / 电台 / 有声
-- [ ] 社交 / IM / 一起听 / 听歌识曲
+- [ ] 社交 / IM 发送与回复 / 听歌识曲；一起听后端已接，UI 由前端接
 - [x] DSP 链路：默认走 QAudioBufferOutput → 10 段 biquad + 低音 + 空间感 → QAudioSink；可 `-DYUNTING_EXPERIMENTAL_EQ=OFF` 关闭
 - [x] 输出设备选择：`audioOutputs()` / `setOutputDevice(id)`；EQ 与默认路径都生效
 - [x] DSP 输出失败自动回退 QAudioOutput
@@ -147,9 +147,13 @@
 - [x] 社交写 SDK：用户关注/取关（weapi，不重试）
 - [ ] 社交写：动态发布/转发按下一批
 
-## 一起听评估（未实现）
+## 一起听后端（已接）
 
-参考库的 REST 面：room create / accept / check / end、heartbeat、play command report、sync list command、sync playlist get。官方客户端同时使用 `module/listentogether` 的 IM/RPC 状态机；只靠 REST 轮询无法可靠复现低延迟同步与成员状态。需要登录、房间生命周期、事件通道和播放时钟对齐，暂不盲写半成品；先做 status/check 只读模型，再决定是否投入真实同步。
+已接入真实明文 REST：`room/create`、`invitation/accept`、`status/get`、`room/check`、`end/v2`、`heartbeat`、`play/command/report`、`sync/list/command/report`、`sync/playlist/get`。
+
+`ListenTogether` 维护房间状态、成员、房间歌单与播放指令：1 秒轮询 `sync/playlist/get` 按 `serverSeq` 应用远端 PLAY/PAUSE/GOTO/seek，5 秒心跳与状态刷新；本地 AudioEngine 的 track/playing/seek 变化反向上报，远端应用期间抑制回声。`syncQueue` 由房主把当前队列 REPLACE 到房间。
+
+前端接缝是 `backend.listenTogether`（Q_PROPERTY/方法/信号见 `src/listentogether.h`）；UI 不在本次范围内，由前端接。
 
 ## 未偿债务 / 迁移
 
@@ -158,12 +162,13 @@
 - [ ] 仍未迁：playlist / search 主体 / artist / album / account 的每日推荐与个人列表 / inbox。它们的嵌套 track 与 playlist card 已改走 typed 边界，下一步可直接把这些端点的请求/响应迁到 typed service，不再被重复的可播性与字段回退挡住。
 - [ ] video（视频时间线、详情、播放地址）的 Store/前端接线：还没有视频页；feed 的首页 block、独家内容不接。
 - [ ] 歌单隐私/封面/导入；云盘写入；下载地址。
-- [ ] 一起听：先做 status/check 只读模型，实时同步需 IM/RPC 通道。
+- [x] 一起听后端：真实 REST 房间生命周期、轮询指令、心跳、队列同步；`--listen-together-selftest` 已 live 建/同步/结束。
 - [ ] 动态封面签名 URL 的刷新策略由前端负责（有时效）。
 
 ## 验证
 
-- [x] `make test` 33/33
+- [x] `make test` 35/35
+- [x] `--listen-together-selftest`：真实建房、同步两首歌单、结束；随后 status inRoom=false
 - [x] `make contract` 登录 + 匿名
 - [x] `make lint`
 - [x] `make smoke-readonly` 匿名会话，不读钥匙串

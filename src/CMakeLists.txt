@@ -39,6 +39,7 @@ set(YUNTING_SDK_SOURCES
     sdk/search_people.h sdk/search_people.cpp
     sdk/mv_page.h sdk/mv_page.cpp
     sdk/account_feed.h sdk/account_feed.cpp
+    sdk/listen_together.h sdk/listen_together.cpp
 )
 
 # Every SDK parser/service test crosses the same transport seam. Keep the source
@@ -59,6 +60,7 @@ endfunction()
 
 qt_add_executable(yunting
     main.cpp cli.h cli.cpp
+    listentogether.h listentogether.cpp
     ncmclient.h ncmclient.cpp
     cookievault.h cookievault.cpp
     store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_comment.cpp store_user.cpp store_inbox.cpp store_stats.cpp store_notify.cpp store_social.cpp store_user_events.cpp store_library.cpp store_resource.cpp store_comment_extra.cpp store_lyrics_new.cpp store_on_demand.cpp store_discovery.cpp store_wiki.cpp
@@ -225,9 +227,10 @@ yunting_add_sdk_test(comment sdk/comment.h sdk/comment.cpp)
 yunting_add_sdk_test(search_people sdk/search_people.h sdk/search_people.cpp)
 yunting_add_sdk_test(mv_page sdk/mv_page.h sdk/mv_page.cpp)
 yunting_add_sdk_test(account_feed sdk/account_feed.h sdk/account_feed.cpp)
+yunting_add_sdk_test(listen_together sdk/listen_together.h sdk/listen_together.cpp)
 
 # 任何测试都碰不到用户的真实凭据与缓存：会话总线不可达（钥匙串因此走后备文件），数据与缓存目录在构建目录里
-set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store sdk_song_wiki sdk_track sdk_discovery sdk_radio sdk_social sdk_feed sdk_video sdk_library sdk_notification sdk_dynamic_cover sdk_search_suggest sdk_service notify lyrics user_social comment search_people mv_page account_feed PROPERTIES ENVIRONMENT
+set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store sdk_song_wiki sdk_track sdk_discovery sdk_radio sdk_social sdk_feed sdk_video sdk_library sdk_notification sdk_dynamic_cover sdk_search_suggest sdk_service notify lyrics user_social comment search_people mv_page account_feed listen_together PROPERTIES ENVIRONMENT
     "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent;XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/data;XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/cache;YUNTING_KEYCHAIN_SERVICE=yunting-test")
 
 target_link_libraries(yunting PRIVATE

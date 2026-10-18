@@ -8,6 +8,7 @@
 #include "diagnostics.h"
 #include "imagecache.h"
 #include "layershellhelper.h"
+#include "listentogether.h"
 #include "mpris.h"
 #include "mvvideo.h"
 #ifdef YUNTING_QRCODE
@@ -15,6 +16,7 @@
 #endif
 #include "ncmclient.h"
 #include "powerinhibitor.h"
+#include "sdk/listen_together.h"
 #include "session.h"
 #include "store.h"
 #include "tray.h"
@@ -111,6 +113,9 @@ struct CommandLine {
     QCommandLineOption storeKey{"store-key",
                                 "Debug: request one Store key and print data/personal",
                                 "key"};
+    QCommandLineOption listenTogetherSelfTest{
+        "listen-together-selftest",
+        "Create a room, sync a two-song queue and end it (requires --allow-write)"};
 
     CommandLine()
     {
@@ -141,6 +146,7 @@ struct CommandLine {
         parser.addOption(scrobbleMode);
         parser.addOption(inbox);
         parser.addOption(storeKey);
+        parser.addOption(listenTogetherSelfTest);
     }
 };
 
@@ -759,6 +765,63 @@ int runSmokeAudio(const CommandLine &cli, QApplication &app, Backend &backend)
     return app.exec();
 }
 
+int runListenTogetherSelfTest(Backend &backend)
+{
+    Store &store = backend.store;
+    NcmClient &client = backend.client;
+    AudioEngine &audio = backend.audio;
+    store.waitForInitial();
+    if (client.hasMusicU() && store.accountUid() > 0) {
+        // accountUid is filled by the initial account request; waitForInitial covers it.
+    } else {
+        std::fprintf(stderr, "listen-together selftest requires a signed-in session\n");
+        return 1;
+    }
+
+    // 先只读查一次，避免把账号上已有的（别人/其它设备的）房间当成自测房间同步或结束。
+    bool alreadyInRoom = false;
+    {
+        QEventLoop statusLoop;
+        ncm::sdk::fetchStatus(client, &statusLoop,
+                              [&](ncm::sdk::Result<ncm::sdk::ListenTogetherStatus> status) {
+            alreadyInRoom = status && status.value->inRoom;
+            statusLoop.quit();
+        });
+        QTimer::singleShot(15 * 1000, &statusLoop, &QEventLoop::quit);
+        statusLoop.exec();
+    }
+    if (alreadyInRoom) {
+        std::fprintf(stderr, "listen-together selftest: account is already in a room; refusing to touch it\n");
+        return 1;
+    }
+
+    ListenTogether room(&client, &store, &audio);
+    QEventLoop loop;
+    int rc = 1;
+    bool queueSent = false;
+
+    QObject::connect(&room, &ListenTogether::stateChanged, &loop, [&] {
+        if (!room.inRoom() || queueSent)
+            return;
+        queueSent = true;
+        room.syncQueue(QVariantList{108485.0, 1.0});
+        QTimer::singleShot(1500, &room, &ListenTogether::leaveRoom);
+    });
+    QObject::connect(&room, &ListenTogether::leftRoom, &loop, [&] {
+        std::printf("listen-together selftest: created, synced, ended\n");
+        rc = 0;
+        loop.quit();
+    });
+    QObject::connect(&room, &ListenTogether::errorChanged, &loop, [&] {
+        if (!room.error().isEmpty())
+            std::fprintf(stderr, "listen-together: %s\n", qPrintable(room.error()));
+    });
+    QTimer::singleShot(20 * 1000, &loop, &QEventLoop::quit);
+    room.createRoom();
+    loop.exec();
+    return rc;
+}
+
 int runGui(const CommandLine &cli, QApplication &app, Backend &backend)
 {
     NcmClient &client = backend.client;
@@ -766,6 +829,8 @@ int runGui(const CommandLine &cli, QApplication &app, Backend &backend)
     AudioEngine &audio = backend.audio;
     Session &session = backend.session;
     Mpris &mpris = backend.mpris;
+    // 一起听：房间状态/轮询/播放指令独立于 Store；QML 从 backend.listenTogether 取。
+    ListenTogether listenTogether(&client, &store, &audio);
 
     // 界面是完整客户端：用户点播放就是真实收听，默认允许上报（命令行 smoke 才需要 --allow-write）
     audio.setScrobblingAllowed(true);
@@ -812,6 +877,7 @@ int runGui(const CommandLine &cli, QApplication &app, Backend &backend)
                            {"layerShell", QVariant::fromValue<QObject *>(&layerShell)},                           {"power", QVariant::fromValue<QObject *>(&power)},
                            {"clipboard", QVariant::fromValue<QObject *>(&clipboard)},
                            {"diagnostics", QVariant::fromValue<QObject *>(&diagnostics)},
+                           {"listenTogether", QVariant::fromValue<QObject *>(&listenTogether)},
                            {"qr", qrAvailable}};
     engine.setInitialProperties({{"backend", backendMap}});
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
@@ -897,7 +963,8 @@ int run(QApplication &app)
 
     if (cli.parser.isSet(cli.like) || cli.parser.isSet(cli.commentLike)
         || cli.parser.isSet(cli.playlistSelfTest)
-        || cli.parser.isSet(cli.subscribeSelfTest)) {
+        || cli.parser.isSet(cli.subscribeSelfTest)
+        || cli.parser.isSet(cli.listenTogetherSelfTest)) {
         if (!cli.parser.isSet(cli.allowWrite)) {
             std::fprintf(stderr, "refusing write commands without --allow-write\n");
             return 1;
@@ -930,6 +997,8 @@ int run(QApplication &app)
         return runInbox(cli, backend);
     if (cli.parser.isSet(cli.smokeAudio))
         return runSmokeAudio(cli, app, backend);
+    if (cli.parser.isSet(cli.listenTogetherSelfTest))
+        return runListenTogetherSelfTest(backend);
     return runGui(cli, app, backend);
 }
 } // namespace Cli

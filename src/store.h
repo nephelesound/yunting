@@ -57,6 +57,8 @@ public:
     QVariantMap personal() const { return m_personal; }
     bool online() const { return m_online; }
     bool sessionExpired() const { return m_sessionExpired; }
+    // 当前账号 userId（匿名/未加载为 0）；一起听用它填 version/自己消息判断。
+    Q_INVOKABLE double accountUid() const { return m_accountUid; }
 
     // 按需加载："lyrics:<id>"、"playlist:<id>"、"search:<query>"、"comments:<id>"、
     // "discover:*"、"radio:<id>"；同 key 在途时去重
