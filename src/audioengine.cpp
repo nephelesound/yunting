@@ -6,21 +6,18 @@
 #include "perf.h"
 #include "ncbl.h"
 
+#include <MpvController>
 #include <mpv/client.h>
 
 #include <QCoreApplication>
 #include <QJsonArray>
 #include <QJsonDocument>
-#include <QMetaObject>
 #include <QPointer>
 #include <QTimer>
-#include <QUrl>
 #include <QUrlQuery>
 #include <algorithm>
-#include <clocale>
 #include <cmath>
 #include <cstdio>
-#include <cstring>
 
 using namespace ncm;
 
@@ -40,6 +37,22 @@ constexpr int kEqFrequencies[10] = {31, 62, 125, 250, 500, 1000, 2000, 4000, 800
 QString number(double value)
 {
     return QString::number(value, 'f', 4);
+}
+
+// MpvController 的 QVariant 返回值：失败时是 ErrorReturn，成功时是结果（可能为空）
+bool isMpvError(const QVariant &reply)
+{
+    return reply.metaType() == QMetaType::fromType<ErrorReturn>();
+}
+
+// 读取一个数值属性；属性不可用（停止后没有 time-pos 等）返回 false
+bool readDouble(MpvController *controller, const char *name, double *out)
+{
+    const QVariant value = controller->getProperty(QString::fromLatin1(name));
+    if (isMpvError(value) || !value.isValid())
+        return false;
+    *out = value.toDouble();
+    return true;
 }
 
 // 一个带标签的 lavfi 滤镜链：10 段 EQ、120Hz 低架与中/侧宽度。
@@ -64,94 +77,62 @@ QString filterSpec(const QVariantList &gains, double bassBoost, double stereoWid
 } // namespace
 
 AudioEngine::AudioEngine(NcmClient *client, QObject *parent)
-    : QObject(parent), m_client(client)
+    : QObject(parent), m_client(client), m_controller(new MpvController(this))
 {
-    // mpv 用 C locale 解析数字选项；必须在 QApplication 之后、mpv_create 之前改回来，否则拒绝初始化。
-    std::setlocale(LC_NUMERIC, "C");
-    m_mpv = mpv_create();
-    if (!m_mpv) {
-        qWarning() << "mpv_create failed";
-        return;
-    }
+    // MpvController 负责 locale、创建与初始化 mpv，以及把 mpv 事件排进 Qt 线程。
+    // 它初始化后才暴露句柄，所以选项都按运行时属性设置（mpv 手册里标为 runtime 的那些）；
+    // libmpv 默认不读用户的 mpv.conf 与脚本，不用另设。
+    m_controller->init();
 
-    const auto option = [this](const char *name, const char *value) {
-        const int err = mpv_set_option_string(m_mpv, name, value);
+    const auto option = [this](const char *name, const QVariant &value) {
+        const int err = m_controller->setProperty(QString::fromLatin1(name), value);
         if (err < 0)
-            qWarning() << "mpv option" << name << "failed:" << mpv_error_string(err);
+            qWarning() << "mpv option" << name << "failed:" << MpvController::getError(err);
     };
+    option("terminal", false);
     option("vo", "null");            // 只出声，不建视频输出
-    option("video", "no");
+    option("vid", "no");
     option("audio-display", "no");
     option("ytdl", "no");
-    option("terminal", "no");
-    // 嵌入播放器不读用户的 mpv.conf / 脚本，否则外部配置会覆盖应用的音质与滤镜参数
-    option("config", "no");
-    option("load-scripts", "no");
-    option("idle", "yes");
+    option("idle", true);
     option("gapless-audio", "weak");
     option("cache", "yes");          // 网络流
     option("audio-device", "auto");  // 跟随 PipeWire/PulseAudio 的默认设备
-    const QByteArray userAgent = ncm::client::userAgent().toUtf8();
-    option("user-agent", userAgent.constData());
+    option("user-agent", ncm::client::userAgent());
     // 测试没有声卡：只认显式设置的变量，正常启动永远不会走到这里。
     if (qEnvironmentVariableIsSet("YUNTING_TEST_AO_NULL"))
         option("ao", "null");
 
-    const int err = mpv_initialize(m_mpv);
-    if (err < 0) {
-        qWarning() << "mpv_initialize failed:" << mpv_error_string(err);
-        mpv_terminate_destroy(m_mpv);
-        m_mpv = nullptr;
-        return;
-    }
+    m_controller->setProperty(QStringLiteral("volume"), linearVolume(m_volume) * 100.0);
+    m_controller->setProperty(QStringLiteral("mute"), m_muted);
 
-    // wakeup 回调来自 mpv 内部线程：只把一个 drainEvents 排到 Qt 线程，事件在拥有 mpv 的线程里取。
-    mpv_set_wakeup_callback(m_mpv, [](void *ctx) {
-        auto *self = static_cast<AudioEngine *>(ctx);
-        if (self->m_destroying.load(std::memory_order_acquire))
-            return;
-        QMetaObject::invokeMethod(self, [self] { self->drainEvents(); }, Qt::QueuedConnection);
-    }, this);
-    mpv_observe_property(m_mpv, 0, "time-pos", MPV_FORMAT_DOUBLE);
-    mpv_observe_property(m_mpv, 0, "duration", MPV_FORMAT_DOUBLE);
-    mpv_observe_property(m_mpv, 0, "pause", MPV_FORMAT_FLAG);
-    mpv_observe_property(m_mpv, 0, "idle-active", MPV_FORMAT_FLAG);
-    mpv_observe_property(m_mpv, 0, "eof-reached", MPV_FORMAT_FLAG);
+    connect(m_controller, &MpvController::propertyChanged, this, &AudioEngine::handleProperty);
+    connect(m_controller, &MpvController::fileLoaded, this, &AudioEngine::onFileLoaded);
+    connect(m_controller, &MpvController::endFile, this, &AudioEngine::onEndFile);
 
-    double mpvVolume = linearVolume(m_volume) * 100.0;
-    mpv_set_property(m_mpv, "volume", MPV_FORMAT_DOUBLE, &mpvVolume);
-    int mpvMute = m_muted;
-    mpv_set_property(m_mpv, "mute", MPV_FORMAT_FLAG, &mpvMute);
+    m_controller->observeProperty(QStringLiteral("time-pos"), MPV_FORMAT_DOUBLE);
+    m_controller->observeProperty(QStringLiteral("duration"), MPV_FORMAT_DOUBLE);
+    m_controller->observeProperty(QStringLiteral("pause"), MPV_FORMAT_FLAG);
+    m_controller->observeProperty(QStringLiteral("idle-active"), MPV_FORMAT_FLAG);
+    m_controller->observeProperty(QStringLiteral("eof-reached"), MPV_FORMAT_FLAG);
 }
 
-AudioEngine::~AudioEngine()
-{
-    m_destroying.store(true, std::memory_order_release);
-    if (m_mpv) {
-        mpv_set_wakeup_callback(m_mpv, nullptr, nullptr);
-        mpv_terminate_destroy(m_mpv);
-        m_mpv = nullptr;
-    }
-}
+AudioEngine::~AudioEngine() = default;
 
 double AudioEngine::position() const
 {
-    if (m_mpv) {
-        double value = 0;
-        if (mpv_get_property(m_mpv, "time-pos", MPV_FORMAT_DOUBLE, &value) >= 0)
-            return value;
-    }
+    double value = 0;
+    if (readDouble(m_controller, "time-pos", &value))
+        return value;
     // 停止或播完后 mpv 不再提供 time-pos：保留最后的位置
     return m_position;
 }
 
 double AudioEngine::duration() const
 {
-    if (m_mpv) {
-        double value = 0;
-        if (mpv_get_property(m_mpv, "duration", MPV_FORMAT_DOUBLE, &value) >= 0 && value > 0)
-            return value;
-    }
+    double value = 0;
+    if (readDouble(m_controller, "duration", &value) && value > 0)
+        return value;
     if (m_duration > 0)
         return m_duration;
     return m_track.value("dur").toDouble();
@@ -163,13 +144,10 @@ void AudioEngine::setTrack(const QVariantMap &track)
         return;
     // 切歌前把上一首的收听时长上报（位置 >= 1 秒才算）
     scrobbleFinish();
-    if (m_mpv) {
-        // 旧文件挂起的 end-file 事件不能落到新曲目上
-        discardEvents();
-        const char *args[] = {"stop", nullptr};
-        mpv_command(m_mpv, args);
-        discardEvents();
-    }
+    // 旧文件挂起的 end-file 事件不能落到新曲目上
+    discardEvents();
+    m_controller->command({QStringLiteral("stop")});
+    discardEvents();
     m_track = track;
     m_pendingSeek = -1;   // 上一首的跳转只属于上一首，不能落到新曲目上
     m_urlReady = false;
@@ -198,30 +176,25 @@ void AudioEngine::setPlaying(bool playing)
     if (playing == m_playing)
         return;
     m_playing = playing;
-    if (m_mpv) {
-        if (playing) {
-            if (m_atEof && m_urlReady && !m_sourceUrl.isEmpty()) {
-                // 播完后 mpv 已回到 idle，再次按播放要重新加载同一地址
-                startSource(m_sourceUrl, m_playedLevel, m_playedBitrate);
-            } else if (m_fileLoaded) {
-                setPaused(false);
-            }
-            // 文件还在加载：FILE_LOADED 里再解除暂停
-        } else {
-            setPaused(true);
-            // 暂停也结算一次；恢复后不会重复上报
-            scrobbleFinish();
+    if (playing) {
+        if (m_atEof && m_urlReady && !m_sourceUrl.isEmpty()) {
+            // 播完后 mpv 已回到 idle，再次按播放要重新加载同一地址
+            startSource(m_sourceUrl, m_playedLevel, m_playedBitrate);
+        } else if (m_fileLoaded) {
+            setPaused(false);
         }
+        // 文件还在加载：FILE_LOADED 里再解除暂停
+    } else {
+        setPaused(true);
+        // 暂停也结算一次；恢复后不会重复上报
+        scrobbleFinish();
     }
     emit playingChanged();
 }
 
 void AudioEngine::setPaused(bool paused)
 {
-    if (!m_mpv)
-        return;
-    int flag = paused;
-    mpv_set_property(m_mpv, "pause", MPV_FORMAT_FLAG, &flag);
+    m_controller->setProperty(QStringLiteral("pause"), paused);
 }
 
 void AudioEngine::setVolume(double volume)
@@ -230,10 +203,7 @@ void AudioEngine::setVolume(double volume)
     if (clamped == m_volume)
         return;
     m_volume = clamped;
-    if (m_mpv) {
-        double mpvVolume = linearVolume(clamped) * 100.0;
-        mpv_set_property(m_mpv, "volume", MPV_FORMAT_DOUBLE, &mpvVolume);
-    }
+    m_controller->setProperty(QStringLiteral("volume"), linearVolume(clamped) * 100.0);
     emit volumeChanged();
 }
 
@@ -242,10 +212,7 @@ void AudioEngine::setMuted(bool muted)
     if (muted == m_muted)
         return;
     m_muted = muted;
-    if (m_mpv) {
-        int flag = muted;
-        mpv_set_property(m_mpv, "mute", MPV_FORMAT_FLAG, &flag);
-    }
+    m_controller->setProperty(QStringLiteral("mute"), muted);
     emit mutedChanged();
 }
 
@@ -280,24 +247,20 @@ QString AudioEngine::effectiveLevel() const
 
 void AudioEngine::applyFilters()
 {
-    if (!m_mpv)
-        return;
-    const QByteArray spec = filterSpec(m_eqGains, m_bassBoost, m_stereoWidth).toUtf8();
-    const int err = mpv_set_property_string(m_mpv, "af", spec.constData());
+    const int err = m_controller->setProperty(QStringLiteral("af"),
+                                              filterSpec(m_eqGains, m_bassBoost, m_stereoWidth));
     if (err < 0)
-        qWarning() << "mpv af failed:" << mpv_error_string(err);
+        qWarning() << "mpv af failed:" << MpvController::getError(err);
 }
 
 void AudioEngine::updateFilter(const char *target, const char *command, double value)
 {
-    if (!m_mpv)
-        return;
     // 运行中改参数走 af-command：只更新一个滤波器的系数，音频链不重建、播放不断。
     // 整条替换会重置所有滤波器状态（增益跳变处可能出现咔哒声），只作为滤镜链还没建立时的后备。
-    const QByteArray valueText = QByteArray::number(value, 'f', 4);
-    const QByteArray targetText(target);
-    const char *args[] = {"af-command", "eq", command, valueText.constData(), targetText.constData(), nullptr};
-    if (mpv_command(m_mpv, args) >= 0)
+    const QVariant reply = m_controller->command({QStringLiteral("af-command"), QStringLiteral("eq"),
+                                                  QString::fromLatin1(command), number(value),
+                                                  QString::fromLatin1(target)});
+    if (!isMpvError(reply))
         return;
     applyFilters();
 }
@@ -366,34 +329,16 @@ void AudioEngine::applyEqPreset(const QString &preset)
 QVariantList AudioEngine::audioOutputs() const
 {
     QVariantList out;
-    if (!m_mpv)
+    const QVariant value = m_controller->getProperty(QStringLiteral("audio-device-list"));
+    if (isMpvError(value) || !value.isValid())
         return out;
-    mpv_node node;
-    if (mpv_get_property(m_mpv, "audio-device-list", MPV_FORMAT_NODE, &node) < 0)
-        return out;
-    if (node.format == MPV_FORMAT_NODE_ARRAY) {
-        for (int i = 0; i < node.u.list->num; ++i) {
-            const mpv_node &entry = node.u.list->values[i];
-            if (entry.format != MPV_FORMAT_NODE_MAP)
-                continue;
-            QString id;
-            QString description;
-            for (int k = 0; k < entry.u.list->num; ++k) {
-                const QByteArray key(entry.u.list->keys[k]);
-                const mpv_node &value = entry.u.list->values[k];
-                if (value.format != MPV_FORMAT_STRING)
-                    continue;
-                if (key == "name")
-                    id = QString::fromUtf8(value.u.string);
-                else if (key == "description")
-                    description = QString::fromUtf8(value.u.string);
-            }
-            // mpv 自己的 auto 项不列出：菜单里的「系统默认」（空 id）就是它，列出来会有两个「默认」
-            if (!id.isEmpty() && id != QLatin1String("auto"))
-                out.append(QVariantMap{{"id", id}, {"description", description}});
-        }
+    for (const QVariant &item : value.toList()) {
+        const QVariantMap entry = item.toMap();
+        // mpv 自己的 auto 项不列出：菜单里的「系统默认」（空 id）就是它，列出来会有两个「默认」
+        const QString id = entry.value("name").toString();
+        if (!id.isEmpty() && id != QLatin1String("auto"))
+            out.append(QVariantMap{{"id", id}, {"description", entry.value("description").toString()}});
     }
-    mpv_free_node_contents(&node);
     return out;
 }
 
@@ -413,13 +358,10 @@ void AudioEngine::setOutputDevice(const QString &id)
     if (m_outputDeviceId == id)
         return;
     m_outputDeviceId = id;
-    if (m_mpv) {
-        const QByteArray name = target.toUtf8();
-        const int err = mpv_set_property_string(m_mpv, "audio-device", name.constData());
-        // 设备不在了由 mpv 自己回退，这里只记一条警告，不重启播放
-        if (err < 0)
-            qWarning() << "mpv audio-device failed:" << mpv_error_string(err);
-    }
+    const int err = m_controller->setProperty(QStringLiteral("audio-device"), target);
+    // 设备不在了由 mpv 自己回退，这里只记一条警告，不重启播放
+    if (err < 0)
+        qWarning() << "mpv audio-device failed:" << MpvController::getError(err);
     emit outputDeviceChanged();
 }
 
@@ -432,10 +374,11 @@ void AudioEngine::seek(double seconds)
 {
     const double d = duration();
     const double target = std::max(0.0, std::min(d > 0 ? d : seconds, seconds));
-    if (m_mpv && m_fileLoaded) {
-        const QByteArray position = QByteArray::number(target, 'f', 3);
-        const char *args[] = {"seek", position.constData(), "absolute", "exact", nullptr};
-        if (mpv_command(m_mpv, args) >= 0) {
+    if (m_fileLoaded) {
+        const QVariant reply = m_controller->command({QStringLiteral("seek"),
+                                                      QString::number(target, 'f', 3),
+                                                      QStringLiteral("absolute"), QStringLiteral("exact")});
+        if (!isMpvError(reply)) {
             m_position = target;
             emit seeked();
             emit positionChanged();
@@ -519,26 +462,19 @@ void AudioEngine::startSource(const QString &url, const QString &level, int bitr
     m_sourceUrl = url;
     m_position = 0;
     emit positionChanged();
-    if (!m_mpv) {
-        if (!m_failed) {
-            m_failed = true;
-            emit failed(QStringLiteral("暂时无法播放这首歌"));
-        }
-        return;
-    }
 
     applyFilters();
     // 先暂停加载：挂起的 seek 要等 FILE_LOADED 后才能发
     setPaused(true);
-    const QByteArray address = url.toUtf8();
-    const char *args[] = {"loadfile", address.constData(), "replace", nullptr};
-    const int err = mpv_command(m_mpv, args);
-    if (err < 0) {
+    const QVariant reply = m_controller->command({QStringLiteral("loadfile"), url,
+                                                  QStringLiteral("replace")});
+    if (isMpvError(reply)) {
         if (!m_failed) {
             m_failed = true;
             emit failed(QStringLiteral("暂时无法播放这首歌"));
         }
-        qWarning() << "mpv loadfile failed:" << mpv_error_string(err);
+        qWarning() << "mpv loadfile failed:"
+                   << MpvController::getError(qvariant_cast<ErrorReturn>(reply).error);
     }
 }
 
@@ -557,88 +493,55 @@ void AudioEngine::notePlaybackStarted()
     scrobbleStart();
 }
 
-void AudioEngine::drainEvents()
-{
-    if (!m_mpv)
-        return;
-    while (true) {
-        mpv_event *event = mpv_wait_event(m_mpv, 0);
-        if (event->event_id == MPV_EVENT_NONE)
-            break;
-        handleEvent(event);
-    }
-}
-
 void AudioEngine::discardEvents()
 {
-    if (!m_mpv)
-        return;
-    while (mpv_wait_event(m_mpv, 0)->event_id != MPV_EVENT_NONE) {
+    // MpvController 与 AudioEngine 在同一线程消费事件队列：切歌前把旧文件挂起的事件丢掉，
+    // 否则旧文件的错误会落到新曲目上。命令发出后 mpv 还会再产生 STOP，事件在事件循环里按序处理。
+    while (mpv_wait_event(m_controller->mpv(), 0)->event_id != MPV_EVENT_NONE) {
     }
 }
 
-void AudioEngine::handleEvent(const mpv_event *event)
+void AudioEngine::handleProperty(const QString &name, const QVariant &value)
 {
-    switch (event->event_id) {
-    case MPV_EVENT_PROPERTY_CHANGE:
-        if (event->data)
-            handleProperty(static_cast<const mpv_event_property *>(event->data));
-        break;
-    case MPV_EVENT_FILE_LOADED:
-        onFileLoaded();
-        break;
-    case MPV_EVENT_END_FILE:
-        if (event->data)
-            onEndFile(static_cast<const mpv_event_end_file *>(event->data));
-        break;
-    default:
-        break;
-    }
-}
-
-void AudioEngine::handleProperty(const mpv_event_property *property)
-{
-    if (!property->data)
+    if (!value.isValid())
         return;
-    const char *name = property->name;
-    if (std::strcmp(name, "time-pos") == 0 && property->format == MPV_FORMAT_DOUBLE) {
-        m_position = *static_cast<double *>(property->data);
+    if (name == QLatin1String("time-pos")) {
+        m_position = value.toDouble();
         if (m_playing && m_position > 0)
             notePlaybackStarted();
         emit positionChanged();
-    } else if (std::strcmp(name, "duration") == 0 && property->format == MPV_FORMAT_DOUBLE) {
-        const double value = *static_cast<double *>(property->data);
-        if (value > 0)
-            m_duration = value;
+    } else if (name == QLatin1String("duration")) {
+        const double duration = value.toDouble();
+        if (duration > 0)
+            m_duration = duration;
         emit durationChanged();
-    } else if (std::strcmp(name, "pause") == 0 && property->format == MPV_FORMAT_FLAG) {
-        const bool paused = *static_cast<int *>(property->data);
+    } else if (name == QLatin1String("pause")) {
+        const bool paused = value.toBool();
         if (paused && m_playClockRunning) {
             m_playedMs += m_playClock.elapsed();
             m_playClockRunning = false;
         }
-    } else if (std::strcmp(name, "idle-active") == 0 && property->format == MPV_FORMAT_FLAG) {
-        // 结束/切歌由 end-file 与 FILE_LOADED 驱动；这里只记录，避免旧文件的事件落到新曲目
-        qCDebug(lcPerf) << "mpv idle-active=" << *static_cast<int *>(property->data);
-    } else if (std::strcmp(name, "eof-reached") == 0 && property->format == MPV_FORMAT_FLAG) {
-        m_atEof = *static_cast<int *>(property->data);
+    } else if (name == QLatin1String("idle-active")) {
+        // 结束/切歌由 endFile 与 fileLoaded 驱动；这里只记录
+        qCDebug(lcPerf) << "mpv idle-active=" << value.toBool();
+    } else if (name == QLatin1String("eof-reached")) {
+        m_atEof = value.toBool();
     }
 }
 
 void AudioEngine::onFileLoaded()
 {
     m_fileLoaded = true;
-    if (m_mpv) {
-        double value = 0;
-        if (mpv_get_property(m_mpv, "duration", MPV_FORMAT_DOUBLE, &value) >= 0 && value > 0)
-            m_duration = value;
-    }
+    double value = 0;
+    if (readDouble(m_controller, "duration", &value) && value > 0)
+        m_duration = value;
     if (m_pendingSeek >= 0) {
         const double target = m_pendingSeek;
         m_pendingSeek = -1;
-        const QByteArray position = QByteArray::number(target, 'f', 3);
-        const char *args[] = {"seek", position.constData(), "absolute", "exact", nullptr};
-        if (m_mpv && mpv_command(m_mpv, args) >= 0) {
+        const QVariant reply = m_controller->command({QStringLiteral("seek"),
+                                                      QString::number(target, 'f', 3),
+                                                      QStringLiteral("absolute"), QStringLiteral("exact")});
+        if (!isMpvError(reply)) {
             m_position = target;
             emit seeked();
             emit positionChanged();
@@ -649,30 +552,25 @@ void AudioEngine::onFileLoaded()
     emit durationChanged();
 }
 
-void AudioEngine::onEndFile(const mpv_event_end_file *end)
+void AudioEngine::onEndFile(const QString &reason)
 {
     m_fileLoaded = false;
-    switch (end->reason) {
-    case MPV_END_FILE_REASON_EOF:
+    if (reason == QLatin1String("eof")) {
         m_atEof = true;
         if (m_finishedEmitted)
-            break;
+            return;
         m_finishedEmitted = true;
         scrobbleFinish();
         setPlaying(false);
         emit finished();
-        break;
-    case MPV_END_FILE_REASON_ERROR:
+    } else if (reason == QLatin1String("error")) {
         if (m_failed)
-            break;
+            return;
         m_failed = true;
         emit failed(QStringLiteral("暂时无法播放这首歌"));
-        qWarning() << "playback error:" << mpv_error_string(end->error);
-        break;
-    default:
-        // STOP（切歌）与 REDIRECT 不是播放结束
-        break;
+        qWarning() << "playback error";
     }
+    // STOP（切歌）不是播放结束
 }
 
 void AudioEngine::scrobbleStart()

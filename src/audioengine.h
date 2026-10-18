@@ -15,13 +15,9 @@
 #include <QString>
 #include <QVariantList>
 #include <QVariantMap>
-#include <atomic>
 
+class MpvController;
 class NcmClient;
-struct mpv_handle;
-struct mpv_event;
-struct mpv_event_property;
-struct mpv_event_end_file;
 
 class AudioEngine : public QObject {
     Q_OBJECT
@@ -121,13 +117,11 @@ private:
     void resolveUrl(double songId);
     void startSource(const QString &url, const QString &level, int bitrate);
     QString effectiveLevel() const;
-    // mpv 事件：wakeup 回调只负责把 drainEvents 排进 Qt 线程
-    void drainEvents();
+    // 切歌时丢掉上一首挂起的事件（STOP 之外，可能是错误），不让它落到新曲目上
     void discardEvents();
-    void handleEvent(const struct mpv_event *event);
-    void handleProperty(const struct mpv_event_property *property);
+    void handleProperty(const QString &name, const QVariant &value);
     void onFileLoaded();
-    void onEndFile(const struct mpv_event_end_file *end);
+    void onEndFile(const QString &reason);
     void setPaused(bool paused);
     // 滤镜链始终挂在一个带标签的 lavfi 上，运行中改参数只发 af-command
     void applyFilters();
@@ -149,9 +143,7 @@ private:
     QSet<QString> m_urlRequests;        // 在途的取址（songId:level）：同一首同一音质只发一次，避免重复 startSource
 
     NcmClient *m_client;
-    mpv_handle *m_mpv = nullptr;
-    // wakeup 回调在 mpv 自己的线程里读它；析构先把 mpv 停掉
-    std::atomic_bool m_destroying{false};
+    MpvController *m_controller = nullptr;
     QVariantMap m_track;
     bool m_playing = false;
     bool m_failed = false;

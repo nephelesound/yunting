@@ -5,7 +5,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Qml Quick QuickControls2 Network Multimedia DBus Sql)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Qml Quick QuickControls2 Network DBus Sql)
+find_package(MpvQt REQUIRED)
 find_package(Qt6Keychain REQUIRED)
 find_package(KF6StatusNotifierItem REQUIRED)
 find_package(KF6CoreAddons REQUIRED)   # KAboutData（「关于」页）、KSignalHandler
@@ -15,7 +16,6 @@ find_package(KF6I18n REQUIRED)         # kirigami-addons 的页面（「关于�
 find_package(OpenSSL REQUIRED COMPONENTS Crypto)
 find_package(LayerShellQt QUIET)
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(MPV REQUIRED IMPORTED_TARGET mpv)
 pkg_check_modules(QRENCODE QUIET libqrencode)
 pkg_check_modules(ZSTD QUIET libzstd)
 
@@ -29,6 +29,7 @@ qt_add_executable(yunting
     json_util.h
     normalize.h normalize.cpp
     audioengine.h audioengine.cpp
+    mvvideo.h mvvideo.cpp
     session.h session.cpp
     mpris.h mpris.cpp
     tray.h tray.cpp
@@ -105,7 +106,7 @@ qt_add_executable(audioengine_test tests/audioengine_test.cpp audioengine.h audi
     ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp json_util.h crypto.h crypto.cpp
     normalize.h normalize.cpp perf.h perf.cpp)
 target_compile_options(audioengine_test PRIVATE -Wall -Wextra)
-target_link_libraries(audioengine_test PRIVATE Qt6::Core Qt6::Test Qt6::Network PkgConfig::MPV Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
+target_link_libraries(audioengine_test PRIVATE Qt6::Core Qt6::Test Qt6::Network MpvQt::MpvQt Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
 add_test(NAME audioengine COMMAND audioengine_test)
 
 # 重试策略：seam 是本地 QTcpServer（I/O 边界），不 mock NcmClient 内部
@@ -134,7 +135,7 @@ qt_add_executable(audioengine_seek_test tests/audioengine_seek_test.cpp
     audioengine.h audioengine.cpp ncmclient.h ncmclient.cpp
     cookievault.h cookievault.cpp json_util.h crypto.h crypto.cpp normalize.h normalize.cpp perf.h perf.cpp)
 target_compile_options(audioengine_seek_test PRIVATE -Wall -Wextra)
-target_link_libraries(audioengine_seek_test PRIVATE Qt6::Core Qt6::Test Qt6::Network PkgConfig::MPV Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
+target_link_libraries(audioengine_seek_test PRIVATE Qt6::Core Qt6::Test Qt6::Network MpvQt::MpvQt Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
 add_test(NAME audioengine_seek COMMAND audioengine_seek_test)
 
 # 任何测试都碰不到用户的真实凭据与缓存：会话总线不可达（钥匙串因此走后备文件），数据与缓存目录在构建目录里
@@ -143,8 +144,8 @@ set_tests_properties(querycache normalize form clientidentity audioengine audioe
 
 target_link_libraries(yunting PRIVATE
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Qml Qt6::Quick Qt6::QuickControls2
-    Qt6::Network Qt6::Multimedia Qt6::DBus Qt6::Sql
-    PkgConfig::MPV
+    Qt6::Network Qt6::DBus Qt6::Sql
+    MpvQt::MpvQt
     Qt6Keychain::Qt6Keychain
     KF6::StatusNotifierItem
     OpenSSL::Crypto

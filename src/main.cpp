@@ -7,12 +7,15 @@
 #include <QApplication>
 #include <QIcon>
 #include <QQuickWindow>
+#include <QSGRendererInterface>
 
 int main(int argc, char *argv[])
 {
     // 桌面歌词与迷你窗是透明的顶层窗口；没有 alpha buffer 时合成器会把透明区域画成黑色。
     // 必须在创建任何 QQuickWindow 之前设置。
     QQuickWindow::setDefaultAlphaBuffer(true);
+    // MV 用 MpvQt 的 MpvAbstractItem 渲染，它只支持 OpenGL；必须在创建第一个窗口前定下
+    QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
     QApplication app(argc, argv);
     // 应用的身份只在这里定义（KAboutData 同时写进 QCoreApplication / QGuiApplication，「关于」页也读它），
     // 其余地方都从 QCoreApplication / QGuiApplication 读：

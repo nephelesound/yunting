@@ -5,7 +5,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtMultimedia
 import org.kde.kirigami as Kirigami
 import "Format.js" as Format
 
@@ -15,13 +14,15 @@ ScreenFrame {
     property real mvId
     readonly property var mv: Source.mv(page.mvId)
     readonly property bool ready: page.mv.url !== ""
+    // 播放器是应用注册的 MvVideo（mpv 画进 QML）。原型没有它，也没有播放地址，画面区只显示说明
+    readonly property var player: video.item
     // 正在出画面：main.qml 据此让屏幕常亮（backend.power.keepScreenOn）
-    readonly property bool videoPlaying: video.playbackState === MediaPlayer.PlayingState
+    readonly property bool videoPlaying: page.player !== null && page.player.playing
 
     heading: page.mv.name || "MV"
     // 播放地址是签名的、会过期：每次打开都向后端要一次（详情仍走缓存，地址重新取）
     Component.onCompleted: Source.need("mv:" + page.mvId)
-    Component.onDestruction: video.stop()
+    Component.onDestruction: if (page.player) page.player.stop()
 
     Item {
         anchors.fill: parent
@@ -39,20 +40,23 @@ ScreenFrame {
             color: "black"
             radius: Tokens.radius
 
-            Video {
+            Loader {
                 id: video
                 anchors.fill: parent
-                fillMode: VideoOutput.PreserveAspectFit
-                source: page.mv.url
-                autoPlay: true
-                volume: 0.8
+                sourceComponent: Source.live ? Qt.createComponent("org.nephelesound.yunting", "MvVideo") : null
+            }
+            Binding {
+                when: page.player !== null
+                target: page.player
+                property: "source"
+                value: page.mv.url
             }
 
             // 解码失败时给出原因，而不是一直黑屏
             Label {
                 anchors.centerIn: parent
-                visible: video.errorString.length > 0
-                text: video.errorString
+                visible: text.length > 0
+                text: page.player ? page.player.errorString : ""
                 color: "white"
                 font.pixelSize: Tokens.textSm
                 wrapMode: Text.Wrap
@@ -108,13 +112,12 @@ ScreenFrame {
 
                     IconButton {
                         icon.color: "white"
-                        icon.name: video.playbackState === MediaPlayer.PlayingState
-                            ? "media-playback-pause" : "media-playback-start"
-                        text: video.playbackState === MediaPlayer.PlayingState ? "暂停" : "播放"
-                        onClicked: video.playbackState === MediaPlayer.PlayingState ? video.pause() : video.play()
+                        icon.name: page.videoPlaying ? "media-playback-pause" : "media-playback-start"
+                        text: page.videoPlaying ? "暂停" : "播放"
+                        onClicked: page.videoPlaying ? page.player.pause() : page.player.play()
                     }
                     Label {
-                        text: Format.elapsed(video.position / 1000)
+                        text: Format.elapsed(seek.value / 1000)
                         color: "white"
                         font.pixelSize: Tokens.textSm
                         font.features: { "tnum": 1 }
@@ -123,17 +126,18 @@ ScreenFrame {
                         id: seek
                         Layout.fillWidth: true
                         from: 0
-                        to: Math.max(1, video.duration)
-                        onMoved: video.position = value
+                        to: Math.max(1, seek.duration)
+                        readonly property real duration: page.player ? page.player.duration : 0
+                        onMoved: page.player.position = value
                         Binding {
                             target: seek
                             property: "value"
-                            value: video.position
+                            value: page.player ? page.player.position : 0
                             when: !seek.pressed
                         }
                     }
                     Label {
-                        text: Format.duration(video.duration / 1000)
+                        text: Format.duration(seek.duration / 1000)
                         color: "white"
                         font.pixelSize: Tokens.textSm
                         font.features: { "tnum": 1 }
