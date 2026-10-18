@@ -334,7 +334,13 @@ void NcmClient::postForm(const QString &path, const QUrlQuery &form, bool person
 {
     // 鉴权上下文是 Web cookie（MUSIC_U）：只走 /api 明文或 /weapi；客户端身份统一由
     // clientidentity.h 提供，不在这里混用 macOS/Android 专有标识或 /eapi。
-    const QString cookie = cookieHeader(personal);
+    postFormWithContext(path, form, personal, QString(), std::move(callback));
+}
+
+void NcmClient::postFormWithContext(const QString &path, const QUrlQuery &form, bool personal,
+                                    const QString &cookieContext, ResponseCallback callback)
+{
+    const QString cookie = cookieHeader(personal, cookieContext);
     postRaw(QUrl(m_apiBase + path), ncm::formEncoded(form), cookie, std::move(callback));
 }
 
@@ -347,7 +353,7 @@ void NcmClient::postForm(const QString &path, const QUrlQuery &form, bool person
     });
 }
 
-QString NcmClient::cookieHeader(bool personal) const
+QString NcmClient::cookieHeader(bool personal, const QString &contextOverride) const
 {
     // 客户端身份对匿名请求也要带上（登录二维码也走同一客户端栈）；认证 cookie 只在
     // personal 时发送。评论写入会校验完整 appver，截断版本会回 250「设备存在安全风险」。
@@ -360,7 +366,8 @@ QString NcmClient::cookieHeader(bool personal) const
                     + QLatin1String(name) + u'=' + value;
         }
     }
-    const QString context = ncm::client::cookieContext();
+    const QString context = contextOverride.isEmpty()
+        ? ncm::client::cookieContext() : contextOverride;
     if (!context.isEmpty())
         header += (header.isEmpty() ? QString() : QStringLiteral("; ")) + context;
     return header;

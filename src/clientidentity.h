@@ -38,6 +38,17 @@ inline QString cookieContext()
         .arg(p.os, p.appver, p.osver, p.channel);
 }
 
+// The download entitlement endpoint rejects the Linux desktop context with
+// code -120 even for an account that can play/download the same song. The PC
+// context returns the signed URL. Use this only for that endpoint; playback,
+// comments and writes keep the Linux context.
+inline QString downloadCookieContext()
+{
+    return QStringLiteral("os=pc; appver=3.1.17.204416; "
+                          "osver=Microsoft-Windows-10-Professional-build-19045-64bit; "
+                          "channel=netease");
+}
+
 inline QString userAgent()
 {
     return QStringLiteral("Mozilla/5.0 (X11; Linux x86_64) Chrome/140.0");

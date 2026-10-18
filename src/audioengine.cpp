@@ -1,4 +1,5 @@
 #include "audioengine.h"
+#include "downloadpaths.h"
 #include "clientidentity.h"
 #include "json_util.h"
 #include "ncmclient.h"
@@ -430,6 +431,12 @@ void AudioEngine::prefetch(double songId)
 
 void AudioEngine::resolveUrl(double songId)
 {
+    // Downloaded files win over the network: this is the offline path and it
+    // also avoids re-resolving a signed URL after the file is present.
+    if (const QString local = yuntingDownloadedFile(static_cast<qint64>(songId)); !local.isEmpty()) {
+        startSource(QUrl::fromLocalFile(local).toString(), effectiveLevel(), 320000);
+        return;
+    }
     const QString level = effectiveLevel();
     const QString cacheKey = QStringLiteral("%1:%2").arg(num(songId), level);
     const auto cached = m_urls.constFind(cacheKey);

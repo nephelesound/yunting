@@ -6,6 +6,7 @@
 #include "audioengine.h"
 #include "clipboardhelper.h"
 #include "diagnostics.h"
+#include "downloadmanager.h"
 #include "imagecache.h"
 #include "layershellhelper.h"
 #include "listentogether.h"
@@ -27,6 +28,7 @@
 #include <QDateTime>
 #include <QEventLoop>
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLoggingCategory>
@@ -118,6 +120,9 @@ struct CommandLine {
         "Create a room, sync a two-song queue and end it (requires --allow-write)"};
     QCommandLineOption refreshSession{"refresh-session",
                                       "Refresh the stored MUSIC_U cookie and exit"};
+    QCommandLineOption downloadSelfTest{"download-selftest",
+                                        "Download one song to the offline directory, verify it and remove it (requires --allow-write)",
+                                        "songId"};
 
     CommandLine()
     {
@@ -150,6 +155,7 @@ struct CommandLine {
         parser.addOption(storeKey);
         parser.addOption(listenTogetherSelfTest);
         parser.addOption(refreshSession);
+        parser.addOption(downloadSelfTest);
     }
 };
 
@@ -768,6 +774,35 @@ int runSmokeAudio(const CommandLine &cli, QApplication &app, Backend &backend)
     return app.exec();
 }
 
+int runDownloadSelfTest(const CommandLine &cli, Backend &backend)
+{
+    const qint64 songId = cli.parser.value(cli.downloadSelfTest).toLongLong();
+    if (songId <= 0)
+        return 1;
+    DownloadManager downloads(&backend.client);
+    QEventLoop loop;
+    int rc = 1;
+    QObject::connect(&downloads, &DownloadManager::finished, &loop,
+                     [&](double id, const QString &path) {
+        const qint64 size = QFileInfo(path).size();
+        std::printf("download selftest: id=%lld bytes=%lld path=%s\n",
+                    static_cast<long long>(id), static_cast<long long>(size),
+                    qPrintable(path));
+        downloads.remove(id);
+        rc = size > 0 ? 0 : 1;
+        loop.quit();
+    });
+    QObject::connect(&downloads, &DownloadManager::failed, &loop,
+                     [&](double, const QString &message) {
+        std::fprintf(stderr, "download selftest failed: %s\n", qPrintable(message));
+        loop.quit();
+    });
+    QTimer::singleShot(90 * 1000, &loop, &QEventLoop::quit);
+    downloads.download(static_cast<double>(songId), QStringLiteral("lossless"));
+    loop.exec();
+    return rc;
+}
+
 int runRefreshSession(Backend &backend)
 {
     QEventLoop loop;
@@ -876,6 +911,8 @@ int runGui(const CommandLine &cli, QApplication &app, Backend &backend)
     // 放在这里而不是开头：之前构造的 Store / CookieVault / 图片缓存已拿到不带组织名的 XDG 路径。
     const QString imageCacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/images";
     app.setOrganizationName(QStringLiteral("."));
+    // 下载文件用 AppDataLocation；必须在组织/应用名设好之后构造。
+    DownloadManager downloads(&client);
     // MV 画面：libmpv 渲染进 QML；原型与截图不注册这个类型，MvPage 退回内置替身
     qmlRegisterType<MvVideo>("org.nephelesound.yunting", 1, 0, "MvVideo");
     QQmlApplicationEngine engine;
@@ -901,6 +938,7 @@ int runGui(const CommandLine &cli, QApplication &app, Backend &backend)
                            {"clipboard", QVariant::fromValue<QObject *>(&clipboard)},
                            {"diagnostics", QVariant::fromValue<QObject *>(&diagnostics)},
                            {"listenTogether", QVariant::fromValue<QObject *>(&listenTogether)},
+                           {"downloads", QVariant::fromValue<QObject *>(&downloads)},
                            {"qr", qrAvailable}};
     engine.setInitialProperties({{"backend", backendMap}});
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
@@ -987,7 +1025,8 @@ int run(QApplication &app)
     if (cli.parser.isSet(cli.like) || cli.parser.isSet(cli.commentLike)
         || cli.parser.isSet(cli.playlistSelfTest)
         || cli.parser.isSet(cli.subscribeSelfTest)
-        || cli.parser.isSet(cli.listenTogetherSelfTest)) {
+        || cli.parser.isSet(cli.listenTogetherSelfTest)
+        || cli.parser.isSet(cli.downloadSelfTest)) {
         if (!cli.parser.isSet(cli.allowWrite)) {
             std::fprintf(stderr, "refusing write commands without --allow-write\n");
             return 1;
@@ -1024,6 +1063,8 @@ int run(QApplication &app)
         return runListenTogetherSelfTest(backend);
     if (cli.parser.isSet(cli.refreshSession))
         return runRefreshSession(backend);
+    if (cli.parser.isSet(cli.downloadSelfTest))
+        return runDownloadSelfTest(cli, backend);
     return runGui(cli, app, backend);
 }
 } // namespace Cli

@@ -46,7 +46,8 @@ using JsonObjectCallback = std::function<void(Result<QJsonObject>)>;
 // POST plaintext /api form. Calls back exactly once on the Qt thread; a callback
 // whose context object is gone is dropped. Non-200 business codes are Api errors.
 void postFormJson(NcmClient &client, QObject *context, QString endpoint,
-                  QUrlQuery form, JsonObjectCallback callback, bool personal = false);
+                  QUrlQuery form, JsonObjectCallback callback, bool personal = false,
+                  QString cookieContext = {});
 
 // Same lifecycle/error policy for weapi POST. `personal` selects whether the
 // stored MUSIC_U cookie is attached.

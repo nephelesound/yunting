@@ -48,14 +48,14 @@ Result<QJsonObject> settled(const QJsonObject &root, const QString &endpoint)
 } // namespace
 
 void postFormJson(NcmClient &client, QObject *context, QString endpoint,
-                  QUrlQuery form, JsonObjectCallback callback, bool personal)
+                  QUrlQuery form, JsonObjectCallback callback, bool personal,
+                  QString cookieContext)
 {
     if (!callback)
         return;
     QPointer<QObject> guard(context);
     const bool hasContext = context != nullptr;
-    client.postForm(endpoint, form, personal,
-                    [guard, hasContext, endpoint, callback = std::move(callback)]
+    auto onResponse = [guard, hasContext, endpoint, callback = std::move(callback)]
                     (const NcmClient::Response &response) {
         if (hasContext && guard.isNull())
             return;
@@ -72,7 +72,12 @@ void postFormJson(NcmClient &client, QObject *context, QString endpoint,
             return;
         }
         callback(settled(root, endpoint));
-    });
+    };
+    if (cookieContext.isEmpty())
+        client.postForm(endpoint, form, personal, std::move(onResponse));
+    else
+        client.postFormWithContext(endpoint, form, personal, cookieContext,
+                                   std::move(onResponse));
 }
 
 void postWeapiJson(NcmClient &client, QObject *context, QString endpoint,

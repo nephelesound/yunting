@@ -62,6 +62,11 @@ explicit NcmClient(QObject *parent = nullptr, bool loadCookies = true);
     // 退出登录：移除 MUSIC_U / __csrf / NMTID 并落盘；匿名设备 cookie 不保留（我们只用这三个）
     void clearAuthCookies();
 
+    // Form POST with an explicit client cookie context. Used only by endpoints
+    // whose entitlement differs by client context (song download).
+    void postFormWithContext(const QString &path, const QUrlQuery &form, bool personal,
+                             const QString &cookieContext, ResponseCallback callback);
+
     // GET https://music.163.com/<path>?<query>，完成后回调一次；失败时 doc 为空、ok=false。
     // 网络错误、超时与 HTTP 5xx 自动重试，最多 3 次，间隔 0.5 / 1 / 2 秒；4xx 与业务码不重试。
     // 语义层的在途去重在 Store.request（key 在它那里才知道）；这里每个请求都发。
@@ -123,7 +128,7 @@ private:
     void persistJar();
     void keepSetCookies(class QNetworkReply *reply, quint64 generation);
     // 同 snapshot.py 的 cookie_header()：只带这三个；空 value 跳过
-    QString cookieHeader(bool personal) const;
+    QString cookieHeader(bool personal, const QString &context = {}) const;
 
     CookieVault *m_vault;
     QNetworkAccessManager *m_nam;
