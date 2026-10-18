@@ -130,6 +130,28 @@ private slots:
         QCOMPARE(lines.at(4).toMap().value("tr").toString(), QStringLiteral("我们碰到了点小事"));
     }
 
+    // 网易的「非滚动歌词」：没有时间戳的纯文本（前面可能挂署名行）。照行给出，t = -1；写回时不加时间戳
+    void untimedLyricsKeepTheirLines()
+    {
+        const QString lrc = QStringLiteral(
+            "{\"c\":[{\"tx\":\"作词: \"},{\"tx\":\"某人\"}]}\n"
+            "致还能动的身体\n"
+            "致还能跳的心\n"
+            "\n"
+            "  致黑夜与天明 \n");
+        const QVariantList lines = ncmParseLrc(lrc, QString());
+        QStringList texts;
+        for (const QVariant &v : lines) {
+            texts.append(v.toMap().value("text").toString());
+            QCOMPARE(v.toMap().value("t").toDouble(), -1.0);
+        }
+        QCOMPARE(texts, (QStringList{QStringLiteral("致还能动的身体"), QStringLiteral("致还能跳的心"),
+                                     QStringLiteral("致黑夜与天明")}));
+        QCOMPARE(ncmLyricsToLrc(lines), QStringLiteral("致还能动的身体\n致还能跳的心\n致黑夜与天明\n"));
+        // 有一句带时间戳就按滚动歌词解析，没时间的行不混进来
+        QCOMPARE(ncmParseLrc(QStringLiteral("[00:01.00]一句\n没有时间的行\n"), QString()).size(), 1);
+    }
+
     // 写回的 LRC 再解析一遍得到同样的句子（时间、原文、译文）；分钟超过 99 不会出现，不测
     void lyricsToLrcRoundTrips()
     {

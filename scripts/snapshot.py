@@ -150,7 +150,12 @@ def parse_lrc(lrc, tlyric=""):
                 out.setdefault(math.floor(t * 100 + 0.5) / 100, body)
         return dict(sorted(out.items()))
     tr = stamps(tlyric)
-    return [{"t": t, "text": text, "tr": tr.get(t, "")} for t, text in stamps(lrc).items()]
+    timed = [{"t": t, "text": text, "tr": tr.get(t, "")} for t, text in stamps(lrc).items()]
+    if timed:
+        return timed
+    # 与 ncmParseLrc 一致：没有时间轴的歌词逐行给出，t = -1；署名行与标签行跳过
+    return [{"t": -1.0, "text": line, "tr": ""} for line in map(str.strip, lrc.splitlines())
+            if line and not line.startswith(("{", "["))]
 
 
 def cloud_track(item):
@@ -277,7 +282,7 @@ def anonymous():
     hot_resp = get(f"api/v6/playlist/detail?id={HOT_CHART}&n=1000")
     hot = hot_resp["playlist"]
     tracks = complete_playlist(hot, personal=False, privileges=hot_resp.get("privileges") or [])
-    lyric = get(f"api/song/lyric?id={tracks[CURRENT]['id']}&lv=1&tv=-1")
+    lyric = get(f"api/song/lyric?id={tracks[CURRENT]['id']}&lv=-1&tv=-1")
     lyrics = parse_lrc(lyric.get("lrc", {}).get("lyric", ""),
                        (lyric.get("tlyric") or {}).get("lyric") or "")
     # 与 Store 一致：接口说这首本身没有歌词（pureMusic，旧字段 nolyric）

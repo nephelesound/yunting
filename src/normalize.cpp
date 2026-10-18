@@ -204,6 +204,15 @@ QVariantList ncmParseLrc(const QString &lrc, const QString &tlyric)
     QVariantList out;
     for (auto it = lines.cbegin(); it != lines.cend(); ++it)
         out.append(QVariantMap{{"t", it.key()}, {"text", it.value()}, {"tr", tr.value(it.key())}});
+    if (!out.isEmpty())
+        return out;
+    // 没有时间轴的歌词（网易的「非滚动歌词」）：逐行原样给出，t 记为 -1，界面不跟着高亮。
+    // 署名行（{…}）与 [ar:] 这类标签行照样跳过
+    for (const QString &raw : lrc.split(u'\n')) {
+        const QString line = raw.trimmed();
+        if (!line.isEmpty() && !line.startsWith(u'{') && !line.startsWith(u'['))
+            out.append(QVariantMap{{"t", -1.0}, {"text", line}, {"tr", QString()}});
+    }
     return out;
 }
 
@@ -268,6 +277,10 @@ QString ncmLyricsToLrc(const QVariantList &lines)
     QString out;
     for (const QVariant &v : lines) {
         const QVariantMap line = v.toMap();
+        if (line.value("t").toDouble() < 0) {   // 没有时间轴的歌词：照原样一行一句
+            out += line.value("text").toString() + u'\n';
+            continue;
+        }
         const qint64 centis = qRound64(line.value("t").toDouble() * 100);
         const QString stamp = QStringLiteral("[%1:%2.%3]")
                                   .arg(centis / 6000, 2, 10, QLatin1Char('0'))

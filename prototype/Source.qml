@@ -587,8 +587,12 @@ QtObject {
     function setCommentLiked(songId, commentId, liked) { if (source.live) source.live.setCommentLiked(songId, commentId, liked); }
     function logout() { if (source.live) source.live.logout(); }
 
-    // 当前句：最后一个开始时间不晚于 elapsed 的句子（正在播放页与桌面歌词共用这一条规则）
+    // 当前句：最后一个开始时间不晚于 elapsed 的句子（正在播放页与桌面歌词共用这一条规则）。
+    // 没有时间轴的歌词（每句 t = -1）没有当前句：-1
+    function lyricsTimed(lines) { return lines.length > 0 && lines[0].t >= 0; }
     function lyricIndex(lines, elapsed) {
+        if (!source.lyricsTimed(lines))
+            return -1;
         let i = 0;
         while (i + 1 < lines.length && lines[i + 1].t <= elapsed)
             i++;
@@ -601,7 +605,7 @@ QtObject {
         if (timed && timed.songId === trackId && timed.lines.length > 0 && timed.lines[0].words !== undefined)
             return timed.lines;
         if (trackId === source.d.lyricsTrackId)
-            return source.d.lyrics;
+            return source.d.lyrics || [];
         source.need("lyrics:" + trackId);
         return [];
     }

@@ -26,7 +26,8 @@ Window {
 
     readonly property int shadowRoom: Tokens.space4   // 投影的位置
     readonly property var lines: mini.track ? Source.lyrics(mini.track.id) : []
-    readonly property var line: mini.lines.length > 0 ? mini.lines[Source.lyricIndex(mini.lines, mini.elapsed)] : null
+    readonly property int lineIndex: Source.lyricIndex(mini.lines, mini.elapsed)
+    readonly property var line: mini.lineIndex >= 0 ? mini.lines[mini.lineIndex] : null
     // 第二行：在放、有歌词时是当前这句，否则是歌手
     readonly property string second: mini.playing && mini.line && mini.line.text ? mini.line.text
         : mini.track ? mini.track.artist : ""

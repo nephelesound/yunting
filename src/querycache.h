@@ -30,7 +30,8 @@ public:
     // 会一直用下去）。改了解析就把它加一：版本不符的库清空。
     // 2 -> 3：评论缓存从匿名结果（liked 恒为 false）改为登录态本人结果，旧行不能再用。
     // 3 -> 4：歌词缓存改为 { lines, pureMusic }；旧行是裸的句子表，没有纯音乐标记。
-    static constexpr int diskFormat = 4;
+    // 4 -> 5：没有时间轴的歌词不再解析成空表；另外清掉升级时仍在运行的旧版本退出时写回的旧格式行。
+    static constexpr int diskFormat = 5;
 
     explicit QueryCache(const QString &diskPath, QObject *parent = nullptr);
     ~QueryCache() override;

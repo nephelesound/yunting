@@ -233,7 +233,9 @@ void Store::requestLyrics(const QString &key, double songId)
     const quint64 token = m_requests.begin(QStringLiteral("lyrics"));
     m_cache.query(key,
         [this, songId](QueryCache::Done done) {
-            m_client->get("api/song/lyric", query({{"id", num(songId)}, {"lv", "1"}, {"tv", "-1"}}), false,
+            // lv / tv 是客户端手里已有的歌词版本，服务器只回更新的：-1 = 要最新的。
+            // 写成 lv=1 时，歌词还停在第 1 版的新歌会回空
+            m_client->get("api/song/lyric", query({{"id", num(songId)}, {"lv", "-1"}, {"tv", "-1"}}), false,
                           [done, songId](const QJsonDocument &doc, bool ok) {
                 if (!ok) {
                     done({}, false);

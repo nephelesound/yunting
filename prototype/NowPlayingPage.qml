@@ -144,7 +144,7 @@ ScreenFrame {
 
             // 目标位置：让第 i 句的顶边落在中线那一行（借 positionViewAtIndex 量，再还原，交给动画）
             function follow(animated) {
-                if (lyrics.browsing || lyrics.count === 0 || !lyrics.visible)
+                if (lyrics.browsing || lyrics.count === 0 || !lyrics.visible || page.lyricIndex < 0)
                     return;
                 const from = lyrics.contentY;
                 lyrics.positionViewAtIndex(page.lyricIndex, ListView.Beginning);
@@ -235,9 +235,12 @@ ScreenFrame {
                 // 有译文的句子占两行网格：原文贴第一行底边，译文贴第二行顶边，读起来是一组
                 height: line.translation.length > 0 ? 2 * page.pitch : page.pitch
 
-                // 可点：悬停时整行淡色调 + 右侧这句的时间；点击跳到这句，右键出菜单
-                HoverHandler { id: lineHover; cursorShape: Qt.PointingHandCursor }
+                // 可点：悬停时整行淡色调 + 右侧这句的时间；点击跳到这句，右键出菜单。
+                // 没有时间轴的歌词（t < 0）无处可跳：不响应悬停与点击
+                readonly property bool seekable: line.modelData.t >= 0
+                HoverHandler { id: lineHover; enabled: line.seekable; cursorShape: Qt.PointingHandCursor }
                 TapHandler {
+                    enabled: line.seekable
                     onTapped: {
                         page.seekRequested(line.modelData.t);
                         lyrics.resume();
@@ -282,7 +285,8 @@ ScreenFrame {
                     // 常规字重：当前句靠字号与颜色突出。Medium 在各家字体里差别最大（HarmonyOS Sans 的 Medium 很轻，
                     // Noto Sans CJK 的 Medium 接近粗体），换台机器整页歌词就显得发黑
                     font.weight: Font.Normal
-                    color: line.current ? Kirigami.Theme.textColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                    // 没有时间轴的歌词没有「当前句」可比，整篇按正文色读
+                    color: line.current || !line.seekable ? Kirigami.Theme.textColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                     elide: Text.ElideRight
                     Behavior on scale { NumberAnimation { duration: Tokens.motionBase; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut } }
                     Behavior on color { ColorAnimation { duration: Tokens.motionBase } }

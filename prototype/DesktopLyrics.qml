@@ -52,8 +52,10 @@ Window {
     }
 
     readonly property int index: Source.lyricIndex(lyricsWindow.lines, lyricsWindow.clock)
-    readonly property var current: lyricsWindow.lines.length > 0 ? lyricsWindow.lines[lyricsWindow.index] : null
-    readonly property var next: lyricsWindow.index + 1 < lyricsWindow.lines.length ? lyricsWindow.lines[lyricsWindow.index + 1] : null
+    // 没有时间轴的歌词 index 是 -1：没有当前句，桌面歌词显示曲名
+    readonly property var current: lyricsWindow.index >= 0 ? lyricsWindow.lines[lyricsWindow.index] : null
+    readonly property var next: lyricsWindow.index >= 0 && lyricsWindow.index + 1 < lyricsWindow.lines.length
+        ? lyricsWindow.lines[lyricsWindow.index + 1] : null
     // 当前句唱到了哪：有逐字歌词时逐字推进，否则按时间比例（规则在 Source.lineFill）
     readonly property real fill: Source.lineFill(lyricsWindow.current, lyricsWindow.next,
                                                  lyricsWindow.track ? lyricsWindow.track.dur || 0 : 0, lyricsWindow.clock)
