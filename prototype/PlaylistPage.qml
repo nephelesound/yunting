@@ -11,7 +11,7 @@ import "Format.js" as Format
 
 ScreenFrame {
     id: page
-    scroller: tracks
+    scroller: page.pane === "comments" && page.commentThread !== null ? comments : tracks
     background: PageAmbience { cover: page.list.cover }
 
     // { heading, cover, facts: [{ value, label }], description, tracks, ranked }
@@ -21,6 +21,12 @@ ScreenFrame {
     property string listKey   // 失败重试用：root.listKey
     // 自己的歌单可以进入排序模式：每行固定显示上移 / 下移，提交一次后退出
     property bool reordering: false
+    property string pane: "tracks"   // tracks | comments（只有歌单有评论）
+    kept: ["pane"]
+    // 歌单（含榜单、红心、雷达这些本身就是歌单的）才有评论；专辑、电台、每日推荐没有
+    readonly property var commentThread: (page.list.listId || 0) > 0 && !page.list.isAlbum && !page.list.paging
+        ? Source.commentThread("playlist", page.list.listId) : null
+    readonly property int commentCount: page.commentThread ? Source.commentTotal(page.commentThread) : 0
 
     signal activated(int index)
     signal playAllRequested()
@@ -160,63 +166,100 @@ ScreenFrame {
             }
         }
 
-        // 右：曲目列表
-        ListView {
-            id: tracks
+        // 右：歌单有评论时上面一排枢轴「曲目 | 评论」；专辑、电台、每日推荐只有曲目
+        ColumnLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            // 列表右边缘 = 页边线；滚动条落在页边距里，不占内容宽度
-            rightMargin: Tokens.pageMargin
-            bottomMargin: Tokens.space6
-            spacing: Tokens.space2
-            clip: true
-            boundsBehavior: Flickable.StopAtBounds
-            // 与歌手页 / 评论区同一种模型：列表更新只增量追加，滚回顶部不会发生
-            model: GrowingModel { values: page.list.tracks }
-            currentIndex: -1
-            ScrollBar.vertical: ScrollBar {}
-            WheelScroll { flickable: tracks }
-            // 分页的列表（电台的节目）：滚到底接着取
-            onAtYEndChanged: if (atYEnd && page.list.paging && count > 0) Source.morePaged(page.list.paging)
-            footer: PagingFooter {
-                width: tracks.width - tracks.rightMargin
-                paging: page.list.paging ? { items: page.list.tracks, more: page.list.paging.more, loading: false,
-                                             failed: page.list.paging.moreFailed } : null
-                doneText: "没有更早的了"
-                onRetryRequested: Source.morePaged(page.list.paging)
-            }
-            LocateCurrent {
-                parent: tracks
-                view: tracks
-                index: page.list.tracks.findIndex(t => t.id === page.currentId)
+            spacing: Tokens.space3
+
+            Pivot {
+                visible: page.commentThread !== null
+                items: [{ key: "tracks", text: "曲目" },
+                        { key: "comments", text: page.commentCount > 0 ? "评论 " + Format.count(page.commentCount) : "评论" }]
+                current: page.pane
+                onActivated: key => page.pane = key
             }
 
-            delegate: TrackTile {
-                modelData: page.list.tracks[index] || ({ id: 0, name: "", artist: "", dur: 0, fee: 0, cover: "" })
-                width: tracks.width - tracks.rightMargin
-                ranked: page.list.ranked || false
-                current: modelData.id === page.currentId
-                showReason: page.list.showReason || false
-                showAlbum: !(page.list.isAlbum || false) && page.list.showAlbum !== false
-                locked: Format.blockedBy(modelData, page.vip) !== ""
-                menuContext: ({ playlistId: page.list.playlistId || 0 })
-                reordering: page.reordering
-                canMoveDown: index < (page.list.tracks || []).length - 1
-                onActivated: index => page.activated(index)
-                onMoveRequested: (index, delta) => page.moveTrack(index, delta)
+            ListView {
+                id: tracks
+                visible: page.pane === "tracks" || page.commentThread === null
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                // 列表右边缘 = 页边线；滚动条落在页边距里，不占内容宽度
+                rightMargin: Tokens.pageMargin
+                bottomMargin: Tokens.space6
+                spacing: Tokens.space2
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                // 与歌手页 / 评论区同一种模型：列表更新只增量追加，滚回顶部不会发生
+                model: GrowingModel { values: page.list.tracks }
+                currentIndex: -1
+                ScrollBar.vertical: ScrollBar {}
+                WheelScroll { flickable: tracks }
+                // 分页的列表（电台的节目）：滚到底接着取
+                onAtYEndChanged: if (atYEnd && page.list.paging && count > 0) Source.morePaged(page.list.paging)
+                footer: PagingFooter {
+                    width: tracks.width - tracks.rightMargin
+                    paging: page.list.paging ? { items: page.list.tracks, more: page.list.paging.more, loading: false,
+                                                 failed: page.list.paging.moreFailed } : null
+                    doneText: "没有更早的了"
+                    onRetryRequested: Source.morePaged(page.list.paging)
+                }
+                LocateCurrent {
+                    parent: tracks
+                    view: tracks
+                    index: page.list.tracks.findIndex(t => t.id === page.currentId)
+                }
+
+                delegate: TrackTile {
+                    modelData: page.list.tracks[index] || ({ id: 0, name: "", artist: "", dur: 0, fee: 0, cover: "" })
+                    width: tracks.width - tracks.rightMargin
+                    ranked: page.list.ranked || false
+                    current: modelData.id === page.currentId
+                    showReason: page.list.showReason || false
+                    showAlbum: !(page.list.isAlbum || false) && page.list.showAlbum !== false
+                    locked: Format.blockedBy(modelData, page.vip) !== ""
+                    menuContext: ({ playlistId: page.list.playlistId || 0 })
+                    reordering: page.reordering
+                    canMoveDown: index < (page.list.tracks || []).length - 1
+                    onActivated: index => page.activated(index)
+                    onMoveRequested: (index, delta) => page.moveTrack(index, delta)
+                }
+
+                // 空列表：说明为什么空，而不是留一片空白
+                Kirigami.PlaceholderMessage {
+                    anchors.centerIn: parent
+                    width: parent.width - 2 * Tokens.pageMargin
+                    visible: tracks.count === 0
+                    icon.name: "view-media-playlist"
+                    text: page.list.failed ? "曲目取不到，点此重试" : (page.list.emptyText || "这里还没有歌")
+                    HoverHandler { enabled: page.list.failed === true; cursorShape: Qt.PointingHandCursor }
+                    TapHandler {
+                        enabled: page.list.failed === true
+                        onTapped: Source.retryKey(page.listKey || "")
+                    }
+                }
             }
 
-            // 空列表：说明为什么空，而不是留一片空白
-            Kirigami.PlaceholderMessage {
-                anchors.centerIn: parent
-                width: parent.width - 2 * Tokens.pageMargin
-                visible: tracks.count === 0
-                icon.name: "view-media-playlist"
-                text: page.list.failed ? "曲目取不到，点此重试" : (page.list.emptyText || "这里还没有歌")
-                HoverHandler { enabled: page.list.failed === true; cursorShape: Qt.PointingHandCursor }
-                TapHandler {
-                    enabled: page.list.failed === true
-                    onTapped: Source.retryKey(page.listKey || "")
+            // 歌单评论：与正在播放页同一个评论区；歌单评论接口只读，不能点赞
+            CommentsPane {
+                id: comments
+                visible: page.pane === "comments" && page.commentThread !== null
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.rightMargin: Tokens.pageMargin
+                thread: page.commentThread
+                active: comments.visible
+                loggedIn: page.loggedIn
+                onLoginRequested: page.loginRequested()
+
+                Kirigami.PlaceholderMessage {
+                    anchors.centerIn: parent
+                    width: parent.width - Tokens.pageMargin
+                    visible: comments.count === 0
+                    icon.name: "dialog-messages"
+                    text: !Source.live ? "原型数据里没有这个歌单的评论"
+                        : comments.hot.loaded && comments.latest && !comments.latest.more ? "还没有评论" : "正在取回评论…"
                 }
             }
         }

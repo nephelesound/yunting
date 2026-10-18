@@ -55,54 +55,8 @@ ScreenFrame {
     readonly property int focusRow: page.coverTopRow + Math.floor(page.coverRows / 2)
 
     readonly property var lines: page.track ? Source.lyrics(page.track.id) : []
-    readonly property var comments: page.track && page.pane === "comments" ? Source.comments(page.track.id) : []
     // 百科只在打开这一栏时取
     readonly property var wiki: page.track && page.pane === "wiki" ? Source.wiki(page.track.id) : null
-    // 最新评论（分页累积）：只认这首歌的；打开评论或换歌时从第一页开始取
-    readonly property var latest: page.track && page.pane === "comments" && Source.latestComments.owner === page.track.id
-        ? Source.latestComments : null
-    // 精彩评论也会出现在按时间排的分页里：同一条（用户 + 时间 + 内容）只在精彩评论里出现一次
-    function commentKey(c) { return c.user + "\n" + c.time + "\n" + c.content; }
-    // 精彩评论只放 3 条（接口按点赞排好序），下面接按时间排的全部评论
-    readonly property var hotShown: page.comments.slice(0, 3)
-    readonly property var commentRows: {
-        const hotKeys = {};
-        for (const c of page.hotShown)
-            hotKeys[page.commentKey(c)] = true;
-        const latest = (page.latest ? page.latest.items : []).filter(c => !hotKeys[page.commentKey(c)]);
-        return page.hotShown.map(c => Object.assign({ group: "hot" }, c))
-            .concat(latest.map(c => Object.assign({ group: "latest" }, c)));
-    }
-    readonly property bool commentsReady: page.track !== null && Source.commentsLoaded(page.track.id)
-    function startComments() {
-        if (!(page.track && page.pane === "comments") || Source.latestComments.owner === page.track.id)
-            return;
-        // 热评是列表头。等它落地后再拉最新页，避免热评晚到后把整张表重建、滚回顶部。
-        if (!page.commentsReady) {
-            Source.need("comments:" + page.track.id);
-            return;
-        }
-        Source.moreComments(page.track.id);
-    }
-    onCommentsReadyChanged: if (page.commentsReady) page.startComments()
-    onPaneChanged: page.startComments()
-    onTrackChanged: {
-        page.openThread = 0;
-        page.startComments();
-    }
-    Component.onCompleted: page.startComments()
-
-    // 展开着回复的那条评论（0 = 都没展开）。展开时要第一页回复，再点收起
-    property real openThread: 0
-    function toggleThread(commentId) {
-        if (page.openThread === commentId) {
-            page.openThread = 0;
-            return;
-        }
-        page.openThread = commentId;
-        if (Source.replies(page.track.id, commentId).pending)
-            Source.need("commentReplies:" + page.track.id + ":" + commentId);
-    }
     readonly property int lyricIndex: Source.lyricIndex(page.lines, page.elapsed)
 
 
@@ -398,96 +352,17 @@ ScreenFrame {
             onActivated: Source.retryKey("lyrics:" + page.track.id)
         }
 
-        // 评论：阅读模式，头像、名字、内容、赞数。先精彩评论，再最新评论（滚到底取下一页）
-        ListView {
+        // 评论：阅读模式，头像、名字、内容、赞数（与歌单页共用 CommentsPane）
+        CommentsPane {
             id: commentList
             visible: page.pane === "comments"
             y: page.pitch
             width: parent.width
             height: (page.rows - 1) * page.pitch
-            clip: true
-            spacing: Tokens.space6   // 评论之间 24：每条是一段独立的话，间距比行内大一档才分得开
-            topMargin: Tokens.space3
-            bottomMargin: Tokens.space6
-            boundsBehavior: Flickable.StopAtBounds
-            // 续取一页只追加新的行，滚动位置不变（直接用数组当 model 会整个重置、滚回顶部）
-            model: GrowingModel {
-                values: page.commentRows
-                keyOf: c => c.group + "\n" + page.commentKey(c)
-            }
-            ScrollBar.vertical: ScrollBar {}
-            WheelScroll { flickable: commentList }
-            onAtYEndChanged: if (atYEnd && page.track && page.pane === "comments") Source.moreComments(page.track.id)
-
-            footer: PagingFooter {
-                width: ListView.view.width - Tokens.space4
-                paging: page.latest
-                loadingText: "正在取回更多评论…"
-                doneText: "没有更多评论了"
-                onRetryRequested: Source.moreComments(page.track.id)
-            }
-
-            delegate: ColumnLayout {
-                id: entry
-                required property int index
-                readonly property var modelData: page.commentRows[entry.index] || ({})
-                width: ListView.view.width - Tokens.space4
-                spacing: Tokens.space3
-
-                // 分组标题：每组第一条之前，与队列的「正在播放 / 接下来播放」同一种小节标题
-                Label {
-                    visible: entry.index === 0 || page.commentRows[entry.index - 1].group !== entry.modelData.group
-                    Layout.topMargin: entry.index === 0 ? 0 : Tokens.space6
-                    text: entry.modelData.group === "hot" ? "精彩评论"
-                        : "最新评论" + (page.latest && page.latest.total > 0 ? " " + Format.count(page.latest.total) : "")
-                    font.pixelSize: Tokens.textSm
-                    color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
-                }
-
-                CommentRow {
-                    Layout.fillWidth: true
-                    comment: entry.modelData
-                    threadOpen: page.openThread === entry.modelData.id
-                    onLikeRequested: liked => {
-                        if (!page.loggedIn) {
-                            page.loginRequested();
-                            return;
-                        }
-                        Source.setCommentLiked(page.track.id, entry.modelData.id, liked);
-                    }
-                    onThreadToggled: page.toggleThread(entry.modelData.id)
-                }
-
-                // 楼中楼：展开在这条下面，缩进到正文的左缘；一次只展开一条（后端只留最近展开的那一条）
-                ColumnLayout {
-                    readonly property var thread: Source.replies(page.track ? page.track.id : 0, entry.modelData.id || 0)
-                    visible: page.openThread === entry.modelData.id && entry.modelData.id > 0
-                    Layout.fillWidth: true
-                    Layout.leftMargin: Tokens.height8 + Tokens.space3
-                    spacing: Tokens.space4
-
-                    Repeater {
-                        model: parent.visible ? parent.thread.items : []
-                        delegate: CommentRow {
-                            required property var modelData
-                            Layout.fillWidth: true
-                            comment: modelData
-                            likeable: false
-                            threadOf: entry.modelData.id || 0
-                        }
-                    }
-                    LinkText {
-                        readonly property var thread: parent.thread
-                        visible: thread.more || thread.pending || thread.failed
-                        parts: [{ text: thread.failed ? "回复没取到，点此重试" : thread.pending ? "正在取回回复…" : "更多回复",
-                                  link: !thread.pending || thread.failed }]
-                        font.pixelSize: Tokens.textSm
-                        color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
-                        onActivated: thread.failed ? Source.retryKey("commentReplies:" + thread.songId + ":" + thread.commentId)
-                                                   : Source.moreReplies(thread)
-                    }
-                }
-            }
+            thread: page.track ? Source.commentThread("song", page.track.id) : null
+            active: page.pane === "comments"
+            loggedIn: page.loggedIn
+            onLoginRequested: page.loginRequested()
         }
 
         WikiPane {
@@ -525,7 +400,7 @@ ScreenFrame {
         // 评论空着时：在取（10 秒内）/ 没取到（可点重试）/ 原型里就是没有。Store 失败不回调，只能靠超时判断
         Label {
             id: commentsEmpty
-            readonly property bool waiting: page.pane === "comments" && page.commentRows.length === 0 && Source.live && page.track !== null
+            readonly property bool waiting: page.pane === "comments" && commentList.rows.length === 0 && Source.live && page.track !== null
             property bool timedOut: false
             onWaitingChanged: {
                 commentsEmpty.timedOut = false;
@@ -536,7 +411,7 @@ ScreenFrame {
 
             y: page.focusRow * page.pitch
             height: page.pitch
-            visible: page.pane === "comments" && page.commentRows.length === 0
+            visible: page.pane === "comments" && commentList.rows.length === 0
             verticalAlignment: Text.AlignVCenter
             text: !page.track ? "还没有在播放的歌" : !Source.live ? "暂无评论"
                 : commentsEmpty.timedOut ? "没取到评论，点此重试" : "正在取回评论…"

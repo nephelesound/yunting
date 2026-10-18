@@ -62,3 +62,4 @@ ResourceRow ResourceRow.qml
 NoticeRow NoticeRow.qml
 SimListenTogether SimListenTogether.qml
 ListenTogetherLink ListenTogetherLink.qml
+CommentsPane CommentsPane.qml

@@ -158,7 +158,7 @@ Item {
             // 系统原生的按钮整个自己画（主题图标由样式着色），不叠自绘图标
             ToolButton {
                 id: commentsButton
-                readonly property string count: bar.active ? Format.corner(Source.commentTotal(bar.track.id)) : ""
+                readonly property string count: bar.active ? Format.corner(Source.commentTotal(Source.commentThread("song", bar.track.id))) : ""
                 visible: !hud.compact
                 enabled: bar.active
                 implicitHeight: Tokens.height8

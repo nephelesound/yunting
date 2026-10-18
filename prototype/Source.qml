@@ -108,20 +108,25 @@ QtObject {
         source.likedOverride = o;
     }
 
-    // 热门评论：只有 live 按需取；快照里带的是歌词那首的
-    function comments(songId) {
-        const c = source.d.comments;
-        if (c && c.songId === songId)
-            return c.items;
-        source.need("comments:" + songId);
-        return [];
+    // 评论区：歌曲或歌单的评论。thread = { kind: "song" | "playlist", id }。
+    // 两种的形状相同，只是槽、请求 key 与 owner 字段名不同（歌单评论只读，不能点赞）
+    readonly property var commentKinds: ({
+        song: { hot: "comments", page: "commentPage", replies: "commentReplies", owner: "songId" },
+        playlist: { hot: "playlistComments", page: "playlistCommentPage", replies: "playlistCommentReplies", owner: "playlistId" },
+    })
+    function commentThread(kind, id) { return { kind: kind, id: id }; }
+    function sameThread(a, b) { return Boolean(a) && Boolean(b) && a.kind === b.kind && a.id === b.id; }
+    // 精彩评论（前 20 条，接口按点赞排好序）与总数：一次请求；快照里带的是歌词那首的
+    function hotComments(t) {
+        const k = source.commentKinds[t.kind];
+        const c = source.d[k.hot];
+        if (c && c[k.owner] === t.id)
+            return { loaded: true, items: c.items || [], total: c.total || 0 };
+        if (t.id > 0)
+            source.need(k.hot + ":" + t.id);
+        return { loaded: false, items: [], total: 0 };
     }
-    // 热评请求是否已经落地（空列表也算）；评论区要等它先回来再请求最新页，
-    // 否则热评晚到会被拼在最新评论前面，列表按差异重建一次，滚动位置就丢了。
-    function commentsLoaded(songId) {
-        const c = source.d.comments;
-        return Boolean(c && c.songId === songId);
-    }
+    function commentTotal(t) { return source.hotComments(t).total; }
 
     // 歌曲百科：data 里只放最近取回的一首，songId 对上才用（取失败时槽里还留着上一首的）。
     // pending：还在取；empty：取到了但这首没有百科
@@ -136,14 +141,6 @@ QtObject {
                  reviews: [], sheets: [], entertainments: [], awards: [] };
     }
 
-    // 评论总数：与热评同一次请求（换歌时取一次，缓存里有就不再发）
-    function commentTotal(songId) {
-        const c = source.d.comments;
-        if (c && c.songId === songId)
-            return c.total || 0;
-        source.need("comments:" + songId);
-        return 0;
-    }
 
     // 最新评论：分页按需取（comments:<songId>:<offset>，每页 20），data 里只放最近一页，
     // 这里按歌累积；只接「正好是下一页」的那页，迟到或重复的页不会打乱顺序
@@ -174,27 +171,45 @@ QtObject {
     readonly property Timer pageTimeout: Timer {
         interval: 10000
         onTriggered: {
-            if (source.latestComments.loading)
-                source.latestComments = Object.assign({}, source.latestComments, { loading: false, failed: true });
+            for (const kind in source.latestComments) {
+                if (source.latestComments[kind].loading)
+                    source.setLatest(kind, Object.assign({}, source.latestComments[kind], { loading: false, failed: true }));
+            }
             if (source.artistSongs.loading)
                 source.artistSongs = Object.assign({}, source.artistSongs, { loading: false, failed: true });
         }
     }
 
-    // 最新评论：打开评论或滚到底时调用 moreComments
-    property var latestComments: ({ owner: 0, items: [], total: 0, more: false, next: 0, loading: false })
+    // 最新评论：打开评论或滚到底时调用 moreComments；每种评论区各有一份累积（owner 是歌或歌单的 id）
+    property var latestComments: ({ song: { owner: 0, items: [], total: 0, more: false, next: 0, loading: false },
+                                    playlist: { owner: 0, items: [], total: 0, more: false, next: 0, loading: false } })
+    function setLatest(kind, acc) {
+        const all = Object.assign({}, source.latestComments);
+        all[kind] = acc;
+        source.latestComments = all;
+    }
+    function latestFor(t) {
+        const acc = source.latestComments[t.kind];
+        return acc.owner === t.id ? acc : null;
+    }
     readonly property var commentPageRaw: source.d.commentPage || null
     onCommentPageRawChanged: {
         const page = source.commentPageRaw;
         if (page)
-            source.latestComments = source.appendPage(source.latestComments, page.songId, page, page.items);
+            source.setLatest("song", source.appendPage(source.latestComments.song, page.songId, page, page.items));
     }
-    function moreComments(songId) {
-        const acc = source.nextPage(source.latestComments, songId, 0, []);
+    readonly property var playlistCommentPageRaw: source.d.playlistCommentPage || null
+    onPlaylistCommentPageRawChanged: {
+        const page = source.playlistCommentPageRaw;
+        if (page)
+            source.setLatest("playlist", source.appendPage(source.latestComments.playlist, page.playlistId, page, page.items));
+    }
+    function moreComments(t) {
+        const acc = source.nextPage(source.latestComments[t.kind], t.id, 0, []);
         if (acc === null)
             return;
-        source.latestComments = acc;
-        source.need("comments:" + songId + ":" + acc.next);
+        source.setLatest(t.kind, acc);
+        source.need(source.commentKinds[t.kind].hot + ":" + t.id + ":" + acc.next);
     }
 
     // 歌手的全部歌曲：先是 artist:<id> 带的热门 50 首，滚到底再按热度从第 50 首往后取（artistSongs:<id>:<offset>）
@@ -219,7 +234,8 @@ QtObject {
     // 换号（含匿名 → 登录 / 退出）时，评论分页与歌手分页里还留着上一个账号的 liked/followed 状态。
     // 只认 userId 变化；同一账号资料刷新不打断正在看的列表。
     onAccountIdChanged: {
-        source.latestComments = ({ owner: 0, items: [], total: 0, more: false, next: 0, loading: false })
+        source.latestComments = ({ song: { owner: 0, items: [], total: 0, more: false, next: 0, loading: false },
+                                   playlist: { owner: 0, items: [], total: 0, more: false, next: 0, loading: false } })
         source.artistSongs = ({ owner: 0, items: [], total: 0, more: false, next: 0, loading: false })
         source.likedOverride = ({})
         source.requestFailures = ({})
@@ -348,16 +364,18 @@ QtObject {
         return { type: type, songCount: r.songCount, tracks: tracks, pending: false, failed: false };
     }
     // 楼中楼：一条评论下的回复；data 里只放最近展开的那一条的
-    function replies(songId, commentId) {
-        const r = source.d.commentReplies;
-        if (r && r.songId === songId && r.commentId === commentId)
-            return Object.assign({ pending: false, failed: false }, r);
-        return { songId: songId, commentId: commentId, before: 0, more: false, items: [], pending: true,
-                 failed: Boolean(source.failure("commentReplies:" + songId + ":" + commentId)) };
+    function replies(t, commentId) {
+        const k = source.commentKinds[t.kind];
+        const key = k.replies + ":" + t.id + ":" + commentId;
+        const r = source.d[k.replies];
+        if (r && r[k.owner] === t.id && r.commentId === commentId)
+            return Object.assign({ key: key, pending: false, failed: false }, r);
+        return { key: key, commentId: commentId, before: 0, more: false, items: [], pending: true,
+                 failed: Boolean(source.failure(key)) };
     }
     function moreReplies(r) {
         if (r.more && !r.pending)
-            source.need("commentReplies:" + r.songId + ":" + r.commentId + ":" + r.before);
+            source.need(r.key + ":" + r.before);
     }
 
     // 私信（只读）：会话列表与当前打开的一段对话；对话在 data 里只放最近取回的一段
