@@ -648,6 +648,12 @@ QtObject {
         }
     }
     function firstCover(tracks) { return tracks.length > 0 ? tracks[0].cover : ""; }
+    // 心动模式的封面（首页入口与列表页同一张）：避开种子歌——种子就是红心第一首，和「我喜欢」的封面会重复
+    function heartCover() {
+        const heart = source.pe.heart;
+        const pick = heart.tracks.find(t => !heart.seed || t.id !== heart.seed.id);
+        return pick ? pick.cover : heart.seed ? heart.seed.cover : "";
+    }
     function songs(n) { return { value: String(n), label: "首" }; }
 
     // 首页第一排：为你推荐的入口。每项 { key, title, caption, cover | symbol, locked }
@@ -674,15 +680,13 @@ QtObject {
         }
 
         const daily = p.daily.tracks;
-        // 心动模式的封面避开种子歌（种子就是红心第一首，和「我喜欢」的封面会重复）
-        const heartCover = p.heart.tracks.find(t => !p.heart.seed || t.id !== p.heart.seed.id);
         const radar = p.radar;
         return [
             daily.length > 0
                 ? { key: "daily", title: "每日推荐", cover: source.sized(daily[0].cover, 400), caption: "从" + source.quoted(daily[0].name) + "听起" }
                 : { key: "daily", title: "每日推荐", symbol: "view-calendar-day-symbolic", caption: "今天的推荐还在生成" },
             p.heart.seed && p.heart.tracks.length > 0
-                ? { key: "heart", title: "心动模式", cover: source.sized(heartCover ? heartCover.cover : p.heart.seed.cover, 400), caption: "从" + source.quoted(p.heart.seed.name) + "出发" }
+                ? { key: "heart", title: "心动模式", cover: source.sized(source.heartCover(), 400), caption: "从" + source.quoted(p.heart.seed.name) + "出发" }
                 : { key: "heart", title: "心动模式", symbol: "love-symbolic", caption: "先给喜欢的歌点个红心" },
             fmEntry,
             { key: "radar", title: "私人雷达", cover: source.sized(radar.cover, 400), symbol: "games-highscores-symbolic",
@@ -704,7 +708,7 @@ QtObject {
             facts: [{ label: p.daily.date }, source.songs(p.daily.tracks.length)],
             description: "根据你的口味生成，每天 6:00 更新", emptyText: "今天的推荐还在生成，稍后再来" };
         case "heart": return {
-            heading: "心动模式", cover: source.sized(p.heart.seed ? p.heart.seed.cover : "", 560), tracks: p.heart.tracks,
+            heading: "心动模式", cover: source.sized(source.heartCover(), 560), tracks: p.heart.tracks,
             facts: [source.songs(p.heart.tracks.length)],
             description: p.heart.seed ? "从红心歌曲" + source.quoted(p.heart.seed.name) + "出发，混合你的红心与相似推荐" : "",
             emptyText: "先给喜欢的歌点个红心，心动模式会从它出发" };

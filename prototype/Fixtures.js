@@ -209,7 +209,8 @@ var worst = {
             { kind: "mv", id: 1, vid: "", name: "我想要两颗西柚（Live）- 2023 网易云音乐年度盛典现场版 官方完整版 MV", cover: BROKEN, artist: "茄子蛋 / 告五人", duration: 3725, playCount: 99999999999 },
             { kind: "video", id: 0, vid: "A1B2", name: "x", cover: "", artist: "", duration: 0, playCount: 0 }] },
         daily: { date: "10月17日", day: "17", tracks: worstTracks.slice(0, 30) },
-        heart: { seed: worstTracks[1], tracks: worstTracks.slice(1, 3) },
+        // 种子与下一首的封面不同：首页入口与列表页取的必须是同一张（不是种子那张）
+        heart: { seed: worstTracks[1], tracks: [worstTracks[1], Object.assign({}, worstTracks[2], { cover: C1 })] },
         radar: { id: 3136952023, name: "私人雷达", description: "今天《我想要两颗西柚（Live）- 2023 网易云音乐年度盛典现场版》爱不释耳", cover: BROKEN, tracks: worstTracks.slice(0, 30) },
         similar: { seed: worstTracks[0], tracks: [] },
         liked: { id: 1, count: 12345, tracks: worstTracks },
