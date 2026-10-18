@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SongWiki normalized response",
+  "type": "object",
+  "required": ["songId", "loaded", "empty", "songName", "albumName", "artistName", "cover",
+               "description", "memory", "chorus", "basic", "creators", "mvs", "reviews",
+               "sheets", "entertainments", "awards"],
+  "properties": {
+    "songId": { "type": "integer", "minimum": 1 },
+    "loaded": { "const": true },
+    "empty": { "type": "boolean" },
+    "songName": { "type": "string" },
+    "albumName": { "type": "string" },
+    "artistName": { "type": "string" },
+    "cover": { "type": "string" },
+    "description": { "type": "string" },
+    "memory": {
+      "type": "object",
+      "required": ["period", "season", "time", "timestamp", "playCount", "text"],
+      "properties": {
+        "period": { "type": "string" },
+        "season": { "type": "string" },
+        "time": { "type": "string" },
+        "timestamp": { "type": "integer" },
+        "playCount": { "type": "integer" },
+        "text": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "chorus": {
+      "type": "object",
+      "required": ["start", "end", "locked"],
+      "properties": {
+        "start": { "type": "number", "minimum": 0 },
+        "end": { "type": "number", "minimum": 0 },
+        "locked": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "basic": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["title", "content", "tags"],
+        "properties": {
+          "title": { "type": "string" },
+          "content": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": true
+      }
+    },
+    "creators": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["role", "people"],
+        "properties": {
+          "role": { "type": "string" },
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "name", "avatar", "subscribed"],
+              "properties": {
+                "id": { "type": "integer" },
+                "name": { "type": "string" },
+                "avatar": { "type": "string" },
+                "subscribed": { "type": "boolean" }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "mvs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "jumpUrl", "name", "artist", "cover", "duration",
+                     "publishTime", "playCount"],
+        "properties": {
+          "id": { "type": "integer" },
+          "jumpUrl": { "type": "string" },
+          "name": { "type": "string" },
+          "artist": { "type": "string" },
+          "cover": { "type": "string" },
+          "duration": { "type": "integer" },
+          "publishTime": { "type": "string" },
+          "playCount": { "type": "integer" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "reviews": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "content", "user", "likes"],
+        "properties": {
+          "id": { "type": "integer" },
+          "type": { "type": "string" },
+          "content": { "type": "string" },
+          "user": { "type": "string" },
+          "likes": { "type": "integer" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "sheets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "types", "difficulty", "key", "bpm", "pages", "cover"],
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "types": { "type": "array", "items": { "type": "string" } },
+          "difficulty": { "type": "string" },
+          "key": { "type": "string" },
+          "bpm": { "type": "integer" },
+          "pages": { "type": "integer" },
+          "cover": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "entertainments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["title", "type", "resourceType", "cover"],
+        "properties": {
+          "title": { "type": "string" },
+          "type": { "type": "string" },
+          "resourceType": { "type": "string" },
+          "cover": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "awards": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["title", "description", "time"],
+        "properties": {
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "time": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

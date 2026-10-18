@@ -1,0 +1,49 @@
+{
+  "songId": 1958384591,
+  "loaded": true,
+  "empty": false,
+  "songName": "ALIVE",
+  "albumName": "ALIVE",
+  "artistName": "ClariS",
+  "cover": "http://p1.music.126.net/example.jpg",
+  "description": "《ALIVE》是 ClariS 演唱的动画片头曲。",
+  "memory": {
+    "period": "深夜",
+    "season": "仲夏",
+    "time": "01:25",
+    "timestamp": 1657387559000,
+    "playCount": 1887,
+    "text": "喜欢的歌，就要听到天荒地老！"
+  },
+  "chorus": { "start": 42.402, "end": 80.866, "locked": false },
+  "basic": [
+    { "title": "语种", "content": "日语", "tags": [] },
+    { "title": "曲风", "content": "", "tags": ["原声带", "动画"] }
+  ],
+  "creators": [
+    {
+      "role": "作词",
+      "people": [
+        { "id": 42, "name": "重永亮介", "avatar": "http://p1.music.126.net/creator.jpg", "subscribed": false }
+      ]
+    }
+  ],
+  "mvs": [
+    {
+      "id": 22621587,
+      "jumpUrl": "orpheus://mv/22621587",
+      "name": "ALIVE",
+      "artist": "ClariS",
+      "cover": "http://p1.music.126.net/mv.jpg",
+      "duration": 221,
+      "publishTime": "2022-08-03",
+      "playCount": 2750
+    }
+  ],
+  "reviews": [
+    { "id": 0, "type": "精选乐评", "content": "好听", "user": "某人", "likes": 7 }
+  ],
+  "sheets": [],
+  "entertainments": [],
+  "awards": []
+}

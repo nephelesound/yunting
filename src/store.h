@@ -182,6 +182,8 @@ private:
     void requestArtist(const QString &key, double artistId);
     void requestArtistSongs(const QString &key, double artistId, int offset);
     void requestAlbum(const QString &key, double albumId);
+    // 歌曲百科：完整 block 页 + 创作者 + 副歌时间；只读、不落盘
+    void requestWiki(const QString &key, double songId);
     void requestMoreFm();
     void requestMv(const QString &key, double mvId);
     void requestUser(const QString &key, double uid);

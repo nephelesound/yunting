@@ -1500,6 +1500,103 @@ private slots:
         QVERIFY(waitUntil([&] { return failed.count() == 3; }, 15000));
         QVERIFY(cachedValues());            // 三个请求都失败，旧值原样保留
     }
+    // 百科：完整 block + 创作者 + 副歌时间合并成一个可直接渲染的形状
+    void wikiCombinesBlocksCreatorsAndChorus()
+    {
+        QJsonArray songBlocks;
+        songBlocks.append(QJsonObject{
+            {"blockCode", "wikiSubBlockSongInfoVo"},
+            {"blockInfo", QJsonObject{{"desc", "一首动画片头曲。"}}}});
+        songBlocks.append(QJsonObject{
+            {"blockCode", "wikiSubBlockBaseInfoVo"},
+            {"blockInfo", QJsonObject{{"wikiSubElementVos", QJsonArray{
+                QJsonObject{{"title", "语种"}, {"content", "日语"}},
+                QJsonObject{{"title", "曲风"},
+                            {"wikiSubMetaVos", QJsonArray{
+                                QJsonObject{{"text", "原声带"}},
+                                QJsonObject{{"text", "动画"}}}}},
+            }}}}});
+        songBlocks.append(QJsonObject{
+            {"blockCode", "wikiSubBlockMvInfoVo"},
+            {"blockInfo", QJsonObject{{"wikiSubElementVos", QJsonArray{
+                QJsonObject{{"title", "ALIVE"}, {"artists", "ClariS"},
+                            {"imgUrl", "http://mv"}, {"duration", 221000},
+                            {"publishTime", "2022-08-03"}, {"playNum", 2750},
+                            {"jumpUrl", "orpheus://mv/22621587"}},
+            }}}}});
+        songBlocks.append(QJsonObject{
+            {"blockCode", "wikiSubBlockSongCommentVo"},
+            {"blockInfo", QJsonObject{{"wikiSubElementVos", QJsonArray{
+                QJsonObject{{"content", "好听"}, {"commenter", "某人"},
+                            {"likes", 7}, {"typeName", "精选乐评"}},
+            }}}}});
+
+        QJsonObject songDetail{
+            {"songName", "ALIVE"}, {"albumName", "ALIVE"}, {"artistName", "ClariS"},
+            {"coverImage", "http://cover"}, {"blocks", songBlocks}};
+        QJsonObject memoryRn{
+            {"moduleTitle", "回忆坐标"},
+            {"firstListen", QJsonObject{{"period", "深夜"}, {"season", "仲夏"},
+                                         {"time", "01:25"}, {"timestamp", 1657387559000.0}}},
+            {"totalPlay", QJsonObject{{"playCount", 1887}, {"text", "听到天荒地老"}}}};
+        QJsonArray topBlocks{
+            QJsonObject{{"rnData", memoryRn}},
+            QJsonObject{{"rnData", songDetail}}};
+        const QJsonObject wikiRoot{
+            {"code", 200},
+            {"data", QJsonObject{{"blocks", topBlocks}}}};
+
+        QJsonObject creatorRole{
+            {"roleName", "作词"},
+            {"creatorMetaVOS", QJsonArray{
+                QJsonObject{{"artistId", 42}, {"artistName", "重永亮介"},
+                            {"artistPic", "http://creator"}, {"isSub", false}}}}};
+        const QJsonObject creatorsRoot{
+            {"code", 200},
+            {"data", QJsonObject{{"songCreatorsRoleVos", QJsonArray{creatorRole}}}}};
+        const QJsonObject chorusRoot{
+            {"code", 200},
+            {"chorus", QJsonArray{QJsonObject{{"id", 9}, {"startTime", 42402},
+                                               {"endTime", 80866}}}}};
+
+        const QByteArray wikiJson = json(wikiRoot);
+        const QByteArray creatorsJson = json(creatorsRoot);
+        const QByteArray chorusJson = json(chorusRoot);
+        m_api->handler = [wikiJson, creatorsJson, chorusJson](const FakeApi::Request &req,
+                                                              const FakeApi::Responder &respond) {
+            if (req.path == "/api/link/page/parent/relation/construct/info") {
+                respond(200, wikiJson);
+                return;
+            }
+            if (req.path == "/api/song/creators") {
+                respond(200, creatorsJson);
+                return;
+            }
+            if (req.path == "/api/song/chorus") {
+                respond(200, chorusJson);
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("wiki:9"));
+        QVERIFY(waitUntil([&] {
+            const QVariantMap wiki = m_store->data().value("wiki").toMap();
+            return wiki.value("songId").toDouble() == 9 && wiki.value("loaded").toBool();
+        }));
+        const QVariantMap wiki = m_store->data().value("wiki").toMap();
+        QCOMPARE(wiki.value("songName").toString(), QStringLiteral("ALIVE"));
+        QCOMPARE(wiki.value("description").toString(), QStringLiteral("一首动画片头曲。"));
+        QCOMPARE(wiki.value("basic").toList().size(), 2);
+        QCOMPARE(wiki.value("creators").toList().size(), 1);
+        QCOMPARE(wiki.value("mvs").toList().at(0).toMap().value("id").toDouble(), 22621587.0);
+        QCOMPARE(wiki.value("reviews").toList().at(0).toMap().value("content").toString(),
+                 QStringLiteral("好听"));
+        QCOMPARE(wiki.value("memory").toMap().value("period").toString(), QStringLiteral("深夜"));
+        QCOMPARE(wiki.value("chorus").toMap().value("start").toDouble(), 42.402);
+        QCOMPARE(wiki.value("empty").toBool(), false);
+    }
+
 };
 
 QTEST_GUILESS_MAIN(StoreTest)

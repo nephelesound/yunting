@@ -99,7 +99,8 @@ qint64 QueryCache::freshFor(const QString &key)
 // （search: / searchUsers: / searchRadios: 都算搜索）
 bool QueryCache::persistent(const QString &key)
 {
-    return !key.startsWith(QLatin1String("search"));
+    // 百科可能含当前账号的回忆坐标，不能写进公共磁盘缓存；只放内存。
+    return !key.startsWith(QLatin1String("search")) && !key.startsWith(QLatin1String("wiki:"));
 }
 
 bool QueryCache::isFresh(const QString &key, const Entry &entry)

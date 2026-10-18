@@ -23,7 +23,8 @@ qt_add_executable(yunting
     main.cpp cli.h cli.cpp
     ncmclient.h ncmclient.cpp
     cookievault.h cookievault.cpp
-    store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_comment.cpp store_user.cpp store_inbox.cpp store_stats.cpp store_notify.cpp store_social.cpp store_comment_extra.cpp store_lyrics_new.cpp store_on_demand.cpp
+    store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_comment.cpp store_user.cpp store_inbox.cpp store_stats.cpp store_notify.cpp store_social.cpp store_comment_extra.cpp store_lyrics_new.cpp store_on_demand.cpp store_wiki.cpp
+    sdk/sdk_json.h sdk/sdk_json.cpp sdk/song_wiki.h sdk/song_wiki.cpp sdk/song_wiki_service.h sdk/song_wiki_service.cpp
     session.h session.cpp
     querycache.h querycache.cpp
     imagecache.h
@@ -69,6 +70,7 @@ qt_add_resources(yunting "app_icon"
     PREFIX "/"
     FILES "${CMAKE_CURRENT_SOURCE_DIR}/../data/io.github.nephelesound.Yunting.svg")
 
+target_include_directories(yunting PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_options(yunting PRIVATE -Wall -Wextra)
 
 # 测试：只测有策略的深模块（QueryCache 的缓存与去重规则、AudioEngine 的音量刻度与钳制、
@@ -123,11 +125,13 @@ add_test(NAME cookievault COMMAND cookievault_test)
 
 # Store 的缓存/写操作行为：本地假接口，不碰外网
 qt_add_executable(store_test tests/store_test.cpp
-    store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_comment.cpp store_user.cpp store_inbox.cpp store_stats.cpp store_notify.cpp store_social.cpp store_comment_extra.cpp store_lyrics_new.cpp store_on_demand.cpp
+    store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_comment.cpp store_user.cpp store_inbox.cpp store_stats.cpp store_notify.cpp store_social.cpp store_comment_extra.cpp store_lyrics_new.cpp store_on_demand.cpp store_wiki.cpp
+    sdk/sdk_json.h sdk/sdk_json.cpp sdk/song_wiki.h sdk/song_wiki.cpp sdk/song_wiki_service.h sdk/song_wiki_service.cpp
     session.h session.cpp
     querycache.h querycache.cpp
     ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp
     normalize.h normalize.cpp json_util.h crypto.h crypto.cpp perf.h perf.cpp)
+target_include_directories(store_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_options(store_test PRIVATE -Wall -Wextra)
 target_link_libraries(store_test PRIVATE Qt6::Core Qt6::Sql Qt6::Network Qt6::Test Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
 add_test(NAME store COMMAND store_test)
@@ -140,8 +144,16 @@ target_compile_options(audioengine_seek_test PRIVATE -Wall -Wextra)
 target_link_libraries(audioengine_seek_test PRIVATE Qt6::Core Qt6::Test Qt6::Network MpvQt::MpvQt Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
 add_test(NAME audioengine_seek COMMAND audioengine_seek_test)
 
+# SDK 的 typed 解析契约：不触碰网络，只校验 raw JSON -> structs / frontend map
+qt_add_executable(sdk_song_wiki_test tests/sdk_song_wiki_test.cpp
+    sdk/sdk_json.h sdk/sdk_json.cpp sdk/song_wiki.h sdk/song_wiki.cpp)
+target_include_directories(sdk_song_wiki_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_options(sdk_song_wiki_test PRIVATE -Wall -Wextra)
+target_link_libraries(sdk_song_wiki_test PRIVATE Qt6::Core Qt6::Test)
+add_test(NAME sdk_song_wiki COMMAND sdk_song_wiki_test)
+
 # 任何测试都碰不到用户的真实凭据与缓存：会话总线不可达（钥匙串因此走后备文件），数据与缓存目录在构建目录里
-set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store PROPERTIES ENVIRONMENT
+set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store sdk_song_wiki PROPERTIES ENVIRONMENT
     "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent;XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/data;XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/cache;YUNTING_KEYCHAIN_SERVICE=yunting-test")
 
 target_link_libraries(yunting PRIVATE

@@ -105,6 +105,8 @@ void Store::request(const QString &key)
              s.requestUser(k, k.section(u':', 1).toDouble()); }},
         {QStringLiteral("mv:"), [](Store &s, const QString &k) {
              s.requestMv(k, k.section(u':', 1).toDouble()); }},
+        {QStringLiteral("wiki:"), [](Store &s, const QString &k) {
+             s.requestWiki(k, k.section(u':', 1).toDouble()); }},
         {QStringLiteral("album:"), [](Store &s, const QString &k) {
              s.requestAlbum(k, k.section(u':', 1).toDouble()); }},
         {QStringLiteral("inboxThread:"), [](Store &s, const QString &k) {

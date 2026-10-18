@@ -292,7 +292,7 @@ void Store::resetPersonal()
     put("userFolloweds", nullVariant(), false);
     // 按需详情里的 followed / subscribed / liked 都带账号状态：换账号后不能继续显示上一号的结果
     for (const char *key : {"comments", "commentPage", "commentReplies",
-                            "artist", "album", "user"})
+                            "artist", "album", "user", "wiki"})
         put(key, nullVariant(), false);
     m_similarFired = false;
     m_similarSeed.clear();
