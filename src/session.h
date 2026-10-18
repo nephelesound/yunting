@@ -24,10 +24,14 @@ public:
     Q_INVOKABLE void start();
     // 停止轮询，回到 idle
     Q_INVOKABLE void cancel();
+    // 用现有 MUSIC_U 刷新登录 cookie；成功后重拉首屏。会话过期时自动尝试一次。
+    Q_INVOKABLE void refreshSession();
 
 signals:
     void stateChanged();
     void qrContentChanged();
+    void refreshed();
+    void refreshFailed(const QString &message);
 
 private:
     void poll();
@@ -41,4 +45,6 @@ private:
     QString m_unikey;
     quint64 m_generation = 0;   // start()/cancel() 递增；旧二维码的回包一律丢弃
     bool m_polling = false;     // 同一时间只允许一个轮询请求在途
+    bool m_refreshing = false;
+    quint64 m_refreshGeneration = 0;
 };

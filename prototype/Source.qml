@@ -449,14 +449,14 @@ QtObject {
         return source.paged(slot ? Object.assign({ items: slot.programs }, slot) : null, "radio:" + id, slot && slot.id === id);
     }
 
-    // 搜索电台：与搜索词分开取（切到「电台」那一类时才要），只认这个词的
-    function searchRadios(query) {
-        const r = source.d.searchRadios;
+    // 电台、用户的搜索结果另外取（切到那一类时才要），只认这个词的。slot：searchRadios | searchUsers
+    function searchSeparate(slot, query) {
+        const r = source.d[slot];
         if (r && r.query === query)
             return { items: r.items, pending: false, failed: false };
         if (query.length > 0)
-            source.need("searchRadios:" + query);
-        const failed = Boolean(source.failure("searchRadios:" + query));
+            source.need(slot + ":" + query);
+        const failed = Boolean(source.failure(slot + ":" + query));
         return { items: [], pending: Boolean(source.live) && !failed, failed: failed };
     }
 
@@ -502,6 +502,8 @@ QtObject {
     function setPlaylistDescription(id, description) { if (source.live) source.live.setPlaylistDescription(id, description); }
     function deletePlaylist(id) { if (source.live) source.live.deletePlaylist(id); }
     function setPlaylistSubscribed(id, subscribed) { if (source.live) source.live.setPlaylistSubscribed(id, subscribed); }
+    // 自己创建的歌单的顺序：ids 是完整的新顺序
+    function reorderPlaylists(ids) { if (source.live) source.live.reorderPlaylists(ids); }
     // 歌单内曲目排序：ids 是完整的新顺序；原型只读，不写
     function reorderPlaylistTracks(id, ids) { if (source.live) source.live.reorderPlaylistTracks(id, ids); }
     function setArtistSubscribed(id, subscribed) { if (source.live) source.live.setArtistSubscribed(id, subscribed); }

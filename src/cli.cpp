@@ -116,6 +116,8 @@ struct CommandLine {
     QCommandLineOption listenTogetherSelfTest{
         "listen-together-selftest",
         "Create a room, sync a two-song queue and end it (requires --allow-write)"};
+    QCommandLineOption refreshSession{"refresh-session",
+                                      "Refresh the stored MUSIC_U cookie and exit"};
 
     CommandLine()
     {
@@ -147,6 +149,7 @@ struct CommandLine {
         parser.addOption(inbox);
         parser.addOption(storeKey);
         parser.addOption(listenTogetherSelfTest);
+        parser.addOption(refreshSession);
     }
 };
 
@@ -765,6 +768,26 @@ int runSmokeAudio(const CommandLine &cli, QApplication &app, Backend &backend)
     return app.exec();
 }
 
+int runRefreshSession(Backend &backend)
+{
+    QEventLoop loop;
+    int rc = 1;
+    Session session(&backend.client, &backend.store);
+    QObject::connect(&session, &Session::refreshed, &loop, [&] {
+        std::printf("session refresh: ok\n");
+        rc = 0;
+        loop.quit();
+    });
+    QObject::connect(&session, &Session::refreshFailed, &loop, [&](const QString &message) {
+        std::fprintf(stderr, "session refresh failed: %s\n", qPrintable(message));
+        loop.quit();
+    });
+    QTimer::singleShot(20 * 1000, &loop, &QEventLoop::quit);
+    session.refreshSession();
+    loop.exec();
+    return rc;
+}
+
 int runListenTogetherSelfTest(Backend &backend)
 {
     Store &store = backend.store;
@@ -999,6 +1022,8 @@ int run(QApplication &app)
         return runSmokeAudio(cli, app, backend);
     if (cli.parser.isSet(cli.listenTogetherSelfTest))
         return runListenTogetherSelfTest(backend);
+    if (cli.parser.isSet(cli.refreshSession))
+        return runRefreshSession(backend);
     return runGui(cli, app, backend);
 }
 } // namespace Cli

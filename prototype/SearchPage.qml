@@ -62,9 +62,10 @@ ScreenFrame {
 
     // 右栏：一类结果铺满可用的行列，不滚动
     property string collection: "artists"
-    // 电台另外搜（切到「电台」时才要）
-    readonly property var radios: page.collection === "radios" ? Source.searchRadios(page.query) : null
-    readonly property var collectionItems: page.radios ? page.radios.items : page.result[page.collection] || []
+    // 电台、用户另外搜（切到那一类时才要）
+    readonly property var separate: page.collection === "radios" ? Source.searchSeparate("searchRadios", page.query)
+        : page.collection === "users" ? Source.searchSeparate("searchUsers", page.query) : null
+    readonly property var collectionItems: page.separate ? page.separate.items : page.result[page.collection] || []
     // 列数按最小磁贴 104 算，磁贴再等分整栏：右缘正好落在页边线上
     readonly property int tileColumns: Math.max(1, Math.floor((page.rightWidth + Tokens.space2) / (Tokens.tileSm + Tokens.space2)))
     readonly property int tileWidth: Math.floor((page.rightWidth - (page.tileColumns - 1) * Tokens.space2) / page.tileColumns)
@@ -79,6 +80,8 @@ ScreenFrame {
             return item.playCount > 0 ? Format.count(item.playCount) + " 次播放" : "";
         if (page.collection === "radios")
             return item.host || "";
+        if (page.collection === "users")
+            return item.fans > 0 ? Format.count(item.fans) + " 粉丝" : "";
         return item.count > 0 ? item.count + " 首" : "";
     }
 
@@ -328,7 +331,8 @@ ScreenFrame {
                 Pivot {
                     Layout.bottomMargin: Tokens.space3
                     items: [{ key: "artists", text: "歌手" }, { key: "albums", text: "专辑" },
-                            { key: "playlists", text: "歌单" }, { key: "mvs", text: "MV" }, { key: "radios", text: "电台" }]
+                            { key: "playlists", text: "歌单" }, { key: "mvs", text: "MV" }, { key: "radios", text: "电台" },
+                            { key: "users", text: "用户" }]
                     current: page.collection
                     onActivated: key => page.collection = key
                 }
@@ -352,8 +356,9 @@ ScreenFrame {
                         title: modelData.name
                         caption: page.caption(modelData)
                         cover: modelData.cover
-                        round: page.collection === "artists"
+                        round: page.collection === "artists" || page.collection === "users"
                         onClicked: page.collection === "artists" ? Actions.openArtist(modelData.id)
+                                 : page.collection === "users" ? Actions.openUser(modelData.id)
                                  : page.collection === "albums" ? Actions.openAlbum(modelData.id)
                                  : page.collection === "mvs" ? Actions.openMv(modelData.id)
                                  : page.collection === "radios" ? Actions.openRadio(modelData.id)
@@ -364,11 +369,12 @@ ScreenFrame {
                 }
                 Label {
                     visible: page.collectionItems.length === 0
-                    text: (page.radios ? page.radios.pending : page.result.pending) ? "正在搜索…"
+                    text: (page.separate ? page.separate.pending : page.result.pending) ? "正在搜索…"
                         : page.collection === "artists" ? "没有找到相关歌手"
                         : page.collection === "albums" ? "没有找到相关专辑"
                         : page.collection === "mvs" ? "没有找到相关 MV"
-                        : page.collection === "radios" ? "没有找到相关电台" : "没有找到相关歌单"
+                        : page.collection === "radios" ? "没有找到相关电台"
+                        : page.collection === "users" ? "没有找到相关用户" : "没有找到相关歌单"
                     font.pixelSize: Tokens.textSm
                     color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                 }

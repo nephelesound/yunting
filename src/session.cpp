@@ -34,6 +34,12 @@ Session::Session(NcmClient *client, Store *store, QObject *parent)
     m_timer = new QTimer(this);
     m_timer->setInterval(PollMs);
     connect(m_timer, &QTimer::timeout, this, &Session::poll);
+    // Store 发现 301/无 profile 时只尝试一次刷新；成功/失败都会让 Store 的后续 refresh
+    // 给出最终结论，不在信号边上递归刷新。
+    connect(m_store, &Store::sessionExpiredChanged, this, [this] {
+        if (m_store->sessionExpired() && !m_refreshing)
+            refreshSession();
+    });
 }
 
 void Session::setState(const QString &state)
@@ -83,6 +89,34 @@ void Session::cancel()
     m_timer->stop();
     m_unikey.clear();
     setState(QStringLiteral("idle"));
+}
+
+void Session::refreshSession()
+{
+    if (m_refreshing)
+        return;
+    if (!m_client->hasMusicU()) {
+        emit refreshFailed(QStringLiteral("请先登录"));
+        return;
+    }
+    m_refreshing = true;
+    const quint64 generation = ++m_refreshGeneration;
+    // The reference service uses this endpoint through its default transport; the
+    // Web MUSIC_U context is accepted by /weapi. Cookies arrive as Set-Cookie and
+    // are persisted by NcmClient before this callback runs.
+    m_client->postWeapi(QStringLiteral("login/token/refresh"), {}, true,
+                        [this, generation](const QJsonDocument &doc, bool ok) {
+        if (generation != m_refreshGeneration)
+            return;
+        m_refreshing = false;
+        const int code = ok ? doc.object().value(QStringLiteral("code")).toInt() : 0;
+        if (!ok || code != 200 || !m_client->hasMusicU()) {
+            emit refreshFailed(QStringLiteral("登录状态刷新失败，请重新扫码"));
+            return;
+        }
+        m_store->refresh();
+        emit refreshed();
+    });
 }
 
 void Session::poll()
