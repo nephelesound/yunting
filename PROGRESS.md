@@ -61,7 +61,7 @@
 | 音乐百科 | 🟡 SDK 已接 | typed SDK + `wiki:<id>` Store 缓存已落地；`src/sdk/` 有 structs、校验、service、raw/normalized sample 与 JSON Schema。前端：正在播放页「百科」栏（副歌可点跳转）；真实账号未验 |
 | 通知列表 | 🟡 已接 | Store `notify:notices|comments|forwards`；前端：消息页「评论 / @我 / 通知」；live 仍需登录验证 |
 | 评论读取 | 🟡 已接 | 歌曲热评/分页/楼中楼；歌单评论热评/分页/楼中楼（`A_PL_0_`）已接。歌单评论点赞未接 |
-| 评论写 | ❌ 暂缓 | 发评论/回复依赖 xeapi，与当前 Web cookie 上下文冲突；点赞、楼中楼读取已接 |
+| 评论写 | ❌ 不做 | 发评论/回复依赖 xeapi + 易盾反作弊与密钥轮换，维护成本高；只保留读取、点赞、楼中楼读取 |
 | 评论抱一抱 / 举报 / 删除 | ❌ 未接 | `comment/hug`、`comment/report`、`comment/delete` 等 |
 | 内容发现 | 🟡 部分 | 前端「发现」页：排行榜、新歌、新碟、精品歌单（按分类）、推荐 MV、播客；banner、首页 block、独家内容不接（多为广告与编辑位） |
 | 曲目扩展 | 🟡 部分 | 已有逐字歌词、MV、百科创作者/副歌、动态封面；单曲下载 + 本地文件离线播放已接。歌词标记未接 |
@@ -108,8 +108,8 @@
 - [x] 下载 / 离线音频：下载 URL、文件落盘、AudioEngine 本地文件优先播放；`--download-selftest` live 验证 25 MB FLAC，离线 WAV smoke 通过
 - [ ] 本地音乐库（ID3 / CUE / iPod）
 - [x] MV / 视频播放 UI（搜索 MV、曲目菜单、独立播放页）
-- [ ] 评论写：发评论/回复走 xeapi（客户端认证），与 Web cookie 上下文冲突；点赞已走 weapi
-- [ ] 评论写 / 翻页 UI
+- [x] 评论写：明确不做。xeapi + 易盾 token + 公钥轮换长期维护成本高；不做半成品或外部 Node 代理
+- [x] 评论写：明确不做；评论读取与分页由现有 Store/前端负责
 - [ ] 云盘上传 / 导入 / 删除
 - [ ] 播客 / 电台 / 有声
 - [ ] 社交 / IM 发送与回复 / 听歌识曲；一起听后端已接，UI 由前端接
