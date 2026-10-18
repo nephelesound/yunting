@@ -37,6 +37,7 @@ set(YUNTING_SDK_SOURCES
     sdk/comment.h sdk/comment.cpp
     sdk/search_people.h sdk/search_people.cpp
     sdk/mv_page.h sdk/mv_page.cpp
+    sdk/account_feed.h sdk/account_feed.cpp
 )
 
 # Every SDK parser/service test crosses the same transport seam. Keep the source
@@ -170,6 +171,7 @@ qt_add_executable(store_test tests/store_test.cpp
     sdk/comment.h sdk/comment.cpp
     sdk/search_people.h sdk/search_people.cpp
     sdk/mv_page.h sdk/mv_page.cpp
+    sdk/account_feed.h sdk/account_feed.cpp
     session.h session.cpp
     querycache.h querycache.cpp
     ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp
@@ -205,9 +207,10 @@ yunting_add_sdk_test(user_social sdk/user_social.h sdk/user_social.cpp)
 yunting_add_sdk_test(comment sdk/comment.h sdk/comment.cpp)
 yunting_add_sdk_test(search_people sdk/search_people.h sdk/search_people.cpp)
 yunting_add_sdk_test(mv_page sdk/mv_page.h sdk/mv_page.cpp)
+yunting_add_sdk_test(account_feed sdk/account_feed.h sdk/account_feed.cpp)
 
 # 任何测试都碰不到用户的真实凭据与缓存：会话总线不可达（钥匙串因此走后备文件），数据与缓存目录在构建目录里
-set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store sdk_song_wiki sdk_discovery sdk_radio sdk_social sdk_feed sdk_video sdk_library sdk_notification sdk_dynamic_cover sdk_search_suggest sdk_service notify lyrics user_social comment search_people mv_page PROPERTIES ENVIRONMENT
+set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store sdk_song_wiki sdk_discovery sdk_radio sdk_social sdk_feed sdk_video sdk_library sdk_notification sdk_dynamic_cover sdk_search_suggest sdk_service notify lyrics user_social comment search_people mv_page account_feed PROPERTIES ENVIRONMENT
     "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent;XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/data;XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/cache;YUNTING_KEYCHAIN_SERVICE=yunting-test")
 
 target_link_libraries(yunting PRIVATE

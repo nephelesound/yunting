@@ -3,6 +3,7 @@
 
 #include "json_util.h"
 #include "normalize.h"
+#include "sdk/account_feed.h"
 
 #include <QDate>
 #include <QJsonArray>
@@ -23,23 +24,24 @@ void Store::fetchAnonymous()
     fetch("api/toplist/detail", {}, false, [this](const QJsonDocument &doc, bool ok) {
         QVariantList toplists;
         if (ok) {
-            const QJsonArray list = arr(body(doc), "list");
-            for (int i = 0; i < list.size() && i < 12; ++i) {
-                const QJsonObject t = list.at(i).toObject();
-                QVariantList preview;
-                for (const QJsonValue &p : t.value("tracks").toArray()) {
-                    const QJsonObject o = p.toObject();
-                    preview.append(QVariantMap{{"name", o.value("first").toString()},
-                                               {"artist", o.value("second").toString()}});
+            const auto parsed = sdk::parseToplists(body(doc));
+            if (parsed) {
+                toplists.reserve(parsed.value->size());
+                for (const sdk::Toplist &toplist : *parsed.value) {
+                    QVariantList preview;
+                    preview.reserve(toplist.preview.size());
+                    for (const sdk::ToplistPreview &item : toplist.preview)
+                        preview.append(QVariantMap{{"name", item.name},
+                                                   {"artist", item.artist}});
+                    toplists.append(QVariantMap{
+                        {"id", toplist.id},
+                        {"name", toplist.name},
+                        {"cover", ncmSized(toplist.cover, 300)},
+                        {"update", toplist.update},
+                        {"count", toplist.count},
+                        {"preview", preview},
+                    });
                 }
-                toplists.append(QVariantMap{
-                    {"id", t.value("id").toDouble()},
-                    {"name", t.value("name").toString()},
-                    {"cover", ncmSized(t.value("coverImgUrl"), 300)},
-                    {"update", t.value("updateFrequency").toString()},
-                    {"count", t.value("trackCount").toDouble()},
-                    {"preview", preview},
-                });
             }
         }
         put("toplists", toplists, false);
@@ -69,14 +71,13 @@ void Store::fetchAnonymous()
     fetch("api/hotsearchlist/get", {}, false, [this](const QJsonDocument &doc, bool ok) {
         QVariantList hot;
         if (ok) {
-            const QJsonArray data = arr(body(doc), "data");
-            for (int i = 0; i < data.size() && i < 20; ++i) {
-                const QJsonObject h = data.at(i).toObject();
-                hot.append(QVariantMap{
-                    {"word", h.value("searchWord").toString()},
-                    {"note", h.value("content").toString()},
-                    {"score", h.value("score").toDouble()},
-                });
+            const auto parsed = sdk::parseHotSearches(body(doc));
+            if (parsed) {
+                hot.reserve(parsed.value->size());
+                for (const sdk::HotSearch &item : *parsed.value)
+                    hot.append(QVariantMap{{"word", item.word},
+                                           {"note", item.note},
+                                           {"score", item.score}});
             }
         }
         put("hotSearches", hot, false);
@@ -126,9 +127,13 @@ void Store::fetchAccount()
                   [this, likeGeneration](const QJsonDocument &doc, bool /*ok*/) {
                 QVariantList ids;
                 QSet<double> serverIds;
-                for (const QJsonValue &v : arr(body(doc), "ids")) {
-                    ids.append(v.toDouble());
-                    serverIds.insert(v.toDouble());
+                const auto parsed = sdk::parseLikedIds(body(doc));
+                if (parsed) {
+                    ids.reserve(parsed.value->ids.size());
+                    for (double songId : parsed.value->ids) {
+                        ids.append(songId);
+                        serverIds.insert(songId);
+                    }
                 }
                 if (likeGeneration != m_likeGeneration) {
                     for (double songId : std::as_const(m_likeTouched)) {
