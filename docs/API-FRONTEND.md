@@ -37,8 +37,9 @@
 | P0 | 本周/本月时长 | `/api/content/activity/listen/data/realtime/report?type=week|month` | 周/月收听统计 | `listen:week` / `listen:month` |
 | P0 | 歌曲播放排行 | `/api/content/activity/listen/data/song/play/rank?type=month` | 歌曲 + `playCount` | `listen:rank` |
 | P0 | 通知计数 | `/api/pl/count` | `msg` `comment` `event` `follow` `notice` `forward` `newProgramCount` | `notifications` |
-| P1 | 通知列表 | `/weapi/msg/notices`、`/msg/comments`、`/msg/forwards` | 系统通知 / 评论 / 转发 | `notify:<kind>[:<time>]` |
+| P1 | 通知列表 | `/weapi/msg/notices`、`/msg/comments`、`/msg/forwards` | 系统通知 / 评论 / 转发（已实现） | `notify:notices` / `notify:comments` / `notify:forwards` |
 | P1 | 关注 / 粉丝 | `/api/user/getfollows/<uid>`、`/api/user/getfolloweds/<uid>` | 用户列表，带头像/签名/互关 | `userFollows:<uid>` / `userFolloweds:<uid>` |
+| P1 | 用户动态 | `/api/event/get/<uid>` | 动态流（已实现，别人的主页也能看） | `userEvents:<uid>[:<cursor>]` |
 | P1 | 用户等级 | `/api/user/level` | 当前等级、听歌数、升级进度 | `userLevel` |
 | P1 | 评论回复 | `/weapi/resource/comment/floor/get`（POST） | 楼中楼，含 `parentCommentId` | `commentReplies:<songId>:<commentId>` |
 | P1 | 评论抱一抱 | `/weapi/comment/hug/list`、`/comment/hug` | 抱一抱用户列表 | `commentHugs:<songId>:<commentId>` |
@@ -46,7 +47,7 @@
 | P1 | 逐字歌词 | `/api/song/lyric/v1` | `yrc` / `klyric` / 翻译，可做卡拉 OK 和桌面歌词逐字填色 | `lyricsNew:<songId>` |
 | P2 | 精品歌单 | `/weapi/top/playlist/highquality`、`/playlist/highquality/tags` | 分类/标签/高赞歌单 | `discover:highquality:<cat>[:<before>]` / `discover:highqualityTags` |
 | P2 | 新歌 / 新专辑 | `/weapi/personalized/newsong`、`/album/new`、`/album/newest` | 推荐新歌、新碟 | `discover:newSongs` / `discover:newAlbums` |
-| P2 | 歌手/MV/专辑收藏列表 | `/weapi/artist/sublist`、`/album/sublist`、`/mv/sublist` | “我的关注/收藏”页 | `library:artists` / `library:albums` / `library:mvs` |
+| P2 | 歌手/MV/专辑收藏列表 | `/weapi/artist/sublist`、`/album/sublist`、`/cloudvideo/allvideo/sublist` | “我的关注/收藏”页（已实现） | `library:artists` / `library:albums` / `library:mvs` |
 | P2 | 歌曲下载地址 | `/weapi/song/enhance/download/url/v1` | `url` `size` `br` `type` `level` | `download:<songId>:<level>` |
 | P2 | 歌手粉丝 / 关注数 | `/weapi/artist/fans`、`/artist/follow/count` | 歌手社交信息 | `artistSocial:<id>` |
 | P3 | 播客 / 电台 | `/weapi/dj/detail`、`/dj/program/detail`、`/dj/sublist` | 电台与节目 | `radio:<id>[:<offset>]` |
@@ -78,18 +79,35 @@
 | `data.lyrics` | `lyrics:<songId>` | 句子表 `[{t,text,tr}]`；同槽的 `data.lyricsTrackId` 标明是哪首，`data.lyricsPureMusic` 为 true 表示纯音乐（空歌词是正确结果，界面说「纯音乐，请欣赏」） |
 | `data.lyricsNew` | `lyricsNew:<songId>` | `{ songId,lrc,tlyric,yrc,klyric,romalrc,lines:[{t,text,tr}] }` |
 | `data.searchSuggest` | `searchSuggest:<query>` | `{ query,order[],songs:[{id,name,artist,album}],artists:[{id,name,cover}],albums:[{id,name,artist,artistId}],playlists:[{id,name,cover,count}] }`；最新请求的查询优先，不落盘 |
-| `data.newSongs` | `discover:newSongs` | `[Track]`（`cover` 为原图 URL） |
+| `data.newSongs` | `discover:newSongs` | `[Track]` |
 | `data.newAlbums` | `discover:newAlbums` | `[{ id,name,cover,artist,artistId,publishTime,size }]` |
 | `data.highqualityTags` | `discover:highqualityTags` | `[{ name,hot }]` |
-| `data.highquality` | `discover:highquality:<cat>[:<before>]` | `{ cat,before,nextBefore,more,items:[{id,name,cover,count,plays,description,creator}] }`；`cat=全部` 表示不筛分类，`before` 是本次请求游标（首页 0），`nextBefore` 传下一页 |
+| `data.highquality` | `discover:highquality:<cat>[:<next>]` | 分页：`{ cat,more,next,items:[{id,name,cover,count,plays,description,creator}] }`；`cat=全部` 表示不筛分类 |
 | `data.recommendedMvs` | `discover:mvs` | `[{ id,name,cover,artist,artistId,duration,playCount,reason }]` |
 | `data.recommendedPrograms` | `discover:programs` | `[Program]` |
-| `data.radio` | `radio:<id>[:<offset>]` | `{ id,name,cover,description,dj:{id,name,avatar},programCount,subCount,playCount,offset,more,programs:[Program] }`；`offset=0` 时取详情，翻页复用同 id 详情 |
+| `data.radio` | `radio:<id>[:<next>]` | 分页：`{ id,name,cover,description,dj:{id,name,avatar},programCount,subCount,playCount,more,next,programs:[Program] }`；翻页复用同 id 的详情 |
+| `data.userEvents` | `userEvents:<uid>[:<next>]` | 分页：`{ userId,more,next,items:[{id,action,text,time,user,resource,likes,comments,shares}] }`；隐私拒绝时 `items:[]` 另带 `restricted` / `message` |
+| `personal.savedArtists` | `library:artists[:<next>]` | 分页：`{ more,next,count,items:[{id,name,cover,alias,albums,mvs}] }` |
+| `personal.savedAlbums` | `library:albums[:<next>]` | 分页：`{ more,next,count,items:[{id,name,cover,artist,artistId,size}] }` |
+| `personal.savedMvs` | `library:mvs[:<next>]` | 分页：`{ more,next,count,items:[{kind,id,vid,name,cover,artist,duration,playCount}] }`；`kind=mv` 时 `id` 为数字、`vid` 为空；`kind=video` 时 `id` 为 0、`vid` 为字符串 |
+| `data.notices` | `notify:notices[:<next>]` | 分页：`{ more,next,items:[{id,time,user,text,resource}] }` |
+| `data.commentNotices` | `notify:comments[:<next>]` | 分页：`{ more,next,total,items:[{id,time,user,content,repliedContent,resource}] }` |
+| `data.forwards` | `notify:forwards[:<next>]` | 分页：`{ more,next,newCount,items:[{id,time,user,message,resource}] }` |
+| `data.dynamicCover` | `dynamicCover:<songId>` | `{ songId,url,width,height }`；没有动态封面或未登录时 `url:""`、尺寸 0，不报错；签名 URL 不写磁盘缓存 |
+
+「分页」的槽：第一页的 key 不带游标；之后每页的 key 在末尾加 `:<next>`，取回的条目**接在同一个槽的 items 后面**
+（与关注 / 粉丝、私信一样），`more` 为 false 时没有下一页。`next` 是游标或 offset，由 Store 给，界面原样带回。
+这些槽在没取之前是 `null`；`[]` 表示取到了但是空的。
 
 `Track` 与 `ncmTrack` 同形：`id,name,artist,album,albumId,artistId,artists:[{id,name}],dur,fee,cover,alias,quality,mv,playable,blockedBy,reason`。
 `Program` 是节目版 Track：`id` 为主歌 id（真正播放的那首）、`name` 为节目名、`artist` 为主播、`album` 为电台、
 `albumId` 与 `artistId` 为 0、`artists:[{id:0,name:主播}]`、`dur` 为主歌秒数；另带
 `programId,radioId,serial,createTime,description`。没有可播放主歌 id 的节目不会返回。
+
+`user` = `{ id,name,avatar }`（avatar 是原始 URL，尺寸由界面决定）。`resource` =
+`{ kind,id,name,cover,artist }`，`kind` 为 `song|playlist|album|mv|video|artist|program|other`；
+`kind=video` 时 `id` 为 0，另带字符串 `vid`。动态、收藏、通知与动态封面都需要登录：
+未登录时对应的按需 key 不发请求，也不发失败信号。
 
 调用方式：页面里 `Source.need("<key>")`；数据槽到达后 `dataChanged` 会驱动绑定。
 只读信箱、社交列表、歌词、评论回复**不需要写操作**；只有账户级统计需要登录。

@@ -2027,6 +2027,675 @@ private slots:
         QCOMPARE(program.value("radioId").toDouble(), 7.0);
     }
 
+    // 用户动态：第一页 cursor 是 SDK 初始值 -1；翻页沿用第一页代号并累积
+    void userEventsPagesAndMapsResource()
+    {
+        int calls = 0;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/event/get/900042") {
+                ++calls;
+                const bool second = calls > 1;
+                const QJsonObject event{
+                    {"id", second ? 900010 : 900009},
+                    {"actName", second ? "分享歌单 B" : "分享歌单"},
+                    {"eventTime", second ? 1700000001000.0 : 1700000000000.0},
+                    {"user", QJsonObject{{"userId", second ? 900102 : 900101},
+                                         {"nickname", second ? "B" : "A"},
+                                         {"avatarUrl", second ? "http://avatar-b" : "http://avatar-a"}}},
+                    {"info", QJsonObject{
+                        {"title", second ? "标题 B" : "标题"},
+                        {"description", second ? "正文 B" : "正文"},
+                        {"likedCount", second ? 8 : 7},
+                        {"commentCount", 2},
+                        {"shareCount", 1},
+                        {"commentThread", QJsonObject{
+                            {"id", "A_EV_2_1"},
+                            {"resourceType", 2},
+                            {"resourceInfo", QJsonObject{
+                                {"id", second ? 900142 : 900141},
+                                {"name", second ? "第二页歌单" : "分享歌单"},
+                                {"imgUrl", "http://event-cover"},
+                                {"eventType", 13}}}}},
+                    }},
+                };
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"more", !second},
+                    {"lasttime", second ? 1700000002000.0 : 1700000001000.0},
+                    {"events", QJsonArray{event}},
+                }));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("userEvents:900042"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("userEvents").toMap().value("items").toList().size() == 1;
+        }));
+        const QVariantMap first = m_store->data().value("userEvents").toMap();
+        QCOMPARE(first.value("userId").toDouble(), 900042.0);
+        QCOMPARE(first.value("cursor").toDouble(), -1.0);
+        QCOMPARE(first.value("nextCursor").toDouble(), 1700000001000.0);
+        QCOMPARE(first.value("more").toBool(), true);
+        const QVariantMap item = first.value("items").toList().first().toMap();
+        QCOMPARE(item.value("id").toDouble(), 900009.0);
+        QCOMPARE(item.value("action").toString(), QStringLiteral("分享歌单"));
+        QCOMPARE(item.value("text").toString(), QStringLiteral("正文"));
+        QCOMPARE(item.value("time").toDouble(), 1700000000000.0);
+        QCOMPARE(item.value("user").toMap().value("id").toDouble(), 900101.0);
+        QCOMPARE(item.value("user").toMap().value("avatar").toString(),
+                 QStringLiteral("http://avatar-a"));
+        const QVariantMap resource = item.value("resource").toMap();
+        QCOMPARE(resource.value("kind").toString(), QStringLiteral("playlist"));
+        QCOMPARE(resource.value("id").toDouble(), 900141.0);
+        QCOMPARE(resource.value("name").toString(), QStringLiteral("分享歌单"));
+        QCOMPARE(resource.value("cover").toString(), QStringLiteral("http://event-cover"));
+        QCOMPARE(item.value("likes").toDouble(), 7.0);
+        QCOMPARE(item.value("comments").toDouble(), 2.0);
+        QCOMPARE(item.value("shares").toDouble(), 1.0);
+
+        m_store->request(QStringLiteral("userEvents:900042:1700000001000"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("userEvents").toMap().value("items").toList().size() == 2;
+        }));
+        const QVariantMap secondPage = m_store->data().value("userEvents").toMap();
+        QCOMPARE(secondPage.value("cursor").toDouble(), 1700000001000.0);
+        QCOMPARE(secondPage.value("nextCursor").toDouble(), 1700000002000.0);
+        QCOMPARE(secondPage.value("more").toBool(), false);
+        QCOMPARE(secondPage.value("items").toList().at(0).toMap().value("id").toDouble(), 900009.0);
+    }
+
+    // 动态页被隐私挡住：页面内说明，不发全局 requestFailed
+    void userEventsPrivacyIsInlineRestriction()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/event/get/900042") {
+                respond(200, "{\"code\":-460,\"message\":\"用户隐私无权限查看\"}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        QSignalSpy restricted(m_store, &Store::requestRestricted);
+        QSignalSpy failed(m_store, &Store::requestFailed);
+
+        m_store->request(QStringLiteral("userEvents:900042"));
+        QVERIFY(waitUntil([&] { return restricted.count() == 1; }));
+        QCOMPARE(failed.count(), 0);
+        QCOMPARE(restricted.first().at(0).toString(), QStringLiteral("userEvents:900042"));
+        const QVariantMap slot = m_store->data().value("userEvents").toMap();
+        QCOMPARE(slot.value("userId").toDouble(), 900042.0);
+        QCOMPARE(slot.value("restricted").toBool(), true);
+        QCOMPARE(slot.value("message").toString(), QStringLiteral("用户隐私无权限查看"));
+        QCOMPARE(slot.value("items").toList().size(), 0);
+    }
+
+    // 没有登录：所有账号绑定 key 都不发请求、不发失败；动态封面只清空槽
+    void accountBoundRequestsNeedLogin()
+    {
+        m_client->clearAuthCookies();
+        m_api->requests.clear();
+        QSignalSpy failed(m_store, &Store::requestFailed);
+        QSignalSpy restricted(m_store, &Store::requestRestricted);
+        const QStringList keys{
+            QStringLiteral("userEvents:900042"),
+            QStringLiteral("userEvents:900042:1700000001000"),
+            QStringLiteral("library:artists"),
+            QStringLiteral("library:albums"),
+            QStringLiteral("library:mvs"),
+            QStringLiteral("notify:notices"),
+            QStringLiteral("notify:comments"),
+            QStringLiteral("notify:forwards"),
+        };
+        for (const QString &key : keys)
+            m_store->request(key);
+        QTest::qWait(150);
+        QCOMPARE(m_api->requests.size(), 0);
+        QCOMPARE(failed.count(), 0);
+        QCOMPARE(restricted.count(), 0);
+
+        m_store->request(QStringLiteral("dynamicCover:900009"));
+        QCOMPARE(m_api->requests.size(), 0);
+        const QVariantMap cover = m_store->data().value("dynamicCover").toMap();
+        QCOMPARE(cover.value("songId").toDouble(), 900009.0);
+        QVERIFY(cover.value("url").toString().isEmpty());
+        QCOMPARE(cover.value("width").toDouble(), 0.0);
+        QCOMPARE(cover.value("height").toDouble(), 0.0);
+        QCOMPARE(failed.count(), 0);
+    }
+
+    // 关注用户：成功同步 user / 关注列表 / 粉丝列表；失败发 followFailed；未登录不发请求
+    void followUserUpdatesSlotsAndEmits()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/weapi/v1/user/detail/900042") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"profile", QJsonObject{{"userId", 900042}, {"nickname", "目标"},
+                                            {"follows", 2}, {"followeds", 5}}},
+                }));
+                return;
+            }
+            if (req.path == "/weapi/user/playlist") {
+                respond(200, json(QJsonObject{{"code", 200}, {"playlist", QJsonArray{}}}));
+                return;
+            }
+            if (req.path == "/api/user/getfollows/900042") {
+                respond(200, json(QJsonObject{
+                    {"code", 200}, {"more", false},
+                    {"follow", QJsonArray{
+                        QJsonObject{{"userId", 900007}, {"nickname", "A"}, {"followed", false}},
+                        QJsonObject{{"userId", 900008}, {"nickname", "B"}, {"followed", true}},
+                    }},
+                }));
+                return;
+            }
+            if (req.path == "/api/user/getfolloweds/900042") {
+                respond(200, json(QJsonObject{
+                    {"code", 200}, {"more", false},
+                    {"followeds", QJsonArray{
+                        QJsonObject{{"userId", 900007}, {"nickname", "A"}, {"followed", false}},
+                    }},
+                }));
+                return;
+            }
+            if (req.path == "/weapi/user/follow/900007"
+                || req.path == "/weapi/user/follow/900042") {
+                respond(200, "{\"code\":200}");
+                return;
+            }
+            if (req.path == "/weapi/user/follow/900008") {
+                respond(200, "{\"code\":500,\"message\":\"服务器拒绝\"}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("user:900042"));
+        m_store->request(QStringLiteral("userFollows:900042"));
+        m_store->request(QStringLiteral("userFolloweds:900042"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("user").toMap().value("id").toDouble() == 900042
+                && m_store->data().value("userFollows").toMap().value("items").toList().size() == 2
+                && m_store->data().value("userFolloweds").toMap().value("items").toList().size() == 1;
+        }));
+
+        QSignalSpy changed(m_store, &Store::userFollowChanged);
+        QSignalSpy failed(m_store, &Store::followFailed);
+        // 关注的是列表里的另一个人：只同步列表行，不改当前被查看用户的资料
+        m_store->setUserFollowed(900007, true);
+        QVERIFY(waitUntil([&] { return changed.count() == 1; }));
+        QCOMPARE(changed.first().at(0).toDouble(), 900007.0);
+        QCOMPARE(changed.first().at(1).toBool(), true);
+        QCOMPARE(m_store->data().value("user").toMap().value("followed").toBool(), false);
+        QCOMPARE(m_store->data().value("user").toMap().value("followeds").toDouble(), 5.0);
+        QCOMPARE(m_store->data().value("userFollows").toMap().value("items").toList()
+                     .at(0).toMap().value("followed").toBool(), true);
+        QCOMPARE(m_store->data().value("userFollows").toMap().value("items").toList()
+                     .at(1).toMap().value("followed").toBool(), true);
+        QCOMPARE(m_store->data().value("userFolloweds").toMap().value("items").toList()
+                     .at(0).toMap().value("followed").toBool(), true);
+
+        // 关注当前被查看的用户：资料槽与粉丝数一起更新
+        m_store->setUserFollowed(900042, true);
+        QVERIFY(waitUntil([&] { return changed.count() == 2; }));
+        QCOMPARE(m_store->data().value("user").toMap().value("followed").toBool(), true);
+        QCOMPARE(m_store->data().value("user").toMap().value("followeds").toDouble(), 6.0);
+
+        m_store->setUserFollowed(900008, true);
+        QVERIFY(waitUntil([&] { return failed.count() == 1; }));
+        QCOMPARE(failed.first().at(0).toString(), QStringLiteral("关注用户"));
+        QCOMPARE(failed.first().at(1).toString(), QStringLiteral("服务器拒绝"));
+
+        m_client->clearAuthCookies();
+        m_api->requests.clear();
+        m_store->setUserFollowed(900007, false);
+        QCOMPARE(failed.count(), 2);
+        QCOMPARE(failed.last().at(0).toString(), QStringLiteral("取消关注"));
+        QCOMPARE(failed.last().at(1).toString(), QStringLiteral("登录后才能关注"));
+        QCOMPARE(m_api->requests.size(), 0);
+    }
+
+    // 收藏列表：三页形状；取关后当前槽立即移除，下一次请求重新取服务器状态
+    void libraryPagesAndUnsubscribeRemoval()
+    {
+        int artistListRequests = 0;
+        int albumListRequests = 0;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/weapi/artist/sublist") {
+                ++artistListRequests;
+                QJsonArray data;
+                if (artistListRequests == 1) {
+                    data.append(QJsonObject{
+                        {"id", 900101}, {"name", "歌手"}, {"picUrl", "http://artist"},
+                        {"alias", QJsonArray{"Alias"}}, {"albumSize", 9}, {"mvSize", 3}});
+                } else if (artistListRequests == 2) {
+                    data.append(QJsonObject{{"id", 900102}, {"name", "第二页歌手"}});
+                }
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"count", artistListRequests >= 3 ? 0 : 2},
+                    {"hasMore", artistListRequests == 1},
+                    {"data", data},
+                }));
+                return;
+            }
+            if (req.path == "/weapi/album/sublist") {
+                ++albumListRequests;
+                QJsonArray data;
+                if (albumListRequests == 1) {
+                    data.append(QJsonObject{
+                        {"id", 900201}, {"name", "专辑"}, {"picUrl", "http://album"},
+                        {"artists", QJsonArray{QJsonObject{{"id", 900101}, {"name", "歌手"}}}},
+                        {"size", 4}});
+                }
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"count", albumListRequests >= 2 ? 0 : 1},
+                    {"hasMore", false},
+                    {"data", data},
+                }));
+                return;
+            }
+            if (req.path == "/weapi/cloudvideo/allvideo/sublist") {
+                respond(200, json(QJsonObject{
+                    {"code", 200}, {"count", 2}, {"hasMore", false},
+                    {"data", QJsonArray{
+                        QJsonObject{{"type", 0}, {"title", "MV"}, {"durationms", 265000},
+                                    {"creator", QJsonArray{QJsonObject{{"userName", "作者"}}}},
+                                    {"playTime", 782783}, {"coverUrl", "http://mv"},
+                                    {"vid", "5307442"}},
+                        QJsonObject{{"type", 1}, {"title", "视频"}, {"durationms", 1000},
+                                    {"creator", QJsonArray{QJsonObject{{"userName", "用户"}}}},
+                                    {"playTime", 3}, {"coverUrl", "http://video"},
+                                    {"vid", "4E673ABCA5B939B889FDE4A2B148C2BD"}},
+                    }},
+                }));
+                return;
+            }
+            if (req.path == "/weapi/artist/unsub" || req.path == "/weapi/album/unsub") {
+                respond(200, "{\"code\":200}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("library:artists"));
+        QVERIFY(waitUntil([&] {
+            return m_store->personal().value("savedArtists").toMap().value("items").toList().size() == 1;
+        }));
+        const QVariantMap artists = m_store->personal().value("savedArtists").toMap();
+        QCOMPARE(artists.value("offset").toInt(), 0);
+        QCOMPARE(artists.value("more").toBool(), true);
+        QCOMPARE(artists.value("count").toDouble(), 2.0);
+        const QVariantMap artist = artists.value("items").toList().first().toMap();
+        QCOMPARE(artist.value("id").toDouble(), 900101.0);
+        QCOMPARE(artist.value("alias").toString(), QStringLiteral("Alias"));
+        QCOMPARE(artist.value("albums").toDouble(), 9.0);
+        QCOMPARE(artist.value("mvs").toDouble(), 3.0);
+        QCOMPARE(artist.value("cover").toString(), QStringLiteral("http://artist"));
+
+        m_store->request(QStringLiteral("library:artists:25"));
+        QVERIFY(waitUntil([&] {
+            return m_store->personal().value("savedArtists").toMap().value("items").toList().size() == 2;
+        }));
+        QCOMPARE(m_store->personal().value("savedArtists").toMap().value("offset").toInt(), 25);
+
+        m_store->request(QStringLiteral("library:albums"));
+        QVERIFY(waitUntil([&] {
+            return m_store->personal().value("savedAlbums").toMap().value("items").toList().size() == 1;
+        }));
+        const QVariantMap album = m_store->personal().value("savedAlbums").toMap()
+            .value("items").toList().first().toMap();
+        QCOMPARE(album.value("id").toDouble(), 900201.0);
+        QCOMPARE(album.value("name").toString(), QStringLiteral("专辑"));
+        QCOMPARE(album.value("artist").toString(), QStringLiteral("歌手"));
+        QCOMPARE(album.value("artistId").toDouble(), 900101.0);
+        QCOMPARE(album.value("size").toDouble(), 4.0);
+
+        m_store->request(QStringLiteral("library:mvs"));
+        QVERIFY(waitUntil([&] {
+            return m_store->personal().value("savedMvs").toMap().value("items").toList().size() == 2;
+        }));
+        const QVariantList mvs = m_store->personal().value("savedMvs").toMap().value("items").toList();
+        QCOMPARE(mvs.at(0).toMap().value("kind").toString(), QStringLiteral("mv"));
+        QCOMPARE(mvs.at(0).toMap().value("id").toDouble(), 5307442.0);
+        QVERIFY(mvs.at(0).toMap().value("vid").toString().isEmpty());
+        QCOMPARE(mvs.at(0).toMap().value("duration").toDouble(), 265.0);
+        QCOMPARE(mvs.at(0).toMap().value("playCount").toDouble(), 782783.0);
+        QCOMPARE(mvs.at(1).toMap().value("kind").toString(), QStringLiteral("video"));
+        QCOMPARE(mvs.at(1).toMap().value("id").toDouble(), 0.0);
+        QCOMPARE(mvs.at(1).toMap().value("vid").toString(),
+                 QStringLiteral("4E673ABCA5B939B889FDE4A2B148C2BD"));
+
+        QSignalSpy artistChanged(m_store, &Store::artistChanged);
+        QSignalSpy albumChanged(m_store, &Store::albumChanged);
+        m_store->setArtistSubscribed(900101, false);
+        m_store->setAlbumSubscribed(900201, false);
+        QVERIFY(waitUntil([&] { return artistChanged.count() == 1 && albumChanged.count() == 1; }));
+
+        QCOMPARE(m_store->personal().value("savedArtists").toMap().value("items").toList().size(), 1);
+        QCOMPARE(m_store->personal().value("savedArtists").toMap().value("count").toDouble(), 1.0);
+        QCOMPARE(m_store->personal().value("savedAlbums").toMap().value("items").toList().size(), 0);
+        QCOMPARE(m_store->personal().value("savedAlbums").toMap().value("count").toDouble(), 0.0);
+
+        // 下一次请求必须重新走服务器，不能返回取关前的列表
+        const int before = artistListRequests;
+        m_store->request(QStringLiteral("library:artists"));
+        QVERIFY(waitUntil([&] { return artistListRequests > before; }));
+        QVERIFY(waitUntil([&] {
+            return m_store->personal().value("savedArtists").toMap().value("items").toList().isEmpty();
+        }));
+
+        m_store->logout();
+        QVERIFY(m_store->personal().value("savedArtists").isNull());
+        QVERIFY(m_store->personal().value("savedAlbums").isNull());
+        QVERIFY(m_store->personal().value("savedMvs").isNull());
+    }
+
+    // 三类通知：字段、资源映射、payload 类型文案、分页与退出清理
+    void notificationListsMapAndPage()
+    {
+        int noticeCalls = 0;
+        int forwardCalls = 0;
+        const auto encode = [](const QJsonObject &object) {
+            return QString::fromUtf8(QJsonDocument(object).toJson(QJsonDocument::Compact));
+        };
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/nuser/account/get") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"profile", QJsonObject{{"userId", 900042}, {"nickname", "我"}}},
+                }));
+                return;
+            }
+            if (req.path == "/weapi/msg/notices") {
+                ++noticeCalls;
+                QJsonArray notices;
+                if (noticeCalls == 1) {
+                    // 坏 payload 必须被跳过，不能变成空行
+                    notices.append(QJsonObject{{"id", 900301}, {"userId", 900001},
+                                               {"time", 1700000000001.0}, {"notice", "not-json"}});
+                    const QJsonObject playlistPayload{
+                        {"type", 2},
+                        {"user", QJsonObject{{"userId", 900001}, {"nickname", "收藏者"},
+                                             {"avatarUrl", "http://notice-avatar"}}},
+                        {"playlist", QJsonObject{{"id", 900401}, {"name", "歌单名"},
+                                                 {"coverImgUrl", "http://playlist-cover"}}},
+                    };
+                    notices.append(QJsonObject{{"id", 900302}, {"userId", 900001},
+                                               {"time", 1700000000002.0},
+                                               {"notice", encode(playlistPayload)}});
+                    const QJsonObject generalPayload{
+                        {"type", 1},
+                        {"user", QJsonObject{{"userId", 900002}, {"nickname", "通知用户"},
+                                             {"avatarUrl", "http://general-avatar"}}},
+                        {"comment", QJsonObject{{"commentId", 900501}, {"content", "被赞的评论"}}},
+                        {"generalNotice", QJsonObject{{"actionDesc", "赞了你的评论"},
+                                                      {"content", "通知正文"},
+                                                      {"type", 3}, {"resourceId", 900456}}},
+                    };
+                    notices.append(QJsonObject{{"id", 900303}, {"userId", 900002},
+                                               {"time", 1700000000003.0},
+                                               {"notice", encode(generalPayload)}});
+                } else {
+                    const QJsonObject playlistPayload{
+                        {"type", 2},
+                        {"user", QJsonObject{{"userId", 900001}, {"nickname", "收藏者"},
+                                             {"avatarUrl", "http://notice-avatar"}}},
+                        {"playlist", QJsonObject{{"id", 900402}, {"name", "第二页歌单"},
+                                                 {"coverImgUrl", "http://playlist-cover-2"}}},
+                    };
+                    notices.append(QJsonObject{{"id", 900304}, {"userId", 900001},
+                                               {"time", 1700000000004.0},
+                                               {"notice", encode(playlistPayload)}});
+                }
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"more", noticeCalls == 1},
+                    {"notices", notices},
+                }));
+                return;
+            }
+            if (req.path == "/weapi/v1/user/comments/900042") {
+                respond(200, json(QJsonObject{
+                    {"code", 200}, {"total", 12}, {"more", true},
+                    {"comments", QJsonArray{QJsonObject{
+                        {"user", QJsonObject{{"userId", 900003}, {"nickname", "回复者"},
+                                             {"avatarUrl", "http://reply-avatar"}}},
+                        {"beRepliedContent", "原评论"},
+                        {"content", "回复内容"},
+                        {"time", 1700000000100.0},
+                        {"combindId", "1700000000100_900003_4"},
+                        {"resourceType", 4},
+                    }}},
+                }));
+                return;
+            }
+            if (req.path == "/weapi/forwards/get") {
+                ++forwardCalls;
+                QJsonArray forwards;
+                if (forwardCalls == 1) {
+                    const QJsonObject song{
+                        {"id", 900601}, {"name", "分享的歌"},
+                        {"artists", QJsonArray{QJsonObject{{"name", "歌手"}}}},
+                        {"album", QJsonObject{{"picUrl", "http://song-cover"}}},
+                    };
+                    const QJsonObject event{
+                        {"user", QJsonObject{{"userId", 900004}, {"nickname", "动态作者"},
+                                             {"avatarUrl", "http://event-avatar"}}},
+                        {"type", 13},
+                        {"json", encode(QJsonObject{{"msg", "事件正文"},
+                                                    {"song", song}})},
+                    };
+                    // 转发行是 E{user,type,json}，E.json 才是 S{msg,event/song/...}
+                    forwards.append(QJsonObject{
+                        {"id", 900701}, {"userId", 900004}, {"time", 1700000000200.0},
+                        {"type", 1},
+                        {"json", encode(QJsonObject{
+                            {"user", QJsonObject{{"userId", 900004}, {"nickname", "动态作者"},
+                                                 {"avatarUrl", "http://event-avatar"}}},
+                            {"type", 13},
+                            {"json", encode(QJsonObject{{"msg", "@了你"}, {"event", event}})},
+                        })},
+                    });
+                    const QJsonObject video{
+                        {"vid", "5307442"}, {"title", "视频"},
+                        {"coverUrl", "http://video-cover"},
+                        {"creator", QJsonObject{{"nickname", "视频作者"}}},
+                    };
+                    forwards.append(QJsonObject{
+                        {"id", 900702}, {"userId", 900005}, {"time", 1700000000201.0},
+                        {"type", 1},
+                        {"json", encode(QJsonObject{
+                            {"user", QJsonObject{{"userId", 900005}, {"nickname", "视频用户"},
+                                                 {"avatarUrl", "http://video-avatar"}}},
+                            {"type", 13},
+                            {"json", encode(QJsonObject{{"msg", "分享了视频"}, {"video", video}})},
+                        })},
+                    });
+                } else {
+                    forwards.append(QJsonObject{
+                        {"id", 900703}, {"userId", 900006}, {"time", 1700000000202.0},
+                        {"type", 1},
+                        {"json", encode(QJsonObject{
+                            {"user", QJsonObject{{"userId", 900006}, {"nickname", "第二页用户"}}},
+                            {"type", 13},
+                            {"json", encode(QJsonObject{
+                                {"msg", "第二页"},
+                                {"playlist", QJsonObject{{"id", 900801}, {"name", "第二页歌单"}}}})},
+                        })},
+                    });
+                }
+                respond(200, json(QJsonObject{
+                    {"code", 200}, {"more", forwardCalls == 1}, {"newCount", 3},
+                    {"lasttime", 1700000000201.0}, {"forwards", forwards},
+                }));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        // 评论通知需要当前账号 uid：先走一次账号链
+        m_store->refresh();
+        QVERIFY(waitUntil([&] {
+            return m_store->personal().value("account").toMap().value("id").toDouble() == 900042;
+        }));
+
+        m_store->request(QStringLiteral("notify:notices"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("notices").toMap().value("items").toList().size() == 2;
+        }));
+        const QVariantMap notices = m_store->data().value("notices").toMap();
+        QCOMPARE(notices.value("before").toDouble(), -1.0);
+        QCOMPARE(notices.value("nextBefore").toDouble(), 1700000000003.0);
+        QCOMPARE(notices.value("more").toBool(), true);
+        const QVariantMap playlistNotice = notices.value("items").toList().at(0).toMap();
+        QCOMPARE(playlistNotice.value("id").toDouble(), 900302.0);
+        QCOMPARE(playlistNotice.value("text").toString(), QStringLiteral("收藏了你的歌单"));
+        QCOMPARE(playlistNotice.value("user").toMap().value("avatar").toString(),
+                 QStringLiteral("http://notice-avatar"));
+        QCOMPARE(playlistNotice.value("resource").toMap().value("kind").toString(),
+                 QStringLiteral("playlist"));
+        QCOMPARE(playlistNotice.value("resource").toMap().value("id").toDouble(), 900401.0);
+        QCOMPARE(playlistNotice.value("resource").toMap().value("name").toString(),
+                 QStringLiteral("歌单名"));
+        const QVariantMap generalNotice = notices.value("items").toList().at(1).toMap();
+        QCOMPARE(generalNotice.value("text").toString(), QStringLiteral("赞了你的评论"));
+        QCOMPARE(generalNotice.value("resource").toMap().value("kind").toString(),
+                 QStringLiteral("other"));
+        QCOMPARE(generalNotice.value("resource").toMap().value("id").toDouble(), 900456.0);
+
+        m_store->request(QStringLiteral("notify:notices:1700000000003"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("notices").toMap().value("items").toList().size() == 3;
+        }));
+        QCOMPARE(m_store->data().value("notices").toMap().value("before").toDouble(),
+                 1700000000003.0);
+        QCOMPARE(m_store->data().value("notices").toMap().value("more").toBool(), false);
+
+        m_store->request(QStringLiteral("notify:comments"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("commentNotices").toMap().value("items").toList().size() == 1;
+        }));
+        const QVariantMap comments = m_store->data().value("commentNotices").toMap();
+        QCOMPARE(comments.value("before").toDouble(), -1.0);
+        QCOMPARE(comments.value("nextBefore").toDouble(), 1700000000100.0);
+        QCOMPARE(comments.value("more").toBool(), true);
+        QCOMPARE(comments.value("total").toDouble(), 12.0);
+        const QVariantMap comment = comments.value("items").toList().first().toMap();
+        QCOMPARE(comment.value("id").toString(), QStringLiteral("1700000000100_900003_4"));
+        QCOMPARE(comment.value("content").toString(), QStringLiteral("回复内容"));
+        QCOMPARE(comment.value("repliedContent").toString(), QStringLiteral("原评论"));
+        QCOMPARE(comment.value("user").toMap().value("name").toString(), QStringLiteral("回复者"));
+        QCOMPARE(comment.value("resource").toMap().value("kind").toString(),
+                 QStringLiteral("other"));
+
+        m_store->request(QStringLiteral("notify:forwards"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("forwards").toMap().value("items").toList().size() == 2;
+        }));
+        const QVariantMap forwards = m_store->data().value("forwards").toMap();
+        QCOMPARE(forwards.value("offset").toInt(), 0);
+        QCOMPARE(forwards.value("more").toBool(), true);
+        QCOMPARE(forwards.value("newCount").toInt(), 3);
+        const QVariantMap firstForward = forwards.value("items").toList().at(0).toMap();
+        QCOMPARE(firstForward.value("id").toDouble(), 900701.0);
+        QCOMPARE(firstForward.value("user").toMap().value("name").toString(),
+                 QStringLiteral("动态作者"));
+        QCOMPARE(firstForward.value("message").toString(), QStringLiteral("@了你"));
+        QCOMPARE(firstForward.value("resource").toMap().value("kind").toString(),
+                 QStringLiteral("song"));
+        QCOMPARE(firstForward.value("resource").toMap().value("id").toDouble(), 900601.0);
+        QCOMPARE(firstForward.value("resource").toMap().value("name").toString(),
+                 QStringLiteral("分享的歌"));
+        const QVariantMap videoForward = forwards.value("items").toList().at(1).toMap();
+        QCOMPARE(videoForward.value("resource").toMap().value("kind").toString(),
+                 QStringLiteral("video"));
+        QCOMPARE(videoForward.value("resource").toMap().value("id").toDouble(), 0.0);
+        QCOMPARE(videoForward.value("resource").toMap().value("vid").toString(),
+                 QStringLiteral("5307442"));
+
+        m_store->request(QStringLiteral("notify:forwards:30"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("forwards").toMap().value("items").toList().size() == 3;
+        }));
+        QCOMPARE(m_store->data().value("forwards").toMap().value("offset").toInt(), 30);
+
+        m_store->logout();
+        QVERIFY(m_store->data().value("notices").isNull());
+        QVERIFY(m_store->data().value("commentNotices").isNull());
+        QVERIFY(m_store->data().value("forwards").isNull());
+    }
+
+    // 动态封面：最新请求获胜；没有封面/未登录只写空槽，不发失败；退出清空
+    void dynamicCoverLatestRequestWins()
+    {
+        FakeApi::Responder held;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/songplay/dynamic-cover") {
+                if (req.body.contains("songId=900009")) {
+                    held = respond;
+                    return;
+                }
+                if (req.body.contains("songId=900010")) {
+                    respond(200, json(QJsonObject{
+                        {"code", 200},
+                        {"data", QJsonObject{{"videoPlayUrl", "http://cover-10"},
+                                             {"width", 1080}, {"height", 1920}}},
+                    }));
+                    return;
+                }
+                respond(200, json(QJsonObject{{"code", 200}, {"data", QJsonValue::Null}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("dynamicCover:900009"));
+        QVERIFY(waitUntil([&] { return static_cast<bool>(held); }));
+        m_store->request(QStringLiteral("dynamicCover:900010"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("dynamicCover").toMap().value("songId").toDouble() == 900010;
+        }));
+        const QVariantMap available = m_store->data().value("dynamicCover").toMap();
+        QCOMPARE(available.value("url").toString(), QStringLiteral("http://cover-10"));
+        QCOMPARE(available.value("width").toInt(), 1080);
+        QCOMPARE(available.value("height").toInt(), 1920);
+
+        // 上一首的晚到回包不能覆盖当前槽
+        held(200, json(QJsonObject{
+            {"code", 200},
+            {"data", QJsonObject{{"videoPlayUrl", "http://cover-9"},
+                                 {"width", 1}, {"height", 2}}},
+        }));
+        QTest::qWait(150);
+        QCOMPARE(m_store->data().value("dynamicCover").toMap().value("songId").toDouble(), 900010.0);
+
+        m_store->request(QStringLiteral("dynamicCover:900011"));
+        QVERIFY(waitUntil([&] {
+            const QVariantMap slot = m_store->data().value("dynamicCover").toMap();
+            return slot.value("songId").toDouble() == 900011 && slot.value("url").toString().isEmpty();
+        }));
+        QCOMPARE(m_store->data().value("dynamicCover").toMap().value("width").toDouble(), 0.0);
+        QCOMPARE(m_store->data().value("dynamicCover").toMap().value("height").toDouble(), 0.0);
+
+        QSignalSpy failed(m_store, &Store::requestFailed);
+        m_client->clearAuthCookies();
+        m_api->requests.clear();
+        m_store->request(QStringLiteral("dynamicCover:900012"));
+        QCOMPARE(m_api->requests.size(), 0);
+        const QVariantMap loggedOut = m_store->data().value("dynamicCover").toMap();
+        QCOMPARE(loggedOut.value("songId").toDouble(), 900012.0);
+        QVERIFY(loggedOut.value("url").toString().isEmpty());
+        QCOMPARE(loggedOut.value("width").toDouble(), 0.0);
+        QCOMPARE(loggedOut.value("height").toDouble(), 0.0);
+        QCOMPARE(failed.count(), 0);
+
+        m_store->logout();
+        QVERIFY(m_store->data().value("dynamicCover").isNull());
+    }
+
 };
 
 QTEST_GUILESS_MAIN(StoreTest)

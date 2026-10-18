@@ -1,7 +1,10 @@
-// Store 的关注/收藏写操作：歌手关注、专辑收藏。两者都是单发写请求，不重试。
+// Store 的关注/收藏写操作：用户关注、歌手关注、专辑收藏。都是单发写请求，不重试。
 #include "store.h"
 
 #include "json_util.h"
+#include "sdk/social.h"
+
+#include <algorithm>
 
 using namespace ncm;
 
@@ -41,6 +44,25 @@ void Store::setArtistSubscribed(double id, bool subscribed)
             put("artist", artist, false);
         }
         m_cache.forget(QStringLiteral("artist:") + num(id));
+        if (!subscribed) {
+            // 收藏列表可能正在取：作废在途回包，并把已显示的这位立刻移掉。
+            m_requests.begin(QStringLiteral("savedArtists"));
+            QVariantMap saved = m_personal.value("savedArtists").toMap();
+            QVariantList kept;
+            bool removed = false;
+            for (const QVariant &v : saved.value("items").toList()) {
+                if (v.toMap().value("id").toDouble() == id) {
+                    removed = true;
+                    continue;
+                }
+                kept.append(v);
+            }
+            if (removed) {
+                saved.insert("items", kept);
+                saved.insert("count", std::max(0.0, saved.value("count").toDouble() - 1));
+                put("savedArtists", saved, true);
+            }
+        }
         emit artistChanged(id, subscribed);
     });
     });
@@ -58,7 +80,82 @@ void Store::setAlbumSubscribed(double id, bool subscribed)
             put("album", album, false);
         }
         m_cache.forget(QStringLiteral("album:") + num(id));
+        if (!subscribed) {
+            m_requests.begin(QStringLiteral("savedAlbums"));
+            QVariantMap saved = m_personal.value("savedAlbums").toMap();
+            QVariantList kept;
+            bool removed = false;
+            for (const QVariant &v : saved.value("items").toList()) {
+                if (v.toMap().value("id").toDouble() == id) {
+                    removed = true;
+                    continue;
+                }
+                kept.append(v);
+            }
+            if (removed) {
+                saved.insert("items", kept);
+                saved.insert("count", std::max(0.0, saved.value("count").toDouble() - 1));
+                put("savedAlbums", saved, true);
+            }
+        }
         emit albumChanged(id, subscribed);
     });
+    });
+}
+
+void Store::setUserFollowed(double userId, bool followed)
+{
+    if (!(userId > 0))
+        return;
+    const QString action = followed ? QStringLiteral("关注用户") : QStringLiteral("取消关注");
+    if (!m_client->hasMusicU()) {
+        emit followFailed(action, QStringLiteral("登录后才能关注"));
+        return;
+    }
+    const quint64 epoch = m_epoch;
+    sdk::setUserFollowed(*m_client, static_cast<qint64>(userId), followed, this,
+                         [this, userId, followed, action, epoch]
+                         (sdk::Result<sdk::UserFollowState> result) {
+        if (epoch != m_epoch)
+            return;
+        if (!result) {
+            emit followFailed(action, requestFailure(
+                result.error, followed ? QStringLiteral("暂时无法关注用户")
+                                       : QStringLiteral("暂时无法取消关注")));
+            return;
+        }
+        const bool state = result.value->followed;
+
+        QVariantMap user = m_data.value("user").toMap();
+        if (user.value("id").toDouble() == userId) {
+            const bool was = user.value("followed").toBool();
+            user.insert("followed", state);
+            if (was != state) {
+                const double followers = user.value("followeds").toDouble();
+                user.insert("followeds", std::max(0.0, followers + (state ? 1.0 : -1.0)));
+            }
+            put("user", user, false);
+        }
+
+        // 关注/粉丝列表里的同一个人同步成新状态，不必等重新翻页。
+        for (const char *slot : {"userFollows", "userFolloweds"}) {
+            QVariantMap page = m_data.value(QLatin1String(slot)).toMap();
+            QVariantList items = page.value("items").toList();
+            bool changed = false;
+            for (QVariant &v : items) {
+                QVariantMap row = v.toMap();
+                if (row.value("id").toDouble() == userId
+                    && row.value("followed").toBool() != state) {
+                    row.insert("followed", state);
+                    v = row;
+                    changed = true;
+                }
+            }
+            if (changed) {
+                page.insert("items", items);
+                put(slot, page, false);
+            }
+        }
+        emit userFollowChanged(userId, state);
     });
 }

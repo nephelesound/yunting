@@ -22,6 +22,10 @@ class NcmClient;
 class QNetworkInformation;
 class QTimer;
 
+namespace ncm::sdk {
+struct Error;
+}
+
 // 一个数据槽的请求代号。页面切换会开始新代号；旧请求晚到时凭代号丢弃，
 // 不把上一页的数据写进当前槽。只在同一槽内递增，不参与跨槽排序。
 class RequestLedger {
@@ -78,6 +82,8 @@ public:
     // 关注歌手 / 收藏专辑：成功只发对应 changed，失败发 followFailed
     Q_INVOKABLE void setArtistSubscribed(double id, bool subscribed);
     Q_INVOKABLE void setAlbumSubscribed(double id, bool subscribed);
+    // 关注 / 取关用户：成功发 userFollowChanged 并同步已有用户行，失败发 followFailed
+    Q_INVOKABLE void setUserFollowed(double userId, bool followed);
     // 评论点赞：乐观更新 comments / commentPage，失败回滚并发 commentLikeFailed
     Q_INVOKABLE void setCommentLiked(double songId, double commentId, bool liked);
 
@@ -103,6 +109,7 @@ signals:
     void playlistActionFailed(const QString &action, const QString &message);
     void artistChanged(double id, bool subscribed);
     void albumChanged(double id, bool subscribed);
+    void userFollowChanged(double id, bool followed);
     void followFailed(const QString &action, const QString &message);
     void commentLikeFailed(double songId, double commentId, const QString &message);
     void commentLikeSucceeded(double songId, double commentId, bool liked);
@@ -169,6 +176,8 @@ private:
     QString requestFailure(const NcmClient::Response &response);
     // GET 回调只有 doc/ok；构造同样的 Response，让 250/301 也走统一分类
     QString requestFailure(const QJsonDocument &doc, bool ok);
+    // SDK 已经分好类：网络/业务码走同一套文案；解析错误用它自己的 fallback，绝不显示 parser 文本
+    QString requestFailure(const ncm::sdk::Error &error, const QString &fallback);
     // 歌单写请求的共同部分：登录检查、epoch 防串号、错误消息
     void playlistWrite(const QString &path, const QJsonObject &payload, const QString &action,
                        std::function<void(const QJsonObject &)> onSuccess);
@@ -212,6 +221,18 @@ private:
     void requestUserFolloweds(double uid, int offset);
     void requestUserLevel();
     void requestUserSubcount();
+    // -- 用户动态：需要登录；别人的主页也能看。cursor 为第一页时传 SDK 的初始值 -1
+    void requestUserEvents(const QString &key, double uid, qint64 cursor);
+    // -- 收藏列表：歌手 / 专辑 / MV+视频；分页从 0 开始
+    void requestSavedArtists(int offset);
+    void requestSavedAlbums(int offset);
+    void requestSavedMvs(int offset);
+    // -- 通知列表：系统通知 / 评论 / @我；游标分页（前两者）与 offset 分页（@我）
+    void requestNotices(qint64 before);
+    void requestCommentNotices(qint64 before);
+    void requestForwards(int offset);
+    // -- 动态封面：签名 URL，只进内存；没有封面不是失败
+    void requestDynamicCover(double songId);
     // -- 评论楼中楼：data.commentReplies；只读
     void requestCommentReplies(double songId, double commentId, qint64 before);
     // -- 逐字歌词：data.lyricsNew = { songId, lines }，lines 与普通歌词同形，有 yrc 时每句多 words

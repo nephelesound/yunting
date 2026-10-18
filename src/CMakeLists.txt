@@ -60,7 +60,7 @@ qt_add_executable(yunting
     main.cpp cli.h cli.cpp
     ncmclient.h ncmclient.cpp
     cookievault.h cookievault.cpp
-    store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_comment.cpp store_user.cpp store_inbox.cpp store_stats.cpp store_notify.cpp store_social.cpp store_comment_extra.cpp store_lyrics_new.cpp store_on_demand.cpp store_discovery.cpp store_wiki.cpp
+    store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_comment.cpp store_user.cpp store_inbox.cpp store_stats.cpp store_notify.cpp store_social.cpp store_user_events.cpp store_library.cpp store_resource.cpp store_comment_extra.cpp store_lyrics_new.cpp store_on_demand.cpp store_discovery.cpp store_wiki.cpp
     ${YUNTING_SDK_SOURCES}
     session.h session.cpp
     querycache.h querycache.cpp
@@ -162,8 +162,10 @@ add_test(NAME cookievault COMMAND cookievault_test)
 
 # Store 的缓存/写操作行为：本地假接口，不碰外网
 qt_add_executable(store_test tests/store_test.cpp
-    store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_comment.cpp store_user.cpp store_inbox.cpp store_stats.cpp store_notify.cpp store_social.cpp store_comment_extra.cpp store_lyrics_new.cpp store_on_demand.cpp store_discovery.cpp store_wiki.cpp
+    store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_comment.cpp store_user.cpp store_inbox.cpp store_stats.cpp store_notify.cpp store_social.cpp store_user_events.cpp store_library.cpp store_resource.cpp store_comment_extra.cpp store_lyrics_new.cpp store_on_demand.cpp store_discovery.cpp store_wiki.cpp
     sdk/sdk_json.h sdk/sdk_json.cpp sdk/service.h sdk/service.cpp
+    sdk/library.h sdk/library.cpp sdk/notification.h sdk/notification.cpp
+    sdk/social.h sdk/social.cpp sdk/dynamic_cover.h sdk/dynamic_cover.cpp
     sdk/song_wiki.h sdk/song_wiki.cpp sdk/song_wiki_service.h sdk/song_wiki_service.cpp
     sdk/discovery.h sdk/discovery.cpp
     sdk/radio.h sdk/radio.cpp

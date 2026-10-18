@@ -5,6 +5,7 @@
 #include "json_util.h"
 #include "ncmclient.h"
 #include "normalize.h"
+#include "sdk/dynamic_cover.h"
 #include "sdk/lyrics.h"
 #include "sdk/comment.h"
 #include "sdk/mv_page.h"
@@ -107,6 +108,33 @@ void Store::request(const QString &key)
              s.requestArtistSongs(k, parts.value(1).toDouble(), parts.value(2).toInt()); }},
         {QStringLiteral("artist:"), [](Store &s, const QString &k) {
              s.requestArtist(k, k.section(u':', 1).toDouble()); }},
+        {QStringLiteral("userEvents:"), [](Store &s, const QString &k) {
+             const QStringList parts = k.split(u':');
+             s.requestUserEvents(k, parts.value(1).toDouble(),
+                                 parts.size() >= 3 ? parts.at(2).toLongLong() : -1); }},
+        {QStringLiteral("library:"), [](Store &s, const QString &k) {
+             const QStringList parts = k.split(u':');
+             const QString kind = parts.value(1);
+             const int offset = parts.value(2).toInt();
+             if (kind == QLatin1String("artists"))
+                 s.requestSavedArtists(offset);
+             else if (kind == QLatin1String("albums"))
+                 s.requestSavedAlbums(offset);
+             else if (kind == QLatin1String("mvs"))
+                 s.requestSavedMvs(offset); }},
+        {QStringLiteral("notify:"), [](Store &s, const QString &k) {
+             const QStringList parts = k.split(u':');
+             const QString kind = parts.value(1);
+             const bool paging = parts.size() >= 3;
+             if (kind == QLatin1String("notices")) {
+                 s.requestNotices(paging ? parts.at(2).toLongLong() : -1);
+             } else if (kind == QLatin1String("comments")) {
+                 s.requestCommentNotices(paging ? parts.at(2).toLongLong() : -1);
+             } else if (kind == QLatin1String("forwards")) {
+                 s.requestForwards(paging ? parts.at(2).toInt() : 0);
+             } }},
+        {QStringLiteral("dynamicCover:"), [](Store &s, const QString &k) {
+             s.requestDynamicCover(k.section(u':', 1).toDouble()); }},
         {QStringLiteral("user:"), [](Store &s, const QString &k) {
              s.requestUser(k, k.section(u':', 1).toDouble()); }},
         {QStringLiteral("mv:"), [](Store &s, const QString &k) {
@@ -765,4 +793,37 @@ void Store::requestSearchRadios(const QString &key, const QString &raw)
             });
         },
         [this](const QVariant &result) { put("searchRadios", result, false); });
+}
+
+void Store::requestDynamicCover(double songId)
+{
+    if (!(songId > 0))
+        return;
+    // 签名 URL 只进内存，也不能让上一首的晚到回包覆盖当前这首。
+    const quint64 token = m_requests.begin(QStringLiteral("dynamicCover"));
+    const quint64 epoch = m_epoch;
+    const QVariantMap empty{{"songId", songId}, {"url", QString{}},
+                            {"width", 0.0}, {"height", 0.0}};
+    if (!m_client->hasMusicU()) {
+        put("dynamicCover", empty, false);
+        return;
+    }
+    sdk::fetchDynamicCover(*m_client, static_cast<qint64>(songId), this,
+                           [this, songId, token, epoch, empty]
+                           (sdk::Result<sdk::DynamicCover> result) {
+        if (epoch != m_epoch || !m_requests.current(QStringLiteral("dynamicCover"), token))
+            return;
+        // 大多数歌没有动态封面；网络/解析失败也只清空这一槽，不为装饰性数据弹全局错误。
+        if (!result || !result.value->available) {
+            put("dynamicCover", empty, false);
+            return;
+        }
+        const sdk::DynamicCover &cover = *result.value;
+        put("dynamicCover", QVariantMap{
+            {"songId", songId},
+            {"url", cover.url},
+            {"width", cover.width},
+            {"height", cover.height},
+        }, false);
+    });
 }

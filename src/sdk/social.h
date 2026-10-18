@@ -18,7 +18,7 @@ class NcmClient;
 
 namespace ncm::sdk {
 
-struct SocialUser {
+struct EventUser {
     qint64 id = 0;         // user.userId
     QString name;          // user.nickname
     QString avatar;        // user.avatarUrl
@@ -38,7 +38,7 @@ struct UserEvent {
     QString actionName;    // events[].actName
     QString title;         // info.title, fallback resourceInfo.name
     QString description;   // info.description
-    SocialUser user;       // events[].user
+    EventUser user;        // events[].user
     EventResource resource;
     qint64 likeCount = 0;  // info.likedCount
     qint64 commentCount = 0; // info.commentCount

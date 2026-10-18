@@ -2,6 +2,7 @@
 #include "json_util.h"
 #include "ncmclient.h"
 #include "normalize.h"
+#include "sdk/sdk_result.h"
 
 #include <QDate>
 #include <QEventLoop>
@@ -95,6 +96,11 @@ Store::Store(NcmClient *client, QObject *parent)
         {"userFolloweds", nullVariant()},
         {"userLevel", nullVariant()},
         {"userSubcount", nullVariant()},
+        {"userEvents", nullVariant()},
+        {"notices", nullVariant()},
+        {"commentNotices", nullVariant()},
+        {"forwards", nullVariant()},
+        {"dynamicCover", nullVariant()},
         {"commentReplies", nullVariant()},
         {"lyricsNew", nullVariant()},
         // 匿名发现：形状见 docs/API-FRONTEND.md「已实现的新增数据槽」
@@ -122,6 +128,9 @@ Store::Store(NcmClient *client, QObject *parent)
         {"fm", QVariantMap{{"tracks", QVariantList{}}}},
         {"similar", QVariantMap{{"seed", nullVariant()}, {"tracks", QVariantList{}}}},
         {"playlistDetails", QVariantMap{}},
+        {"savedArtists", nullVariant()},
+        {"savedAlbums", nullVariant()},
+        {"savedMvs", nullVariant()},
     };
     m_emptyPersonal = m_personal;
     m_client->setCallbackContext(this);
@@ -300,6 +309,9 @@ void Store::resetPersonal()
     put("listenRank", nullVariant(), false);
     put("userFollows", nullVariant(), false);
     put("userFolloweds", nullVariant(), false);
+    // 动态、通知、收藏列表与动态封面都带着当前账号的私有状态
+    for (const char *key : {"userEvents", "notices", "commentNotices", "forwards", "dynamicCover"})
+        put(key, nullVariant(), false);
     // 按需详情里的 followed / subscribed / liked 都带账号状态：换账号后不能继续显示上一号的结果
     for (const char *key : {"comments", "commentPage", "commentReplies",
                             "artist", "album", "user", "wiki"})
@@ -385,6 +397,29 @@ QString Store::requestFailure(const NcmClient::Response &response)
     if (failure == NcmClient::Failure::SessionExpired)
         setSessionExpired(true);
     return failureMessage(failure, response.doc.object());
+}
+
+QString Store::requestFailure(const ncm::sdk::Error &error, const QString &fallback)
+{
+    // 解析失败没有服务端句子可用：用调用方给的固定文案，绝不把 error.message（JSON path）交给界面。
+    if (error.kind == ncm::sdk::ErrorKind::Parse
+        || error.kind == ncm::sdk::ErrorKind::InvalidRequest)
+        return fallback;
+    NcmClient::Response response;
+    response.parsed = true;
+    response.networkFailure = error.kind == ncm::sdk::ErrorKind::Network;
+    response.httpStatus = error.httpStatus;
+    response.ok = error.kind != ncm::sdk::ErrorKind::Api || error.httpStatus < 400;
+    QJsonObject payload;
+    if (error.kind == ncm::sdk::ErrorKind::Api) {
+        payload.insert(QStringLiteral("code"), error.code);
+        // Api 错误的 message 是网易云自己给用户的句子；只有它允许原样展示。
+        if (!error.message.isEmpty())
+            payload.insert(QStringLiteral("message"), error.message);
+    }
+    response.doc = QJsonDocument(payload);
+    const QString message = requestFailure(response);
+    return message.isEmpty() ? fallback : message;
 }
 
 void Store::fetchAlways(const QString &path, const QUrlQuery &q, bool personal,
