@@ -31,7 +31,7 @@ Item {
     // 不用实时模糊：导出走 grabToImage，着色器效果在离屏重绘里不可靠。没有封面时是深灰底
     Rectangle {
         anchors.fill: parent
-        color: Tokens.desktopToolbar
+        color: Tokens.shareBlank
     }
     Image {
         anchors.fill: parent

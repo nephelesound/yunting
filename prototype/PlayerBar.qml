@@ -270,19 +270,19 @@ Item {
                 font.features: { "tnum": 1 }
                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             }
+            // 开着的状态（正在播放页、桌面歌词）用强调色的图标表示，不用按钮的「勾选」底：
+            // 勾选底由用户的控件样式画（Breeze、Klassy 等各不相同，有的整块填色），换台机器就不一样
             IconButton {
                 icon.name: "view-media-lyrics"
-                text: "正在播放与歌词"
-                checkable: true
-                checked: bar.nowPlayingShown
+                icon.color: bar.nowPlayingShown ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor
+                text: bar.nowPlayingShown ? "关闭正在播放" : "正在播放与歌词"
                 onClicked: bar.nowPlayingToggled()
             }
             IconButton {
                 visible: !hud.compact
                 glyph: "词"
+                icon.color: bar.desktopLyricsShown ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor
                 text: bar.desktopLyricsShown ? "关闭桌面歌词" : "桌面歌词"
-                checkable: true
-                checked: bar.desktopLyricsShown
                 onClicked: bar.desktopLyricsToggled()
             }
             IconButton {
@@ -343,8 +343,8 @@ Item {
                          : bar.volume < 0.34 ? "audio-volume-low"
                          : bar.volume < 0.67 ? "audio-volume-medium" : "audio-volume-high"
                 text: bar.muted ? "音量（已静音）" : "音量 " + Math.round(bar.volume * 100) + "%"
-                checkable: true
-                checked: volumePopup.visible
+                // 浮层开着时按钮保持按下的样子（打开浮层的按钮的标准做法），不用勾选底
+                down: volumePopup.visible || pressed
                 onClicked: volumePopup.visible ? volumePopup.close() : volumePopup.open()
                 WheelHandler {
                     onWheel: event => bar.volumeRequested(Math.max(0, Math.min(1, bar.volume + (event.angleDelta.y > 0 ? 0.05 : -0.05))))
@@ -361,8 +361,6 @@ Item {
                         IconButton {
                             icon.name: bar.muted ? "audio-volume-muted" : "audio-volume-high"
                             text: bar.muted ? "取消静音" : "静音"
-                            checkable: true
-                            checked: bar.muted
                             onClicked: bar.muteToggled()
                         }
                         Slider {

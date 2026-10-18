@@ -45,11 +45,15 @@ QtObject {
     readonly property real coverScrim: 0.6
     // 压在视频画面上的控制条深色底：白字图标在任何画面上都看得清，又不挡住画面
     readonly property real videoScrim: 0.45
-    // 桌面歌词的字：纯白（亮壁纸上可换纯黑）配不透明度，不靠阴影、不靠底板。
+    // 桌面歌词的字：纯白（亮壁纸上可换纯黑）配不透明度，默认不靠阴影、不靠底板。
     // 还没唱到的字与第二行是这个不透明度，唱到的字点亮成全不透明
     readonly property real desktopInk: 0.55
-    // 悬停时工具条的底：与字同一色系的不透明深灰，白色图标
-    readonly property color desktopToolbar: "#505050"
+    // 桌面歌词悬停时托住字的底板：与字相反的颜色（白字是黑、黑字是白）配这个不透明度，看清字也透出桌面
+    readonly property real desktopPlate: 0.5
+    // 桌面歌词的文字阴影三档：无 / 柔和 / 浓，[阴影的不透明度, 模糊程度 0–1]；颜色与字相反
+    readonly property var desktopShadows: [[0, 0], [0.5, 0.5], [0.85, 0.8]]
+    // 分享图没有封面时的底：中深灰
+    readonly property color shareBlank: "#505050"
     // 桌面歌词：隔着一段距离看的字，三档（当前句 / 第二行）。
     // 点亮色默认是字色本身（全不透明），也可选系统强调色或这几种中间调（亮壁纸、暗壁纸上都读得出）
     // 分享图：3:4 竖图（45 × 8 宽），导出放大 3 倍（1080 × 1440）。底是封面色场，压暗到白字站得住

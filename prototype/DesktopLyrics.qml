@@ -5,13 +5,16 @@
 // 当前句随播放从左到右点亮：引擎的进度几次一秒，点亮走逐帧时钟（与引擎进度对齐），所以是连续的。
 // 观感：纯白的字配不透明度，直接压在桌面上，没有底板、没有阴影。还没唱到的字与第二行半透明，唱到的字点亮成全白。
 // 应用读不到窗口背后的壁纸（Wayland 不给），白字在亮壁纸上看不见，所以字色可换成纯黑，由用户按壁纸选。
-// 悬停时字的正上方出现一条标准工具栏（QQC2 ToolBar + ToolButton，样式与配色全由系统画，不自绘）：
-// 字号、黑字、唱到的字的颜色（菜单）、第二行、复位、锁定、关闭。
+// 悬停时字的后面出现一块方角的半透明底板（白字是黑，黑字是白），正上方是一条标准工具栏
+//（QQC2 ToolBar + ToolButton，样式与配色全由系统画，不自绘）：字号、「样式」菜单（字色、唱到的字的颜色、
+// 文字阴影）、第二行、复位、锁定、关闭。菜单开在自己的窗口里（popupType: Window）：
+// 歌词窗口很矮，菜单留在窗口里会被裁成方角、挤成一团。文字阴影默认关，可选柔和 / 浓，颜色与字相反。
 // 锁定后点击穿透，在播放条关掉再打开即解锁。样式与位置只在应用里记住（persist），原型与截图不读不写。
 pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Effects
 import QtQuick.Layouts
 import QtQuick.Window
 import QtCore
@@ -31,6 +34,7 @@ Window {
     property int sizeStep: 1         // Tokens.desktopLyricSizes 的下标
     property bool darkInk: false     // 字色：白（默认）或黑
     property int colorIndex: 0       // fills 的下标：0 = 字色本身
+    property int shadowLevel: 0      // Tokens.desktopShadows 的下标：0 = 无
     property bool showSecond: true
     property int left: -1            // 窗口离屏幕左边；-1 = 还没放过（用默认位置）
     property int bottomGap: 2 * Tokens.height12   // 窗口离屏幕下边
@@ -57,6 +61,8 @@ Window {
     readonly property string second: !lyricsWindow.showSecond || !lyricsWindow.current ? ""
         : lyricsWindow.current.tr ? lyricsWindow.current.tr : lyricsWindow.next ? lyricsWindow.next.text : ""
     readonly property color ink: lyricsWindow.darkInk ? "black" : "white"
+    // 与字相反的颜色：悬停底板与文字阴影用它
+    readonly property color backing: lyricsWindow.darkInk ? "white" : "black"
     // 唱到的字：字色本身，或系统强调色、几种固定的中间调。强调色取色相，饱和度至少 70%、亮度落在 50%–60%：
     // 原样的强调色可能很深或很灰，与半透明的字分不开
     readonly property color accent: Kirigami.Theme.highlightColor
@@ -159,6 +165,7 @@ Window {
                 property int sizeStep: 1
                 property bool darkInk: false
                 property int colorIndex: 0
+                property int shadowLevel: 0
                 property bool showSecond: true
                 property int left: -1
                 property int bottomGap: 2 * Tokens.height12
@@ -167,6 +174,7 @@ Window {
                 lyricsWindow.sizeStep = Math.max(0, Math.min(Tokens.desktopLyricSizes.length - 1, saved.sizeStep));
                 lyricsWindow.darkInk = saved.darkInk;
                 lyricsWindow.colorIndex = Math.max(0, Math.min(lyricsWindow.fills.length - 1, saved.colorIndex));
+                lyricsWindow.shadowLevel = Math.max(0, Math.min(Tokens.desktopShadows.length - 1, saved.shadowLevel));
                 lyricsWindow.showSecond = saved.showSecond;
                 lyricsWindow.left = saved.left;
                 lyricsWindow.bottomGap = saved.bottomGap;
@@ -175,6 +183,7 @@ Window {
             Binding { when: persisted.restored; target: saved; property: "sizeStep"; value: lyricsWindow.sizeStep }
             Binding { when: persisted.restored; target: saved; property: "darkInk"; value: lyricsWindow.darkInk }
             Binding { when: persisted.restored; target: saved; property: "colorIndex"; value: lyricsWindow.colorIndex }
+            Binding { when: persisted.restored; target: saved; property: "shadowLevel"; value: lyricsWindow.shadowLevel }
             Binding { when: persisted.restored; target: saved; property: "showSecond"; value: lyricsWindow.showSecond }
             Binding { when: persisted.restored; target: saved; property: "left"; value: lyricsWindow.left }
             Binding { when: persisted.restored; target: saved; property: "bottomGap"; value: lyricsWindow.bottomGap }
@@ -184,7 +193,7 @@ Window {
     Item {
         id: stage
         anchors.fill: parent
-        readonly property bool active: hover.hovered || drag.active || colorMenu.visible
+        readonly property bool active: hover.hovered || drag.active || styleMenu.visible
 
         HoverHandler { id: hover; enabled: !lyricsWindow.locked }
         DragHandler {
@@ -214,6 +223,17 @@ Window {
             ToolTip.delay: 600
         }
 
+        // 悬停底板：托住工具栏与歌词，宽度跟着字走（至少与工具栏同宽），方角，与工具栏一致
+        Rectangle {
+            visible: stage.active
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: Math.min(parent.width, Math.max(tools.implicitWidth,
+                                                   Math.ceil(Math.max(lineBox.width, secondLine.visible ? secondLine.contentWidth : 0))
+                                                   + 2 * Tokens.space6))
+            height: parent.height
+            color: Qt.alpha(lyricsWindow.backing, Tokens.desktopPlate)
+        }
+
         // 工具栏：悬停（或拖动）时出现在歌词正上方。一天要碰很多次，出现与消失都不做动画；
         // 位置一直留着，窗口高度不随悬停跳动。标准 ToolBar：底色与边线是系统工具栏的样子
         ToolBar {
@@ -237,33 +257,68 @@ Window {
                     onClicked: lyricsWindow.sizeStep++
                 }
                 ToolSeparator {}
-                Tool {
-                    icon.name: "color-mode-invert-text"
-                    text: "黑字（亮壁纸时用）"
-                    checkable: true
-                    checked: lyricsWindow.darkInk
-                    onToggled: lyricsWindow.darkInk = checked
-                }
-                Tool {
-                    id: colorButton
+                // 「样式」：带文字的菜单按钮（KDE 工具栏里打开菜单的按钮的惯常写法），字色、唱到的字、阴影都在里面
+                ToolButton {
+                    id: styleButton
                     icon.name: "format-text-color"
-                    text: "唱到的字的颜色"
-                    down: colorMenu.visible
-                    onClicked: colorMenu.popup(colorButton, 0, colorButton.height)
+                    text: "样式"
+                    display: AbstractButton.TextBesideIcon
+                    down: styleMenu.visible
+                    onClicked: styleMenu.popup(styleButton, 0, styleButton.height)
                     Menu {
-                        id: colorMenu
-                        Instantiator {
-                            model: lyricsWindow.fillNames
-                            delegate: MenuItem {
-                                required property int index
-                                required property string modelData
-                                text: modelData
-                                checkable: true
-                                checked: lyricsWindow.colorIndex === index
-                                onTriggered: lyricsWindow.colorIndex = index
+                        id: styleMenu
+                        popupType: Popup.Window
+                        MenuItem {
+                            text: "白字（暗壁纸）"
+                            checkable: true
+                            checked: !lyricsWindow.darkInk
+                            onTriggered: lyricsWindow.darkInk = false
+                        }
+                        MenuItem {
+                            text: "黑字（亮壁纸）"
+                            checkable: true
+                            checked: lyricsWindow.darkInk
+                            onTriggered: lyricsWindow.darkInk = true
+                        }
+                        MenuSeparator {}
+                        Menu {
+                            id: fillMenu
+                            title: "唱到的字"
+                            popupType: Popup.Window
+                            // 每种颜色前一个实心圆点，就是这种颜色
+                            Instantiator {
+                                model: lyricsWindow.fillNames
+                                delegate: MenuItem {
+                                    required property int index
+                                    required property string modelData
+                                    text: modelData
+                                    icon.name: "media-record-symbolic"
+                                    icon.color: lyricsWindow.fills[index]
+                                    checkable: true
+                                    checked: lyricsWindow.colorIndex === index
+                                    onTriggered: lyricsWindow.colorIndex = index
+                                }
+                                onObjectAdded: (index, object) => fillMenu.insertItem(index, object)
+                                onObjectRemoved: (index, object) => fillMenu.removeItem(object)
                             }
-                            onObjectAdded: (index, object) => colorMenu.insertItem(index, object)
-                            onObjectRemoved: (index, object) => colorMenu.removeItem(object)
+                        }
+                        Menu {
+                            id: shadowMenu
+                            title: "文字阴影"
+                            popupType: Popup.Window
+                            Instantiator {
+                                model: ["无", "柔和", "浓"]
+                                delegate: MenuItem {
+                                    required property int index
+                                    required property string modelData
+                                    text: modelData
+                                    checkable: true
+                                    checked: lyricsWindow.shadowLevel === index
+                                    onTriggered: lyricsWindow.shadowLevel = index
+                                }
+                                onObjectAdded: (index, object) => shadowMenu.insertItem(index, object)
+                                onObjectRemoved: (index, object) => shadowMenu.removeItem(object)
+                            }
                         }
                     }
                 }
@@ -294,12 +349,23 @@ Window {
             }
         }
 
-        // 歌词：直接压在桌面上。字重取 DemiBold：半透明的笔画细了会被壁纸吃掉
+        // 歌词：直接压在桌面上。字重取 DemiBold：半透明的笔画细了会被壁纸吃掉。
+        // 文字阴影（选了才有）：颜色与字相反，紧贴字形，只在下方偏一像素
         Column {
             id: textColumn
             anchors.bottom: parent.bottom
             width: parent.width
             spacing: Tokens.space1
+            readonly property var shadow: Tokens.desktopShadows[lyricsWindow.shadowLevel]
+            layer.enabled: lyricsWindow.shadowLevel > 0
+            layer.effect: MultiEffect {
+                shadowEnabled: true
+                shadowColor: Qt.alpha(lyricsWindow.backing, textColumn.shadow[0])
+                shadowBlur: textColumn.shadow[1]
+                blurMax: Tokens.space4
+                shadowHorizontalOffset: 0
+                shadowVerticalOffset: Tokens.line
+            }
 
             // 当前句：底层是半透明的字，上层同样的字用点亮色、按进度裁出左边一段
             Item {
@@ -315,7 +381,8 @@ Window {
                         : lyricsWindow.track ? lyricsWindow.track.name + " — " + lyricsWindow.track.artist : "云听"
                     font.pixelSize: lyricsWindow.sizes[0]
                     font.weight: Font.DemiBold
-                    color: Qt.alpha(lyricsWindow.ink, Tokens.desktopInk)
+                    // 还没有歌词时显示的歌名不会被点亮，直接是全色
+                    color: lyricsWindow.current ? Qt.alpha(lyricsWindow.ink, Tokens.desktopInk) : lyricsWindow.ink
                 }
                 Item {
                     width: parent.width * lyricsWindow.fill
@@ -330,6 +397,7 @@ Window {
                 }
             }
             LyricText {
+                id: secondLine
                 width: textColumn.width
                 visible: text.length > 0
                 text: lyricsWindow.second

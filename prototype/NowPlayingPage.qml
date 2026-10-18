@@ -293,7 +293,9 @@ ScreenFrame {
                     scale: line.current ? 1 : original.rest
                     text: line.modelData.text
                     font.pixelSize: Tokens.text4xl
-                    font.weight: Font.Medium
+                    // 常规字重：当前句靠字号与颜色突出。Medium 在各家字体里差别最大（HarmonyOS Sans 的 Medium 很轻，
+                    // Noto Sans CJK 的 Medium 接近粗体），换台机器整页歌词就显得发黑
+                    font.weight: Font.Normal
                     color: line.current ? Kirigami.Theme.textColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                     elide: Text.ElideRight
                     Behavior on scale { NumberAnimation { duration: Tokens.motionBase; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut } }

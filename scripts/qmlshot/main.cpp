@@ -1,5 +1,7 @@
 // 离屏截图：加载一个 QML 窗口，等几帧后用同步的 grabWindow() 存成 PNG。
 // 用法: qmlshot <main.qml> <out.png> [宽 高] [-- 根对象属性 key=value ...]
+#include "colortone.h"
+
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -54,6 +56,9 @@ int main(int argc, char *argv[])
         fprintf(stderr, "%s\n", qPrintable(msg));
     });
     QGuiApplication app(argc, argv);
+    // 与应用一样：中性的系统配色给本应用染上强调色的色调（src/colortone.cpp），截图里才是用户真正看到的样子
+    app.setApplicationName(QStringLiteral("yunting-qmlshot"));
+    ColorTone::apply();
     if (qEnvironmentVariableIsEmpty("QT_QUICK_CONTROLS_STYLE"))
         QQuickStyle::setStyle(QStringLiteral("org.kde.desktop"));
 

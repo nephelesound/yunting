@@ -4,8 +4,8 @@
 #include <KConfig>
 #include <KConfigGroup>
 #include <KSharedConfig>
-#include <QApplication>
 #include <QDir>
+#include <QGuiApplication>
 #include <QFile>
 #include <QStandardPaths>
 
@@ -97,8 +97,9 @@ QString apply()
         general.writeEntry("Name", QStringLiteral("云听"));
         out.sync();
     }
-    qApp->setProperty("KDE_COLOR_SCHEME_PATH", path);
-    qApp->setPalette(KColorScheme::createApplicationPalette(KSharedConfig::openConfig(path)));
+    // 只用 QGuiApplication 的接口：截图工具（scripts/qmlshot）也调这里，它不是 QApplication
+    QCoreApplication::instance()->setProperty("KDE_COLOR_SCHEME_PATH", path);
+    QGuiApplication::setPalette(KColorScheme::createApplicationPalette(KSharedConfig::openConfig(path)));
     return path;
 }
 

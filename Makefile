@@ -39,19 +39,27 @@ contract: app-build ## 检查 C++ Store 与快照的数据形状一致
 	python3 -I scripts/check_contract.py build/store-anon.json build/contract-anon/Data.js build/contract-anon/Personal.js
 
 # 离屏截图走 GPU（OpenGL）路径；默认的 software 后端不画 MultiEffect/ShadowedTexture，看到的不是真实效果
-SHOT_ENV = QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME=kde QT_QUICK_BACKEND=rhi QSG_RHI_BACKEND=opengl
+SHOT_ENV = QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME=kde QT_QUICK_BACKEND=rhi QSG_RHI_BACKEND=opengl \
+           XDG_CACHE_HOME=$(CURDIR)/build/shot-cache
 SHOT_SIZE ?= 1280 800
 
-build/qmlshot/qmlshot: scripts/qmlshot/main.cpp scripts/qmlshot/CMakeLists.txt
+build/qmlshot/qmlshot: scripts/qmlshot/main.cpp scripts/qmlshot/CMakeLists.txt src/colortone.h src/colortone.cpp
 	cmake -S scripts/qmlshot -B build/qmlshot -G Ninja -DCMAKE_BUILD_TYPE=Release >/dev/null
 	ninja -C build/qmlshot >/dev/null
 
-# 暗色截图用临时配置目录里的 Breeze Dark 配色，不碰用户自己的 ~/.config/kdeglobals
-build/dark/kdeglobals:
-	@mkdir -p build/dark
-	cp /usr/share/color-schemes/BreezeDark.colors $@
-	printf '\n[Icons]\nTheme=breeze-dark\n' >> $@
-	grep -m1 '^font=' $(HOME)/.config/kdeglobals | sed '1i [General]' >> $@ || true
+# 「别人的机器」：发行版默认的 Breeze 配色（stock 浅色、dark 深色）与默认字体 Noto Sans，
+# 配置放在临时目录（XDG_CONFIG_HOME），不碰用户自己的 ~/.config。fontconfig 的用户偏好也在 XDG_CONFIG_HOME 下，
+# 换掉目录就只剩发行版默认；再排除本机系统设置里用的字体，否则中日文字回退时仍会选到它
+SYSTEM_FONT = $(shell grep -m1 '^font=' $(HOME)/.config/kdeglobals 2>/dev/null | sed 's/^font=//; s/,.*//')
+# 按文件所在目录排除（字体家族名靠不住：HarmonyOS Sans 的中文是另一个家族 HarmonyOS Sans SC）；本机本来就用 Noto 时不排除
+SYSTEM_FONT_DIR = $(if $(filter Noto%,$(SYSTEM_FONT)),,$(shell fc-list "$(SYSTEM_FONT)" file 2>/dev/null | head -1 | sed 's/: *$$//' | xargs -r dirname))
+STOCK_FONT = font=Noto Sans,10,-1,5,400,0,0,0,0,0,0,0,0,0,0,1
+build/stock/kdeglobals build/dark/kdeglobals:
+	@mkdir -p $(dir $@)fontconfig
+	cp /usr/share/color-schemes/$(if $(findstring dark,$@),BreezeDark,BreezeLight).colors $@
+	printf '\n[Icons]\nTheme=$(if $(findstring dark,$@),breeze-dark,breeze)\n\n[General]\n$(STOCK_FONT)\n' >> $@
+	printf '<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">\n<fontconfig>\n%b</fontconfig>\n' \
+		"$(if $(SYSTEM_FONT_DIR),  <selectfont><rejectfont><glob>$(SYSTEM_FONT_DIR)/*</glob></rejectfont></selectfont>\n)" > $(dir $@)fontconfig/fonts.conf
 
 # 截图清单：文件名:根对象属性（逗号分隔，按顺序设置）
 SHOTS = home:page=home home-anon:account=anonymous,page=home charts:page=charts \
@@ -77,11 +85,12 @@ data: ## 重新抓取数据快照（有 gtk4 客户端登录 cookie 时同时生
 prototype/Personal.js:
 	cp prototype/Anonymous.js $@
 
-shots: build/qmlshot/qmlshot build/dark/kdeglobals prototype/Personal.js ## 各屏截图到 build/shots/（系统配色、Breeze Dark、窄窗）
+shots: build/qmlshot/qmlshot build/stock/kdeglobals build/dark/kdeglobals prototype/Personal.js ## 各屏截图到 build/shots/（本机配色、发行版默认的浅色与深色、窄窗）
 	@mkdir -p build/shots
 	@for s in $(SHOTS); do \
 		n=$${s%%:*}; props=$$(echo $${s#*:} | tr , ' '); \
 		$(SHOT_ENV) build/qmlshot/qmlshot prototype/main.qml build/shots/$$n.png $(SHOT_SIZE) -- $$props || exit 1; \
+		$(SHOT_ENV) XDG_CONFIG_HOME=$(CURDIR)/build/stock build/qmlshot/qmlshot prototype/main.qml build/shots/$$n-stock.png $(SHOT_SIZE) -- $$props || exit 1; \
 		$(SHOT_ENV) XDG_CONFIG_HOME=$(CURDIR)/build/dark build/qmlshot/qmlshot prototype/main.qml build/shots/$$n-dark.png $(SHOT_SIZE) -- $$props || exit 1; \
 		$(SHOT_ENV) build/qmlshot/qmlshot prototype/main.qml build/shots/$$n-narrow.png 960 700 -- $$props || exit 1; \
 	done
