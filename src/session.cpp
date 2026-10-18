@@ -1,5 +1,6 @@
 #include "session.h"
 #include "ncmclient.h"
+#include "perf.h"
 #include "store.h"
 
 #include <QJsonArray>
@@ -9,6 +10,22 @@
 
 namespace {
 constexpr int PollMs = 2000;
+
+void appendCookies(QJsonArray &jar, const QString &raw)
+{
+    // 803 的 cookie 可能是 "MUSIC_U=…; __csrf=…" 这一种字符串（新版接口），
+    // 也可能是 Set-Cookie 风格的属性串；只取我们需要的三个键。
+    for (const QString &part : raw.split(u';')) {
+        const QString pair = part.section(u';', 0, 0).trimmed();
+        if (pair.isEmpty())
+            continue;
+        const QString name = pair.section(u'=', 0, 0).trimmed();
+        if (name == QLatin1String("MUSIC_U") || name == QLatin1String("__csrf")
+            || name == QLatin1String("NMTID")) {
+            jar.append(QJsonObject{{name, pair.mid(name.length() + 1)}});
+        }
+    }
+}
 } // namespace
 
 Session::Session(NcmClient *client, Store *store, QObject *parent)
@@ -24,6 +41,7 @@ void Session::setState(const QString &state)
     if (state == m_state)
         return;
     m_state = state;
+    qCDebug(lcPerf) << "login state" << state;
     emit stateChanged();
 }
 
@@ -79,7 +97,7 @@ void Session::poll()
     const QString unikey = m_unikey;
     m_polling = true;
     m_client->get("api/login/qrcode/client/login",
-                  QUrlQuery{{QStringLiteral("key"), unikey}, {QStringLiteral("type"), QStringLiteral("1")}},
+                  QUrlQuery{{QStringLiteral("key"), unikey}, {QStringLiteral("type"), QStringLiteral("3")}},
                   false, [this, generation, unikey](const QJsonDocument &doc, bool ok) {
         m_polling = false;
         // 取消/重开过，或回包属于上一张二维码：不能改状态，更不能在 cancel 后把用户登进去
@@ -102,17 +120,28 @@ void Session::poll()
             if (m_state != QLatin1String("waiting") && m_state != QLatin1String("scanned"))
                 break;
             m_timer->stop();
-            // 成功回包带 cookieSet 数组（"NAME=VALUE; Path=..."）：挑要紧的三个落盘，重拉首屏
+            // 803 的 cookie 在不同版本里可能是 cookieSet 数组，也可能是单个 cookie 字符串；
+            // 两种都收，之后统一落进 jar 并重拉首屏。
+            const QJsonObject root = doc.object();
             QJsonArray jar;
-            for (const QJsonValue &c : doc.object().value("cookieSet").toArray()) {
-                const QString pair = c.toString().section(u';', 0, 0);
-                const QString name = pair.section(u'=', 0, 0).trimmed();
-                if (name == "MUSIC_U" || name == "__csrf" || name == "NMTID")
-                    jar.append(QJsonObject{{name, pair.mid(name.length() + 1)}});
+            for (const QJsonValue &c : root.value("cookieSet").toArray())
+                appendCookies(jar, c.toString());
+            const QJsonValue cookie = root.value("cookie");
+            if (cookie.isString())
+                appendCookies(jar, cookie.toString());
+            else if (cookie.isArray()) {
+                for (const QJsonValue &c : cookie.toArray())
+                    appendCookies(jar, c.toString());
             }
+            QStringList cookieNames;
+            for (const QJsonValue &c : jar)
+                cookieNames.append(c.toObject().keys().value(0));
+            qInfo().noquote() << "login qr success cookie keys=" << cookieNames.join(u',')
+                              << "response fields=" << root.keys().join(u',');
             m_client->adoptCookies(QJsonDocument(jar));
             if (!m_client->hasMusicU()) {
-                qWarning() << "login succeeded without MUSIC_U";
+                qWarning() << "login succeeded without MUSIC_U; response fields=" << root.keys()
+                           << "cookie keys=" << cookieNames;
                 setState(QStringLiteral("expired"));
                 break;
             }

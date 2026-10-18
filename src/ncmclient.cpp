@@ -521,6 +521,10 @@ void NcmClient::startGet(const QString &path, const QUrlQuery &query, bool perso
         } else if (!parsed) {
             qWarning() << "bad JSON from" << reply->url().toString(QUrl::RemoveQuery)
                        << raw.left(200);
+        } else if (path == QLatin1String("api/login/qrcode/client/login")) {
+            // 轮询的 800/801/802 是预期状态，803 是成功；都不算服务器拒绝。
+            qCDebug(lcNet).noquote() << "QR poll path=" << path << "code=" << code
+                                      << "status=" << status;
         } else if (businessReject) {
             const QString message = object.value(QStringLiteral("message")).toString(
                 object.value(QStringLiteral("msg")).toString());

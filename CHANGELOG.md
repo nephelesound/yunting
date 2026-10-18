@@ -2,6 +2,11 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.5.4] - 2026-10-18
+
+### 修复
+- 扫码确认后登录没有完成：803 回包的 cookie 在新版接口里是 `cookie` 字符串，旧代码只认 `cookieSet`，导致始终拿不到 `MUSIC_U`。现在两种形状都解析，并记录 cookie 键名便于排查。
+
 ## [0.5.3] - 2026-10-18
 
 ### 修复

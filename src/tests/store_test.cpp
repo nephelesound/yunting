@@ -3,6 +3,7 @@
 // 已取消的红心插回列表。
 #include "../store.h"
 #include "../ncmclient.h"
+#include "../session.h"
 
 #include <QDateTime>
 #include <QDeadlineTimer>
@@ -274,6 +275,33 @@ private slots:
         QCOMPARE(user.value("id").toDouble(), 9.0);
         QCOMPARE(user.value("restricted").toBool(), true);
         QCOMPARE(user.value("message").toString(), QStringLiteral("用户隐私无权限查看"));
+    }
+
+    // 扫码 803 的 cookie 在新版接口里是字符串；不能只认 cookieSet，否则扫码后永远没有 MUSIC_U。
+    void qrLoginAcceptsCookieString()
+    {
+        bool keyHasType = false;
+        bool pollHasType = false;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/login/qrcode/unikey") {
+                keyHasType = req.query.contains("type=3");
+                respond(200, "{\"code\":200,\"unikey\":\"qr-key\"}");
+                return;
+            }
+            if (req.path == "/api/login/qrcode/client/login") {
+                pollHasType = req.query.contains("type=3");
+                respond(200, "{\"code\":803,\"cookie\":\"MUSIC_U=session-cookie; __csrf=session-csrf; NMTID=session-nmtid\"}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        Session session(m_client, m_store);
+        session.start();
+        QVERIFY(waitUntil([&] { return session.state() == "done"; }, 5000));
+        QVERIFY(keyHasType);
+        QVERIFY(pollHasType);
+        QCOMPARE(m_client->cookieJar().value("MUSIC_U"), QStringLiteral("session-cookie"));
+        QCOMPARE(m_client->cookieJar().value("__csrf"), QStringLiteral("session-csrf"));
     }
 
     // 旧页面的回包晚于新页面时必须丢弃：单槽数据由最新请求代号拥有。
