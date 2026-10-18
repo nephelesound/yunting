@@ -51,6 +51,74 @@ Kirigami.ApplicationWindow {
     SimEngine { id: simEngine }
     SimSession { id: simSession }
 
+    // 一起听：应用里是 C++ ListenTogether，原型里是替身（截图 harness 用 listenState 给定状态）
+    property string listenState: "none"   // none | waiting | together
+    SimListenTogether { id: simListen; state: root.listenState }
+    readonly property var listenRoom: root.backend ? root.backend.listenTogether : simListen
+    // 和谁一起听：房间里除自己以外的那个人
+    readonly property string togetherText: {
+        const me = Source.account ? Source.account.id : 0;
+        const other = (root.listenRoom.users || []).find(u => u.userId !== me);
+        return other ? "正在和 " + other.name + " 一起听" : "一起听：等好友加入";
+    }
+    ListenTogetherLink { room: root.listenRoom; playback: playback }
+    Connections {
+        target: root.listenRoom
+        function onLeftRoom() { root.notify("一起听已结束"); }
+    }
+
+    // 用好友发来的链接加入：链接或房间号都行
+    Kirigami.PromptDialog {
+        id: joinDialog
+        title: "加入一起听"
+        standardButtons: Kirigami.Dialog.NoButton
+        customFooterActions: [
+            Kirigami.Action {
+                text: "加入"
+                icon.name: "dialog-ok"
+                enabled: joinField.text.trim().length > 0
+                onTriggered: joinDialog.accept()
+            },
+            Kirigami.Action {
+                text: "取消"
+                icon.name: "dialog-cancel"
+                onTriggered: joinDialog.reject()
+            }
+        ]
+        onOpened: {
+            joinField.text = "";
+            joinField.forceActiveFocus();
+        }
+        onAccepted: root.listenRoom.joinRoom(joinField.text.trim())
+        TextField {
+            id: joinField
+            implicitWidth: Tokens.trackColumn + Tokens.albumColumn
+            placeholderText: "粘贴好友发来的一起听链接"
+            onAccepted: if (joinField.text.trim().length > 0) joinDialog.accept()
+        }
+    }
+
+    // 房主结束：房间散了，好友那边也会停；说清楚再结束
+    Kirigami.PromptDialog {
+        id: endListenDialog
+        title: "结束一起听？"
+        subtitle: "好友那边也会停止。"
+        standardButtons: Kirigami.Dialog.NoButton
+        customFooterActions: [
+            Kirigami.Action {
+                text: "结束"
+                icon.name: "system-log-out"
+                onTriggered: endListenDialog.accept()
+            },
+            Kirigami.Action {
+                text: "取消"
+                icon.name: "dialog-cancel"
+                onTriggered: endListenDialog.reject()
+            }
+        ]
+        onAccepted: root.listenRoom.leaveRoom()
+    }
+
     Playback {
         id: playback
         engine: root.backend ? root.backend.audio : simEngine
@@ -233,6 +301,11 @@ Kirigami.ApplicationWindow {
         onRemoveRequested: index => playback.remove(index)
         onClearRequested: playback.clearUpcoming()
         onMoveRequested: (from, to) => playback.move(from, to)
+        room: root.loggedIn ? root.listenRoom : null
+        onListenStartRequested: root.listenRoom.createRoom()
+        onListenJoinRequested: joinDialog.open()
+        onListenEndRequested: root.listenRoom.host ? endListenDialog.open() : root.listenRoom.leaveRoom()
+        onListenLinkCopied: root.notify("已复制邀请链接")
     }
 
     LoginDialog {
@@ -975,6 +1048,8 @@ Kirigami.ApplicationWindow {
         id: playerBar
         // MV 页有自己的画面控制，收起播放条把高度让给画面
         visible: root.page !== "mv"
+        together: root.listenRoom.inRoom
+        togetherText: root.togetherText
         track: root.currentTrack
         playing: playback.engine.playing
         elapsed: playback.engine.position

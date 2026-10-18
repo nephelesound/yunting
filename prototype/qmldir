@@ -60,3 +60,5 @@ TileGrid TileGrid.qml
 SavedPage SavedPage.qml
 ResourceRow ResourceRow.qml
 NoticeRow NoticeRow.qml
+SimListenTogether SimListenTogether.qml
+ListenTogetherLink ListenTogetherLink.qml

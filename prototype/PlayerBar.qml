@@ -53,6 +53,8 @@ Item {
     signal fullscreenRequested()
 
     property bool desktopLyricsShown
+    property bool together           // 正在一起听
+    property string togetherText     // 「正在和某某一起听」
 
     function openEqualizer() { eqPanel.showAt(bar); }
     function openQualityMenu() { qualityMenu.popup(qualityButton, 0, -qualityMenu.implicitHeight - Tokens.space2); }
@@ -224,7 +226,14 @@ Item {
                 ToolTip.delay: 600
             }
             IconButton { icon.name: "media-skip-forward"; text: "下一首"; onClicked: bar.nextRequested() }
-            IconButton { icon.source: Tokens.queueIcon; text: "播放队列"; onClicked: bar.queueRequested() }
+            // 一起听时队列按钮换成强调色的人像（同一个位置，不挤动中段）：打开的队列里有房间那一段
+            IconButton {
+                icon.source: bar.together ? "" : Tokens.queueIcon
+                icon.name: bar.together ? "group-symbolic" : ""
+                icon.color: bar.together ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor
+                text: bar.together ? bar.togetherText + " · 播放队列" : "播放队列"
+                onClicked: bar.queueRequested()
+            }
         }
 
         // 右：时间与视图。放不下时（与中段传输控件之间不足 24）音质、桌面歌词、迷你播放器收进「更多」：

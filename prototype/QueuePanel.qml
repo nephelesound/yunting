@@ -7,6 +7,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
+import org.kde.prison as Prison
 import "Format.js" as Format
 
 Kirigami.OverlayDrawer {
@@ -16,8 +17,13 @@ Kirigami.OverlayDrawer {
     property int currentIndex: -1
     property bool vip
     property bool smartEnabled: false
+    property var room: null   // 一起听（C++ ListenTogether 或原型替身）；未登录时为 null
 
     signal activated(int index)
+    signal listenStartRequested()
+    signal listenJoinRequested()
+    signal listenEndRequested()
+    signal listenLinkCopied()
     signal nowPlayingRequested()
     signal smartToggled(bool enabled)
     signal removeRequested(int index)
@@ -156,6 +162,119 @@ Kirigami.OverlayDrawer {
             }
         }
 
+        // 一起听：谁在房间里；还没人来时怎么邀请（扫码或发链接）；能做什么；怎么离开
+        ColumnLayout {
+            id: listenSection
+            visible: panel.room !== null && panel.room.inRoom
+            Layout.fillWidth: true
+            Layout.leftMargin: Tokens.pageMargin
+            Layout.rightMargin: Tokens.pageMargin
+            Layout.topMargin: Tokens.space2
+            spacing: Tokens.space3
+            readonly property var users: panel.room ? panel.room.users || [] : []
+            readonly property bool waiting: users.length < 2
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Tokens.space3
+                Repeater {
+                    model: listenSection.users
+                    delegate: RowLayout {
+                        id: member
+                        required property var modelData
+                        required property int index
+                        spacing: Tokens.space2
+                        PersonAvatar {
+                            implicitWidth: Tokens.height8
+                            implicitHeight: Tokens.height8
+                            name: member.modelData.name || ""
+                            source: member.modelData.avatar || ""
+                        }
+                        Label {
+                            Layout.maximumWidth: Tokens.albumColumn - Tokens.height8
+                            text: member.modelData.name || ""
+                            font.pixelSize: Tokens.textBase
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+                // 第二个位置空着：等好友来
+                Label {
+                    visible: listenSection.waiting
+                    text: "等好友加入…"
+                    font.pixelSize: Tokens.textSm
+                    color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                }
+                Item { Layout.fillWidth: true }
+                Button {
+                    implicitHeight: Tokens.height8
+                    flat: true
+                    enabled: !panel.room || !panel.room.busy
+                    // 房主走了房间就散了，好友那边也会停；好友退出只是自己离开
+                    text: panel.room && panel.room.host ? "结束" : "退出"
+                    font.pixelSize: Tokens.textSm
+                    onClicked: panel.listenEndRequested()
+                }
+            }
+
+            // 邀请：网易云音乐 App 扫码即可加入；也可以把链接发给好友
+            RowLayout {
+                visible: listenSection.waiting
+                Layout.fillWidth: true
+                spacing: Tokens.space4
+                Rectangle {
+                    implicitWidth: Tokens.tileSm
+                    implicitHeight: Tokens.tileSm
+                    radius: Tokens.radius
+                    color: "white"   // 二维码要白底才扫得出，深色主题下也一样
+                    Prison.Barcode {
+                        anchors.fill: parent
+                        anchors.margins: Tokens.space1
+                        barcodeType: Prison.Barcode.QRCode
+                        content: panel.room ? panel.room.shareUrl : ""
+                    }
+                }
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignTop
+                    spacing: Tokens.space2
+                    Label {
+                        Layout.fillWidth: true
+                        text: "用网易云音乐 App 扫码，或把链接发给好友"
+                        font.pixelSize: Tokens.textSm
+                        wrapMode: Text.Wrap
+                    }
+                    Button {
+                        implicitHeight: Tokens.height8
+                        icon.name: "edit-copy-symbolic"
+                        icon.width: Tokens.iconSm
+                        icon.height: Tokens.iconSm
+                        text: "复制邀请链接"
+                        font.pixelSize: Tokens.textSm
+                        onClicked: {
+                            Clipboard.copy(panel.room.shareUrl);
+                            panel.listenLinkCopied();
+                        }
+                    }
+                }
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: panel.room && panel.room.host ? "你放的歌会同步给好友，两人都能切歌和暂停"
+                    : "歌单由房主决定，两人都能切歌和暂停"
+                font.pixelSize: Tokens.textSm
+                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                wrapMode: Text.Wrap
+            }
+            Kirigami.InlineMessage {
+                Layout.fillWidth: true
+                visible: text.length > 0
+                type: Kirigami.MessageType.Error
+                text: panel.room ? panel.room.error || "" : ""
+            }
+        }
+
         // 正在播放
         SectionLabel {
             Layout.topMargin: Tokens.space4
@@ -273,6 +392,47 @@ Kirigami.OverlayDrawer {
                 icon.name: "view-media-playlist"
                 text: panel.current ? "这是队列里最后一首" : "队列是空的"
                 explanation: "在任意列表里点一首歌，它所在的列表会成为新的队列"
+            }
+        }
+
+        // 一起听的入口（不常用，放在最下面，不挤页头）：开一个房间，或用好友发来的链接加入。
+        // 进了房间后，房间那一段在上面，这一行收起
+        RowLayout {
+            visible: panel.room !== null && !panel.room.inRoom
+            Layout.fillWidth: true
+            Layout.leftMargin: Tokens.pageMargin
+            Layout.rightMargin: Tokens.pageMargin - Tokens.space2
+            Layout.topMargin: Tokens.space2
+            Layout.bottomMargin: Tokens.space4
+            spacing: Tokens.space2
+            Kirigami.Icon {
+                implicitWidth: Tokens.iconSm
+                implicitHeight: Tokens.iconSm
+                source: "group-symbolic"
+                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+            }
+            Label {
+                Layout.fillWidth: true
+                text: "和好友一起听"
+                font.pixelSize: Tokens.textSm
+                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                elide: Text.ElideRight
+            }
+            Button {
+                implicitHeight: Tokens.height8
+                flat: true
+                enabled: !panel.room || !panel.room.busy
+                text: "开始"
+                font.pixelSize: Tokens.textSm
+                onClicked: panel.listenStartRequested()
+            }
+            Button {
+                implicitHeight: Tokens.height8
+                flat: true
+                enabled: !panel.room || !panel.room.busy
+                text: "用链接加入…"
+                font.pixelSize: Tokens.textSm
+                onClicked: panel.listenJoinRequested()
             }
         }
     }
