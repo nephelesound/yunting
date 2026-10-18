@@ -245,14 +245,10 @@ Window {
         }
 
         // 悬停底板：托住按钮与歌词的唯一一块面（Metro：内容在前，不在面里再套一个工具栏的框），
-        // 宽度跟着字走（至少与按钮一行同宽），方角
+        // 铺满整个歌词窗口（也就是能拖动的范围），方角。不跟着字宽变：歌词一句一换，底板会一直伸缩
         Rectangle {
             visible: stage.active
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: Math.min(parent.width, Math.max(tools.implicitWidth,
-                                                   Math.ceil(Math.max(lineBox.width, secondLine.visible ? secondLine.contentWidth : 0))
-                                                   + 2 * Tokens.space6))
-            height: parent.height
+            anchors.fill: parent
             color: Qt.alpha(lyricsWindow.backing, Tokens.desktopPlate)
         }
 
