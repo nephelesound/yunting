@@ -321,16 +321,17 @@ void Store::requestHighQuality(const QString &cat, qint64 before)
                     });
                 }
                 done(QVariantMap{{"cat", category},
-                                 {"before", static_cast<double>(cursor)},
-                                 {"nextBefore", static_cast<double>(result.value->lasttime)},
+                                 {"next", static_cast<double>(result.value->lasttime)},
                                  {"more", result.value->more},
                                  {"items", items}},
                      true);
             });
         },
-        [this, token](const QVariant &value) {
-            if (m_requests.current(QStringLiteral("highquality"), token))
-                put("highquality", value, false);
+        [this, token, category, cursor](const QVariant &value) {
+            if (!m_requests.current(QStringLiteral("highquality"), token))
+                return;
+            const bool samePage = m_data.value("highquality").toMap().value("cat").toString() == category;
+            putPage("highquality", value.toMap(), cursor > 0 && samePage, false);
         });
 }
 
@@ -440,7 +441,8 @@ void Store::requestRadio(double radioId, int offset)
                                                  static_cast<qint64>(radioId)));
                 }
                 QVariantMap page = state->detail;
-                page.insert("offset", start);
+                // 下一页的 offset 按服务器给的条数算（没有主歌而被跳过的节目也占位）
+                page.insert("next", start + static_cast<int>(state->programs.size()));
                 page.insert("more", state->more);
                 page.insert("programs", programs);
                 done(page, true);
@@ -477,8 +479,10 @@ void Store::requestRadio(double radioId, int offset)
                 finish();
             });
         },
-        [this, token](const QVariant &value) {
-            if (m_requests.current(QStringLiteral("radio"), token))
-                put("radio", value, false);
+        [this, token, radioId, start](const QVariant &value) {
+            if (!m_requests.current(QStringLiteral("radio"), token))
+                return;
+            const bool samePage = m_data.value("radio").toMap().value("id").toDouble() == radioId;
+            putPage("radio", value.toMap(), start > 0 && samePage, false, "programs");
         });
 }

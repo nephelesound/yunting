@@ -136,8 +136,6 @@ void Store::requestNotices(qint64 before)
         }
         const sdk::SystemNoticePage &page = *result.value;
         QVariantList items;
-        if (paging)
-            items = m_data.value("notices").toMap().value("items").toList();
         for (const sdk::SystemNotice &notice : page.items) {
             // 外层 notice JSON 解析失败的行没有可读正文，跳过而不是塞空行。
             if (!notice.payloadValid)
@@ -150,12 +148,11 @@ void Store::requestNotices(qint64 before)
                 {"resource", systemNoticeResource(notice.payload)},
             });
         }
-        put("notices", QVariantMap{
-            {"before", static_cast<double>(before)},
-            {"nextBefore", static_cast<double>(page.nextTime)},
+        putPage("notices", QVariantMap{
+            {"next", static_cast<double>(page.nextTime)},
             {"more", page.more},
             {"items", items},
-        }, false);
+        }, paging, false);
     });
 }
 
@@ -180,8 +177,6 @@ void Store::requestCommentNotices(qint64 before)
         }
         const sdk::CommentNotificationPage &page = *result.value;
         QVariantList items;
-        if (paging)
-            items = m_data.value("commentNotices").toMap().value("items").toList();
         for (const sdk::CommentNotification &notification : page.items) {
             // 评论通知没有明确的资源 id；只把 resourceType 映射成 kind，其余留空。
             items.append(QVariantMap{
@@ -194,13 +189,12 @@ void Store::requestCommentNotices(qint64 before)
                                          {}, {}, {})},
             });
         }
-        put("commentNotices", QVariantMap{
-            {"before", static_cast<double>(before)},
-            {"nextBefore", static_cast<double>(page.nextBeforeTime)},
+        putPage("commentNotices", QVariantMap{
+            {"next", static_cast<double>(page.nextBeforeTime)},
             {"more", page.more},
             {"total", static_cast<double>(page.total)},
             {"items", items},
-        }, false);
+        }, paging, false);
     });
 }
 
@@ -224,8 +218,6 @@ void Store::requestForwards(int offset)
         }
         const sdk::ForwardNotificationPage &page = *result.value;
         QVariantList items;
-        if (paging)
-            items = m_data.value("forwards").toMap().value("items").toList();
         for (const sdk::ForwardNotification &notification : page.items) {
             const QString kind = resourceKind(notification.resourceKind);
             const QString vid = kind == QLatin1String("video") && notification.resourceId > 0
@@ -241,11 +233,11 @@ void Store::requestForwards(int offset)
                                          notification.resourceArtist)},
             });
         }
-        put("forwards", QVariantMap{
-            {"offset", offset},
+        putPage("forwards", QVariantMap{
+            {"next", offset + static_cast<int>(page.items.size())},
             {"more", page.more},
             {"newCount", page.newCount},
             {"items", items},
-        }, false);
+        }, paging, false);
     });
 }

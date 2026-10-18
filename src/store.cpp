@@ -10,6 +10,7 @@
 #include <cmath>
 #include <QHash>
 #include <QNetworkInformation>
+#include <QSet>
 #include <QStandardPaths>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -103,14 +104,14 @@ Store::Store(NcmClient *client, QObject *parent)
         {"dynamicCover", nullVariant()},
         {"commentReplies", nullVariant()},
         {"lyricsNew", nullVariant()},
-        // 匿名发现：形状见 docs/API-FRONTEND.md「已实现的新增数据槽」
+        // 匿名发现：形状见 docs/API-FRONTEND.md「已实现的新增数据槽」。没取之前是 null，[] 是取到了但为空
         {"searchSuggest", nullVariant()},
-        {"newSongs", QVariantList{}},
-        {"newAlbums", QVariantList{}},
-        {"highqualityTags", QVariantList{}},
+        {"newSongs", nullVariant()},
+        {"newAlbums", nullVariant()},
+        {"highqualityTags", nullVariant()},
         {"highquality", nullVariant()},
-        {"recommendedMvs", QVariantList{}},
-        {"recommendedPrograms", QVariantList{}},
+        {"recommendedMvs", nullVariant()},
+        {"recommendedPrograms", nullVariant()},
         {"radio", nullVariant()},
     };
     m_personal = QVariantMap{
@@ -229,6 +230,28 @@ void Store::put(const char *key, const QVariant &value, bool personalSide)
         persistScreenData();
         emit dataChanged();
     }
+}
+
+void Store::putPage(const char *key, QVariantMap page, bool append, bool personalSide, const char *itemsKey)
+{
+    if (append) {
+        const QString itemsName = QLatin1String(itemsKey);
+        QVariantList items = (personalSide ? m_personal : m_data).value(QLatin1String(key)).toMap()
+                                 .value(itemsName).toList();
+        QSet<QString> seen;
+        const auto identity = [](const QVariant &item) {
+            const QVariantMap map = item.toMap();
+            return map.value("id").toString() + u'|' + map.value("vid").toString();
+        };
+        for (const QVariant &item : std::as_const(items))
+            seen.insert(identity(item));
+        for (const QVariant &item : page.value(itemsName).toList()) {
+            if (!seen.contains(identity(item)))
+                items.append(item);
+        }
+        page.insert(itemsName, items);
+    }
+    put(key, page, personalSide);
 }
 
 // 首屏快照只留首屏字段。搜索词、评论、歌手/专辑/MV 详情都在别的 key 里，

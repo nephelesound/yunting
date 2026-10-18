@@ -125,6 +125,8 @@ void Store::setUserFollowed(double userId, bool followed)
             return;
         }
         const bool state = result.value->followed;
+        // 与关注歌手一样：缓存里的主页还是旧的关注状态，下次打开要重新取
+        m_cache.forget(QStringLiteral("user:") + num(userId));
 
         QVariantMap user = m_data.value("user").toMap();
         if (user.value("id").toDouble() == userId) {

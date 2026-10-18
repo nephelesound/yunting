@@ -1883,10 +1883,14 @@ private slots:
                     {"creator", QJsonObject{{"userId", 9}, {"nickname", "歌单主"}}}}}}});
         };
 
-        // 第一页与第二页共用第一页的请求代号；第二页仍按自己的游标取
+        // 第一页的 next 是下一页的游标；第二页沿用第一页的请求代号，条目接在第一页后面
         m_store->request(QStringLiteral("discover:highquality:全部"));
         QVERIFY(waitUntil([&] {
             return pending.contains(QStringLiteral("全部:0"));
+        }));
+        pending.value(QStringLiteral("全部:0"))(200, page(5, 777));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("highquality").toMap().value("next").toDouble() == 777.0;
         }));
         m_store->request(QStringLiteral("discover:highquality:全部:777"));
         QVERIFY(waitUntil([&] {
@@ -1894,19 +1898,25 @@ private slots:
         }));
         pending.value(QStringLiteral("全部:777"))(200, page(6, 888));
         QVERIFY(waitUntil([&] {
-            return m_store->data().value("highquality").toMap().value("before").toDouble() == 777.0;
+            return m_store->data().value("highquality").toMap().value("next").toDouble() == 888.0;
         }));
         const QVariantMap paged = m_store->data().value("highquality").toMap();
         QCOMPARE(paged.value("cat").toString(), QStringLiteral("全部"));
-        QCOMPARE(paged.value("nextBefore").toDouble(), 888.0);
         QCOMPARE(paged.value("more").toBool(), true);
-        const QVariantMap pagedItem = paged.value("items").toList().first().toMap();
+        const QVariantList pagedItems = paged.value("items").toList();
+        QCOMPARE(pagedItems.size(), 2);
+        QCOMPARE(pagedItems.at(0).toMap().value("id").toDouble(), 5.0);
+        const QVariantMap pagedItem = pagedItems.at(1).toMap();
         QCOMPARE(pagedItem.value("id").toDouble(), 6.0);
+        // 同一页再送来一次（缓存命中）：不重复接
+        m_store->request(QStringLiteral("discover:highquality:全部:777"));
+        QTest::qWait(150);
+        QCOMPARE(m_store->data().value("highquality").toMap().value("items").toList().size(), 2);
         QCOMPARE(pagedItem.value("count").toDouble(), 12.0);
         QCOMPARE(pagedItem.value("plays").toDouble(), 34.0);
         QCOMPARE(pagedItem.value("creator").toString(), QStringLiteral("歌单主"));
 
-        // 换分类会开始新代号：旧分类的第一页晚到不能覆盖新分类
+        // 换分类是新的一份列表：整槽换掉，不接在旧分类后面
         m_store->request(QStringLiteral("discover:highquality:华语"));
         QVERIFY(waitUntil([&] {
             return pending.contains(QStringLiteral("华语:0"));
@@ -1916,12 +1926,10 @@ private slots:
             return m_store->data().value("highquality").toMap().value("cat").toString()
                 == QStringLiteral("华语");
         }));
-        pending.value(QStringLiteral("全部:0"))(200, page(5, 999));
-        QTest::qWait(150);
 
         const QVariantMap switched = m_store->data().value("highquality").toMap();
-        QCOMPARE(switched.value("cat").toString(), QStringLiteral("华语"));
-        QCOMPARE(switched.value("before").toDouble(), 0.0);
+        QCOMPARE(switched.value("next").toDouble(), 1000.0);
+        QCOMPARE(switched.value("items").toList().size(), 1);
         QCOMPARE(switched.value("items").toList().first().toMap().value("id").toDouble(), 7.0);
         QCOMPARE(cats.size(), 3);
         QCOMPARE(cats.at(0), QStringLiteral("全部"));
@@ -1949,22 +1957,22 @@ private slots:
             }
             respond(200, "{\"code\":200}");
         };
-        const auto page = [] {
+        // 每页两个节目，其中一个没有主歌（不返回，但占 offset）
+        const auto page = [](int mainSongId) {
             return json(QJsonObject{
                 {"code", 200}, {"count", 2}, {"more", true},
-                {"programs", QJsonArray{programObject(55), programObject(0)}}});
+                {"programs", QJsonArray{programObject(mainSongId), programObject(0)}}});
         };
 
         m_store->request(QStringLiteral("radio:7"));
         QVERIFY(waitUntil([&] { return pending.contains(QStringLiteral("0")); }));
-        pending.value(QStringLiteral("0"))(200, page());
+        pending.value(QStringLiteral("0"))(200, page(55));
         QVERIFY(waitUntil([&] {
             return m_store->data().value("radio").toMap().value("id").toDouble() == 7.0
                 && m_store->data().value("radio").toMap().value("programs").toList().size() == 1;
         }));
         const QVariantMap radio = m_store->data().value("radio").toMap();
         QCOMPARE(radio.value("name").toString(), QStringLiteral("电台"));
-        QCOMPARE(radio.value("offset").toDouble(), 0.0);
         QCOMPARE(radio.value("more").toBool(), true);
         const QVariantMap dj = radio.value("dj").toMap();
         QCOMPARE(dj.value("id").toDouble(), 99.0);
@@ -1986,14 +1994,20 @@ private slots:
         QCOMPARE(program.value("createTime").toDouble(), 1700000000000.0);
         QCOMPARE(program.value("description").toString(), QStringLiteral("节目简介"));
 
-        m_store->request(QStringLiteral("radio:7:30"));
-        QVERIFY(waitUntil([&] { return pending.contains(QStringLiteral("30")); }));
+        QCOMPARE(radio.value("next").toInt(), 2);   // 被跳过的节目也占位
+        m_store->request(QStringLiteral("radio:7:2"));
+        QVERIFY(waitUntil([&] { return pending.contains(QStringLiteral("2")); }));
         QCOMPARE(detailRequests, 1);   // 翻页复用槽里的详情
-        pending.value(QStringLiteral("30"))(200, page());
+        pending.value(QStringLiteral("2"))(200, page(56));
         QVERIFY(waitUntil([&] {
-            return m_store->data().value("radio").toMap().value("offset").toDouble() == 30.0;
+            return m_store->data().value("radio").toMap().value("next").toInt() == 4;
         }));
-        QCOMPARE(m_store->data().value("radio").toMap().value("id").toDouble(), 7.0);
+        const QVariantMap paged = m_store->data().value("radio").toMap();
+        QCOMPARE(paged.value("id").toDouble(), 7.0);
+        const QVariantList programs = paged.value("programs").toList();
+        QCOMPARE(programs.size(), 2);   // 第二页接在第一页后面
+        QCOMPARE(programs.at(0).toMap().value("id").toDouble(), 55.0);
+        QCOMPARE(programs.at(1).toMap().value("id").toDouble(), 56.0);
         QCOMPARE(detailRequests, 1);
         QCOMPARE(asc.size(), 2);
         QCOMPARE(asc.at(0), QStringLiteral("false"));
@@ -2075,8 +2089,7 @@ private slots:
         }));
         const QVariantMap first = m_store->data().value("userEvents").toMap();
         QCOMPARE(first.value("userId").toDouble(), 900042.0);
-        QCOMPARE(first.value("cursor").toDouble(), -1.0);
-        QCOMPARE(first.value("nextCursor").toDouble(), 1700000001000.0);
+        QCOMPARE(first.value("next").toDouble(), 1700000001000.0);
         QCOMPARE(first.value("more").toBool(), true);
         const QVariantMap item = first.value("items").toList().first().toMap();
         QCOMPARE(item.value("id").toDouble(), 900009.0);
@@ -2100,8 +2113,7 @@ private slots:
             return m_store->data().value("userEvents").toMap().value("items").toList().size() == 2;
         }));
         const QVariantMap secondPage = m_store->data().value("userEvents").toMap();
-        QCOMPARE(secondPage.value("cursor").toDouble(), 1700000001000.0);
-        QCOMPARE(secondPage.value("nextCursor").toDouble(), 1700000002000.0);
+        QCOMPARE(secondPage.value("next").toDouble(), 1700000002000.0);
         QCOMPARE(secondPage.value("more").toBool(), false);
         QCOMPARE(secondPage.value("items").toList().at(0).toMap().value("id").toDouble(), 900009.0);
     }
@@ -2325,7 +2337,7 @@ private slots:
             return m_store->personal().value("savedArtists").toMap().value("items").toList().size() == 1;
         }));
         const QVariantMap artists = m_store->personal().value("savedArtists").toMap();
-        QCOMPARE(artists.value("offset").toInt(), 0);
+        QCOMPARE(artists.value("next").toInt(), 1);   // 下一页从第 1 条之后取
         QCOMPARE(artists.value("more").toBool(), true);
         QCOMPARE(artists.value("count").toDouble(), 2.0);
         const QVariantMap artist = artists.value("items").toList().first().toMap();
@@ -2335,11 +2347,11 @@ private slots:
         QCOMPARE(artist.value("mvs").toDouble(), 3.0);
         QCOMPARE(artist.value("cover").toString(), QStringLiteral("http://artist"));
 
-        m_store->request(QStringLiteral("library:artists:25"));
+        m_store->request(QStringLiteral("library:artists:1"));
         QVERIFY(waitUntil([&] {
             return m_store->personal().value("savedArtists").toMap().value("items").toList().size() == 2;
         }));
-        QCOMPARE(m_store->personal().value("savedArtists").toMap().value("offset").toInt(), 25);
+        QCOMPARE(m_store->personal().value("savedArtists").toMap().value("next").toInt(), 2);
 
         m_store->request(QStringLiteral("library:albums"));
         QVERIFY(waitUntil([&] {
@@ -2547,8 +2559,7 @@ private slots:
             return m_store->data().value("notices").toMap().value("items").toList().size() == 2;
         }));
         const QVariantMap notices = m_store->data().value("notices").toMap();
-        QCOMPARE(notices.value("before").toDouble(), -1.0);
-        QCOMPARE(notices.value("nextBefore").toDouble(), 1700000000003.0);
+        QCOMPARE(notices.value("next").toDouble(), 1700000000003.0);
         QCOMPARE(notices.value("more").toBool(), true);
         const QVariantMap playlistNotice = notices.value("items").toList().at(0).toMap();
         QCOMPARE(playlistNotice.value("id").toDouble(), 900302.0);
@@ -2570,8 +2581,6 @@ private slots:
         QVERIFY(waitUntil([&] {
             return m_store->data().value("notices").toMap().value("items").toList().size() == 3;
         }));
-        QCOMPARE(m_store->data().value("notices").toMap().value("before").toDouble(),
-                 1700000000003.0);
         QCOMPARE(m_store->data().value("notices").toMap().value("more").toBool(), false);
 
         m_store->request(QStringLiteral("notify:comments"));
@@ -2579,8 +2588,7 @@ private slots:
             return m_store->data().value("commentNotices").toMap().value("items").toList().size() == 1;
         }));
         const QVariantMap comments = m_store->data().value("commentNotices").toMap();
-        QCOMPARE(comments.value("before").toDouble(), -1.0);
-        QCOMPARE(comments.value("nextBefore").toDouble(), 1700000000100.0);
+        QCOMPARE(comments.value("next").toDouble(), 1700000000100.0);
         QCOMPARE(comments.value("more").toBool(), true);
         QCOMPARE(comments.value("total").toDouble(), 12.0);
         const QVariantMap comment = comments.value("items").toList().first().toMap();
@@ -2596,7 +2604,7 @@ private slots:
             return m_store->data().value("forwards").toMap().value("items").toList().size() == 2;
         }));
         const QVariantMap forwards = m_store->data().value("forwards").toMap();
-        QCOMPARE(forwards.value("offset").toInt(), 0);
+        QCOMPARE(forwards.value("next").toInt(), 2);
         QCOMPARE(forwards.value("more").toBool(), true);
         QCOMPARE(forwards.value("newCount").toInt(), 3);
         const QVariantMap firstForward = forwards.value("items").toList().at(0).toMap();
@@ -2616,11 +2624,11 @@ private slots:
         QCOMPARE(videoForward.value("resource").toMap().value("vid").toString(),
                  QStringLiteral("5307442"));
 
-        m_store->request(QStringLiteral("notify:forwards:30"));
+        m_store->request(QStringLiteral("notify:forwards:2"));
         QVERIFY(waitUntil([&] {
             return m_store->data().value("forwards").toMap().value("items").toList().size() == 3;
         }));
-        QCOMPARE(m_store->data().value("forwards").toMap().value("offset").toInt(), 30);
+        QCOMPARE(m_store->data().value("forwards").toMap().value("next").toInt(), 3);
 
         m_store->logout();
         QVERIFY(m_store->data().value("notices").isNull());

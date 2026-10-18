@@ -38,8 +38,6 @@ void Store::requestSavedArtists(int offset)
         }
         const sdk::SubscribedArtistPage &page = *result.value;
         QVariantList items;
-        if (offset > 0)
-            items = m_personal.value("savedArtists").toMap().value("items").toList();
         for (const sdk::SubscribedArtist &artist : page.items) {
             items.append(QVariantMap{
                 {"id", static_cast<double>(artist.id)},
@@ -51,12 +49,12 @@ void Store::requestSavedArtists(int offset)
                 {"mvs", static_cast<double>(artist.mvSize)},
             });
         }
-        put("savedArtists", QVariantMap{
-            {"offset", offset},
+        putPage("savedArtists", QVariantMap{
+            {"next", offset + static_cast<int>(page.items.size())},
             {"more", page.hasMore},
             {"count", static_cast<double>(page.count)},
             {"items", items},
-        }, true);
+        }, offset > 0, true);
     });
 }
 
@@ -79,8 +77,6 @@ void Store::requestSavedAlbums(int offset)
         }
         const sdk::SubscribedAlbumPage &page = *result.value;
         QVariantList items;
-        if (offset > 0)
-            items = m_personal.value("savedAlbums").toMap().value("items").toList();
         for (const sdk::SubscribedAlbum &album : page.items) {
             items.append(QVariantMap{
                 {"id", static_cast<double>(album.id)},
@@ -91,12 +87,12 @@ void Store::requestSavedAlbums(int offset)
                 {"size", static_cast<double>(album.size)},
             });
         }
-        put("savedAlbums", QVariantMap{
-            {"offset", offset},
+        putPage("savedAlbums", QVariantMap{
+            {"next", offset + static_cast<int>(page.items.size())},
             {"more", page.hasMore},
             {"count", static_cast<double>(page.count)},
             {"items", items},
-        }, true);
+        }, offset > 0, true);
     });
 }
 
@@ -119,8 +115,6 @@ void Store::requestSavedMvs(int offset)
         }
         const sdk::SubscribedMvPage &page = *result.value;
         QVariantList items;
-        if (offset > 0)
-            items = m_personal.value("savedMvs").toMap().value("items").toList();
         for (const sdk::SubscribedMv &mv : page.items) {
             // SDK type: 0 = MV（id 是数字），1 = 视频（id 是 vid 字符串）。
             const bool video = mv.type == 1;
@@ -135,11 +129,11 @@ void Store::requestSavedMvs(int offset)
                 {"playCount", static_cast<double>(mv.playCount)},
             });
         }
-        put("savedMvs", QVariantMap{
-            {"offset", offset},
+        putPage("savedMvs", QVariantMap{
+            {"next", offset + static_cast<int>(page.items.size())},
             {"more", page.hasMore},
             {"count", static_cast<double>(page.count)},
             {"items", items},
-        }, true);
+        }, offset > 0, true);
     });
 }

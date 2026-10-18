@@ -51,8 +51,7 @@ void Store::requestUserEvents(const QString &key, double uid, qint64 cursor)
                 // 与关注列表一致：隐私拒绝是页面内状态，不弹全局错误。
                 put("userEvents", QVariantMap{
                     {"userId", uid},
-                    {"cursor", static_cast<double>(cursor)},
-                    {"nextCursor", static_cast<double>(cursor)},
+                    {"next", static_cast<double>(cursor)},
                     {"more", false},
                     {"items", QVariantList{}},
                     {"restricted", true},
@@ -66,11 +65,6 @@ void Store::requestUserEvents(const QString &key, double uid, qint64 cursor)
         }
         const sdk::EventPage &page = *result.value;
         QVariantList items;
-        if (paging) {
-            const QVariantMap old = m_data.value("userEvents").toMap();
-            if (old.value("userId").toDouble() == uid)
-                items = old.value("items").toList();
-        }
         for (const sdk::UserEvent &event : page.items) {
             items.append(QVariantMap{
                 {"id", static_cast<double>(event.id)},
@@ -85,12 +79,12 @@ void Store::requestUserEvents(const QString &key, double uid, qint64 cursor)
                 {"shares", static_cast<double>(event.shareCount)},
             });
         }
-        put("userEvents", QVariantMap{
+        const bool samePerson = m_data.value("userEvents").toMap().value("userId").toDouble() == uid;
+        putPage("userEvents", QVariantMap{
             {"userId", uid},
-            {"cursor", static_cast<double>(cursor)},
-            {"nextCursor", static_cast<double>(page.lasttime)},
+            {"next", static_cast<double>(page.lasttime)},
             {"more", page.more},
             {"items", items},
-        }, false);
+        }, paging && samePerson, false);
     });
 }

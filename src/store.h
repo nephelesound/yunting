@@ -245,6 +245,9 @@ private:
 
     // 归一化结果写回 m_data / m_personal 并 NOTIFY
     void put(const char *key, const QVariant &value, bool personalSide);
+    // 分页槽：第一页（append 为 false）整槽换成这一页；之后的页把 itemsKey 下的条目接在已有的后面
+    //（按 id/vid 去重：缓存命中后再刷新会把同一页送来两次），其余字段（more、next、计数）取这一页的
+    void putPage(const char *key, QVariantMap page, bool append, bool personalSide, const char *itemsKey = "items");
     void setOnline(bool online);
     void setSessionExpired(bool expired);
 
