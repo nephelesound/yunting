@@ -2,6 +2,7 @@
 
 #include <QGuiApplication>
 #include <QMargins>
+#include <QQuickWindow>
 #include <QWindow>
 
 #ifdef YUNTING_LAYERSHELL
@@ -107,6 +108,11 @@ void LayerShellHelper::placeOverlay(QWindow *window, int anchors, int left, int 
     auto *layer = LayerShellQt::Window::get(window);
     layer->setAnchors(LayerShellQt::Window::Anchors(LayerShellQt::Window::Anchors::fromInt(anchors)));
     layer->setMargins(QMargins(left, top, right, bottom));
+    // 边距要等窗口下一次提交才生效，LayerShellQt 自己不提交：画一帧，否则拖动时内容不变的窗口不跟手
+    if (auto *quick = qobject_cast<QQuickWindow *>(window))
+        quick->update();
+    else
+        window->requestUpdate();
 #else
     Q_UNUSED(anchors);
     Q_UNUSED(left);
