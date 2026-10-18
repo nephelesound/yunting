@@ -44,6 +44,10 @@ NcmClient                 传输（cookie、weapi/明文、超时）
 - `library.h/.cpp`：歌手/专辑/MV 收藏列表分页（登录 weapi）。
 - `dynamic_cover.h/.cpp`：动态封面 URL/尺寸/needTransition；匿名 301，登录后可用；live 已验 `videoPlayUrl`。
 - `search_suggest.h/.cpp`：搜索联想（歌手/歌曲/专辑/歌单）；匿名明文接口。
+- `comment.h/.cpp`：热评、游标分页、楼中楼 typed 模型与纯解析；头像 URL 保持原始值，Store 边界统一缩成 96。
+- `lyrics.h/.cpp`：普通/逐字歌词原始文本（lrc/tlyric/yrc/ytlrc、pureMusic/nolyric）；LRC/YRC 行解析仍由 Store 边界复用旧解析器。
+- `notify.h/.cpp`：`/api/pl/count` 通知计数纯解析；`total` 由 Store 按固定六项求和。
+- `user_social.h/.cpp`：关注/粉丝列表、账号等级、收藏计数纯解析；不包含关注写操作。
 - 动态封面 live shape：`data.videoPlayUrl` + `needTransition`；`weight` 兼容上游 typo，URL 是带时效签名地址。
 - `service.h/.cpp`：唯一的 HTTP code/错误/context/JSON 信封 seam，所有 service 共用。
 - `samples/`：
@@ -114,6 +118,7 @@ ncm::sdk::fetchSubscribedArtists(client, 25, 0, this,
 1. 在 `sdk/` 建 `xxx.h/.cpp`：请求 struct、响应 struct、每个字段注明 raw JSON path。
 2. 所有解析只写在该 `.cpp`，用 `JsonReader`；禁止在 Store/QML 读取 raw JSON。
 3. 网络编排放在 `xxx_service.cpp`，返回 `Result<T>`；错误必须有 `endpoint`，解析错误必须有 `path`。
+   迁移已有 Store 按需接口时，如果必须保留它的 `QueryCache`、在途去重、epoch/token 和错误 key，可以只提供 typed parser，HTTP 留在 Store；新接口仍应优先走 service。
 4. 加一个 typed parser 测试；再决定是否加 Store 缓存层。
 5. 在 `samples/` 放 request、raw、normalized 三份 JSON。
 6. 旧前端若仍吃 `QVariantMap`，只在边界写 `toVariantMap()`，不让 map 进入 SDK。
