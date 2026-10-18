@@ -201,6 +201,16 @@ QtObject {
 
     // 账号
     readonly property var account: source.p.account   // null = 没有登录快照
+    readonly property double accountId: source.account ? source.account.id : 0
+    // 换号（含匿名 → 登录 / 退出）时，评论分页与歌手分页里还留着上一个账号的 liked/followed 状态。
+    // 只认 userId 变化；同一账号资料刷新不打断正在看的列表。
+    onAccountIdChanged: {
+        source.latestComments = ({ owner: 0, items: [], total: 0, more: false, next: 0, loading: false })
+        source.artistSongs = ({ owner: 0, items: [], total: 0, more: false, next: 0, loading: false })
+        source.likedOverride = ({})
+        source.requestFailures = ({})
+        source.requestRestrictions = ({})
+    }
 
     // 榜单
     readonly property var toplists: source.d.toplists
