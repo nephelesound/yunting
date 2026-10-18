@@ -93,7 +93,10 @@ ScreenFrame {
             spacing: Tokens.space1
             clip: true
             boundsBehavior: Flickable.StopAtBounds
-            model: page.conversations.items
+            model: GrowingModel {
+                values: page.conversations.items
+                keyOf: c => c.userId
+            }
             ScrollBar.vertical: ScrollBar {}
             WheelScroll { flickable: list }
             onAtYEndChanged: if (atYEnd) Source.moreInbox()
@@ -108,16 +111,17 @@ ScreenFrame {
             }
 
             delegate: PersonRow {
-                required property var modelData
+                required property int index
+                readonly property var conversation: page.conversations.items[index] || ({})
                 width: ListView.view.width - ListView.view.rightMargin
-                avatar: modelData.avatar
-                name: modelData.name
+                avatar: conversation.avatar
+                name: conversation.name
                 // 后端给的最后一句：对方说的话，没说话时是分享物的名字（再包一层「分享了…」会重复书名号）
-                detail: modelData.lastText
-                meta: Format.commentTime(modelData.lastTime)
-                unread: modelData.unread
-                current: modelData.userId === page.peer
-                onClicked: page.peer = modelData.userId
+                detail: conversation.lastText
+                meta: Format.commentTime(conversation.lastTime)
+                unread: conversation.unread
+                current: conversation.userId === page.peer
+                onClicked: page.peer = conversation.userId
             }
 
             Kirigami.PlaceholderMessage {
@@ -162,7 +166,10 @@ ScreenFrame {
                 boundsBehavior: Flickable.StopAtBounds
                 // 接口给的是新到旧：从下往上排，最新的贴着底部；往上滚到头接着取更早的
                 verticalLayoutDirection: ListView.BottomToTop
-                model: page.thread.items
+                model: GrowingModel {
+                    values: page.thread.items
+                    keyOf: m => m.id > 0 ? String(m.id) : m.fromUserId + ":" + m.time + ":" + m.batchId
+                }
                 ScrollBar.vertical: ScrollBar {}
                 WheelScroll { flickable: messages }
                 onAtYBeginningChanged: if (atYBeginning && count > 0) Source.moreThread(page.thread)
@@ -179,7 +186,8 @@ ScreenFrame {
 
                 delegate: RowLayout {
                     id: message
-                    required property var modelData
+                    required property int index
+                    readonly property var messageData: page.thread.items[index] || ({})
                     width: ListView.view.width - ListView.view.rightMargin
                     spacing: Tokens.space3
 
@@ -187,8 +195,8 @@ ScreenFrame {
                         Layout.alignment: Qt.AlignTop
                         implicitWidth: Tokens.height8
                         implicitHeight: Tokens.height8
-                        name: message.modelData.fromName
-                        source: message.modelData.fromAvatar
+                        name: message.messageData.fromName
+                        source: message.messageData.fromAvatar
                     }
                     // 贴左上：只有分享物（固定宽）时列比行窄，不能被居中
                     ColumnLayout {
@@ -198,11 +206,11 @@ ScreenFrame {
                         RowLayout {
                             spacing: Tokens.space2
                             Label {
-                                text: message.modelData.mine ? "我" : message.modelData.fromName
+                                text: message.messageData.mine ? "我" : message.messageData.fromName
                                 font.pixelSize: Tokens.textSm
                             }
                             Label {
-                                text: Format.commentTime(message.modelData.time)
+                                text: Format.commentTime(message.messageData.time)
                                 font.pixelSize: Tokens.textSm
                                 font.features: { "tnum": 1 }
                                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
@@ -215,9 +223,9 @@ ScreenFrame {
                             readOnly: true
                             selectByMouse: true
                             // 分享时没写话，接口用分享物的名字顶上：那就不重复显示
-                            readonly property var shared: message.modelData.message[message.modelData.message.kind] || null
-                            text: message.modelData.message.text !== (shared && shared.name ? shared.name : null)
-                                ? message.modelData.message.text : ""
+                            readonly property var shared: message.messageData.message[message.messageData.message.kind] || null
+                            text: message.messageData.message.text !== (shared && shared.name ? shared.name : null)
+                                ? message.messageData.message.text : ""
                             font.pixelSize: Tokens.textBase
                             color: Kirigami.Theme.textColor
                             selectionColor: Kirigami.Theme.highlightColor
@@ -228,7 +236,7 @@ ScreenFrame {
                         // 分享物宽度固定为一栏（窄于 wideRow 时曲目行自己收起专辑列，成为紧凑的一张「歌」）。
                         // 外面套一层占满列宽的容器：定宽的子项不能反过来把整列压窄、被布局居中
                         Item {
-                            readonly property var song: message.modelData.message.song || null
+                            readonly property var song: message.messageData.message.song || null
                             Layout.fillWidth: true
                             implicitHeight: songTile.height
                             visible: song !== null
@@ -243,9 +251,9 @@ ScreenFrame {
                             }
                         }
                         Item {
-                            readonly property string kind: message.modelData.message.kind
+                            readonly property string kind: message.messageData.message.kind
                             readonly property var item: kind === "album" || kind === "playlist" || kind === "mv"
-                                ? message.modelData.message[kind] || null : null
+                                ? message.messageData.message[kind] || null : null
                             Layout.fillWidth: true
                             implicitHeight: sharedTile.height
                             visible: item !== null

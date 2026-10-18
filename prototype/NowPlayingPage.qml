@@ -71,10 +71,18 @@ ScreenFrame {
         return page.hotShown.map(c => Object.assign({ group: "hot" }, c))
             .concat(latest.map(c => Object.assign({ group: "latest" }, c)));
     }
+    readonly property bool commentsReady: page.track !== null && Source.commentsLoaded(page.track.id)
     function startComments() {
-        if (page.track && page.pane === "comments" && Source.latestComments.owner !== page.track.id)
-            Source.moreComments(page.track.id);
+        if (!(page.track && page.pane === "comments") || Source.latestComments.owner === page.track.id)
+            return;
+        // 热评是列表头。等它落地后再拉最新页，避免热评晚到后把整张表重建、滚回顶部。
+        if (!page.commentsReady) {
+            Source.need("comments:" + page.track.id);
+            return;
+        }
+        Source.moreComments(page.track.id);
     }
+    onCommentsReadyChanged: if (page.commentsReady) page.startComments()
     onPaneChanged: page.startComments()
     onTrackChanged: {
         page.openThread = 0;

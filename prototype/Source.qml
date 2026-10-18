@@ -115,6 +115,12 @@ QtObject {
         source.need("comments:" + songId);
         return [];
     }
+    // 热评请求是否已经落地（空列表也算）；评论区要等它先回来再请求最新页，
+    // 否则热评晚到会被拼在最新评论前面，列表按差异重建一次，滚动位置就丢了。
+    function commentsLoaded(songId) {
+        const c = source.d.comments;
+        return Boolean(c && c.songId === songId);
+    }
 
     // 评论总数：与热评同一次请求（换歌时取一次，缓存里有就不再发）
     function commentTotal(songId) {
