@@ -51,8 +51,12 @@ Item {
     signal shareRequested()
     signal commentsRequested()
     signal fullscreenRequested()
+    signal listenStartRequested()
+    signal listenJoinRequested()
 
     property bool desktopLyricsShown
+    property bool canListen          // 一起听可用（登录后）
+    property bool listenBusy         // 正在建房间 / 加入：菜单先不让点
     property bool together           // 正在一起听
     property string togetherText     // 「正在和某某一起听」
 
@@ -105,7 +109,7 @@ Item {
         RowLayout {
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            // 至多一栏宽（400）：歌名、红心、分享、评论都放得下；窄窗口时让给中间的传输控件
+            // 至多一栏宽（400）：歌名、红心、分享、评论、一起听都放得下；窄窗口时让给中间的传输控件
             width: Math.min(Tokens.measureMax, transport.x - Tokens.space6)
             spacing: Tokens.space3
 
@@ -175,6 +179,31 @@ Item {
                 ToolTip.delay: 600
                 onClicked: bar.commentsRequested()
             }
+            // 一起听：和喜欢、分享、评论同属「对这首歌做什么」。不在房间时弹原生菜单（开始 / 用链接加入），
+            // 在房间时是强调色，点开队列（房间那一段在队列顶上）
+            IconButton {
+                id: listenButton
+                visible: !hud.compact && bar.canListen
+                icon.name: "group-symbolic"
+                icon.color: bar.together ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor
+                text: bar.together ? bar.togetherText : "和好友一起听"
+                onClicked: bar.together ? bar.queueRequested() : listenMenu.popup(listenButton, 0, -listenMenu.implicitHeight - Tokens.space2)
+            }
+            Menu {
+                id: listenMenu
+                MenuItem {
+                    enabled: bar.active && !bar.listenBusy
+                    icon.name: "group-symbolic"
+                    text: "开始一起听"
+                    onTriggered: bar.listenStartRequested()
+                }
+                MenuItem {
+                    enabled: !bar.listenBusy
+                    icon.name: "insert-link-symbolic"
+                    text: "用链接加入…"
+                    onTriggered: bar.listenJoinRequested()
+                }
+            }
         }
 
         // 中：传输控制（对称）
@@ -226,12 +255,9 @@ Item {
                 ToolTip.delay: 600
             }
             IconButton { icon.name: "media-skip-forward"; text: "下一首"; onClicked: bar.nextRequested() }
-            // 一起听时队列按钮换成强调色的人像（同一个位置，不挤动中段）：打开的队列里有房间那一段
             IconButton {
-                icon.source: bar.together ? "" : Tokens.queueIcon
-                icon.name: bar.together ? "group-symbolic" : ""
-                icon.color: bar.together ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor
-                text: bar.together ? "播放队列\n" + bar.togetherText : "播放队列"
+                icon.source: Tokens.queueIcon
+                text: "播放队列"
                 onClicked: bar.queueRequested()
             }
         }
@@ -337,6 +363,14 @@ Item {
                         icon.name: "comment-symbolic"
                         text: "评论"
                         onTriggered: bar.commentsRequested()
+                    }
+                    MenuItem {
+                        visible: bar.canListen
+                        height: visible ? implicitHeight : 0
+                        icon.name: "group-symbolic"
+                        text: bar.together ? bar.togetherText : "和好友一起听…"
+                        onTriggered: bar.together ? bar.queueRequested()
+                            : listenMenu.popup(moreButton, 0, -listenMenu.implicitHeight - Tokens.space2)
                     }
                     MenuItem {
                         icon.name: "view-fullscreen"

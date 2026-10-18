@@ -20,8 +20,6 @@ Kirigami.OverlayDrawer {
     property var room: null   // 一起听（C++ ListenTogether 或原型替身）；未登录时为 null
 
     signal activated(int index)
-    signal listenStartRequested()
-    signal listenJoinRequested()
     signal listenEndRequested()
     signal listenLinkCopied()
     signal nowPlayingRequested()
@@ -392,47 +390,6 @@ Kirigami.OverlayDrawer {
                 icon.name: "view-media-playlist"
                 text: panel.current ? "这是队列里最后一首" : "队列是空的"
                 explanation: "在任意列表里点一首歌，它所在的列表会成为新的队列"
-            }
-        }
-
-        // 一起听的入口（不常用，放在最下面，不挤页头）：开一个房间，或用好友发来的链接加入。
-        // 进了房间后，房间那一段在上面，这一行收起
-        RowLayout {
-            visible: panel.room !== null && !panel.room.inRoom
-            Layout.fillWidth: true
-            Layout.leftMargin: Tokens.pageMargin
-            Layout.rightMargin: Tokens.pageMargin - Tokens.space2
-            Layout.topMargin: Tokens.space2
-            Layout.bottomMargin: Tokens.space4
-            spacing: Tokens.space2
-            Kirigami.Icon {
-                implicitWidth: Tokens.iconSm
-                implicitHeight: Tokens.iconSm
-                source: "group-symbolic"
-                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
-            }
-            Label {
-                Layout.fillWidth: true
-                text: "和好友一起听"
-                font.pixelSize: Tokens.textSm
-                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
-                elide: Text.ElideRight
-            }
-            Button {
-                implicitHeight: Tokens.height8
-                flat: true
-                enabled: !panel.room || !panel.room.busy
-                text: "开始"
-                font.pixelSize: Tokens.textSm
-                onClicked: panel.listenStartRequested()
-            }
-            Button {
-                implicitHeight: Tokens.height8
-                flat: true
-                enabled: !panel.room || !panel.room.busy
-                text: "用链接加入…"
-                font.pixelSize: Tokens.textSm
-                onClicked: panel.listenJoinRequested()
             }
         }
     }

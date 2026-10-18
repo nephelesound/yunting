@@ -312,8 +312,6 @@ Kirigami.ApplicationWindow {
         onClearRequested: playback.clearUpcoming()
         onMoveRequested: (from, to) => playback.move(from, to)
         room: root.loggedIn ? root.listenRoom : null
-        onListenStartRequested: root.listenRoom.createRoom()
-        onListenJoinRequested: joinDialog.open()
         onListenEndRequested: root.listenRoom.host ? endListenDialog.open() : root.listenRoom.leaveRoom()
         onListenLinkCopied: root.notify("已复制邀请链接")
     }
@@ -1064,8 +1062,16 @@ Kirigami.ApplicationWindow {
         id: playerBar
         // MV 页有自己的画面控制，收起播放条把高度让给画面
         visible: root.page !== "mv"
+        canListen: root.loggedIn
+        listenBusy: root.listenRoom.busy
         together: root.listenRoom.inRoom
         togetherText: root.togetherText
+        // 开房间后打开队列：邀请（二维码与链接）在房间那一段里
+        onListenStartRequested: {
+            root.listenRoom.createRoom();
+            queuePanel.open();
+        }
+        onListenJoinRequested: joinDialog.open()
         track: root.currentTrack
         playing: playback.engine.playing
         elapsed: playback.engine.position
