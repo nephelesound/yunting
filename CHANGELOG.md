@@ -2,6 +2,12 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.5.2] - 2026-10-18
+
+### 修复
+- 私信的会话列表与对话往下（往上）翻页时不再跳回开头，已经看到的位置不动。
+- 打开评论区时热门评论晚到，整张列表会重建并滚回顶部；现在先等热评到了再取最新评论。
+
 ## [0.5.1] - 2026-10-18
 
 ### 修复
@@ -94,6 +100,7 @@
 - 分享：链接、二维码、Telegram 与邮件，以及带封面与歌词的分享图。
 - 「关于」窗口与「复制诊断信息」，方便反馈问题。
 
+[0.5.2]: https://github.com/nephelesound/yunting/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/nephelesound/yunting/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/nephelesound/yunting/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/nephelesound/yunting/compare/v0.4.1...v0.4.2

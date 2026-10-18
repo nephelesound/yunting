@@ -22,6 +22,11 @@
     </p>
   </description>
   <releases>
+    <release version="0.5.2" date="2026-10-18">
+      <description>
+        <p>私信与评论区翻页时不再跳回开头。完整的更新日志见仓库里的 CHANGELOG.md。</p>
+      </description>
+    </release>
     <release version="0.5.1" date="2026-10-18">
       <description>
         <p>修复音量过小、插拔耳机后不跟随输出设备、换页时数据错乱与隐私主页报错。完整的更新日志见仓库里的 CHANGELOG.md。</p>
