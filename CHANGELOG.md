@@ -2,6 +2,15 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.5.1] - 2026-10-18
+
+### 修复
+- 音量滑条拉到一半时声音几乎听不见：mpv 的音量本身已按听感分布，不再另做换算。
+- 插拔耳机、连上或断开蓝牙耳机后，正在播放的歌曲跟到新的输出设备；选中的设备拔掉后回到系统默认。
+- 快速返回或连续换页时，上一页晚到的数据不再盖掉当前页。
+- 用户主页设置了隐私时，页面里直接说明，不再报错或一直转圈。
+- 后台加载失败只在各页面里提示并可重试，不再弹出全局的「网络不可用」。
+
 ## [0.5.0] - 2026-10-18
 
 ### 变化
@@ -85,6 +94,7 @@
 - 分享：链接、二维码、Telegram 与邮件，以及带封面与歌词的分享图。
 - 「关于」窗口与「复制诊断信息」，方便反馈问题。
 
+[0.5.1]: https://github.com/nephelesound/yunting/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/nephelesound/yunting/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/nephelesound/yunting/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/nephelesound/yunting/compare/v0.4.0...v0.4.1
