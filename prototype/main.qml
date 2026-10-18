@@ -720,10 +720,17 @@ Kirigami.ApplicationWindow {
         if (h.length > root.maxHistory)
             h = h.slice(h.length - root.maxHistory);
         root.history = h;
-        root.listKey = next.listKey;
-        root.mvId = next.mvId;
-        root.userId = next.userId;
+        root.goTo(page, next);
+    }
+    // 页名变了由 onPageChanged 重建；页名没变（只换了参数）要自己重建
+    function goTo(page, route) {
+        const samePage = page === root.page;
+        root.listKey = route.listKey;
+        root.mvId = route.mvId || 0;
+        root.userId = route.userId || 0;
         root.page = page;
+        if (samePage)
+            root.showPage();
     }
     function goBack() {
         // 没有来路的子页（例如启动时直接打开）：返回键写着「推荐」，就回推荐，任何时候都回得去
@@ -734,10 +741,7 @@ Kirigami.ApplicationWindow {
         }
         const prev = root.history[root.history.length - 1];
         root.history = root.history.slice(0, -1);
-        root.listKey = prev.listKey;
-        root.mvId = prev.mvId || 0;
-        root.userId = prev.userId || 0;
-        root.page = prev.page;
+        root.goTo(prev.page, prev);
         root.restoreCurrentView(prev.view);
     }
     // 返回时回到离开时的样子（枢轴、搜索词、滚动位置）：页面每次导航都会重建，状态记在来路里。
@@ -975,7 +979,9 @@ Kirigami.ApplicationWindow {
     readonly property var pages: ({ home: homePage, mine: root.loggedIn ? minePage : placeholderPage, search: searchPage,
                                     charts: chartsPage, list: listPage, artist: artistPage, playlists: playlistsPage,
                                     saved: savedPage, nowplaying: nowPlayingPage, mv: mvPage, user: userPage, inbox: inboxPage })
-    onPageChanged: {
+    // 换路由就重建页面：同类页之间（用户 → 他的粉丝、歌手 → 相似歌手）页名不变，只换参数，也要重建
+    onPageChanged: root.showPage()
+    function showPage() {
         // 路由参数作为页面的初始属性交给页面实例：返回 / 换页时不再把 root 上的
         // 临时 0 绑进仍然存活的页面（曾经因此请求过 /user/detail/0）。
         const params = {};
@@ -993,14 +999,14 @@ Kirigami.ApplicationWindow {
         pageStack.push(root.pages[root.page], params);
     }
     // 「我的」在登录前后是两个不同的页（引导 / 内容）：登录状态一变就换掉，不必切走再切回来
-    onLoggedInChanged: if (root.page === "mine") root.pageChanged()
+    onLoggedInChanged: if (root.page === "mine") root.showPage()
     Component.onCompleted: {
         if (root.backend && root.backend.clipboard)
             Clipboard.live = root.backend.clipboard;
         root.applyCommandLine();
         // 先换好数据源与队列，再推首页
         root.applyFixture();
-        root.pageChanged();
+        root.showPage();
     }
 
     // 应用里截图与调试：命令行 -- 之后的 key=value 与 qmlshot 同一格式，设到根对象的同名属性上

@@ -64,15 +64,28 @@ Item {
             window.close();
         }
 
+        // 从一个用户的关注 / 粉丝点进另一个用户：页名不变，页面也要换成那个人的，返回时换回来
         function test_switching_user_replaces_content_not_history_depth() {
             const window = makeWindow();
+            window.open("user", "", { userId: 42 });
             window.history = [];
-            window.page = "user";
-            window.userId = 42;
             window.open("user", "", { userId: 7 });
             compare(window.userId, 7);
             compare(window.page, "user");
             compare(window.history.length, 1, "换用户只压入一层来路");
+            tryCompare(window.pageStack.currentItem, "userId", 7);
+            window.goBack();
+            tryCompare(window.pageStack.currentItem, "userId", 42);
+            window.close();
+        }
+
+        function test_switching_artist_shows_the_new_artist() {
+            const window = makeWindow();
+            window.open("artist", "artist:6452");
+            window.open("artist", "artist:3684");
+            tryCompare(window.pageStack.currentItem, "artistId", 3684);
+            window.goBack();
+            tryCompare(window.pageStack.currentItem, "artistId", 6452);
             window.close();
         }
     }
