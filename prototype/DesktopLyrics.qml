@@ -8,7 +8,7 @@
 // 悬停时字的后面出现一块方角的半透明底板（白字是黑，黑字是白），按钮直接放在底板上方（一块面，不另套工具栏的框）：
 // 系统的 ToolButton，几组之间只用间距分开：字号、「样式」菜单（字色、唱到的字的颜色、文字阴影）、
 // 第二行（开着时图标是强调色）、复位、锁定、关闭。菜单开在自己的窗口里（popupType: Window）：
-// 歌词窗口很矮，菜单留在窗口里会被裁成方角、挤成一团。文字阴影默认关，可选柔和 / 浓，颜色与字相反。
+// 歌词窗口很矮，菜单留在窗口里会被裁成方角、挤成一团。文字阴影默认关，可选柔和 / 浓，总是黑色。
 // 锁定后点击穿透，在播放条关掉再打开即解锁。样式与位置只在应用里记住（persist），原型与截图不读不写。
 pragma ComponentBehavior: Bound
 
@@ -61,7 +61,7 @@ Window {
     readonly property string second: !lyricsWindow.showSecond || !lyricsWindow.current ? ""
         : lyricsWindow.current.tr ? lyricsWindow.current.tr : lyricsWindow.next ? lyricsWindow.next.text : ""
     readonly property color ink: lyricsWindow.darkInk ? "black" : "white"
-    // 与字相反的颜色：悬停底板与文字阴影用它
+    // 与字相反的颜色：悬停底板用它
     readonly property color backing: lyricsWindow.darkInk ? "white" : "black"
     // 唱到的字：字色本身，或系统强调色、几种固定的中间调。强调色取色相，饱和度至少 70%、亮度落在 50%–60%：
     // 原样的强调色可能很深或很灰，与半透明的字分不开
@@ -374,23 +374,48 @@ Window {
                 }
         }
 
-        // 歌词：直接压在桌面上。字重取 DemiBold：半透明的笔画细了会被壁纸吃掉。
-        // 文字阴影（选了才有）：颜色与字相反，紧贴字形，只在下方偏一像素
+        // 文字阴影（选了才有）：同样的字用不透明的黑色另画一份，模糊后垫在歌词下面、下移一像素。
+        // 不给歌词本身加阴影：歌词逐帧点亮，阴影会跟着逐帧重新模糊，且随字的透明度深浅不一。
+        // 这一份只在换句时重画
+        Column {
+            id: shadowColumn
+            readonly property var level: Tokens.desktopShadows[lyricsWindow.shadowLevel]
+            visible: lyricsWindow.shadowLevel > 0
+            anchors.left: textColumn.left
+            anchors.right: textColumn.right
+            anchors.bottom: textColumn.bottom
+            anchors.bottomMargin: -Tokens.line
+            spacing: textColumn.spacing
+            opacity: level[0]
+            layer.enabled: visible
+            layer.effect: MultiEffect {
+                blurEnabled: true
+                blur: shadowColumn.level[1]
+                blurMax: Tokens.space4
+            }
+
+            LyricText {
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: lineBox.width
+                text: base.text
+                font: base.font
+                color: "black"
+            }
+            LyricText {
+                width: parent.width
+                visible: secondLine.visible
+                text: secondLine.text
+                font: secondLine.font
+                color: "black"
+            }
+        }
+
+        // 歌词：直接压在桌面上。字重取 DemiBold：半透明的笔画细了会被壁纸吃掉
         Column {
             id: textColumn
             anchors.bottom: parent.bottom
             width: parent.width
             spacing: Tokens.space1
-            readonly property var shadow: Tokens.desktopShadows[lyricsWindow.shadowLevel]
-            layer.enabled: lyricsWindow.shadowLevel > 0
-            layer.effect: MultiEffect {
-                shadowEnabled: true
-                shadowColor: Qt.alpha(lyricsWindow.backing, textColumn.shadow[0])
-                shadowBlur: textColumn.shadow[1]
-                blurMax: Tokens.space4
-                shadowHorizontalOffset: 0
-                shadowVerticalOffset: Tokens.line
-            }
 
             // 当前句：底层是半透明的字，上层同样的字用点亮色、按进度裁出左边一段
             Item {

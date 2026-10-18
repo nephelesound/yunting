@@ -50,7 +50,7 @@ QtObject {
     readonly property real desktopInk: 0.55
     // 桌面歌词悬停时托住字的底板：与字相反的颜色（白字是黑、黑字是白）配这个不透明度，看清字也透出桌面
     readonly property real desktopPlate: 0.5
-    // 桌面歌词的文字阴影三档：无 / 柔和 / 浓，[阴影的不透明度, 模糊程度 0–1]；颜色与字相反
+    // 桌面歌词的文字阴影三档：无 / 柔和 / 浓，[阴影的不透明度, 模糊程度 0–1]；黑色
     readonly property var desktopShadows: [[0, 0], [0.5, 0.5], [0.85, 0.8]]
     // 分享图没有封面时的底：中深灰
     readonly property color shareBlank: "#505050"
