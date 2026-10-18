@@ -1,0 +1,116 @@
+# 云听的 Flatpak：所有发行版通用。KDE 运行时已带 Kirigami、Kirigami Addons、Prison、KStatusNotifierItem、
+# qrencode、OpenSSL 与 ffmpeg；这里只补运行时没有的 qtkeychain、layer-shell-qt 与 mpv 一套（照 Flathub 上 Haruna 的写法）。
+# 本地构建：flatpak-builder --user --install --force-clean build/flatpak packaging/flatpak/io.github.nephelesound.Yunting.yml
+app-id: io.github.nephelesound.Yunting
+runtime: org.kde.Platform
+runtime-version: '6.11'
+sdk: org.kde.Sdk
+command: yunting
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --socket=pulseaudio
+  - --device=dri
+  # MPRIS：服务名是 org.mpris.MediaPlayer2.<applicationName>
+  - --own-name=org.mpris.MediaPlayer2.yunting
+  # 登录凭据存钥匙串（qtkeychain：Secret Service 或 KWallet）
+  - --talk-name=org.freedesktop.secrets
+  - --talk-name=org.kde.kwalletd6
+  # 托盘与托盘通知
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --talk-name=org.freedesktop.Notifications
+  # 放歌时不自动睡眠、看 MV 时屏幕常亮（powerinhibitor.cpp）
+  - --talk-name=org.freedesktop.ScreenSaver
+  - --talk-name=org.freedesktop.PowerManagement
+  - --talk-name=org.kde.Solid.PowerManagement
+cleanup:
+  - '*.a'
+  - '*.la'
+  - /include
+  - /lib/cmake
+  - /lib/pkgconfig
+  - /share/man
+  - /share/doc
+
+modules:
+  - name: qtkeychain
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DBUILD_TRANSLATIONS=NO
+      - -DBUILD_WITH_QT6=ON
+    sources:
+      - type: archive
+        url: https://github.com/frankosterfeld/qtkeychain/archive/0.17.0.tar.gz
+        sha256: 3b85c3929034b0a99da777130c34d99f006fcd3a9d56564159399a33fee0e504
+
+  # Wayland 下的桌面歌词置顶
+  - name: layer-shell-qt
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DBUILD_TESTING=OFF
+    sources:
+      - type: archive
+        url: https://download.kde.org/stable/plasma/6.8.0/layer-shell-qt-6.8.0.tar.xz
+        sha256: 91ced561862f0d84836ad4ae5c34914bb532576c88607baf4ec2c957b895b41d
+
+  - name: mpvqt
+    buildsystem: cmake-ninja
+    sources:
+      - type: archive
+        url: https://download.kde.org/stable/mpvqt/mpvqt-1.2.0.tar.xz
+        sha256: 8660ad79c0d60fed77f29b36e1742841466af5405de702c81a121e6eeb625ebb
+    modules:
+      # 只要 libmpv：不要 mpv 播放器本体、脚本与手册
+      - name: libmpv
+        buildsystem: meson
+        config-opts:
+          - -Dlibmpv=true
+          - -Dcplayer=false
+          - -Dlua=disabled
+          - -Djavascript=disabled
+          - -Dalsa=disabled
+          - -Dmanpage-build=disabled
+          - -Dbuild-date=false
+        cleanup:
+          - /share
+        sources:
+          - type: archive
+            url: https://github.com/mpv-player/mpv/archive/refs/tags/v0.41.0.tar.gz
+            sha256: ee21092a5ee427353392360929dc64645c54479aefdb5babc5cfbb5fad626209
+        modules:
+          - name: libplacebo
+            buildsystem: meson
+            config-opts:
+              - -Ddemos=false
+            sources:
+              - type: git
+                url: https://github.com/haasn/libplacebo.git
+                tag: v7.360.1
+                commit: cee9b076f2c63104ccfd497fa79c39a867293ec4
+          - name: libass
+            config-opts:
+              - --disable-static
+            sources:
+              - type: archive
+                url: https://github.com/libass/libass/releases/download/0.17.5/libass-0.17.5.tar.gz
+                sha256: caab4b993dd7be6187c55623b789ed75dddefea6e65938af134637c732fe094a
+
+  - name: yunting
+    buildsystem: cmake-ninja
+    subdir: src
+    builddir: true
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_TESTING=OFF
+    sources:
+      - type: dir
+        path: ../..
+        skip:
+          - build
+          - .flatpak-builder
+          - docs/reference
+          - packaging/aur/pkg
+          - packaging/aur/src
+          - packaging/aur/yunting

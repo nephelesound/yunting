@@ -1,5 +1,6 @@
 # 构建产物
 build/
+.flatpak-builder/
 node_modules/
 *.user
 .cache/

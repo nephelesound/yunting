@@ -66,6 +66,16 @@
 
 ## 安装
 
+### 任意发行版（Flatpak）
+
+从 [Releases](https://github.com/nephelesound/yunting/releases) 下载 `yunting-x86_64.flatpak`（ARM 机器用 `yunting-aarch64.flatpak`），然后：
+
+```bash
+flatpak install --user yunting-x86_64.flatpak
+```
+
+需要的 KDE 运行时会自动从 Flathub 装上。更新：下载新版本的包再装一次。卸载：`flatpak uninstall io.github.nephelesound.Yunting`。
+
 ### Arch Linux
 
 云听不在 AUR 上（AUR 暂停了新账号注册），`yay` / `paru` 搜不到。用仓库里的 PKGBUILD 从 GitHub 构建并安装 `yunting-git`：

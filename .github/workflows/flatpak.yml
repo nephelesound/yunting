@@ -1,0 +1,50 @@
+# 打 Flatpak：主干与 PR 上检查能否构建；推 v* 标签时把两种架构的包附到该版本的 Release 上。
+name: Flatpak
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (${{ matrix.variant.arch }})
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.11
+      options: --privileged
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.variant.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: yunting-${{ matrix.variant.arch }}.flatpak
+          manifest-path: packaging/flatpak/io.github.nephelesound.Yunting.yml
+          arch: ${{ matrix.variant.arch }}
+          artifact-name: yunting-${{ matrix.variant.arch }}.flatpak
+
+  release:
+    name: Attach to release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: yunting-*.flatpak
+          merge-multiple: true
+      # 版本说明照常由 gh release create 写；这里只把包加进同一个 Release（还没建就先建）
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: yunting-*.flatpak
