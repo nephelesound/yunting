@@ -19,18 +19,9 @@ constexpr auto ByRadioPath = "api/dj/program/byradio";
 constexpr auto ProgramPath = "api/dj/program/detail";
 constexpr auto RadioPath = "api/djradio/v2/get";
 
-QStringList namesOf(const QJsonArray &objects)
-{
-    QStringList names;
-    for (const QJsonValue &value : objects) {
-        const QString name = value.toObject().value(QStringLiteral("name")).toString();
-        if (!name.isEmpty())
-            names.append(name);
-    }
-    return names;
-}
 
-Result<RadioStation> radioFrom(const QJsonObject &object, const QString &path)
+Result<RadioStation> radioFrom(const QJsonObject &object, const QString &path,
+                               const char *endpoint)
 {
     JsonReader reader(object, path);
     RadioStation radio;
@@ -48,14 +39,15 @@ Result<RadioStation> radioFrom(const QJsonObject &object, const QString &path)
     radio.djAvatar = djReader.string("avatarUrl");
     if (!reader.ok())
         return Result<RadioStation>::failure(
-            endpointError(ErrorKind::Parse, RadioPath, reader.error(), path));
+            endpointError(ErrorKind::Parse, endpoint, reader.error(), path));
     if (!djReader.ok())
         return Result<RadioStation>::failure(
-            endpointError(ErrorKind::Parse, RadioPath, djReader.error(), path));
+            endpointError(ErrorKind::Parse, endpoint, djReader.error(), path));
     return Result<RadioStation>::success(radio);
 }
 
-Result<RadioProgram> programFrom(const QJsonObject &object, const QString &path)
+Result<RadioProgram> programFrom(const QJsonObject &object, const QString &path,
+                                 const char *endpoint)
 {
     JsonReader reader(object, path);
     RadioProgram program;
@@ -71,20 +63,20 @@ Result<RadioProgram> programFrom(const QJsonObject &object, const QString &path)
     program.mainSongName = songReader.string("name");
     program.mainSongDuration = songReader.integer("duration") / 1000;
     program.fee = static_cast<int>(songReader.integer("fee"));
-    program.artists = namesOf(mainSong.value(QStringLiteral("artists")).toArray());
+    program.artists = objectNameList(mainSong.value(QStringLiteral("artists")).toArray());
     const QJsonObject radio = reader.object("radio");
     if (!radio.isEmpty()) {
-        const auto parsed = radioFrom(radio, path + QStringLiteral(".radio"));
+        const auto parsed = radioFrom(radio, path + QStringLiteral(".radio"), endpoint);
         if (!parsed)
             return Result<RadioProgram>::failure(parsed.error);
         program.radio = *parsed.value;
     }
     if (!reader.ok())
         return Result<RadioProgram>::failure(
-            endpointError(ErrorKind::Parse, ProgramPath, reader.error(), path));
+            endpointError(ErrorKind::Parse, endpoint, reader.error(), path));
     if (!songReader.ok())
         return Result<RadioProgram>::failure(
-            endpointError(ErrorKind::Parse, ProgramPath, songReader.error(), path));
+            endpointError(ErrorKind::Parse, endpoint, songReader.error(), path));
     return Result<RadioProgram>::success(program);
 }
 
@@ -96,11 +88,13 @@ Result<QList<RadioProgram>> parseRecommendedPrograms(const QJsonObject &root)
     const QJsonArray items = reader.array("result");
     if (!reader.ok())
         return Result<QList<RadioProgram>>::failure(
-            endpointError(ErrorKind::Parse, RecommendedPath, reader.error()));
+            endpointError(ErrorKind::Parse, RecommendedPath, reader.error(),
+                          QStringLiteral("radio.recommended")));
     if (!reader.has("result"))
         return Result<QList<RadioProgram>>::failure(
             endpointError(ErrorKind::Parse, RecommendedPath,
-                          QStringLiteral("radio.recommended.result: missing array")));
+                          QStringLiteral("radio.recommended.result: missing array"),
+                          QStringLiteral("radio.recommended.result")));
 
     QList<RadioProgram> programs;
     for (qsizetype i = 0; i < items.size(); ++i) {
@@ -112,7 +106,7 @@ Result<QList<RadioProgram>> parseRecommendedPrograms(const QJsonObject &root)
                 endpointError(ErrorKind::Parse, RecommendedPath, item.error(), path));
         if (program.isEmpty())
             continue;
-        const auto parsed = programFrom(program, path + QStringLiteral(".program"));
+        const auto parsed = programFrom(program, path + QStringLiteral(".program"), RecommendedPath);
         if (!parsed)
             return Result<QList<RadioProgram>>::failure(parsed.error);
         programs.append(*parsed.value);
@@ -126,18 +120,25 @@ Result<RadioProgramPage> parseRadioProgramPage(const QJsonObject &root)
     const QJsonArray items = reader.array("programs");
     if (!reader.ok())
         return Result<RadioProgramPage>::failure(
-            endpointError(ErrorKind::Parse, ByRadioPath, reader.error()));
+            endpointError(ErrorKind::Parse, ByRadioPath, reader.error(),
+                          QStringLiteral("radio.programPage")));
     if (!reader.has("programs"))
         return Result<RadioProgramPage>::failure(
             endpointError(ErrorKind::Parse, ByRadioPath,
-                          QStringLiteral("radio.programPage.programs: missing array")));
+                          QStringLiteral("radio.programPage.programs: missing array"),
+                          QStringLiteral("radio.programPage.programs")));
 
     RadioProgramPage page;
     page.count = reader.integer("count");
     page.more = reader.boolean("more");
+    if (!reader.ok())
+        return Result<RadioProgramPage>::failure(
+            endpointError(ErrorKind::Parse, ByRadioPath, reader.error(),
+                          QStringLiteral("radio.programPage")));
     for (qsizetype i = 0; i < items.size(); ++i) {
         const auto parsed = programFrom(items.at(i).toObject(),
-                                        QStringLiteral("radio.programPage.programs[%1]").arg(i));
+                                        QStringLiteral("radio.programPage.programs[%1]").arg(i),
+                                        ByRadioPath);
         if (!parsed)
             return Result<RadioProgramPage>::failure(parsed.error);
         page.items.append(*parsed.value);
@@ -151,12 +152,14 @@ Result<RadioProgram> parseRadioProgram(const QJsonObject &root)
     const QJsonObject program = reader.object("program");
     if (!reader.ok())
         return Result<RadioProgram>::failure(
-            endpointError(ErrorKind::Parse, ProgramPath, reader.error()));
+            endpointError(ErrorKind::Parse, ProgramPath, reader.error(),
+                          QStringLiteral("radio.program")));
     if (program.isEmpty())
         return Result<RadioProgram>::failure(
             endpointError(ErrorKind::Parse, ProgramPath,
-                          QStringLiteral("radio.program.program: missing object")));
-    return programFrom(program, QStringLiteral("radio.program.program"));
+                          QStringLiteral("radio.program.program: missing object"),
+                          QStringLiteral("radio.program.program")));
+    return programFrom(program, QStringLiteral("radio.program.program"), ProgramPath);
 }
 
 Result<RadioStation> parseRadioStation(const QJsonObject &root)
@@ -165,12 +168,14 @@ Result<RadioStation> parseRadioStation(const QJsonObject &root)
     const QJsonObject data = reader.object("data");
     if (!reader.ok())
         return Result<RadioStation>::failure(
-            endpointError(ErrorKind::Parse, RadioPath, reader.error()));
+            endpointError(ErrorKind::Parse, RadioPath, reader.error(),
+                          QStringLiteral("radio.station")));
     if (data.isEmpty())
         return Result<RadioStation>::failure(
             endpointError(ErrorKind::Parse, RadioPath,
-                          QStringLiteral("radio.station.data: missing object")));
-    return radioFrom(data, QStringLiteral("radio.station.data"));
+                          QStringLiteral("radio.station.data: missing object"),
+                          QStringLiteral("radio.station.data")));
+    return radioFrom(data, QStringLiteral("radio.station.data"), RadioPath);
 }
 
 void fetchRecommendedPrograms(NcmClient &client, QObject *context,
@@ -195,12 +200,15 @@ void fetchRadioPrograms(NcmClient &client, qint64 radioId, int limit, int offset
     form.addQueryItem(QStringLiteral("offset"), QString::number(std::max(0, offset)));
     form.addQueryItem(QStringLiteral("asc"), asc ? QStringLiteral("true") : QStringLiteral("false"));
     postFormJson(client, context, QString::fromLatin1(ByRadioPath), form,
-                 [callback = std::move(callback)](Result<QJsonObject> root) {
+                 [callback = std::move(callback), offset](Result<QJsonObject> root) {
         if (!root) {
             callback(Result<RadioProgramPage>::failure(root.error));
             return;
         }
-        callback(parseRadioProgramPage(*root.value));
+        auto page = parseRadioProgramPage(*root.value);
+        if (page)
+            page.value->offset = offset;
+        callback(std::move(page));
     });
 }
 

@@ -14,8 +14,7 @@ class NcmClient;
 namespace ncm::sdk {
 
 Error endpointError(ErrorKind kind, QString endpoint, QString message,
-                    QString path = {}, int code = 0);
-Error parseError(QString endpoint, QString message, QString path = {});
+                    QString path = {}, int code = 0, int httpStatus = 0);
 
 using JsonObjectCallback = std::function<void(Result<QJsonObject>)>;
 

@@ -19,6 +19,7 @@ struct Error {
     QString endpoint;   // 请求路径，例如 api/link/page/...
     QString path;       // 失败字段的 JSON path，例如 wiki.data.blocks[0].rnData
     int code = 0;       // 网易业务码；0 表示没有
+    int httpStatus = 0; // HTTP 状态；0 表示没有响应
     QString message;    // 给日志/开发者看的原文
 };
 

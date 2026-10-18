@@ -2,6 +2,7 @@
 #include "sdk/social.h"
 
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QJsonObject>
 #include <QTest>
 
@@ -42,6 +43,26 @@ private slots:
         QCOMPARE(event.likeCount, qint64(7));
         QCOMPARE(event.resource.id, qint64(42));
         QCOMPARE(event.resource.resourceType, 2);
+    }
+
+    void parsesFallbackContentWhenResourceInfoIsNull()
+    {
+        const QString json = QStringLiteral(
+            "{\"msg\":\"动态正文\",\"title\":\"动态标题\","
+            "\"resource\":{\"mlogBaseData\":{\"coverUrl\":\"http://mlog\"}}}");
+        QJsonObject info{{"resourceId", 88}, {"resourceType", 2},
+                         {"commentThread", QJsonObject{{"resourceType", 2}}}};
+        QJsonObject event{{"id", 10}, {"actName", "发布动态"}, {"json", json},
+                          {"user", QJsonObject{{"userId", 1}, {"nickname", "用户"}}},
+                          {"info", info}};
+        const auto result = parseUserEvents(
+            QJsonObject{{"code", 200}, {"events", QJsonArray{event}}});
+        QVERIFY2(result.ok(), qPrintable(result.error.message));
+        const UserEvent &out = result.value->items.first();
+        QCOMPARE(out.title, QStringLiteral("动态标题"));
+        QCOMPARE(out.description, QStringLiteral("动态正文"));
+        QCOMPARE(out.resource.id, qint64(88));
+        QCOMPARE(out.resource.cover, QStringLiteral("http://mlog"));
     }
 
     void missingEventsIsParseError()

@@ -11,6 +11,9 @@
 
 namespace ncm::sdk {
 
+// 从 [{"name": "..."}] 数组取出非空名称；SDK 的曲目/节目共用的一个实现。
+QStringList objectNameList(const QJsonArray &objects);
+
 class JsonReader {
 public:
     explicit JsonReader(const QJsonObject &object, QString path = {});

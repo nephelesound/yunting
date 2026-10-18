@@ -45,5 +45,13 @@
   ],
   "sheets": [],
   "entertainments": [],
-  "awards": []
+  "awards": [
+    {
+      "title": "第2届hito流行音乐奖",
+      "awardName": "Hito年度华语歌曲",
+      "result": "获",
+      "cover": "http://p5.music.126.net/award",
+      "jumpUrl": "https://music.163.com/st/musicwiki/awards"
+    }
+  ]
 }

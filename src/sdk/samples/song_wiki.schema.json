@@ -145,11 +145,13 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["title", "description", "time"],
+        "required": ["title", "awardName", "result", "cover", "jumpUrl"],
         "properties": {
           "title": { "type": "string" },
-          "description": { "type": "string" },
-          "time": { "type": "string" }
+          "awardName": { "type": "string" },
+          "result": { "type": "string" },
+          "cover": { "type": "string" },
+          "jumpUrl": { "type": "string" }
         },
         "additionalProperties": true
       }

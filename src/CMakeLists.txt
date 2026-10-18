@@ -193,8 +193,18 @@ target_link_libraries(sdk_social_test PRIVATE Qt6::Core Qt6::Network Qt6::Test
     Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
 add_test(NAME sdk_social COMMAND sdk_social_test)
 
+qt_add_executable(sdk_service_test tests/sdk_service_test.cpp
+    sdk/sdk_json.h sdk/sdk_json.cpp sdk/service.h sdk/service.cpp
+    ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp
+    crypto.h crypto.cpp perf.h perf.cpp)
+target_include_directories(sdk_service_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_options(sdk_service_test PRIVATE -Wall -Wextra)
+target_link_libraries(sdk_service_test PRIVATE Qt6::Core Qt6::Network Qt6::Test
+    Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
+add_test(NAME sdk_service COMMAND sdk_service_test)
+
 # 任何测试都碰不到用户的真实凭据与缓存：会话总线不可达（钥匙串因此走后备文件），数据与缓存目录在构建目录里
-set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store sdk_song_wiki sdk_discovery sdk_radio sdk_social PROPERTIES ENVIRONMENT
+set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store sdk_song_wiki sdk_discovery sdk_radio sdk_social sdk_service PROPERTIES ENVIRONMENT
     "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent;XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/data;XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/cache;YUNTING_KEYCHAIN_SERVICE=yunting-test")
 
 target_link_libraries(yunting PRIVATE

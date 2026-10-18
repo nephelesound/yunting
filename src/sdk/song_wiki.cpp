@@ -10,10 +10,13 @@
 namespace ncm::sdk {
 namespace {
 
+constexpr auto WikiEndpoint = "api/link/page/parent/relation/construct/info";
+
 Error makeError(ErrorKind kind, const QString &message, const QString &path = {})
 {
     Error error;
     error.kind = kind;
+    error.endpoint = QString::fromLatin1(WikiEndpoint);
     error.path = path;
     error.message = message;
     return error;
@@ -148,42 +151,48 @@ QString appendEntertainments(const QJsonObject &info, const QString &path, SongW
 
 QString appendAwards(const QJsonObject &info, const QString &path, SongWiki &out)
 {
-    const QJsonArray elements = info.value(QStringLiteral("wikiSubElementVos")).toArray();
+    JsonReader infoReader(info, path);
+    const QJsonArray elements = infoReader.array("wikiSubElementVos");
+    if (!infoReader.ok())
+        return infoReader.error();
     for (qsizetype i = 0; i < elements.size(); ++i) {
-        const QJsonObject element = elements.at(i).toObject();
-        const QString title = element.value(QStringLiteral("title")).toString(
-            element.value(QStringLiteral("name")).toString(
-                element.value(QStringLiteral("awardName")).toString()));
-        const QString description = element.value(QStringLiteral("desc")).toString(
-            element.value(QStringLiteral("content")).toString(
-                element.value(QStringLiteral("awardDesc")).toString()));
-        const QString time = element.value(QStringLiteral("time")).toString(
-            element.value(QStringLiteral("awardTime")).toString());
-        if (title.isEmpty() && description.isEmpty())
-            continue;
+        JsonReader reader(elements.at(i).toObject(),
+                          QStringLiteral("%1.wikiSubElementVos[%2]").arg(path).arg(i));
         SongWikiAward award;
-        award.title = title;
-        award.description = description;
-        award.time = time;
+        award.title = reader.string("title");
+        award.awardName = reader.string("subTitle");
+        award.result = reader.string("content");
+        award.cover = reader.string("imgUrl");
+        award.jumpUrl = reader.string("jumpUrl");
+        if (!reader.ok())
+            return reader.error();
+        if (award.title.isEmpty() && award.awardName.isEmpty() && award.result.isEmpty())
+            continue;
         out.awards.append(award);
     }
-    Q_UNUSED(path)
     return {};
 }
+
 
 QString parseMemory(const QJsonObject &rn, const QString &path, SongWiki &out)
 {
     JsonReader reader(rn, path + QStringLiteral(".rnData"));
     const QJsonObject first = reader.object("firstListen");
     const QJsonObject total = reader.object("totalPlay");
-    out.memory.period = first.value(QStringLiteral("period")).toString();
-    out.memory.season = first.value(QStringLiteral("season")).toString();
-    out.memory.time = first.value(QStringLiteral("time")).toString();
-    out.memory.timestamp = static_cast<qint64>(first.value(QStringLiteral("timestamp")).toDouble());
-    out.memory.playCount = static_cast<qint64>(total.value(QStringLiteral("playCount")).toDouble());
-    out.memory.text = total.value(QStringLiteral("text")).toString();
+    JsonReader firstReader(first, path + QStringLiteral(".rnData.firstListen"));
+    JsonReader totalReader(total, path + QStringLiteral(".rnData.totalPlay"));
+    out.memory.period = firstReader.string("period");
+    out.memory.season = firstReader.string("season");
+    out.memory.time = firstReader.string("time");
+    out.memory.timestamp = firstReader.integer("timestamp");
+    out.memory.playCount = totalReader.integer("playCount");
+    out.memory.text = totalReader.string("text");
     if (!reader.ok())
         return reader.error();
+    if (!firstReader.ok())
+        return firstReader.error();
+    if (!totalReader.ok())
+        return totalReader.error();
     return {};
 }
 
@@ -231,10 +240,11 @@ void parseChorus(const QJsonObject &root, qint64 songId, SongWiki &out)
             continue;
         const double start = item.value(QStringLiteral("startTime")).toDouble();
         const double end = item.value(QStringLiteral("endTime")).toDouble();
-        if (start > 0 && end > start) {
+        if (start >= 0 && end > start) {
+            const QJsonValue locked = item.value(QStringLiteral("ugcLocked"));
             out.chorus.start = start / 1000.0;
             out.chorus.end = end / 1000.0;
-            out.chorus.locked = item.value(QStringLiteral("ugcLocked")).toBool();
+            out.chorus.locked = locked.isBool() ? locked.toBool() : locked.toInt() != 0;
         }
         break;
     }
@@ -262,7 +272,6 @@ Result<SongWiki> SongWiki::fromApi(const QJsonObject &wikiRoot,
 
     SongWiki out;
     out.songId = songId;
-    out.empty = blocks.isEmpty();
 
     for (qsizetype i = 0; i < blocks.size(); ++i) {
         const QJsonObject block = blocks.at(i).toObject();
@@ -323,6 +332,11 @@ Result<SongWiki> SongWiki::fromApi(const QJsonObject &wikiRoot,
 
     parseCreators(creatorsRoot, out);
     parseChorus(chorusRoot, songId, out);
+    out.empty = out.songName.isEmpty() && out.description.isEmpty()
+        && out.basic.isEmpty() && out.creators.isEmpty() && out.mvs.isEmpty()
+        && out.reviews.isEmpty() && out.sheets.isEmpty() && out.entertainments.isEmpty()
+        && out.awards.isEmpty() && out.memory.text.isEmpty() && out.memory.time.isEmpty()
+        && !out.chorus.valid();
     return Result<SongWiki>::success(std::move(out));
 }
 
@@ -385,8 +399,9 @@ QVariantMap SongWiki::toVariantMap() const
 
     QVariantList awardList;
     for (const SongWikiAward &award : awards)
-        awardList.append(QVariantMap{{"title", award.title}, {"description", award.description},
-                                     {"time", award.time}});
+        awardList.append(QVariantMap{{"title", award.title}, {"awardName", award.awardName},
+                                     {"result", award.result}, {"cover", award.cover},
+                                     {"jumpUrl", award.jumpUrl}});
 
     return {
         {"songId", songId},

@@ -38,6 +38,7 @@ NcmClient                 传输（cookie、weapi/明文、超时）
 - `discovery.h/.cpp`：推荐新歌、新碟、精品歌单、精品标签、首页 banner 的 typed 模型与请求。
 - `radio.h/.cpp`：推荐节目、电台详情、节目详情、电台节目分页的 typed 模型与请求。
 - `social.h/.cpp`：用户动态流的 typed 模型、只读请求，以及用户关注/取关写请求（需要登录 cookie，不重试）。
+- `service.h/.cpp`：唯一的 HTTP code/错误/context/JSON 信封 seam，所有 service 共用。
 - `samples/`：
   - `song_wiki.request.json`：参数与三个 form 的形态。
   - `song_wiki.raw.json`：三个上游响应的代表样例。

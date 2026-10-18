@@ -54,6 +54,15 @@ class SdkSongWikiTest : public QObject {
         QJsonObject sheetInfo;
         sheetInfo.insert("wikiSubElementVos", QJsonArray{sheet});
 
+        QJsonObject award;
+        award.insert("title", "第1届测试奖");
+        award.insert("subTitle", "最佳歌曲");
+        award.insert("content", "获");
+        award.insert("imgUrl", "http://award");
+        award.insert("jumpUrl", "https://award");
+        QJsonObject awardInfo;
+        awardInfo.insert("wikiSubElementVos", QJsonArray{award});
+
         QJsonArray subBlocks;
         subBlocks.append(QJsonObject{
             {"blockCode", "wikiSubBlockSongInfoVo"},
@@ -66,6 +75,8 @@ class SdkSongWikiTest : public QObject {
             {"blockCode", "wikiSubBlockSongCommentVo"}, {"blockInfo", reviewInfo}});
         subBlocks.append(QJsonObject{
             {"blockCode", "wikiSubBlockSheetInfoVo"}, {"blockInfo", sheetInfo}});
+        subBlocks.append(QJsonObject{
+            {"blockCode", "wikiSubBlockAwardRecordVo"}, {"blockInfo", awardInfo}});
 
         QJsonObject detail;
         detail.insert("songName", "歌曲");
@@ -148,6 +159,9 @@ private slots:
         QCOMPARE(wiki.mvs.first().duration, qint64(221));
         QCOMPARE(wiki.reviews.first().likes, qint64(7));
         QCOMPARE(wiki.sheets.first().types, QStringList{QStringLiteral("吉他")});
+        QCOMPARE(wiki.awards.first().title, QStringLiteral("第1届测试奖"));
+        QCOMPARE(wiki.awards.first().awardName, QStringLiteral("最佳歌曲"));
+        QCOMPARE(wiki.awards.first().result, QStringLiteral("获"));
         QCOMPARE(wiki.memory.playCount, qint64(99));
         QCOMPARE(wiki.chorus.start, 42.402);
         QVERIFY(wiki.chorus.valid());
@@ -161,6 +175,7 @@ private slots:
         QVERIFY(!result.ok());
         QCOMPARE(result.error.kind, ErrorKind::Parse);
         QCOMPARE(result.error.path, QStringLiteral("wiki.data.blocks"));
+        QVERIFY(result.error.endpoint.contains(QStringLiteral("link/page")));
     }
 
     void optionalCreatorsMayBeAbsent()
@@ -168,6 +183,34 @@ private slots:
         const Result<SongWiki> result = SongWiki::fromApi(fixture(), {}, {}, 7);
         QVERIFY(result.ok());
         QVERIFY(result.value->creators.isEmpty());
+    }
+
+    void numericLockedAndZeroChorusStart()
+    {
+        const QJsonObject chorusRoot{
+            {"code", 200},
+            {"chorus", QJsonArray{QJsonObject{{"id", 7}, {"startTime", 0},
+                                               {"endTime", 1000}, {"ugcLocked", 1}}}}};
+        const auto result = SongWiki::fromApi(fixture(), {}, chorusRoot, 7);
+        QVERIFY2(result.ok(), qPrintable(result.error.message));
+        QVERIFY(result.value->chorus.valid());
+        QCOMPARE(result.value->chorus.start, 0.0);
+        QCOMPARE(result.value->chorus.locked, true);
+    }
+
+    void shellBlocksAreEmpty()
+    {
+        QJsonArray blocks;
+        blocks.append(QJsonObject{{"rnData", QJsonObject{{"simSongs", QJsonArray{}}}}});
+        blocks.append(QJsonObject{{"rnData", QJsonObject{{"simPlaylist", QJsonArray{}}}}});
+        QJsonObject data;
+        data.insert("blocks", blocks);
+        QJsonObject root;
+        root.insert("code", 200);
+        root.insert("data", data);
+        const auto result = SongWiki::fromApi(root, {}, {}, 7);
+        QVERIFY(result.ok());
+        QCOMPARE(result.value->empty, true);
     }
 
     // 前端当前仍消费 QVariantMap；字段名是兼容契约，不能悄悄改名。

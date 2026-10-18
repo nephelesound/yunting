@@ -768,7 +768,8 @@ void AudioEngine::sendWeblog(const char *action, int seconds)
     const QString logsJson = QString::fromUtf8(QJsonDocument(logs).toJson(QJsonDocument::Compact));
     QUrlQuery form;
     form.addQueryItem(QStringLiteral("logs"), logsJson);
-    m_client->postForm(QStringLiteral("api/feedback/weblog"), form, true, nullptr);
+    m_client->postForm(QStringLiteral("api/feedback/weblog"), form, true,
+                        NcmClient::GetCallback{});
 }
 
 int AudioEngine::smokeTest(double songId, int seconds)

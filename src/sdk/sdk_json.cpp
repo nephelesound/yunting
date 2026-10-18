@@ -2,6 +2,18 @@
 
 namespace ncm::sdk {
 
+QStringList objectNameList(const QJsonArray &objects)
+{
+    QStringList names;
+    names.reserve(objects.size());
+    for (const QJsonValue &value : objects) {
+        const QString name = value.toObject().value(QStringLiteral("name")).toString();
+        if (!name.isEmpty())
+            names.append(name);
+    }
+    return names;
+}
+
 JsonReader::JsonReader(const QJsonObject &object, QString path)
     : m_object(object), m_path(std::move(path))
 {

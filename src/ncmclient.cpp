@@ -21,6 +21,7 @@
 #include <QStandardPaths>
 #include <QTimer>
 #include <QUrl>
+#include <utility>
 
 Q_LOGGING_CATEGORY(lcNet, "yunting.net", QtWarningMsg)
 
@@ -329,13 +330,18 @@ void NcmClient::postWeapi(const QString &path, const QJsonObject &payload, bool 
 }
 
 void NcmClient::postForm(const QString &path, const QUrlQuery &form, bool personal,
-                         GetCallback callback)
+                         ResponseCallback callback)
 {
     // 鉴权上下文是 Web cookie（MUSIC_U）：只走 /api 明文或 /weapi；客户端身份统一由
     // clientidentity.h 提供，不在这里混用 macOS/Android 专有标识或 /eapi。
     const QString cookie = cookieHeader(personal);
-    postRaw(QUrl(m_apiBase + path), ncm::formEncoded(form), cookie,
-            [callback](const Response &response) {
+    postRaw(QUrl(m_apiBase + path), ncm::formEncoded(form), cookie, std::move(callback));
+}
+
+void NcmClient::postForm(const QString &path, const QUrlQuery &form, bool personal,
+                         GetCallback callback)
+{
+    postForm(path, form, personal, [callback = std::move(callback)](const Response &response) {
         if (callback)
             callback(response.doc, response.ok);
     });

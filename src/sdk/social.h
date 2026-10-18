@@ -63,6 +63,7 @@ using UserFollowCallback = std::function<void(Result<UserFollowState>)>;
 
 // `personal` attaches the stored MUSIC_U cookie; pass true for the current
 // account's own feed, false for a public profile.
+// lasttime <= 0 uses the API's initial cursor (-1).
 void fetchUserEvents(NcmClient &client, qint64 uid, qint64 lasttime, int limit,
                      bool personal, QObject *context, UserEventsCallback callback);
 

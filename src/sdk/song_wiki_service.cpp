@@ -89,7 +89,7 @@ void fetchSongWiki(NcmClient &client, SongWikiRequest request, QObject *context,
         if (root)
             state->creators = *root.value;
         optionalSettled();
-    });
+    }, client.hasMusicU());
 
     QUrlQuery chorusForm;
     chorusForm.addQueryItem(QStringLiteral("ids"),
@@ -99,7 +99,7 @@ void fetchSongWiki(NcmClient &client, SongWikiRequest request, QObject *context,
         if (root)
             state->chorus = *root.value;
         optionalSettled();
-    });
+    }, client.hasMusicU());
 }
 
 } // namespace ncm::sdk

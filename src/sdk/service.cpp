@@ -10,21 +10,16 @@
 namespace ncm::sdk {
 
 Error endpointError(ErrorKind kind, QString endpoint, QString message,
-                    QString path, int code)
+                    QString path, int code, int httpStatus)
 {
     Error error;
     error.kind = kind;
     error.endpoint = std::move(endpoint);
     error.path = std::move(path);
     error.code = code;
+    error.httpStatus = httpStatus;
     error.message = std::move(message);
     return error;
-}
-
-Error parseError(QString endpoint, QString message, QString path)
-{
-    return endpointError(ErrorKind::Parse, std::move(endpoint), std::move(message),
-                         std::move(path));
 }
 
 namespace {
@@ -61,15 +56,22 @@ void postFormJson(NcmClient &client, QObject *context, QString endpoint,
     const bool hasContext = context != nullptr;
     client.postForm(endpoint, form, personal,
                     [guard, hasContext, endpoint, callback = std::move(callback)]
-                    (const QJsonDocument &doc, bool ok) {
+                    (const NcmClient::Response &response) {
         if (hasContext && guard.isNull())
             return;
-        if (!ok) {
+        const QJsonObject root = response.doc.object();
+        if (response.networkFailure) {
             callback(Result<QJsonObject>::failure(endpointError(
                 ErrorKind::Network, endpoint, QStringLiteral("request failed"))));
             return;
         }
-        callback(settled(doc.object(), endpoint));
+        if (!response.ok) {
+            callback(Result<QJsonObject>::failure(endpointError(
+                ErrorKind::Api, endpoint, responseMessage(root), {},
+                responseCode(root), response.httpStatus)));
+            return;
+        }
+        callback(settled(root, endpoint));
     });
 }
 
@@ -85,11 +87,16 @@ void postWeapiJson(NcmClient &client, QObject *context, QString endpoint,
                      (const NcmClient::Response &response) {
         if (hasContext && guard.isNull())
             return;
-        if (!response.ok || response.networkFailure) {
+        if (response.networkFailure) {
             callback(Result<QJsonObject>::failure(endpointError(
-                ErrorKind::Network, endpoint,
-                response.networkFailure ? QStringLiteral("request failed")
-                                        : responseMessage(response.doc.object()))));
+                ErrorKind::Network, endpoint, QStringLiteral("request failed"))));
+            return;
+        }
+        if (!response.ok) {
+            const QJsonObject root = response.doc.object();
+            callback(Result<QJsonObject>::failure(endpointError(
+                ErrorKind::Api, endpoint, responseMessage(root), {},
+                responseCode(root), response.httpStatus)));
             return;
         }
         callback(settled(response.doc.object(), endpoint));

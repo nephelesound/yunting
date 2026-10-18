@@ -72,9 +72,11 @@ struct SongWikiEntertainment {
 
 // .blockInfo.wikiSubElementVos[] of award blocks
 struct SongWikiAward {
-    QString title;
-    QString description;
-    QString time;
+    QString title;     // .title（颁奖礼）
+    QString awardName; // .subTitle（奖项）
+    QString result;    // .content（获/提名）
+    QString cover;     // .imgUrl
+    QString jumpUrl;   // .jumpUrl
 };
 
 // .rnData.firstListen / .rnData.totalPlay of the "回忆坐标" block
@@ -92,7 +94,7 @@ struct SongWikiChorus {
     double start = 0;     // startTime / 1000
     double end = 0;       // endTime / 1000
     bool locked = false;  // ugcLocked
-    bool valid() const { return start > 0 && end > start; }
+    bool valid() const { return start >= 0 && end > start; }
 };
 
 // .data.songCreatorsRoleVos[]; roleName groups people[].

@@ -78,6 +78,9 @@ explicit NcmClient(QObject *parent = nullptr, bool loadCookies = true);
                    ResponseCallback callback, bool keepCookies = true);
     // 明文 /api/ 表单 POST（听歌打卡 /api/feedback/weblog 用），同样不重试。
     void postForm(const QString &path, const QUrlQuery &form, bool personal, GetCallback callback);
+    // 同上，但保留 HTTP 状态/网络失败分类；SDK 用来区分离线与服务端拒绝。
+    void postForm(const QString &path, const QUrlQuery &form, bool personal,
+                  ResponseCallback callback);
 
     // 客户端日志（NCBL）上传：multipart 已由 Ncbl::multipart 组好，cookie 是完整设备上下文。
     // 不参与 Store 的 online 计数；网络/5xx 最多重试 2 次（日志上传非幂等，服务端可能重复记录）。

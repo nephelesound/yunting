@@ -21,16 +21,6 @@ constexpr auto HighQualityPath = "api/playlist/highquality/list";
 constexpr auto HighQualityTagsPath = "api/playlist/highquality/tags";
 constexpr auto BannersPath = "api/v2/banner/get";
 
-QStringList namesOf(const QJsonArray &objects)
-{
-    QStringList names;
-    for (const QJsonValue &value : objects) {
-        const QString name = value.toObject().value(QStringLiteral("name")).toString();
-        if (!name.isEmpty())
-            names.append(name);
-    }
-    return names;
-}
 } // namespace
 
 Result<QList<NewSong>> parseNewSongs(const QJsonObject &root)
@@ -39,11 +29,12 @@ Result<QList<NewSong>> parseNewSongs(const QJsonObject &root)
     const QJsonArray items = reader.array("result");
     if (!reader.ok())
         return Result<QList<NewSong>>::failure(
-            endpointError(ErrorKind::Parse, NewSongsPath, reader.error()));
+            endpointError(ErrorKind::Parse, NewSongsPath, reader.error(), QStringLiteral("discovery.newSongs")));
     if (!reader.has("result"))
         return Result<QList<NewSong>>::failure(
             endpointError(ErrorKind::Parse, NewSongsPath,
-                          QStringLiteral("discovery.newSongs.result: missing array")));
+                          QStringLiteral("discovery.newSongs.result: missing array"),
+                          QStringLiteral("discovery.newSongs.result")));
 
     QList<NewSong> songs;
     for (qsizetype i = 0; i < items.size(); ++i) {
@@ -52,14 +43,14 @@ Result<QList<NewSong>> parseNewSongs(const QJsonObject &root)
         const QJsonObject song = itemReader.object("song");
         if (!itemReader.ok())
             return Result<QList<NewSong>>::failure(
-                endpointError(ErrorKind::Parse, NewSongsPath, itemReader.error()));
+                endpointError(ErrorKind::Parse, NewSongsPath, itemReader.error(), itemReader.path()));
         if (song.isEmpty())
             continue;
         JsonReader songReader(song, itemReader.path() + QStringLiteral(".song"));
         NewSong out;
         out.songId = songReader.integer("id");
         out.name = songReader.string("name");
-        out.artists = namesOf(song.value(QStringLiteral("artists")).toArray());
+        out.artists = objectNameList(song.value(QStringLiteral("artists")).toArray());
         const QJsonObject album = song.value(QStringLiteral("album")).toObject();
         JsonReader albumReader(album, songReader.path() + QStringLiteral(".album"));
         out.albumId = albumReader.integer("id");
@@ -72,7 +63,7 @@ Result<QList<NewSong>> parseNewSongs(const QJsonObject &root)
         if (!songReader.ok() || !albumReader.ok()) {
             const QString error = !songReader.ok() ? songReader.error() : albumReader.error();
             return Result<QList<NewSong>>::failure(
-                endpointError(ErrorKind::Parse, NewSongsPath, error));
+                endpointError(ErrorKind::Parse, NewSongsPath, error, itemReader.path()));
         }
         if (out.songId > 0)
             songs.append(out);
@@ -86,11 +77,12 @@ Result<QList<NewAlbum>> parseNewAlbums(const QJsonObject &root)
     const QJsonArray items = reader.array("albums");
     if (!reader.ok())
         return Result<QList<NewAlbum>>::failure(
-            endpointError(ErrorKind::Parse, NewAlbumsPath, reader.error()));
+            endpointError(ErrorKind::Parse, NewAlbumsPath, reader.error(), QStringLiteral("discovery.newAlbums")));
     if (!reader.has("albums"))
         return Result<QList<NewAlbum>>::failure(
             endpointError(ErrorKind::Parse, NewAlbumsPath,
-                          QStringLiteral("discovery.newAlbums.albums: missing array")));
+                          QStringLiteral("discovery.newAlbums.albums: missing array"),
+                          QStringLiteral("discovery.newAlbums.albums")));
 
     QList<NewAlbum> albums;
     for (qsizetype i = 0; i < items.size(); ++i) {
@@ -105,12 +97,12 @@ Result<QList<NewAlbum>> parseNewAlbums(const QJsonObject &root)
         JsonReader artistReader(artist, item.path() + QStringLiteral(".artist"));
         out.artistId = artistReader.integer("id");
         out.artistName = artistReader.string("name");
-        out.artists = namesOf(item.array("artists"));
+        out.artists = objectNameList(item.array("artists"));
         out.size = item.integer("size");
         if (!item.ok() || !artistReader.ok()) {
             const QString error = !item.ok() ? item.error() : artistReader.error();
             return Result<QList<NewAlbum>>::failure(
-                endpointError(ErrorKind::Parse, NewAlbumsPath, error));
+                endpointError(ErrorKind::Parse, NewAlbumsPath, error, item.path()));
         }
         if (out.id > 0)
             albums.append(out);
@@ -124,15 +116,20 @@ Result<HighQualityPlaylistPage> parseHighQualityPlaylists(const QJsonObject &roo
     const QJsonArray items = reader.array("playlists");
     if (!reader.ok())
         return Result<HighQualityPlaylistPage>::failure(
-            endpointError(ErrorKind::Parse, HighQualityPath, reader.error()));
+            endpointError(ErrorKind::Parse, HighQualityPath, reader.error(), QStringLiteral("discovery.highQualityPlaylists")));
     if (!reader.has("playlists"))
         return Result<HighQualityPlaylistPage>::failure(
             endpointError(ErrorKind::Parse, HighQualityPath,
-                          QStringLiteral("discovery.highQualityPlaylists.playlists: missing array")));
+                          QStringLiteral("discovery.highQualityPlaylists.playlists: missing array"),
+                          QStringLiteral("discovery.highQualityPlaylists.playlists")));
 
     HighQualityPlaylistPage page;
     page.more = reader.boolean("more");
     page.lasttime = reader.integer("lasttime");
+    if (!reader.ok())
+        return Result<HighQualityPlaylistPage>::failure(
+            endpointError(ErrorKind::Parse, HighQualityPath, reader.error(),
+                          QStringLiteral("discovery.highQualityPlaylists")));
     for (qsizetype i = 0; i < items.size(); ++i) {
         JsonReader item(items.at(i).toObject(),
                         QStringLiteral("discovery.highQualityPlaylists.playlists[%1]").arg(i));
@@ -152,7 +149,7 @@ Result<HighQualityPlaylistPage> parseHighQualityPlaylists(const QJsonObject &roo
         if (!item.ok() || !creatorReader.ok()) {
             const QString error = !item.ok() ? item.error() : creatorReader.error();
             return Result<HighQualityPlaylistPage>::failure(
-                endpointError(ErrorKind::Parse, HighQualityPath, error));
+                endpointError(ErrorKind::Parse, HighQualityPath, error, item.path()));
         }
         if (out.id > 0)
             page.items.append(out);
@@ -166,11 +163,12 @@ Result<QList<HighQualityTag>> parseHighQualityTags(const QJsonObject &root)
     const QJsonArray items = reader.array("tags");
     if (!reader.ok())
         return Result<QList<HighQualityTag>>::failure(
-            endpointError(ErrorKind::Parse, HighQualityTagsPath, reader.error()));
+            endpointError(ErrorKind::Parse, HighQualityTagsPath, reader.error(), QStringLiteral("discovery.highQualityTags")));
     if (!reader.has("tags"))
         return Result<QList<HighQualityTag>>::failure(
             endpointError(ErrorKind::Parse, HighQualityTagsPath,
-                          QStringLiteral("discovery.highQualityTags.tags: missing array")));
+                          QStringLiteral("discovery.highQualityTags.tags: missing array"),
+                          QStringLiteral("discovery.highQualityTags.tags")));
 
     QList<HighQualityTag> tags;
     for (qsizetype i = 0; i < items.size(); ++i) {
@@ -184,7 +182,7 @@ Result<QList<HighQualityTag>> parseHighQualityTags(const QJsonObject &root)
         out.hot = item.boolean("hot");
         if (!item.ok()) {
             return Result<QList<HighQualityTag>>::failure(
-                endpointError(ErrorKind::Parse, HighQualityTagsPath, item.error()));
+                endpointError(ErrorKind::Parse, HighQualityTagsPath, item.error(), item.path()));
         }
         if (!out.name.isEmpty())
             tags.append(out);
@@ -198,11 +196,12 @@ Result<QList<Banner>> parseBanners(const QJsonObject &root)
     const QJsonArray items = reader.array("banners");
     if (!reader.ok())
         return Result<QList<Banner>>::failure(
-            endpointError(ErrorKind::Parse, BannersPath, reader.error()));
+            endpointError(ErrorKind::Parse, BannersPath, reader.error(), QStringLiteral("discovery.banners")));
     if (!reader.has("banners"))
         return Result<QList<Banner>>::failure(
             endpointError(ErrorKind::Parse, BannersPath,
-                          QStringLiteral("discovery.banners.banners: missing array")));
+                          QStringLiteral("discovery.banners.banners: missing array"),
+                          QStringLiteral("discovery.banners.banners")));
 
     QList<Banner> banners;
     for (qsizetype i = 0; i < items.size(); ++i) {
@@ -216,7 +215,7 @@ Result<QList<Banner>> parseBanners(const QJsonObject &root)
         out.targetId = item.integer("targetId");
         if (!item.ok())
             return Result<QList<Banner>>::failure(
-                endpointError(ErrorKind::Parse, BannersPath, item.error()));
+                endpointError(ErrorKind::Parse, BannersPath, item.error(), item.path()));
         if (!out.imageUrl.isEmpty())
             banners.append(out);
     }
