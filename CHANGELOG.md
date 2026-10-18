@@ -2,6 +2,12 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.4.1] - 2026-10-18
+
+### 修复
+- 桌面歌词开着文字阴影时，播放中每一帧都重新模糊整块歌词，白白占用显卡。阴影现在只在换句时重画。
+- 桌面歌词的文字阴影在还没唱到的字和第二行下面偏淡；黑字的阴影是白色的，在亮壁纸上看不出来。阴影现在一律是黑色，深浅均匀。
+
 ## [0.4.0] - 2026-10-18
 
 ### 变化
@@ -66,6 +72,7 @@
 - 分享：链接、二维码、Telegram 与邮件，以及带封面与歌词的分享图。
 - 「关于」窗口与「复制诊断信息」，方便反馈问题。
 
+[0.4.1]: https://github.com/nephelesound/yunting/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/nephelesound/yunting/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/nephelesound/yunting/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/nephelesound/yunting/compare/v0.2.1...v0.2.2
