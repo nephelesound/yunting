@@ -7,6 +7,8 @@
 #include "normalize.h"
 #include "sdk/lyrics.h"
 #include "sdk/comment.h"
+#include "sdk/mv_page.h"
+#include "sdk/search_people.h"
 
 #include <QDateTime>
 #include <QSet>
@@ -611,25 +613,30 @@ void Store::requestMv(const QString &key, double mvId)
             m_client->postWeapi("v1/mv/detail", QJsonObject{{"id", num(mvId)}}, true,
                                 [done](const QJsonDocument &doc, bool ok) {
                 const QJsonObject root = body(doc);
-                const QJsonObject d = root.value("data").toObject();
-                if (!ok || root.value("code").toInt() != 200 || d.isEmpty()) {
+                if (!ok || root.value("code").toInt() != 200) {
                     done({}, false);
                     return;
                 }
+                const auto parsed = sdk::parseMvDetail(root);
+                if (!parsed) {
+                    done({}, false);
+                    return;
+                }
+                const sdk::MvDetail &detail = *parsed.value;
                 done(QVariantMap{
-                    {"id", d.value("id").toDouble()},
-                    {"name", d.value("name").toString()},
-                    {"cover", ncmSized(d.value("cover"), 400)},
-                    {"artist", d.value("artistName").toString()},
-                    {"artistId", d.value("artistId").toDouble()},
-                    {"duration", std::floor(d.value("duration").toDouble() / 1000)},
-                    {"playCount", d.value("playCount").toDouble()},
-                    {"subCount", d.value("subCount").toDouble()},
-                    {"shareCount", d.value("shareCount").toDouble()},
-                    {"commentCount", d.value("commentCount").toDouble()},
-                    {"publishTime", d.value("publishTime").toString()},
-                    {"description", d.value("desc").toString()},
-                    {"subscribed", root.value("subed").toBool()},
+                    {"id", static_cast<double>(detail.id)},
+                    {"name", detail.name},
+                    {"cover", ncmSized(QJsonValue(detail.cover), 400)},
+                    {"artist", detail.artist},
+                    {"artistId", static_cast<double>(detail.artistId)},
+                    {"duration", static_cast<double>(detail.duration)},
+                    {"playCount", static_cast<double>(detail.playCount)},
+                    {"subCount", static_cast<double>(detail.subCount)},
+                    {"shareCount", static_cast<double>(detail.shareCount)},
+                    {"commentCount", static_cast<double>(detail.commentCount)},
+                    {"publishTime", detail.publishTime},
+                    {"description", detail.description},
+                    {"subscribed", detail.subscribed},
                 }, true);
             });
         },
@@ -675,22 +682,30 @@ void Store::requestSearchUsers(const QString &key, const QString &raw)
                           query({{"s", raw}, {"type", "1002"}, {"limit", "20"}, {"offset", "0"}}), false,
                           [done, raw](const QJsonDocument &doc, bool ok) {
                 const QJsonObject resp = body(doc);
+                if (!ok || resp.value("code").toInt() != 200) {
+                    done({}, false);
+                    return;
+                }
+                const auto parsed = sdk::parseSearchUsers(resp, raw);
+                if (!parsed) {
+                    done({}, false);
+                    return;
+                }
                 QVariantList items;
-                for (const QJsonValue &v : arr(resp.value("result").toObject(), "userprofiles")) {
-                    const QJsonObject u = v.toObject();
+                items.reserve(parsed.value->items.size());
+                for (const sdk::SearchUser &user : parsed.value->items) {
                     items.append(QVariantMap{
-                        {"id", u.value("userId").toDouble()},
-                        {"name", u.value("nickname").toString()},
-                        {"cover", ncmSized(u.value("avatarUrl"), 300)},
-                        {"followed", u.value("followed").toBool()},
-                        {"fans", u.value("followeds").toDouble()},
-                        {"follows", u.value("follows").toDouble()},
-                        {"playlists", u.value("playlistCount").toDouble()},
-                        {"signature", u.value("signature").toString()},
+                        {"id", static_cast<double>(user.id)},
+                        {"name", user.name},
+                        {"cover", ncmSized(QJsonValue(user.cover), 300)},
+                        {"followed", user.followed},
+                        {"fans", static_cast<double>(user.fans)},
+                        {"follows", static_cast<double>(user.follows)},
+                        {"playlists", static_cast<double>(user.playlists)},
+                        {"signature", user.signature},
                     });
                 }
-                done(QVariantMap{{"query", raw}, {"items", items}},
-                     ok && resp.value("code").toInt() == 200);
+                done(QVariantMap{{"query", parsed.value->query}, {"items", items}}, true);
             });
         },
         [this](const QVariant &result) { put("searchUsers", result, false); });
@@ -705,22 +720,30 @@ void Store::requestSearchRadios(const QString &key, const QString &raw)
                           query({{"s", raw}, {"type", "1009"}, {"limit", "20"}, {"offset", "0"}}), false,
                           [done, raw](const QJsonDocument &doc, bool ok) {
                 const QJsonObject resp = body(doc);
+                if (!ok || resp.value("code").toInt() != 200) {
+                    done({}, false);
+                    return;
+                }
+                const auto parsed = sdk::parseSearchRadios(resp, raw);
+                if (!parsed) {
+                    done({}, false);
+                    return;
+                }
                 QVariantList items;
-                for (const QJsonValue &v : arr(resp.value("result").toObject(), "djRadios")) {
-                    const QJsonObject r = v.toObject();
+                items.reserve(parsed.value->items.size());
+                for (const sdk::SearchRadio &radio : parsed.value->items) {
                     items.append(QVariantMap{
-                        {"id", r.value("id").toDouble()},
-                        {"name", r.value("name").toString()},
-                        {"cover", ncmSized(r.value("picUrl"), 300)},
-                        {"description", r.value("desc").toString()},
-                        {"host", r.value("dj").toObject().value("nickname").toString()},
-                        {"programCount", r.value("programCount").toDouble()},
-                        {"subCount", r.value("subCount").toDouble()},
-                        {"playCount", r.value("playCount").toDouble()},
+                        {"id", static_cast<double>(radio.id)},
+                        {"name", radio.name},
+                        {"cover", ncmSized(QJsonValue(radio.cover), 300)},
+                        {"description", radio.description},
+                        {"host", radio.host},
+                        {"programCount", static_cast<double>(radio.programCount)},
+                        {"subCount", static_cast<double>(radio.subCount)},
+                        {"playCount", static_cast<double>(radio.playCount)},
                     });
                 }
-                done(QVariantMap{{"query", raw}, {"items", items}},
-                     ok && resp.value("code").toInt() == 200);
+                done(QVariantMap{{"query", parsed.value->query}, {"items", items}}, true);
             });
         },
         [this](const QVariant &result) { put("searchRadios", result, false); });

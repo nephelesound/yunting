@@ -48,6 +48,8 @@ NcmClient                 传输（cookie、weapi/明文、超时）
 - `lyrics.h/.cpp`：普通/逐字歌词原始文本（lrc/tlyric/yrc/ytlrc、pureMusic/nolyric）；LRC/YRC 行解析仍由 Store 边界复用旧解析器。
 - `notify.h/.cpp`：`/api/pl/count` 通知计数纯解析；`total` 由 Store 按固定六项求和。
 - `user_social.h/.cpp`：关注/粉丝列表、账号等级、收藏计数纯解析；不包含关注写操作。
+- `search_people.h/.cpp`：Cloudsearch 用户/电台结果行纯解析（type=1002/1009）。
+- `mv_page.h/.cpp`：MV 详情 typed 模型；签名播放地址仍由 Store 的 `mvUrl:<id>` 状态机刷新。
 - 动态封面 live shape：`data.videoPlayUrl` + `needTransition`；`weight` 兼容上游 typo，URL 是带时效签名地址。
 - `service.h/.cpp`：唯一的 HTTP code/错误/context/JSON 信封 seam，所有 service 共用。
 - `samples/`：
