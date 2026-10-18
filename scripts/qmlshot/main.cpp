@@ -27,17 +27,17 @@ bool isHarmlessWarning(const QQmlError &error, const QSet<QString> &dialogTypes)
 {
     const QString description = error.description();
     if (description.contains(QLatin1String("Created graphical object was not placed in the graphics scene."))
-        || description.contains(QLatin1String("QQuickImage: Error transferring")))
+        || description.contains(QLatin1String(": Error transferring")))   // 图片下载失败（Image 或带图片的图层）
         return true;
     static const QRegularExpression dialogLoop(QStringLiteral("^QML (\\w+): Binding loop detected for property \"y\""));
     const QRegularExpressionMatch m = dialogLoop.match(description);
     return m.hasMatch() && dialogTypes.contains(m.captured(1));
 }
 
-// 目录里根对象是 Kirigami.Dialog 的组件名（文件名即类型名），外加 Kirigami 自己的 Dialog
+// 目录里根对象是 Kirigami.Dialog 的组件名（文件名即类型名），外加 Kirigami 自己的 Dialog 与 PromptDialog
 QSet<QString> kirigamiDialogTypes(const QString &dir)
 {
-    QSet<QString> types{QStringLiteral("Dialog")};
+    QSet<QString> types{QStringLiteral("Dialog"), QStringLiteral("PromptDialog")};
     static const QRegularExpression root(QStringLiteral("^Kirigami\\.Dialog\\s*\\{"), QRegularExpression::MultilineOption);
     const QFileInfoList files = QDir(dir).entryInfoList({QStringLiteral("*.qml")}, QDir::Files);
     for (const QFileInfo &info : files) {

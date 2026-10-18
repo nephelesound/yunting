@@ -5,7 +5,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import org.kde.kirigami as Kirigami
 
 ScreenFrame {
     id: page
@@ -46,40 +45,17 @@ ScreenFrame {
             }
         }
 
-        // 与歌手页的专辑网格同一种排法：视图延伸到窗口右缘，磁贴止于页边线，滚动条在页边距里
-        GridView {
+        TileGrid {
             id: grid
             Layout.fillWidth: true
             Layout.fillHeight: true
-            readonly property int usable: width - Tokens.pageMargin
-            readonly property int columns: Math.max(1, Math.floor((usable + Tokens.space4) / (Tokens.tileLg + Tokens.space4)))
-            cellWidth: (usable + Tokens.space4) / columns
-            cellHeight: cellWidth - Tokens.space4 + Tokens.space2 + Tokens.height12 + Tokens.space4
-            bottomMargin: Tokens.space6
-            clip: true
-            boundsBehavior: Flickable.StopAtBounds
-            model: page.shown
-            ScrollBar.vertical: ScrollBar {}
-            WheelScroll { flickable: grid }
-
-            delegate: MediaTile {
-                required property var modelData
-                width: grid.cellWidth - Tokens.space4
-                title: modelData.name
-                caption: modelData.count > 0 ? modelData.count + " 首" : "空歌单"
-                cover: modelData.cover
-                onClicked: Actions.openPlaylist(modelData.id)
-                onMenuRequested: Actions.playlistMenuRequested(modelData)
-            }
-
-            Kirigami.PlaceholderMessage {
-                anchors.centerIn: parent
-                width: parent.width - 2 * Tokens.pageMargin
-                visible: grid.count === 0
-                icon.name: "view-media-playlist"
-                text: page.pane === "owned" ? "还没有创建歌单" : "还没有收藏歌单"
-                explanation: page.pane === "owned" ? "用右上角的「新建歌单」，或在任意歌曲的菜单里「添加到歌单 › 新建歌单」" : "在歌单页的「更多」里可以收藏"
-            }
+            list: ({ items: page.shown, more: false, pending: false, failed: false, moreFailed: false, key: "" })
+            captionOf: item => item.count > 0 ? item.count + " 首" : "空歌单"
+            emptyIcon: "view-media-playlist"
+            emptyText: page.pane === "owned" ? "还没有创建歌单" : "还没有收藏歌单"
+            emptyExplanation: page.pane === "owned" ? "用右上角的「新建歌单」，或在任意歌曲的菜单里「添加到歌单 › 新建歌单」" : "在歌单页的「更多」里可以收藏"
+            onOpened: item => Actions.openPlaylist(item.id)
+            onMenuRequested: item => Actions.playlistMenuRequested(item)
         }
     }
 }

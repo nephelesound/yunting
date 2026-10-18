@@ -330,6 +330,35 @@ Item {
             compare(calls.length, 0);
         }
 
+        // 分页列表：没取过就要第一页；下一页的 key 是第一页的 key 加上 Store 给的 next
+        function test_pagedListsAskForFirstThenNextPage() {
+            const saved = Source.live;
+            const calls = [];
+            Source.live = { data: { highquality: { cat: "全部", more: true, next: 777, items: [{ id: 1 }] } },
+                            personal: {}, request: key => calls.push(key) };
+            const list = Source.highquality("全部");
+            compare(list.items.length, 1);
+            Source.morePaged(list);
+            Source.saved("artists");
+            tryVerify(() => calls.indexOf("discover:highquality:全部:777") >= 0, 1000, "next page key");
+            tryVerify(() => calls.indexOf("library:artists") >= 0, 1000, "first page of an empty slot");
+            Source.live = saved;
+        }
+
+        // 动态、通知里提到的歌只有 id 时也能放：补成最小的曲目交给播放器；视频没有页可开
+        function test_mentionedSongPlaysFromItsId() {
+            const spy = spyComponent.createObject(root, { target: Actions, signalName: "playRequested" });
+            verify(Actions.canOpen({ kind: "song", id: 5, name: "歌", artist: "人" }));
+            verify(!Actions.canOpen({ kind: "video", id: 0, vid: "A1" }));
+            Actions.openResource({ kind: "song", id: 5, name: "歌", artist: "人", cover: "" });
+            compare(spy.count, 1);
+            const track = spy.signalArguments[0][0][0];
+            compare(track.id, 5);
+            compare(track.name, "歌");
+            compare(track.artist, "人");
+            spy.destroy();
+        }
+
         // 评论点赞从页面转发到后端时，参数不能丢（songId, commentId, 目标状态）。
         function test_commentLikeForwardsToLive() {
             const calls = [];

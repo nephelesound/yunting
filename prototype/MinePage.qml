@@ -1,7 +1,7 @@
 // 我的（已登录）：回到自己的歌。一屏放完，与首页共用同一套列网格。
 //   第一排：「我的音乐」两块入口（我喜欢的音乐 · 音乐云盘）| 「最近播放」直接列出最近的歌（识别而非回忆），
 //          行数取刚好与磁贴（含下方两行字）同高的条数，两组上下边缘对齐；
-//   第二排：「歌单」，创建的在前、收藏的在后；放不下的在「全部歌单」页，右键磁贴有歌单菜单。
+//   第二排：收藏，枢轴切「歌单 / 歌手 / 专辑 / MV」，同一排磁贴；放不下的在「全部」页，右键歌单磁贴有歌单菜单。
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -18,8 +18,26 @@ ScreenFrame {
     signal playlistOpened(int index)
     signal recentActivated(int index)
     signal allPlaylistsRequested()
+    signal allSavedRequested(string kind)   // artists | albums | mvs
 
     currentPivot: "mine"
+    kept: ["collection"]
+
+    // 第二排看哪一类收藏：playlists | artists | albums | mvs（歌手等只在切到时才取）
+    property string collection: "playlists"
+    readonly property var saved: page.collection === "playlists" ? ({ items: [], count: 0, pending: false, failed: false, key: "" })
+        : Source.saved(page.collection)
+    // MV 收藏里的视频没有 MV 页可开，只列 MV
+    readonly property var collectionItems: page.collection === "playlists" ? Source.myPlaylists
+        : page.collection === "mvs" ? page.saved.items.filter(m => m.kind === "mv") : page.saved.items
+    readonly property int collectionCount: page.collection === "playlists" ? Source.myPlaylists.length : page.saved.count || 0
+    function caption(item) {
+        if (page.collection === "playlists")
+            return item.owned ? (item.count > 0 ? item.count + " 首" : "空歌单") : "收藏的歌单";
+        if (page.collection === "artists")
+            return item.albums > 0 ? item.albums + " 张专辑" : "";
+        return item.artist || "";
+    }
 
     readonly property int textBlock: Tokens.space2 + Tokens.height12
     readonly property int headerBlock: Tokens.height10 + Tokens.space3
@@ -109,36 +127,51 @@ ScreenFrame {
             }
         }
 
-        // 歌单：创建的在前，收藏的在后
+        // 第二排：收藏的东西，一次看一类。歌单（创建的在前，收藏的在后）/ 关注的歌手 / 收藏的专辑 / 收藏的 MV
         ColumnLayout {
             spacing: 0
-            // 有歌单时进「全部歌单」（那里也能新建）；一个都没有时直接新建
+            // 有内容时进「全部」页；歌单一个都没有时直接新建
             GroupHeader {
-                text: "歌单"
-                actionText: Source.myPlaylists.length > 0 ? "全部 " + Source.myPlaylists.length + " 个" : "新建歌单"
-                onActionTriggered: Source.myPlaylists.length > 0 ? page.allPlaylistsRequested() : Actions.newPlaylistRequested()
+                pivots: [{ key: "playlists", text: "歌单" }, { key: "artists", text: "歌手" },
+                         { key: "albums", text: "专辑" }, { key: "mvs", text: "MV" }]
+                current: page.collection
+                onPivotActivated: key => page.collection = key
+                actionText: page.collectionCount > 0 ? "全部 " + page.collectionCount + " 个"
+                    : page.collection === "playlists" ? "新建歌单" : ""
+                onActionTriggered: page.collection !== "playlists" ? page.allSavedRequested(page.collection)
+                    : Source.myPlaylists.length > 0 ? page.allPlaylistsRequested() : Actions.newPlaylistRequested()
             }
             Row {
                 spacing: Tokens.space2
                 Repeater {
-                    model: Source.myPlaylists.slice(0, page.columns)
+                    model: page.collectionItems.slice(0, page.columns)
                     delegate: MediaTile {
                         required property var modelData
                         required property int index
                         width: page.tile
                         title: modelData.name
-                        caption: modelData.owned ? (modelData.count > 0 ? modelData.count + " 首" : "空歌单") : "收藏的歌单"
+                        caption: page.caption(modelData)
                         cover: modelData.cover
-                        onClicked: page.playlistOpened(index)
-                        onMenuRequested: Actions.playlistMenuRequested(modelData)
+                        round: page.collection === "artists"
+                        onClicked: page.collection === "playlists" ? page.playlistOpened(index)
+                            : page.collection === "artists" ? Actions.openArtist(modelData.id)
+                            : page.collection === "albums" ? Actions.openAlbum(modelData.id)
+                            : Actions.openMv(modelData.id)
+                        onMenuRequested: if (page.collection === "playlists") Actions.playlistMenuRequested(modelData)
                     }
                 }
             }
             Label {
-                visible: Source.myPlaylists.length === 0
-                text: "还没有创建或收藏的歌单"
+                visible: page.collectionItems.length === 0
+                text: page.collection === "playlists" ? "还没有创建或收藏的歌单"
+                    : page.saved.pending ? "正在取回…"
+                    : page.saved.failed ? "没取到，点此重试"
+                    : { artists: "还没有关注的歌手", albums: "还没有收藏的专辑", mvs: "还没有收藏的 MV" }[page.collection]
                 font.pixelSize: Tokens.textSm
+                font.underline: page.saved.failed && savedRetry.hovered
                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                HoverHandler { id: savedRetry; enabled: page.saved.failed; cursorShape: Qt.PointingHandCursor }
+                TapHandler { enabled: page.saved.failed; onTapped: Source.retryKey(page.saved.key) }
             }
         }
 

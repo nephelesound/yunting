@@ -14,13 +14,14 @@ ScreenFrame {
     id: page
     // 关注 / 粉丝的网格在 Repeater 里，显示着的那个自己报上来
     property Flickable peopleView: null
-    scroller: page.pane === "playlists" ? playlists : page.pane === "rank" ? rankList : page.peopleView
+    scroller: page.pane === "playlists" ? playlists : page.pane === "events" ? eventList
+        : page.pane === "rank" ? rankList : page.peopleView
     kept: ["pane"]
     background: PageAmbience { cover: page.user.avatar || "" }
 
     property real userId
     property real currentId
-    property string pane: "playlists"   // playlists | rank | follows | fans
+    property string pane: "playlists"   // playlists | events | rank | follows | fans
     property string rankType: "week"    // week | month
 
     readonly property var user: Source.user(page.userId)
@@ -31,7 +32,12 @@ ScreenFrame {
     readonly property var follows: Source.people("userFollows", page.userId)
     readonly property var fans: Source.people("userFolloweds", page.userId)
     readonly property var level: page.own ? Source.level : null
+    // 动态只在切到那一栏时取
+    readonly property var events: page.pane === "events" ? Source.events(page.userId) : null
+    readonly property bool followed: page.user.followed === true
     heading: page.user.name || "用户"
+
+    signal followToggled(real id, bool followed)
 
     // 听歌排行、关注、粉丝后端不缓存：切到那一栏（或换周 / 月）时要一次，已经有了就不再要
     function load() {
@@ -160,6 +166,25 @@ ScreenFrame {
                         ? [{ value: Format.count(Math.round(Source.listenSeconds / 3600)), label: "小时听歌时长" }] : [])
             }
 
+            // 别人的主页：关注。与这一栏的其他动作一样用文字链接（字的左缘与事实对齐）；
+            // 已关注时先说状态，取消关注是弱化的链接。未登录时由 main 引向登录
+            RowLayout {
+                Layout.topMargin: Tokens.space4
+                visible: !page.own && page.userId > 0 && (page.user.name !== "" || page.restricted)
+                spacing: Tokens.space3
+                Label {
+                    visible: page.followed
+                    text: "已关注"
+                    font.pixelSize: Tokens.textBase
+                }
+                LinkText {
+                    parts: [{ text: page.followed ? "取消关注" : "关注", link: true }]
+                    font.pixelSize: Tokens.textBase
+                    color: page.followed ? Qt.alpha(Kirigami.Theme.textColor, Tokens.muted) : Kirigami.Theme.textColor
+                    onActivated: page.followToggled(page.userId, !page.followed)
+                }
+            }
+
             // 升级还差多少：等级接口给出下一级要求的听歌数与登录天数（满级时两者都不再增长，不显示）
             Label {
                 Layout.fillWidth: true
@@ -212,7 +237,8 @@ ScreenFrame {
             spacing: Tokens.space3
 
             Pivot {
-                items: [{ key: "playlists", text: (page.user.playlistCount || 0) > 0 ? "歌单 " + page.user.playlistCount : "歌单" }]
+                items: [{ key: "playlists", text: (page.user.playlistCount || 0) > 0 ? "歌单 " + page.user.playlistCount : "歌单" },
+                        { key: "events", text: "动态" }]
                     .concat(page.own ? [{ key: "rank", text: "听歌排行" }] : [])
                     .concat([{ key: "follows", text: (page.user.follows || 0) > 0 ? "关注 " + Format.count(page.user.follows) : "关注" },
                              { key: "fans", text: (page.user.followeds || 0) > 0 ? "粉丝 " + Format.count(page.user.followeds) : "粉丝" }])
@@ -255,6 +281,101 @@ ScreenFrame {
                     restrictedText: "对方设置了隐私，无法查看公开歌单"
                     retryKey: "user:" + page.userId
                     emptyText: "还没有公开歌单"
+                }
+            }
+
+            // 动态：这个人说了什么、分享了什么。一条一段：动作与时间一行，说的话一段，分享的东西一行（可点：
+            // 歌直接放，歌单 / 专辑 / MV 打开），赞与评论数弱化在最后。都是同一个人发的，不重复头像与名字
+            ListView {
+                id: eventList
+                visible: page.pane === "events"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                rightMargin: Tokens.pageMargin
+                bottomMargin: Tokens.space6
+                spacing: Tokens.space6
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                model: GrowingModel {
+                    values: page.events ? page.events.items : []
+                    keyOf: e => e.id
+                }
+                ScrollBar.vertical: ScrollBar {}
+                WheelScroll { flickable: eventList }
+                onAtYEndChanged: if (atYEnd && page.events && count > 0) Source.morePaged(page.events)
+
+                delegate: ColumnLayout {
+                    id: event
+                    required property int index
+                    readonly property var entry: page.events ? page.events.items[event.index] || ({}) : ({})
+                    readonly property var resource: event.entry.resource || ({ kind: "other" })
+                    width: eventList.width - eventList.rightMargin
+                    spacing: Tokens.space2
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Tokens.space4
+                        Label {
+                            Layout.fillWidth: true
+                            text: event.entry.action || "动态"
+                            font.pixelSize: Tokens.textSm
+                            color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                            elide: Text.ElideRight
+                        }
+                        Label {
+                            text: Format.commentTime(event.entry.time || 0)
+                            font.pixelSize: Tokens.textSm
+                            font.features: { "tnum": 1 }
+                            color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                        }
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        visible: text.length > 0
+                        text: event.entry.text || ""
+                        font.pixelSize: Tokens.textBase
+                        wrapMode: Text.Wrap
+                    }
+                    ResourceRow {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: -Tokens.space1
+                        visible: event.resource.kind !== "other" && (event.resource.name || "").length > 0
+                        enabled: Actions.canOpen(event.resource)
+                        aspect: event.resource.kind === "mv" || event.resource.kind === "video" ? 16 / 9 : 1
+                        round: event.resource.kind === "artist"
+                        cover: event.resource.cover || ""
+                        title: event.resource.name || ""
+                        detail: event.resource.artist || ""
+                        onClicked: Actions.openResource(event.resource)
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        readonly property var counts: [(event.entry.likes || 0) > 0 ? Format.count(event.entry.likes) + " 赞" : "",
+                                                       (event.entry.comments || 0) > 0 ? Format.count(event.entry.comments) + " 评论" : ""]
+                        visible: text.length > 0
+                        text: counts.filter(s => s.length > 0).join("   ")
+                        font.pixelSize: Tokens.textSm
+                        font.features: { "tnum": 1 }
+                        color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                    }
+                }
+
+                footer: PagingFooter {
+                    width: eventList.width - eventList.rightMargin
+                    paging: page.events ? { items: page.events.items, more: page.events.more, loading: false, failed: page.events.moreFailed } : null
+                    doneText: "没有更早的动态了"
+                    onRetryRequested: Source.morePaged(page.events)
+                }
+
+                PaneMessage {
+                    visible: eventList.count === 0
+                    icon.name: "view-list-text"
+                    pending: page.events !== null && page.events.pending
+                    failed: page.events !== null && page.events.failed
+                    restricted: page.events !== null && page.events.restricted
+                    restrictedText: "对方设置了隐私，无法查看动态"
+                    retryKey: page.events ? page.events.key : ""
+                    emptyText: page.own ? "还没有发过动态" : "还没有动态"
                 }
             }
 

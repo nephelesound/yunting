@@ -12,13 +12,13 @@ import "Format.js" as Format
 
 ScreenFrame {
     id: page
-    scroller: page.pane === "comments" ? commentList : null
+    scroller: page.pane === "comments" ? commentList : page.pane === "wiki" ? wikiPane : null
     kept: ["pane"]
 
     property var track
     property real elapsed
     property bool playing
-    property string pane: "lyrics"   // lyrics | comments
+    property string pane: "lyrics"   // lyrics | comments | wiki
 
     // 逐字填色要逐帧走（引擎的进度更新得没那么勤）：播放时每帧前进，与引擎偏差大或暂停时对齐（与桌面歌词同一做法）
     property real clock: 0
@@ -56,6 +56,8 @@ ScreenFrame {
 
     readonly property var lines: page.track ? Source.lyrics(page.track.id) : []
     readonly property var comments: page.track && page.pane === "comments" ? Source.comments(page.track.id) : []
+    // 百科只在打开这一栏时取
+    readonly property var wiki: page.track && page.pane === "wiki" ? Source.wiki(page.track.id) : null
     // 最新评论（分页累积）：只认这首歌的；打开评论或换歌时从第一页开始取
     readonly property var latest: page.track && page.pane === "comments" && Source.latestComments.owner === page.track.id
         ? Source.latestComments : null
@@ -120,6 +122,28 @@ ScreenFrame {
             pixelSize: 800
             // 共享封面转场飞行时隐藏，落地后再显示：屏上永远只有一张封面
             opacity: page.coverHidden ? 0 : 1
+
+            // 动态封面（登录后，少数歌有的循环小视频）：盖在封面上，不出声。只在这一页、正在放歌时才转，
+            // 暂停、换歌或离开就把播放器拆掉（不在后台解码）；没有动态封面时就是普通封面
+            Loader {
+                id: dynamicCover
+                readonly property string url: page.track && Source.live ? Source.dynamicCover(page.track.id) : ""
+                anchors.fill: parent
+                active: dynamicCover.url.length > 0 && page.visible && page.playing && !page.coverHidden
+                sourceComponent: Qt.createComponent("org.nephelesound.yunting", "MvVideo")
+                Binding {
+                    when: dynamicCover.item !== null
+                    target: dynamicCover.item
+                    property: "ambient"
+                    value: true
+                }
+                Binding {
+                    when: dynamicCover.item !== null
+                    target: dynamicCover.item
+                    property: "source"
+                    value: dynamicCover.url
+                }
+            }
         }
         Facts {
             Layout.fillWidth: true
@@ -139,7 +163,7 @@ ScreenFrame {
         // 第 0 行：枢轴，与页头枢轴同一种语言（淡出的可点）
         Pivot {
             rowHeight: page.pitch
-            items: [{ key: "lyrics", text: "歌词" }, { key: "comments", text: "评论" }]
+            items: [{ key: "lyrics", text: "歌词" }, { key: "comments", text: "评论" }, { key: "wiki", text: "百科" }]
             current: page.pane
             onActivated: key => page.pane = key
         }
@@ -463,6 +487,38 @@ ScreenFrame {
                                                    : Source.moreReplies(thread)
                     }
                 }
+            }
+        }
+
+        WikiPane {
+            id: wikiPane
+            visible: page.pane === "wiki" && page.wiki !== null && !page.wiki.empty
+            y: page.pitch
+            width: parent.width
+            height: (page.rows - 1) * page.pitch
+            topMargin: Tokens.space3
+            wiki: page.wiki || ({})
+            onSeekRequested: seconds => page.seekRequested(seconds)
+        }
+
+        // 百科空着时：在取 / 没取到（可点重试）/ 这首没有百科 / 原型数据里没有
+        Label {
+            id: wikiEmpty
+            readonly property bool failed: page.wiki !== null && page.wiki.failed
+            y: page.focusRow * page.pitch
+            height: page.pitch
+            visible: page.pane === "wiki" && (page.wiki === null || page.wiki.empty)
+            verticalAlignment: Text.AlignVCenter
+            text: !page.track ? "还没有在播放的歌" : wikiEmpty.failed ? "百科没取到，点此重试"
+                : page.wiki && page.wiki.pending ? "正在取回百科…"
+                : Source.live ? "这首歌还没有百科" : "原型数据里没有这首歌的百科"
+            font.pixelSize: Tokens.text2xl
+            font.underline: wikiEmpty.failed && wikiRetryHover.hovered
+            color: wikiEmpty.failed ? Kirigami.Theme.textColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+            HoverHandler { id: wikiRetryHover; enabled: wikiEmpty.failed; cursorShape: Qt.PointingHandCursor }
+            TapHandler {
+                enabled: wikiEmpty.failed
+                onTapped: Source.retryKey("wiki:" + page.track.id)
             }
         }
 

@@ -12,17 +12,23 @@ import "Format.js" as Format
 
 ScreenFrame {
     id: page
-    scroller: list
-    kept: ["peer"]
+    scroller: page.pane === "messages" ? list : noticeList
+    kept: ["peer", "pane"]
 
     property real currentId
     property real peer: 0   // 打开的那段对话的对方 uid
+    property string pane: "messages"   // messages | comments | forwards | notices
+
+    // 未读数（通知计数接口）；评论 / @我 / 通知只在切到那一栏时取
+    readonly property var counts: Source.d.notifications || ({})
+    function labelled(text, n) { return n > 0 ? text + " " + Format.count(n) : text; }
+    readonly property var notices: page.pane === "messages" || !page.loggedIn ? null : Source.notices(page.pane)
 
     readonly property var conversations: Source.inbox
     readonly property var thread: Source.thread(page.peer)
     readonly property var peerItem: page.conversations.items.find(c => c.userId === page.peer) || null
 
-    heading: "私信"
+    heading: "消息"
 
     Component.onCompleted: if (page.loggedIn) Source.need("inbox")
     // 读过的私信服务器会记成已读：离开时重取页头的未读数
@@ -76,12 +82,25 @@ ScreenFrame {
         }
     }
 
+    // 四类消息，未读数跟在后面
+    Pivot {
+        x: Tokens.pageMargin
+        visible: page.loggedIn
+        items: [{ key: "messages", text: page.labelled("私信", page.counts.msg) },
+                { key: "comments", text: page.labelled("评论", page.counts.comment) },
+                { key: "forwards", text: page.labelled("@我", page.counts.forward) },
+                { key: "notices", text: page.labelled("通知", page.counts.notice) }]
+        current: page.pane
+        onActivated: key => page.pane = key
+    }
+
     RowLayout {
         anchors.fill: parent
+        anchors.topMargin: Tokens.height10 + Tokens.space3
         anchors.leftMargin: Tokens.pageMargin
         anchors.bottomMargin: Tokens.space6
         spacing: Tokens.space6
-        visible: page.loggedIn
+        visible: page.loggedIn && page.pane === "messages"
 
         // 左：会话
         ListView {
@@ -298,10 +317,66 @@ ScreenFrame {
         }
     }
 
+    // 评论回复 / @我 / 通知：一列，按时间从新到旧，滚到底接着取。
+    // 左缘与私信两栏一致，止于可读的宽度（一段话不拉到整屏宽）
+    ListView {
+        id: noticeList
+        visible: page.loggedIn && page.pane !== "messages"
+        x: Tokens.pageMargin
+        y: Tokens.height10 + Tokens.space3
+        width: Math.min(parent.width - 2 * Tokens.pageMargin, Tokens.measureMax + Tokens.space6 + Tokens.wideRow)
+        height: parent.height - y - Tokens.space6
+        rightMargin: Tokens.space3
+        spacing: Tokens.space6
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        model: GrowingModel {
+            values: page.notices ? page.notices.items : []
+            keyOf: n => String(n.id)
+        }
+        ScrollBar.vertical: ScrollBar {}
+        WheelScroll { flickable: noticeList }
+        onAtYEndChanged: if (atYEnd && page.notices && count > 0) Source.morePaged(page.notices)
+
+        delegate: NoticeRow {
+            id: notice
+            required property int index
+            readonly property var entry: page.notices ? page.notices.items[notice.index] || ({}) : ({})
+            width: noticeList.width - noticeList.rightMargin
+            user: notice.entry.user || ({})
+            time: notice.entry.time || 0
+            text: notice.entry.content || notice.entry.message || notice.entry.text || ""
+            quote: notice.entry.repliedContent || ""
+            resource: notice.entry.resource || null
+        }
+
+        footer: PagingFooter {
+            width: noticeList.width - noticeList.rightMargin
+            paging: page.notices ? { items: page.notices.items, more: page.notices.more, loading: false, failed: page.notices.moreFailed } : null
+            doneText: "没有更早的了"
+            onRetryRequested: Source.morePaged(page.notices)
+        }
+
+        Kirigami.PlaceholderMessage {
+            anchors.centerIn: parent
+            width: parent.width
+            visible: noticeList.count === 0
+            icon.name: page.notices && (page.notices.pending || page.notices.failed) ? "" : "notifications"
+            text: page.notices && page.notices.pending ? "正在取回…" : page.notices && page.notices.failed ? "没取到"
+                : ({ comments: "还没有人回复你的评论", forwards: "还没有人 @ 你", notices: "还没有通知" })[page.pane] || ""
+            helpfulAction: Kirigami.Action {
+                enabled: page.notices !== null && page.notices.failed
+                text: "重试"
+                icon.name: "view-refresh"
+                onTriggered: Source.retryKey(page.notices.key)
+            }
+        }
+    }
+
     Kirigami.PlaceholderMessage {
         anchors.centerIn: parent
         visible: !page.loggedIn
         icon.name: "dialog-messages"
-        text: "登录后可以查看私信"
+        text: "登录后可以查看消息"
     }
 }

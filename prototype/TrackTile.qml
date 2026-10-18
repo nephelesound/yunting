@@ -175,18 +175,22 @@ AbstractButton {
             }
         }
 
-        // 专辑列：单曲的专辑名常与曲名相同，重复就留空（列仍占位，保证右侧各列对齐）
+        // 专辑列：单曲的专辑名常与曲名相同，重复就留空（列仍占位，保证右侧各列对齐）。
+        // 播客节目的这一列是电台名，点了打开电台
         Item {
             Layout.preferredWidth: Tokens.albumColumn
             Layout.fillHeight: true
             visible: tile.width >= Tokens.wideRow
             LinkText {
+                readonly property real radioId: tile.modelData.radioId || 0
                 anchors.verticalCenter: parent.verticalCenter
                 width: Math.min(implicitWidth, parent.width)
                 parts: !tile.showAlbum || !tile.modelData.album || tile.modelData.album === tile.modelData.name ? []
+                    : radioId > 0 ? [{ text: tile.modelData.album, link: true }]
                     : [{ text: tile.modelData.album, albumId: tile.modelData.albumId }]
                 font.pixelSize: Tokens.textSm
                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                onActivated: Actions.openRadio(radioId)
             }
         }
 

@@ -73,9 +73,9 @@ ScreenFrame {
                 MediaTile {
                     visible: page.loggedIn
                     width: page.tile
-                    title: "排行榜"
+                    title: "发现"
                     caption: Source.chartsCaption
-                    symbol: "office-chart-line-symbolic"
+                    symbol: "compass-symbolic"
                     onClicked: page.entryOpened("charts")
                 }
             }

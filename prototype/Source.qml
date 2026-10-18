@@ -7,6 +7,7 @@
 pragma Singleton
 
 import QtQuick
+import "Format.js" as Format
 
 QtObject {
     id: source
@@ -122,6 +123,19 @@ QtObject {
         return Boolean(c && c.songId === songId);
     }
 
+    // 歌曲百科：data 里只放最近取回的一首，songId 对上才用（取失败时槽里还留着上一首的）。
+    // pending：还在取；empty：取到了但这首没有百科
+    function wiki(songId) {
+        const w = source.d.wiki;
+        if (w && w.songId === songId)
+            return Object.assign({ pending: false, failed: false }, w);
+        if (songId > 0)
+            source.need("wiki:" + songId);
+        return { songId: songId, pending: Boolean(source.live), failed: Boolean(source.failure("wiki:" + songId)),
+                 empty: true, description: "", memory: null, chorus: null, basic: [], creators: [], mvs: [],
+                 reviews: [], sheets: [], entertainments: [], awards: [] };
+    }
+
     // 评论总数：与热评同一次请求（换歌时取一次，缓存里有就不再发）
     function commentTotal(songId) {
         const c = source.d.comments;
@@ -214,7 +228,8 @@ QtObject {
 
     // 榜单
     readonly property var toplists: source.d.toplists
-    readonly property string chartsCaption: source.toplists.length > 0 ? source.toplists.length + " 个官方与特色榜单" : "暂时没有榜单"
+    // 发现页入口的说明：里面有什么
+    readonly property string chartsCaption: "排行榜、新歌新碟、精品歌单、播客"
     readonly property var hotChart: ({ name: source.d.playlist.name, count: source.d.playlist.count, tracks: source.d.tracks })
 
     // 推荐歌单（首页第二排）
@@ -372,6 +387,95 @@ QtObject {
     // 自己的累计听歌时长（秒）与升级进度；还没取到时为 0 / null
     readonly property real listenSeconds: source.d.listenTotal ? source.d.listenTotal.seconds : 0
     readonly property var level: source.d.userLevel || null
+    // 收藏数：歌手 / MV / 创建与收藏的歌单 / 电台
+    readonly property var subcount: source.d.userSubcount || null
+
+    // 分页列表（收藏、动态、通知、精品歌单、电台节目）：Store 把一页页接进同一个槽，槽里有 more 与 next
+    //（下一页的游标或 offset），这里只读。matches：槽里的是不是要的那一份（同一个人 / 同一个分类）。
+    // pending：第一页在取；failed：第一页没取到；moreFailed：下一页没取到（都可重试）
+    function paged(slot, key, matches) {
+        if (slot && matches)
+            return Object.assign({ key: key, pending: false, failed: false,
+                                   moreFailed: slot.more === true && Boolean(source.failure(key + ":" + slot.next)) }, slot);
+        source.need(key);
+        const failed = Boolean(source.failure(key));
+        return { key: key, items: [], more: false, next: 0, pending: Boolean(source.live) && !failed, failed: failed, moreFailed: false };
+    }
+    function morePaged(list) {
+        if (list.more && !list.pending)
+            source.retryKey(list.key + ":" + list.next);
+    }
+
+    // 收藏的歌手 / 专辑 / MV（kind：artists | albums | mvs）
+    function saved(kind) {
+        const slot = source.p[{ artists: "savedArtists", albums: "savedAlbums", mvs: "savedMvs" }[kind]];
+        return source.paged(slot, "library:" + kind, true);
+    }
+    // 用户动态（任何人的主页都有）；对方设置隐私时 restricted
+    function events(uid) {
+        if (!(uid > 0))
+            return { key: "", items: [], more: false, next: 0, pending: false, failed: false, moreFailed: false, restricted: false };
+        const key = "userEvents:" + uid;
+        const restricted = source.restriction(key);
+        const list = source.paged(source.d.userEvents, key, source.d.userEvents && source.d.userEvents.userId === uid);
+        return Object.assign(list, { restricted: restricted.length > 0, restrictedMessage: restricted,
+                                     pending: list.pending && restricted.length === 0 });
+    }
+    // 通知：kind 是 notices（系统通知）| comments（评论与回复）| forwards（@我与转发）
+    function notices(kind) {
+        const slot = source.d[{ notices: "notices", comments: "commentNotices", forwards: "forwards" }[kind]];
+        return source.paged(slot, "notify:" + kind, true);
+    }
+
+    // 发现：新歌（可直接播放的曲目）、新碟、推荐 MV、推荐的播客节目（也是曲目）、精品歌单的分类
+    function discover(kind) {
+        const key = "discover:" + { newSongs: "newSongs", newAlbums: "newAlbums", recommendedMvs: "mvs",
+                                    recommendedPrograms: "programs", highqualityTags: "highqualityTags" }[kind];
+        const slot = source.d[kind];   // newSongs | newAlbums | recommendedMvs | recommendedPrograms | highqualityTags
+        if (slot)
+            return { key: key, items: slot, more: false, pending: false, failed: false, moreFailed: false };
+        source.need(key);
+        const failed = Boolean(source.failure(key));
+        return { key: key, items: [], more: false, pending: Boolean(source.live) && !failed, failed: failed, moreFailed: false };
+    }
+    // 精品歌单：cat 是分类名，「全部」不限
+    function highquality(cat) {
+        const slot = source.d.highquality;
+        return source.paged(slot, "discover:highquality:" + cat, slot && slot.cat === cat);
+    }
+    // 电台：详情 + 节目（节目是能直接播放的曲目）
+    function radio(id) {
+        const slot = source.d.radio;
+        return source.paged(slot ? Object.assign({ items: slot.programs }, slot) : null, "radio:" + id, slot && slot.id === id);
+    }
+
+    // 搜索电台：与搜索词分开取（切到「电台」那一类时才要），只认这个词的
+    function searchRadios(query) {
+        const r = source.d.searchRadios;
+        if (r && r.query === query)
+            return { items: r.items, pending: false, failed: false };
+        if (query.length > 0)
+            source.need("searchRadios:" + query);
+        const failed = Boolean(source.failure("searchRadios:" + query));
+        return { items: [], pending: Boolean(source.live) && !failed, failed: failed };
+    }
+
+    // 搜索建议：打字时按停顿取一次，只认与当前输入相同的那份
+    function suggestions(query) {
+        const s = source.d.searchSuggest;
+        return s && s.query === query ? s : null;
+    }
+    function suggest(query) { if (query.trim().length > 0) source.need("searchSuggest:" + query); }
+
+    // 动态封面（登录后才有）：url 为空表示这首没有
+    function dynamicCover(songId) {
+        const c = source.d.dynamicCover;
+        if (c && c.songId === songId)
+            return c.url || "";
+        if (songId > 0 && source.account)
+            source.need("dynamicCover:" + songId);
+        return "";
+    }
 
     // MV：data 里只放最近取回的一个，id 对上才用；没对上就向 live 要
     function emptyMv(id, failed) {
@@ -395,12 +499,14 @@ QtObject {
     function removeFromPlaylist(playlistId, songId) { if (source.live) source.live.removeSongFromPlaylist(playlistId, songId); }
     function createPlaylist(name) { if (source.live) source.live.createPlaylist(name, false); }
     function renamePlaylist(id, name) { if (source.live) source.live.renamePlaylist(id, name); }
+    function setPlaylistDescription(id, description) { if (source.live) source.live.setPlaylistDescription(id, description); }
     function deletePlaylist(id) { if (source.live) source.live.deletePlaylist(id); }
     function setPlaylistSubscribed(id, subscribed) { if (source.live) source.live.setPlaylistSubscribed(id, subscribed); }
     // 歌单内曲目排序：ids 是完整的新顺序；原型只读，不写
     function reorderPlaylistTracks(id, ids) { if (source.live) source.live.reorderPlaylistTracks(id, ids); }
     function setArtistSubscribed(id, subscribed) { if (source.live) source.live.setArtistSubscribed(id, subscribed); }
     function setAlbumSubscribed(id, subscribed) { if (source.live) source.live.setAlbumSubscribed(id, subscribed); }
+    function setUserFollowed(id, followed) { if (source.live) source.live.setUserFollowed(id, followed); }
     // 评论点赞：live 走 Store 乐观更新；原型不写网络
     function setCommentLiked(songId, commentId, liked) { if (source.live) source.live.setCommentLiked(songId, commentId, liked); }
     function logout() { if (source.live) source.live.logout(); }
@@ -482,7 +588,7 @@ QtObject {
                 { key: "heart", title: "心动模式", locked: true, caption: "登录后从红心歌曲出发" },
                 fmEntry,
                 similarEntry,
-                { key: "charts", title: "排行榜", symbol: "office-chart-line-symbolic", caption: source.chartsCaption },
+                { key: "charts", title: "发现", symbol: "compass-symbolic", caption: source.chartsCaption },
                 { key: "liked", title: "我喜欢的音乐", locked: true, caption: "登录后同步红心歌曲" },
             ];
         }
@@ -580,6 +686,20 @@ QtObject {
                 return { heading: source.quoted(r.query) + "的单曲", cover: source.sized(source.firstCover(r.songs), 560),
                          tracks: r.songs, facts: [source.songs(r.songs.length)], description: "",
                          emptyText: "没有找到相关单曲" };
+            }
+            if (key.startsWith("radio:")) {
+                // 电台：节目就是曲目（放的是节目的主歌），新的在前；节目一页页接着取。专辑列都是电台名，不显示
+                const r = source.radio(Number(key.slice(6)));
+                const facts = [];
+                if (r.dj && r.dj.name)
+                    facts.push({ label: r.dj.name });
+                if (r.programCount > 0)
+                    facts.push({ value: Format.count(r.programCount), label: "期节目" });
+                if (r.subCount > 0)
+                    facts.push({ value: Format.count(r.subCount), label: "人订阅" });
+                return { heading: r.name || "", cover: source.sized(r.cover || "", 560), tracks: r.items, facts: facts,
+                         description: source.unindent(r.description || ""), showAlbum: false, paging: r,
+                         failed: r.failed, emptyText: r.pending ? "正在取回节目…" : "这个电台还没有节目" };
             }
             if (key.startsWith("album:")) {
                 const al = source.album(Number(key.slice(6)));

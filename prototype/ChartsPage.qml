@@ -1,23 +1,120 @@
-// 排行榜（「推荐」下的子页，网易官方客户端里榜单也只是次要入口）：一屏放完，不滚动。
-// 两条带，全部按 56（48 行 + 8 间距）的节距对齐：
+// 发现（「推荐」下的子页）：首页只放为你推荐的，其余在这里，枢轴分
+// 「排行榜 | 新歌 | 新碟 | 精品歌单 | MV | 播客」。新歌与播客节目是曲目行（点了就放），其余是磁贴网格。
+// 排行榜一屏放完，不滚动。两条带，全部按 56（48 行 + 8 间距）的节距对齐：
 //   上带：官方榜（榜单卡：封面 + 前三首，信息气味）| 更多榜单（104 封面磁贴）
 //   下带：热歌榜，名次按列优先排（先往下再换列），多列时阅读顺序仍与名次一致；放不下的行数直接不显示
 // 窄窗：官方榜卡改单列、更多榜单改 2 列，两者都是 4 行卡高；下带没空间就整条省略（入口仍在热歌榜卡上）。
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
+import org.kde.kirigami as Kirigami
 
 ScreenFrame {
     id: page
+    kept: ["pane", "category"]
+    scroller: page.pane === "newSongs" || page.pane === "programs" ? songList
+        : page.pane === "charts" ? null : grid
 
     property real currentId   // 正在播放的曲目 id（新歌的 id 超出 32 位整数，不能用 int）
+    property string pane: "charts"      // charts | newSongs | newAlbums | highquality | mvs | programs
+    property string category: "全部"    // 精品歌单的分类
 
     signal toplistOpened(int index)
     signal trackActivated(int index)
 
-    heading: "排行榜"
+    heading: "发现"
     parentText: "推荐"
+
+    // 除排行榜外，切到哪一栏才取哪一栏
+    readonly property var songs: page.pane === "newSongs" ? Source.discover("newSongs")
+        : page.pane === "programs" ? Source.discover("recommendedPrograms") : null
+    readonly property var tiles: page.pane === "newAlbums" ? Source.discover("newAlbums")
+        : page.pane === "mvs" ? Source.discover("recommendedMvs")
+        : page.pane === "highquality" ? Source.highquality(page.category) : null
+    readonly property var tags: page.pane === "highquality" ? Source.discover("highqualityTags").items : []
+    readonly property int pivotBlock: Tokens.height10 + Tokens.space3
+
+    Pivot {
+        x: Tokens.pageMargin
+        items: [{ key: "charts", text: "排行榜" }, { key: "newSongs", text: "新歌" }, { key: "newAlbums", text: "新碟" },
+                { key: "highquality", text: "精品歌单" }, { key: "mvs", text: "MV" }, { key: "programs", text: "播客" }]
+        current: page.pane
+        onActivated: key => page.pane = key
+    }
+
+    // 新歌 / 推荐的播客节目：曲目行，点一首从这里开始放整张
+    ListView {
+        id: songList
+        visible: page.songs !== null
+        anchors.fill: parent
+        anchors.topMargin: page.pivotBlock
+        anchors.leftMargin: Tokens.pageMargin
+        rightMargin: Tokens.pageMargin
+        bottomMargin: Tokens.space6
+        spacing: Tokens.space2
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        model: page.songs ? page.songs.items : []
+        ScrollBar.vertical: ScrollBar {}
+        WheelScroll { flickable: songList }
+
+        delegate: TrackTile {
+            width: songList.width - songList.rightMargin
+            current: modelData.id === page.currentId
+            onActivated: index => Actions.play(page.songs.items, index)
+        }
+
+        Kirigami.PlaceholderMessage {
+            anchors.centerIn: parent
+            width: parent.width - Tokens.pageMargin
+            visible: songList.count === 0
+            text: page.songs && page.songs.pending ? "正在取回…" : page.songs && page.songs.failed ? "没取到"
+                : !Source.live ? "原型数据里没有这一栏" : page.pane === "programs" ? "暂时没有推荐的节目" : "暂时没有新歌"
+            helpfulAction: Kirigami.Action {
+                enabled: page.songs !== null && page.songs.failed
+                text: "重试"
+                icon.name: "view-refresh"
+                onTriggered: Source.retryKey(page.pane === "programs" ? "discover:programs" : "discover:newSongs")
+            }
+        }
+    }
+
+    // 新碟 / 精品歌单 / MV：磁贴网格；精品歌单上面一排分类（热门的在前）
+    ColumnLayout {
+        visible: page.tiles !== null
+        anchors.fill: parent
+        anchors.topMargin: page.pivotBlock
+        anchors.leftMargin: Tokens.pageMargin
+        spacing: Tokens.space3
+
+        Pivot {
+            visible: page.pane === "highquality" && page.tags.length > 0
+            items: [{ key: "全部", text: "全部" }].concat(
+                page.tags.filter(t => t.hot).concat(page.tags.filter(t => !t.hot)).slice(0, 11)
+                    .map(t => ({ key: t.name, text: t.name })))
+            current: page.category
+            rowHeight: Tokens.height8
+            fontSize: Tokens.textBase
+            spacing: Tokens.space4
+            onActivated: key => page.category = key
+        }
+
+        TileGrid {
+            id: grid
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            list: page.tiles
+            captionOf: item => page.pane === "highquality" ? (item.count > 0 ? item.count + " 首" : "")
+                : item.artist || ""
+            emptyIcon: "media-optical-audio"
+            emptyText: !Source.live ? "原型数据里没有这一栏" : "这里暂时是空的"
+            onOpened: item => page.pane === "newAlbums" ? Actions.openAlbum(item.id)
+                : page.pane === "mvs" ? Actions.openMv(item.id) : Actions.openPlaylist(item.id)
+            onMenuRequested: item => { if (page.pane === "highquality") Actions.playlistMenuRequested(item); }
+        }
+    }
 
     readonly property var official: Source.toplists.filter(t => t.preview.length > 0)
     readonly property var others: Source.toplists.filter(t => t.preview.length === 0)
@@ -34,7 +131,9 @@ ScreenFrame {
 
     ColumnLayout {
         id: body
+        visible: page.pane === "charts"
         anchors.fill: parent
+        anchors.topMargin: page.pivotBlock
         anchors.leftMargin: Tokens.pageMargin
         anchors.rightMargin: Tokens.pageMargin
         anchors.bottomMargin: Tokens.space6

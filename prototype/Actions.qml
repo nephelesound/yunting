@@ -27,6 +27,33 @@ QtObject {
     function openMv(id) { if (id > 0) mvRequested(id); }
     function openUser(id) { if (id > 0) userRequested(id); }
     function openPlaylist(id) { if (id > 0) playlistRequested(id); }
+    signal radioRequested(real id)
+    function openRadio(id) { if (id > 0) radioRequested(id); }
+    // 动态、通知里提到的东西（{ kind, id, name, cover, artist, track }）：歌直接放，其余打开对应的页；
+    // 视频还没有页可开。只有 id 的歌补成最小的曲目（播放地址与时长由播放器按 id 取）
+    function canOpen(resource) {
+        return Boolean(resource) && (resource.track ? true : resource.id > 0
+            && ["song", "playlist", "album", "mv", "artist"].indexOf(resource.kind) >= 0);
+    }
+    function openResource(resource) {
+        if (!canOpen(resource))
+            return;
+        if (resource.track)
+            play([resource.track], 0);
+        else if (resource.kind === "song")
+            play([{ id: resource.id, name: resource.name || "", artist: resource.artist || "", album: "", albumId: 0,
+                    artistId: 0, artists: [{ id: 0, name: resource.artist || "" }], dur: 0, fee: 0,
+                    cover: resource.cover || "", alias: "", quality: "", reason: "", mv: 0, playable: true }], 0);
+        else if (resource.kind === "playlist")
+            openPlaylist(resource.id);
+        else if (resource.kind === "album")
+            openAlbum(resource.id);
+        else if (resource.kind === "mv")
+            openMv(resource.id);
+        else if (resource.kind === "artist")
+            openArtist(resource.id);
+    }
+
     signal inboxRequested()
     function openInbox() { inboxRequested(); }
     signal aboutRequested()

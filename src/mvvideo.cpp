@@ -77,6 +77,17 @@ void MvVideo::setSource(const QUrl &source)
     }
 }
 
+void MvVideo::setAmbient(bool ambient)
+{
+    if (ambient == m_ambient)
+        return;
+    m_ambient = ambient;
+    // aid=no：不选音轨，mpv 就不打开音频输出；循环靠 loop-file，不会走到播完
+    setProperty(QStringLiteral("aid"), ambient ? QStringLiteral("no") : QStringLiteral("auto"));
+    setProperty(QStringLiteral("loop-file"), ambient ? QStringLiteral("inf") : QStringLiteral("no"));
+    emit ambientChanged();
+}
+
 void MvVideo::setPosition(double milliseconds)
 {
     const double target = m_duration > 0

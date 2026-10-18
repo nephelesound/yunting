@@ -26,6 +26,7 @@ ScreenFrame {
     signal playAllRequested()
     signal shuffleRequested()
     signal renameRequested(real id, string name)
+    signal describeRequested(real id, string description)
     signal deleteRequested(real id, string name)
     signal subscribeToggled(real id, string name, bool subscribed)
     signal albumSubscriptionToggled(real id, bool subscribed)
@@ -130,6 +131,13 @@ ScreenFrame {
                     MenuItem {
                         visible: page.list.owned || false
                         height: visible ? implicitHeight : 0
+                        icon.name: "document-edit"
+                        text: "编辑简介…"
+                        onTriggered: page.describeRequested(page.list.listId, page.list.description || "")
+                    }
+                    MenuItem {
+                        visible: page.list.owned || false
+                        height: visible ? implicitHeight : 0
                         icon.name: "edit-delete"
                         text: "删除歌单…"
                         onTriggered: page.deleteRequested(page.list.listId, page.list.heading)
@@ -168,6 +176,15 @@ ScreenFrame {
             currentIndex: -1
             ScrollBar.vertical: ScrollBar {}
             WheelScroll { flickable: tracks }
+            // 分页的列表（电台的节目）：滚到底接着取
+            onAtYEndChanged: if (atYEnd && page.list.paging && count > 0) Source.morePaged(page.list.paging)
+            footer: PagingFooter {
+                width: tracks.width - tracks.rightMargin
+                paging: page.list.paging ? { items: page.list.tracks, more: page.list.paging.more, loading: false,
+                                             failed: page.list.paging.moreFailed } : null
+                doneText: "没有更早的了"
+                onRetryRequested: Source.morePaged(page.list.paging)
+            }
             LocateCurrent {
                 parent: tracks
                 view: tracks
@@ -180,7 +197,7 @@ ScreenFrame {
                 ranked: page.list.ranked || false
                 current: modelData.id === page.currentId
                 showReason: page.list.showReason || false
-                showAlbum: !(page.list.isAlbum || false)
+                showAlbum: !(page.list.isAlbum || false) && page.list.showAlbum !== false
                 locked: Format.blockedBy(modelData, page.vip) !== ""
                 menuContext: ({ playlistId: page.list.playlistId || 0 })
                 reordering: page.reordering

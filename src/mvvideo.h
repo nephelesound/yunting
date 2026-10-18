@@ -1,13 +1,15 @@
 #pragma once
 // MV 画面：MpvQt 的 MpvAbstractItem 把 mpv 的 vid 直接渲染进 QML。
-// 对外接口只覆盖 MvPage 用到的播放器能力，单位与 QML 播放器接口相同：
+// 对外接口只覆盖 MvPage 与动态封面用到的播放器能力，单位与 QML 播放器接口相同：
 // position / duration 是毫秒，playing 是「正在出画面」。
+// ambient：当作画面背景（动态封面）——不出声（不选音轨，也就不占声卡）、循环播放。
 #include <MpvAbstractItem>
 #include <QUrl>
 
 class MvVideo : public MpvAbstractItem {
     Q_OBJECT
     Q_PROPERTY(QUrl source READ source WRITE setSource NOTIFY sourceChanged)
+    Q_PROPERTY(bool ambient READ ambient WRITE setAmbient NOTIFY ambientChanged)
     Q_PROPERTY(bool playing READ playing NOTIFY playingChanged)
     Q_PROPERTY(double position READ position WRITE setPosition NOTIFY positionChanged)
     Q_PROPERTY(double duration READ duration NOTIFY durationChanged)
@@ -16,6 +18,7 @@ public:
     explicit MvVideo(QQuickItem *parent = nullptr);
 
     QUrl source() const { return m_source; }
+    bool ambient() const { return m_ambient; }
     bool playing() const { return m_playing; }
     double position() const { return m_position; }
     double duration() const { return m_duration; }
@@ -23,6 +26,7 @@ public:
 
     // 换地址即开始播放
     void setSource(const QUrl &source);
+    void setAmbient(bool ambient);
     void setPosition(double milliseconds);
 
     Q_INVOKABLE void play();
@@ -31,6 +35,7 @@ public:
 
 signals:
     void sourceChanged();
+    void ambientChanged();
     void playingChanged();
     void positionChanged();
     void durationChanged();
@@ -47,6 +52,7 @@ private:
     void onEndFile(const QString &reason);
 
     QUrl m_source;
+    bool m_ambient = false;
     bool m_playing = false;
     double m_position = 0;
     double m_duration = 0;

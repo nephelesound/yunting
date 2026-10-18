@@ -204,9 +204,16 @@ Kirigami.ApplicationWindow {
     }
 
     // 浮层：播放队列（右侧抽屉）与扫码登录（对话框）
-    // 截图 harness 可用 startOverlay = queue | login，以及 loginState = waiting | scanned | expired
+    // 截图 harness 可用 startOverlay = queue | login | describe（歌单简介）…，以及 loginState = waiting | scanned | expired
     // （不能叫 overlay：会遮住 ApplicationWindow.overlay，Kirigami 的对话框就挂不上去了）
     property string startOverlay: ""
+    // 截图 harness：打开的页切到这一栏（用户页的 events、消息页的 comments 之类）
+    property string startPane: ""
+    onStartPaneChanged: Qt.callLater(() => {
+        const item = root.pageStack.currentItem;
+        if (item && "pane" in item)
+            item.pane = root.startPane;
+    })
     property string loginState: "waiting"
     onStartOverlayChanged: root.openOverlay()
 
@@ -325,6 +332,44 @@ Kirigami.ApplicationWindow {
             placeholderText: "歌单名称"
             maximumLength: 40
             onAccepted: if (nameField.text.trim().length > 0) playlistNameDialog.accept()
+        }
+    }
+
+    // 歌单简介：多行文字，可以清空（空简介也是合法的保存）
+    Kirigami.PromptDialog {
+        id: playlistDescriptionDialog
+        property real playlistId
+        function ask(id, description) {
+            playlistDescriptionDialog.playlistId = id;
+            descriptionArea.text = description;
+            playlistDescriptionDialog.open();
+            descriptionArea.forceActiveFocus();
+            descriptionArea.cursorPosition = descriptionArea.length;
+        }
+        title: "编辑歌单简介"
+        standardButtons: Kirigami.Dialog.NoButton
+        customFooterActions: [
+            Kirigami.Action {
+                text: "保存"
+                icon.name: "dialog-ok"
+                onTriggered: playlistDescriptionDialog.accept()
+            },
+            Kirigami.Action {
+                text: "取消"
+                icon.name: "dialog-cancel"
+                onTriggered: playlistDescriptionDialog.reject()
+            }
+        ]
+        onAccepted: {
+            root.noteOnSuccess(playlistDescriptionDialog.playlistId, "更新歌单描述", "已更新歌单简介");
+            Source.setPlaylistDescription(playlistDescriptionDialog.playlistId, descriptionArea.text.trim());
+        }
+        TextArea {
+            id: descriptionArea
+            implicitWidth: Tokens.trackColumn + Tokens.albumColumn
+            implicitHeight: Tokens.tileLg
+            placeholderText: "介绍一下这个歌单"
+            wrapMode: TextEdit.Wrap
         }
     }
 
@@ -461,6 +506,10 @@ Kirigami.ApplicationWindow {
             root.fullscreenShown = true;
         else if (root.startOverlay === "share")
             Qt.callLater(() => root.shareTrack(root.currentTrack || root.openList.tracks[0]));
+        else if (root.startOverlay === "suggest")
+            Qt.callLater(() => (root.pageStack.currentItem as SearchPage).showSuggestions())
+        else if (root.startOverlay === "describe")
+            Qt.callLater(() => playlistDescriptionDialog.ask(root.openList.listId || 0, root.openList.description || ""));
         else if (root.startOverlay === "login") {
             loginDialog.open();
             simSession.state = root.loginState;
@@ -470,8 +519,8 @@ Kirigami.ApplicationWindow {
     // 导航：推荐/我的/搜索 是顶层枢轴；排行榜、列表、歌手、正在播放压在其上，history 记录来路
     property var history: []
     readonly property int maxHistory: 64
-    readonly property var pageNames: ({ home: "推荐", mine: "我的", search: "搜索", charts: "排行榜", playlists: "全部歌单",
-                                        nowplaying: "正在播放", mv: "MV", user: "用户" })
+    readonly property var pageNames: ({ home: "推荐", mine: "我的", search: "搜索", charts: "发现", playlists: "全部歌单",
+                                        saved: "全部收藏", nowplaying: "正在播放", mv: "MV", user: "用户", inbox: "消息" })
     // 返回键上的字：离开那一页时记下的标题（见 open）；记下时还没取到名字就用页的类别名，永远不为空
     readonly property string parentName: root.history.length > 0
         ? root.history[root.history.length - 1].title || root.pageNames[root.history[root.history.length - 1].page] || "推荐"
@@ -491,6 +540,7 @@ Kirigami.ApplicationWindow {
         }
         function onArtistRequested(id) { root.open("artist", "artist:" + id); }
         function onAlbumRequested(id) { root.open("list", "album:" + id); }
+        function onRadioRequested(id) { root.open("list", "radio:" + id); }
         function onMvRequested(id) {
             playback.engine.playing = false;   // MV 自带音轨：不要和主播放器同时出声
             root.open("mv", "", { mvId: id });
@@ -839,7 +889,7 @@ Kirigami.ApplicationWindow {
     property string searchQuery: ""
     readonly property var pages: ({ home: homePage, mine: root.loggedIn ? minePage : placeholderPage, search: searchPage,
                                     charts: chartsPage, list: listPage, artist: artistPage, playlists: playlistsPage,
-                                    nowplaying: nowPlayingPage, mv: mvPage, user: userPage, inbox: inboxPage })
+                                    saved: savedPage, nowplaying: nowPlayingPage, mv: mvPage, user: userPage, inbox: inboxPage })
     onPageChanged: {
         // 路由参数作为页面的初始属性交给页面实例：返回 / 换页时不再把 root 上的
         // 临时 0 绑进仍然存活的页面（曾经因此请求过 /user/detail/0）。
@@ -852,6 +902,8 @@ Kirigami.ApplicationWindow {
             params.userId = root.userId;
         else if (root.page === "mv")
             params.mvId = root.mvId;
+        else if (root.page === "saved")
+            params.kind = root.listKey;   // artists | albums | mvs
         pageStack.clear();
         pageStack.push(root.pages[root.page], params);
     }
@@ -993,6 +1045,7 @@ Kirigami.ApplicationWindow {
             onLeaveRequested: root.goBack()
             onLoginRequested: root.requestLogin()
             onRenameRequested: (id, name) => playlistNameDialog.ask(id, name, null)
+            onDescribeRequested: (id, description) => playlistDescriptionDialog.ask(id, description)
             onDeleteRequested: (id, name) => deleteDialog.ask(id, name)
             onSubscribeToggled: (id, name, subscribed) => {
                 root.noteOnSuccess(id, subscribed ? "收藏歌单" : "取消收藏歌单", (subscribed ? "已收藏「" : "已取消收藏「") + name + "」");
@@ -1043,6 +1096,13 @@ Kirigami.ApplicationWindow {
             parentText: root.parentName
             onLeaveRequested: root.goBack()
             onLoginRequested: root.requestLogin()
+            onFollowToggled: (id, followed) => {
+                if (!root.loggedIn) {
+                    root.notify("关注需要登录", "long", "扫码登录", () => root.requestLogin());
+                    return;
+                }
+                Source.setUserFollowed(id, followed);
+            }
         }
     }
 
@@ -1101,12 +1161,23 @@ Kirigami.ApplicationWindow {
             onPlaylistOpened: index => root.open("list", "playlist:" + Source.myPlaylists[index].id)
             onRecentActivated: index => root.play(Source.recent.tracks, index)
             onAllPlaylistsRequested: root.open("playlists")
+            onAllSavedRequested: kind => root.open("saved", kind)
         }
     }
 
     Component {
         id: playlistsPage
         PlaylistsPage {
+            loggedIn: root.loggedIn
+            parentText: root.parentName
+            onLeaveRequested: root.goBack()
+            onLoginRequested: root.requestLogin()
+        }
+    }
+
+    Component {
+        id: savedPage
+        SavedPage {
             loggedIn: root.loggedIn
             parentText: root.parentName
             onLeaveRequested: root.goBack()

@@ -23,10 +23,36 @@ ScreenFrame {
     signal trackActivated(int index)
     signal allSongsRequested()
 
+    // 截图 harness（startOverlay=suggest）：像刚打过字那样亮出建议
+    function showSuggestions() {
+        Source.suggest(field.text.trim());
+        suggestions.dismissed = false;
+    }
+
     currentPivot: "search"
 
     // 只用这个词的结果；旧词的响应后到时不会冒充新词的结果
     readonly property var result: Source.searchFor(page.query)
+    // 搜索建议：按接口给的顺序分组，每组最多 3 条，合起来不超过 10 条
+    readonly property var suggestionRows: {
+        const s = Source.suggestions(field.text.trim());
+        if (!s)
+            return [];
+        const groups = { songs: "单曲", artists: "歌手", albums: "专辑", playlists: "歌单" };
+        const rows = [];
+        for (const kind of s.order.filter(k => groups[k] !== undefined)) {
+            for (const item of (s[kind] || []).slice(0, 3))
+                rows.push({ group: groups[kind], kind: kind, id: item.id, name: item.name,
+                            detail: kind === "songs" || kind === "albums" ? item.artist || "" : "" });
+        }
+        return rows.slice(0, 10);
+    }
+    // 打字时新词的建议还没到：先留着上一份，不让列表一闪一闪；清空输入才清掉
+    property var shownSuggestions: []
+    onSuggestionRowsChanged: {
+        if (page.suggestionRows.length > 0 || field.text.trim().length === 0)
+            page.shownSuggestions = page.suggestionRows;
+    }
     readonly property int half: Math.floor((body.width - Tokens.space6) / 2)
     readonly property int headerBlock: Tokens.height10 + Tokens.space3
     readonly property int pitch: Tokens.trackRow + Tokens.space2
@@ -36,7 +62,9 @@ ScreenFrame {
 
     // 右栏：一类结果铺满可用的行列，不滚动
     property string collection: "artists"
-    readonly property var collectionItems: page.result[page.collection] || []
+    // 电台另外搜（切到「电台」时才要）
+    readonly property var radios: page.collection === "radios" ? Source.searchRadios(page.query) : null
+    readonly property var collectionItems: page.radios ? page.radios.items : page.result[page.collection] || []
     // 列数按最小磁贴 104 算，磁贴再等分整栏：右缘正好落在页边线上
     readonly property int tileColumns: Math.max(1, Math.floor((page.rightWidth + Tokens.space2) / (Tokens.tileSm + Tokens.space2)))
     readonly property int tileWidth: Math.floor((page.rightWidth - (page.tileColumns - 1) * Tokens.space2) / page.tileColumns)
@@ -49,6 +77,8 @@ ScreenFrame {
             return item.artist || "";
         if (page.collection === "mvs")
             return item.playCount > 0 ? Format.count(item.playCount) + " 次播放" : "";
+        if (page.collection === "radios")
+            return item.host || "";
         return item.count > 0 ? item.count + " 首" : "";
     }
 
@@ -71,15 +101,115 @@ ScreenFrame {
             text: page.query
             focus: true
             autoAccept: false
-            onTextEdited: typing.restart()
+            onTextEdited: {
+                typing.restart();
+                suggesting.restart();
+                suggestions.dismissed = false;
+            }
             onAccepted: {
                 typing.stop();
+                if (suggestions.opened && suggestionList.currentIndex >= 0) {
+                    suggestions.pick(page.shownSuggestions[suggestionList.currentIndex]);
+                    return;
+                }
+                suggestions.dismissed = true;
                 page.query = field.text.trim();
+            }
+            // 建议列表里上下选（焦点留在输入框，照常打字）；Esc 先收起建议
+            Keys.onDownPressed: if (suggestions.opened) suggestionList.incrementCurrentIndex()
+            Keys.onUpPressed: if (suggestions.opened) suggestionList.decrementCurrentIndex()
+            Keys.onEscapePressed: event => {
+                event.accepted = suggestions.opened;
+                suggestions.dismissed = true;
             }
             Timer {
                 id: typing
                 interval: 500
                 onTriggered: page.query = field.text.trim()
+            }
+            // 建议比搜索轻得多，停顿 200 毫秒就取
+            Timer {
+                id: suggesting
+                interval: 200
+                onTriggered: Source.suggest(field.text.trim())
+            }
+
+            // 搜索建议：边打字边给出可以直接去的歌手、专辑、歌单（歌曲换成搜它）。
+            // 结果照常在下面边输入边出现，建议只是跳过去的捷径：选了、回车、Esc 或点别处就收起
+            Popup {
+                id: suggestions
+                // 只有打字才打开：回到搜索页时（输入框里还留着上次的词）不自己弹出来
+                property bool dismissed: true
+                function pick(row) {
+                    suggestions.dismissed = true;
+                    if (row.kind === "artists")
+                        Actions.openArtist(row.id);
+                    else if (row.kind === "albums")
+                        Actions.openAlbum(row.id);
+                    else if (row.kind === "playlists")
+                        Actions.openPlaylist(row.id);
+                    else {
+                        field.text = row.name;
+                        typing.stop();
+                        page.query = row.name;
+                    }
+                }
+                // 开关由这几样决定；点别处由弹层自己关，关了就算收起（下一次打字再出来）
+                readonly property bool wanted: field.activeFocus && !suggestions.dismissed && page.shownSuggestions.length > 0
+                onWantedChanged: suggestions.wanted ? suggestions.open() : suggestions.close()
+                onClosed: suggestions.dismissed = true
+                y: field.height + Tokens.space1
+                width: field.width
+                padding: Tokens.space1
+                closePolicy: Popup.CloseOnPressOutsideParent
+
+                contentItem: ListView {
+                    id: suggestionList
+                    implicitHeight: contentHeight
+                    interactive: false
+                    currentIndex: -1
+                    model: page.shownSuggestions
+                    onModelChanged: currentIndex = -1
+                    section.property: "group"
+                    section.delegate: Label {
+                        required property string section
+                        width: ListView.view.width
+                        leftPadding: Tokens.space2
+                        topPadding: Tokens.space1
+                        bottomPadding: Tokens.space1
+                        text: section
+                        font.pixelSize: Tokens.textSm
+                        color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                    }
+                    delegate: ItemDelegate {
+                        id: suggestion
+                        required property var modelData
+                        required property int index
+                        width: ListView.view.width
+                        leftPadding: Tokens.space2   // 与组标题同一条左缘
+                        highlighted: ListView.isCurrentItem
+                        text: suggestion.modelData.name
+                        onClicked: suggestions.pick(suggestion.modelData)
+                        contentItem: RowLayout {
+                            spacing: Tokens.space2
+                            Label {
+                                Layout.fillWidth: true
+                                Layout.maximumWidth: Math.ceil(implicitWidth)
+                                text: suggestion.modelData.name
+                                font.pixelSize: Tokens.textBase
+                                elide: Text.ElideRight
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                visible: text.length > 0
+                                text: suggestion.modelData.detail
+                                font.pixelSize: Tokens.textSm
+                                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                                elide: Text.ElideRight
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -198,7 +328,7 @@ ScreenFrame {
                 Pivot {
                     Layout.bottomMargin: Tokens.space3
                     items: [{ key: "artists", text: "歌手" }, { key: "albums", text: "专辑" },
-                            { key: "playlists", text: "歌单" }, { key: "mvs", text: "MV" }]
+                            { key: "playlists", text: "歌单" }, { key: "mvs", text: "MV" }, { key: "radios", text: "电台" }]
                     current: page.collection
                     onActivated: key => page.collection = key
                 }
@@ -226,6 +356,7 @@ ScreenFrame {
                         onClicked: page.collection === "artists" ? Actions.openArtist(modelData.id)
                                  : page.collection === "albums" ? Actions.openAlbum(modelData.id)
                                  : page.collection === "mvs" ? Actions.openMv(modelData.id)
+                                 : page.collection === "radios" ? Actions.openRadio(modelData.id)
                                  : Actions.openPlaylist(modelData.id)
                         // 歌单在哪里出现都是同一个菜单（这里能收藏）；歌手、专辑没有菜单
                         onMenuRequested: if (page.collection === "playlists") Actions.playlistMenuRequested(modelData)
@@ -233,10 +364,11 @@ ScreenFrame {
                 }
                 Label {
                     visible: page.collectionItems.length === 0
-                    text: page.result.pending ? "正在搜索…"
+                    text: (page.radios ? page.radios.pending : page.result.pending) ? "正在搜索…"
                         : page.collection === "artists" ? "没有找到相关歌手"
                         : page.collection === "albums" ? "没有找到相关专辑"
-                        : page.collection === "mvs" ? "没有找到相关 MV" : "没有找到相关歌单"
+                        : page.collection === "mvs" ? "没有找到相关 MV"
+                        : page.collection === "radios" ? "没有找到相关电台" : "没有找到相关歌单"
                     font.pixelSize: Tokens.textSm
                     color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                 }
