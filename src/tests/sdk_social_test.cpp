@@ -53,7 +53,7 @@ private slots:
         QJsonObject info{{"resourceId", 88}, {"resourceType", 2},
                          {"commentThread", QJsonObject{{"resourceType", 2}}}};
         QJsonObject event{{"id", 10}, {"actName", "发布动态"}, {"json", json},
-                          {"user", QJsonObject{{"userId", 1}, {"nickname", "用户"}}},
+                          {"user", QJsonObject{{"userId", 1001}, {"nickname", "用户"}}},
                           {"info", info}};
         const auto result = parseUserEvents(
             QJsonObject{{"code", 200}, {"events", QJsonArray{event}}});
