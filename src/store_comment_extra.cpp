@@ -4,6 +4,7 @@
 #include "json_util.h"
 #include "ncmclient.h"
 #include "normalize.h"
+#include "sdk/comment.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -33,22 +34,26 @@ void Store::requestCommentReplies(double songId, double commentId, qint64 before
                                QStringLiteral("暂时取不到评论回复"));
             return;
         }
-        QJsonArray source = root.value("data").toObject().value("comments").toArray();
-        if (source.isEmpty())
-            source = root.value("comments").toArray();
+        const auto parsed = sdk::parseCommentReplies(root);
+        if (!parsed) {
+            emit requestFailed(QStringLiteral("commentReplies:%1:%2").arg(num(songId), num(commentId)),
+                               QStringLiteral("暂时取不到评论回复"));
+            return;
+        }
         QVariantList items;
         if (before > 0) {
             const QVariant old = m_data.value("commentReplies");
             if (old.toMap().value("commentId").toDouble() == commentId)
                 items = old.toMap().value("items").toList();
         }
-        for (const QJsonValue &v : source)
-            items.append(ncmComment(v.toObject()));
-        const qint64 next = source.isEmpty() ? before
-                                             : qint64(source.last().toObject().value("time").toDouble());
+        for (const sdk::Comment &comment : parsed.value->comments)
+            items.append(commentToVariantMap(comment));
+        const qint64 next = parsed.value->comments.isEmpty()
+                                ? before
+                                : parsed.value->comments.last().time;
         put("commentReplies", QVariantMap{
             {"songId", songId}, {"commentId", commentId}, {"before", next},
-            {"more", root.value("more").toBool()}, {"items", items},
+            {"more", parsed.value->more}, {"items", items},
         }, false);
     });
 }

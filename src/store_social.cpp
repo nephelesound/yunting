@@ -4,6 +4,7 @@
 #include "json_util.h"
 #include "ncmclient.h"
 #include "normalize.h"
+#include "sdk/user_social.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -11,17 +12,20 @@
 using namespace ncm;
 
 namespace {
-QVariantMap socialUser(const QJsonObject &u)
+// QML-facing legacy shape. The SDK model keeps the avatar raw; sizing stays at
+// this boundary, and ids/counters keep the double scalar types the existing
+// bindings receive.
+QVariantMap socialUser(const sdk::SocialUser &u)
 {
     return {
-        {"id", u.value("userId").toDouble()},
-        {"name", u.value("nickname").toString()},
-        {"avatar", ncmSized(u.value("avatarUrl"), 96)},
-        {"signature", u.value("signature").toString()},
-        {"gender", u.value("gender").toInt()},
-        {"followed", u.value("followed").toBool()},
-        {"mutual", u.value("mutual").toBool()},
-        {"vipType", u.value("vipType").toDouble()},
+        {"id", static_cast<double>(u.id)},
+        {"name", u.name},
+        {"avatar", ncmSized(QJsonValue(u.avatar), 96)},
+        {"signature", u.signature},
+        {"gender", u.gender},
+        {"followed", u.followed},
+        {"mutual", u.mutual},
+        {"vipType", static_cast<double>(u.vipType)},
     };
 }
 
@@ -61,16 +65,22 @@ void Store::requestUserFollows(double uid, int offset)
             emit requestFailed(pageKey(QStringLiteral("userFollows"), uid, offset), failure);
             return;
         }
+        const auto parsed = sdk::parseUserFollows(r);
+        if (!parsed) {
+            emit requestFailed(pageKey(QStringLiteral("userFollows"), uid, offset),
+                               QStringLiteral("暂时取不到关注列表"));
+            return;
+        }
         QVariantList items;
         if (offset > 0) {
             const QVariant old = m_data.value("userFollows");
             if (old.toMap().value("userId").toDouble() == uid)
                 items = old.toMap().value("items").toList();
         }
-        for (const QJsonValue &v : r.value("follow").toArray())
-            items.append(socialUser(v.toObject()));
+        for (const sdk::SocialUser &user : parsed.value->items)
+            items.append(socialUser(user));
         put("userFollows", QVariantMap{{"userId", uid}, {"offset", offset},
-                                       {"more", r.value("more").toBool()}, {"items", items}}, false);
+                                       {"more", parsed.value->more}, {"items", items}}, false);
     });
 }
 
@@ -101,16 +111,22 @@ void Store::requestUserFolloweds(double uid, int offset)
             emit requestFailed(pageKey(QStringLiteral("userFolloweds"), uid, offset), failure);
             return;
         }
+        const auto parsed = sdk::parseUserFolloweds(r);
+        if (!parsed) {
+            emit requestFailed(pageKey(QStringLiteral("userFolloweds"), uid, offset),
+                               QStringLiteral("暂时取不到粉丝列表"));
+            return;
+        }
         QVariantList items;
         if (offset > 0) {
             const QVariant old = m_data.value("userFolloweds");
             if (old.toMap().value("userId").toDouble() == uid)
                 items = old.toMap().value("items").toList();
         }
-        for (const QJsonValue &v : r.value("followeds").toArray())
-            items.append(socialUser(v.toObject()));
+        for (const sdk::SocialUser &user : parsed.value->items)
+            items.append(socialUser(user));
         put("userFolloweds", QVariantMap{{"userId", uid}, {"offset", offset},
-                                         {"more", r.value("more").toBool()}, {"items", items}}, false);
+                                         {"more", parsed.value->more}, {"items", items}}, false);
     });
 }
 
@@ -128,19 +144,21 @@ void Store::requestUserLevel()
             emit requestFailed(QStringLiteral("userLevel"), failure);
             return;
         }
-        const QJsonObject d = body(doc).value("data").toObject();
-        if (d.isEmpty()) {
+        const QJsonObject r = body(doc);
+        const auto parsed = sdk::parseUserLevel(r);
+        if (!parsed) {
             emit requestFailed(QStringLiteral("userLevel"), QStringLiteral("暂时取不到等级信息"));
             return;
         }
+        const sdk::UserLevel &level = *parsed.value;
         put("userLevel", QVariantMap{
-            {"level", d.value("level").toInt()},
-            {"nowPlayCount", d.value("nowPlayCount").toInt()},
-            {"nextPlayCount", d.value("nextPlayCount").toInt()},
-            {"nowLoginCount", d.value("nowLoginCount").toInt()},
-            {"nextLoginCount", d.value("nextLoginCount").toInt()},
-            {"progress", d.value("progress").toDouble()},
-            {"info", d.value("info").toString()},
+            {"level", level.level},
+            {"nowPlayCount", level.nowPlayCount},
+            {"nextPlayCount", level.nextPlayCount},
+            {"nowLoginCount", level.nowLoginCount},
+            {"nextLoginCount", level.nextLoginCount},
+            {"progress", level.progress},
+            {"info", level.info},
         }, false);
     });
 }
@@ -160,12 +178,19 @@ void Store::requestUserSubcount()
             return;
         }
         const QJsonObject r = body(doc);
+        const auto parsed = sdk::parseUserSubcount(r);
+        if (!parsed) {
+            emit requestFailed(QStringLiteral("userSubcount"),
+                               QStringLiteral("暂时取不到收藏计数"));
+            return;
+        }
+        const sdk::UserSubcount &counts = *parsed.value;
         put("userSubcount", QVariantMap{
-            {"artistCount", r.value("artistCount").toInt()},
-            {"createdPlaylistCount", r.value("createdPlaylistCount").toInt()},
-            {"subPlaylistCount", r.value("subPlaylistCount").toInt()},
-            {"mvCount", r.value("mvCount").toInt()},
-            {"djRadioCount", r.value("djRadioCount").toInt()},
+            {"artistCount", counts.artistCount},
+            {"createdPlaylistCount", counts.createdPlaylistCount},
+            {"subPlaylistCount", counts.subPlaylistCount},
+            {"mvCount", counts.mvCount},
+            {"djRadioCount", counts.djRadioCount},
         }, false);
     });
 }

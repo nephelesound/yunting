@@ -5,6 +5,8 @@
 #include "json_util.h"
 #include "ncmclient.h"
 #include "normalize.h"
+#include "sdk/lyrics.h"
+#include "sdk/comment.h"
 
 #include <QDateTime>
 #include <QSet>
@@ -165,23 +167,28 @@ void Store::requestLyrics(const QString &key, double songId)
     m_cache.query(key,
         [this, songId](QueryCache::Done done) {
             m_client->get("api/song/lyric", query({{"id", num(songId)}, {"lv", "1"}, {"tv", "-1"}}), false,
-                          [done](const QJsonDocument &doc, bool ok) {
-                const QJsonObject resp = body(doc);
-                const QString lrc = resp.value("lrc").toObject().value("lyric").toString();
-                const QString tlyric = resp.value("tlyric").toObject().value("lyric").toString();
-                // 纯音乐（pureMusic，旧接口叫 nolyric）：空歌词是正确结果，不是没取到；
-                // 界面据此说「纯音乐，请欣赏」。标记随歌词一起缓存，命中缓存时也能还原。
-                const bool pureMusic = resp.value("pureMusic").toBool()
-                    || resp.value("nolyric").toBool();
-                // 网易偶尔会回「HTTP 200 + code 200 + 空 lrc」而不是错误；这种空包不能当成
-                // 「这首歌没有歌词」永久缓存，否则会一直显示「暂无歌词」。纯音乐/明确无歌词才落盘。
-                if (lrc.isEmpty() && tlyric.isEmpty() && !pureMusic) {
+                          [done, songId](const QJsonDocument &doc, bool ok) {
+                if (!ok) {
                     done({}, false);
                     return;
                 }
-                done(QVariantMap{{"lines", ncmParseLrc(lrc, tlyric)},
-                                 {"pureMusic", pureMusic}},
-                     ok && businessOk(resp));
+                const QJsonObject resp = body(doc);
+                const auto parsed =
+                    sdk::parseSongLyrics(resp, static_cast<qint64>(songId));
+                if (!parsed) {
+                    done({}, false);
+                    return;
+                }
+                const sdk::SongLyrics &lyrics = *parsed.value;
+                // 网易偶尔会回「HTTP 200 + code 200 + 空 lrc」而不是错误；这种空包不能当成
+                // 「这首歌没有歌词」永久缓存，否则会一直显示「暂无歌词」。纯音乐/明确无歌词才落盘。
+                if (lyrics.lrc.isEmpty() && lyrics.tlyric.isEmpty() && !lyrics.pureMusic) {
+                    done({}, false);
+                    return;
+                }
+                done(QVariantMap{{"lines", ncmParseLrc(lyrics.lrc, lyrics.tlyric)},
+                                 {"pureMusic", lyrics.pureMusic}},
+                     businessOk(resp));
             });
         },
         [this, songId, token](const QVariant &lyrics) {
@@ -315,8 +322,12 @@ void Store::requestCommentPage(const QString &key, double songId, int offset)
                         done({}, false);
                         return;
                     }
-                    const QJsonObject data = resp.value("data").toObject();
-                    const QJsonArray comments = data.value("comments").toArray();
+                    const auto parsed = sdk::parseCommentPage(resp);
+                    if (!parsed) {
+                        done({}, false);
+                        return;
+                    }
+                    const QList<sdk::Comment> &comments = parsed.value->comments;
                     if (pageOffset != offset) {
                         if (comments.isEmpty()) {
                             done({}, false);
@@ -324,11 +335,11 @@ void Store::requestCommentPage(const QString &key, double songId, int offset)
                         }
                         if (offset < pageOffset + int(comments.size())) {
                             // 目标页在这批评论中间：用前一条的时间当游标
-                            const QJsonObject before = comments.at(offset - pageOffset - 1).toObject();
-                            (*fetch)(offset, QString::number(qlonglong(before.value("time").toDouble())));
+                            const qint64 before = comments.at(offset - pageOffset - 1).time;
+                            (*fetch)(offset, QString::number(before));
                             return;
                         }
-                        const QString next = data.value("cursor").toString();
+                        const QString next = parsed.value->cursor;
                         if (next.isEmpty()) {
                             done({}, false);
                             return;
@@ -337,11 +348,12 @@ void Store::requestCommentPage(const QString &key, double songId, int offset)
                         return;
                     }
                     QVariantList items;
-                    for (const QJsonValue &v : comments)
-                        items.append(ncmComment(v.toObject()));
-                    const double total = data.value("totalCount").toDouble();
-                    const bool more = data.value("hasMore").toBool();
-                    const QString next = data.value("cursor").toString();
+                    items.reserve(comments.size());
+                    for (const sdk::Comment &comment : comments)
+                        items.append(commentToVariantMap(comment));
+                    const double total = static_cast<double>(parsed.value->total);
+                    const bool more = parsed.value->hasMore;
+                    const QString next = parsed.value->cursor;
                     if (more && !items.isEmpty() && !next.isEmpty())
                         m_cache.remember(commentCursorKey(songId, offset + int(items.size())), next);
                     done(QVariantMap{{"songId", songId},
@@ -381,7 +393,20 @@ void Store::requestComments(const QString &key, double songId)
                           m_client->hasMusicU(),
                           [done, songId](const QJsonDocument &doc, bool ok) {
                 const QJsonObject resp = body(doc);
-                done(ncmHotComments(resp, songId), ok && businessOk(resp));
+                const bool success = ok && businessOk(resp);
+                const auto parsed = sdk::parseHotComments(resp);
+                if (!parsed) {
+                    done({}, false);
+                    return;
+                }
+                QVariantList items;
+                items.reserve(parsed.value->comments.size());
+                for (const sdk::Comment &comment : parsed.value->comments)
+                    items.append(commentToVariantMap(comment));
+                done(QVariantMap{{"songId", songId},
+                                 {"total", static_cast<double>(parsed.value->total)},
+                                 {"items", items}},
+                     success);
             });
     };
     auto deliver = [this, token](const QVariant &comments) {

@@ -4,9 +4,9 @@
 #include "json_util.h"
 #include "ncmclient.h"
 #include "normalize.h"
+#include "sdk/lyrics.h"
 
 #include <QJsonDocument>
-#include <QJsonObject>
 
 using namespace ncm;
 
@@ -25,21 +25,25 @@ void Store::requestLyricsNew(double songId)
                                  {"rv", "0"}, {"kv", "0"}, {"yv", "0"}, {"ytv", "0"}, {"yrv", "0"}}),
                           false,
                           [done, songId](const QJsonDocument &doc, bool ok) {
-                const QJsonObject root = body(doc);
-                if (!ok || root.value("code").toInt() != 200) {
+                if (!ok) {
                     done({}, false);
                     return;
                 }
-                const QString lrc = root.value("lrc").toObject().value("lyric").toString();
-                const QString tlyric = root.value("tlyric").toObject().value("lyric").toString();
-                const QString yrc = root.value("yrc").toObject().value("lyric").toString();
+                const auto parsed =
+                    sdk::parseSongLyrics(body(doc), static_cast<qint64>(songId));
+                if (!parsed) {
+                    done({}, false);
+                    return;
+                }
+                const sdk::SongLyrics &lyrics = *parsed.value;
                 // 逐字歌词有自己的译文 ytlrc，时间戳与 yrc 的行对齐；tlyric 对的是 LRC 的行，与 yrc 对不上
-                QString ytlrc = root.value("ytlrc").toObject().value("lyric").toString();
-                if (ytlrc.isEmpty())
-                    ytlrc = tlyric;
+                const QString ytlrc =
+                    lyrics.ytlrc.isEmpty() ? lyrics.tlyric : lyrics.ytlrc;
                 done(QVariantMap{
                     {"songId", songId},
-                    {"lines", yrc.isEmpty() ? ncmParseLrc(lrc, tlyric) : ncmParseYrc(yrc, ytlrc)},
+                    {"lines", lyrics.yrc.isEmpty()
+                                  ? ncmParseLrc(lyrics.lrc, lyrics.tlyric)
+                                  : ncmParseYrc(lyrics.yrc, ytlrc)},
                 }, true);
             });
         },

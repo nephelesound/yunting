@@ -31,6 +31,10 @@ set(YUNTING_SDK_SOURCES
     sdk/notification.h sdk/notification.cpp
     sdk/dynamic_cover.h sdk/dynamic_cover.cpp
     sdk/search_suggest.h sdk/search_suggest.cpp
+    sdk/notify.h sdk/notify.cpp
+    sdk/lyrics.h sdk/lyrics.cpp
+    sdk/user_social.h sdk/user_social.cpp
+    sdk/comment.h sdk/comment.cpp
 )
 
 # Every SDK parser/service test crosses the same transport seam. Keep the source
@@ -158,6 +162,10 @@ qt_add_executable(store_test tests/store_test.cpp
     store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_comment.cpp store_user.cpp store_inbox.cpp store_stats.cpp store_notify.cpp store_social.cpp store_comment_extra.cpp store_lyrics_new.cpp store_on_demand.cpp store_wiki.cpp
     sdk/sdk_json.h sdk/sdk_json.cpp sdk/service.h sdk/service.cpp
     sdk/song_wiki.h sdk/song_wiki.cpp sdk/song_wiki_service.h sdk/song_wiki_service.cpp
+    sdk/notify.h sdk/notify.cpp
+    sdk/lyrics.h sdk/lyrics.cpp
+    sdk/user_social.h sdk/user_social.cpp
+    sdk/comment.h sdk/comment.cpp
     session.h session.cpp
     querycache.h querycache.cpp
     ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp
@@ -187,9 +195,13 @@ yunting_add_sdk_test(sdk_notification sdk/notification.h sdk/notification.cpp)
 yunting_add_sdk_test(sdk_dynamic_cover sdk/dynamic_cover.h sdk/dynamic_cover.cpp)
 yunting_add_sdk_test(sdk_search_suggest sdk/search_suggest.h sdk/search_suggest.cpp)
 yunting_add_sdk_test(sdk_service)
+yunting_add_sdk_test(notify sdk/notify.h sdk/notify.cpp)
+yunting_add_sdk_test(lyrics sdk/lyrics.h sdk/lyrics.cpp)
+yunting_add_sdk_test(user_social sdk/user_social.h sdk/user_social.cpp)
+yunting_add_sdk_test(comment sdk/comment.h sdk/comment.cpp)
 
 # 任何测试都碰不到用户的真实凭据与缓存：会话总线不可达（钥匙串因此走后备文件），数据与缓存目录在构建目录里
-set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store sdk_song_wiki sdk_discovery sdk_radio sdk_social sdk_feed sdk_video sdk_library sdk_notification sdk_dynamic_cover sdk_search_suggest sdk_service PROPERTIES ENVIRONMENT
+set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store sdk_song_wiki sdk_discovery sdk_radio sdk_social sdk_feed sdk_video sdk_library sdk_notification sdk_dynamic_cover sdk_search_suggest sdk_service notify lyrics user_social comment PROPERTIES ENVIRONMENT
     "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent;XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/data;XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/cache;YUNTING_KEYCHAIN_SERVICE=yunting-test")
 
 target_link_libraries(yunting PRIVATE

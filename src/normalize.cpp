@@ -1,5 +1,6 @@
 #include "normalize.h"
 #include "json_util.h"
+#include "sdk/comment.h"
 
 #include <QDate>
 #include <QDateTime>
@@ -179,45 +180,33 @@ QVariantMap ncmProfile(const QJsonObject &p, int avatarPx, int backgroundPx)
     };
 }
 
-QVariantMap ncmComment(const QJsonObject &c)
+QVariantMap commentToVariantMap(const sdk::Comment &c)
 {
-    const QJsonObject user = c.value("user").toObject();
     QVariantList replied;
-    for (const QJsonValue &v : c.value("beReplied").toArray()) {
-        const QJsonObject r = v.toObject();
-        const QJsonObject ru = r.value("user").toObject();
+    replied.reserve(c.beReplied.size());
+    for (const sdk::RepliedComment &r : c.beReplied) {
         replied.append(QVariantMap{
-            {"id", r.value("beRepliedCommentId").toDouble()},
-            {"content", textOr(r, "content")},
-            {"userId", ru.value("userId").toDouble()},
-            {"user", textOr(ru, "nickname")},
+            {"id", static_cast<double>(r.id)},
+            {"content", r.content},
+            {"userId", static_cast<double>(r.userId)},
+            {"user", r.user},
         });
     }
     return {
-        {"user", textOr(user, "nickname")},
-        {"userId", user.value("userId").toDouble()},
-        {"avatar", ncmSized(user.value("avatarUrl"), 96)},
-        {"content", textOr(c, "content")},
-        {"likes", c.value("likedCount").toDouble()},
-        {"time", c.value("time").toDouble()},
-        {"id", c.value("commentId").toDouble()},
-        {"liked", c.value("liked").toBool()},
+        {"user", c.user},
+        {"userId", static_cast<double>(c.userId)},
+        {"avatar", ncmSized(QJsonValue(c.avatar), 96)},
+        {"content", c.content},
+        {"likes", static_cast<double>(c.likes)},
+        {"time", static_cast<double>(c.time)},
+        {"id", static_cast<double>(c.id)},
+        {"liked", c.liked},
         // 楼中楼：parentId 指向父评论；beReplied 是被引用的那条，前端据此画「回复 @某人」
-        {"parentId", c.value("parentCommentId").toDouble()},
+        {"parentId", static_cast<double>(c.parentId)},
         {"beReplied", replied},
         // 楼中楼回复数只在新版接口的 showFloorComment 里；没有这个对象（旧接口、无回复）归 0
-        {"replyCount", numOr(c.value("showFloorComment").toObject(), "replyCount")},
+        {"replyCount", static_cast<double>(c.replyCount)},
     };
-}
-
-QVariantMap ncmHotComments(const QJsonObject &resp, double songId)
-{
-    // v2 接口把热评放在 data.comments，保持接口给的顺序，最多 10 条
-    QVariantList items;
-    const QJsonObject data = resp.value("data").toObject();
-    for (const QJsonValue &v : take(data.value("comments").toArray(), 10))
-        items.append(ncmComment(v.toObject()));
-    return {{"songId", songId}, {"total", data.value("totalCount").toDouble()}, {"items", items}};
 }
 
 // 歌单/推荐卡片：id/name/cover/count/reason 供现有磁贴；description/playCount/creator/updateTime

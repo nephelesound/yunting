@@ -1,5 +1,6 @@
 // 归一化形状测试：不碰网络，只锁新加的导航字段与 MV / 云盘形状。
 #include "../normalize.h"
+#include "../sdk/comment.h"
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -133,36 +134,57 @@ private slots:
         QCOMPARE(cloud.value("blockedBy").toString(), QString());
     }
 
-    // 评论的楼中楼回复数来自 showFloorComment.replyCount；没有这个对象时为 0，字段始终存在
-    void commentCarriesReplyCount()
+    // 评论的边界转换：typed Comment → 现有 QML map；avatar 在这里缩成 96 方图，键集合不变
+    void commentMapPreservesLegacyShape()
     {
-        const QJsonObject withReplies{
-            {"commentId", 7}, {"content", "hi"}, {"likedCount", 3}, {"time", 10},
-            {"user", QJsonObject{{"userId", 1}, {"nickname", "u"}}},
-            {"showFloorComment", QJsonObject{{"replyCount", 14}, {"comments", QJsonValue::Null}}},
-        };
-        const QVariantMap comment = ncmComment(withReplies);
-        QCOMPARE(comment.value("id").toDouble(), 7.0);
-        QCOMPARE(comment.value("replyCount").toDouble(), 14.0);
+        ncm::sdk::Comment comment;
+        comment.user = QStringLiteral("u");
+        comment.userId = 7;
+        comment.avatar = QStringLiteral("http://cover/u.jpg");
+        comment.content = QStringLiteral("hi");
+        comment.likes = 3;
+        comment.time = 10;
+        comment.id = 42;
+        comment.liked = true;
+        comment.parentId = 1;
+        comment.replyCount = 14;
+        comment.beReplied.append(
+            ncm::sdk::RepliedComment{9, QStringLiteral("old"), 8, QStringLiteral("v")});
 
-        const QVariantMap absent = ncmComment(QJsonObject{{"commentId", 8}});
-        QVERIFY(absent.contains("replyCount"));
-        QCOMPARE(absent.value("replyCount").toDouble(), 0.0);
+        const QVariantMap commentMap = commentToVariantMap(comment);
+        QCOMPARE(commentMap.keys(),
+                 (QStringList{QStringLiteral("avatar"), QStringLiteral("beReplied"),
+                              QStringLiteral("content"), QStringLiteral("id"),
+                              QStringLiteral("liked"), QStringLiteral("likes"),
+                              QStringLiteral("parentId"), QStringLiteral("replyCount"),
+                              QStringLiteral("time"), QStringLiteral("user"),
+                              QStringLiteral("userId")}));
+        QCOMPARE(commentMap.value("user").toString(), QStringLiteral("u"));
+        QCOMPARE(commentMap.value("userId").toDouble(), 7.0);
+        QCOMPARE(commentMap.value("avatar").toString(),
+                 QStringLiteral("http://cover/u.jpg?param=96y96"));
+        QCOMPARE(commentMap.value("content").toString(), QStringLiteral("hi"));
+        QCOMPARE(commentMap.value("likes").toDouble(), 3.0);
+        QCOMPARE(commentMap.value("time").toDouble(), 10.0);
+        QCOMPARE(commentMap.value("id").toDouble(), 42.0);
+        QCOMPARE(commentMap.value("liked").toBool(), true);
+        QCOMPARE(commentMap.value("parentId").toDouble(), 1.0);
+        QCOMPARE(commentMap.value("replyCount").toDouble(), 14.0);
 
-        const QVariantMap nullFloor =
-            ncmComment(QJsonObject{{"commentId", 9}, {"showFloorComment", QJsonValue::Null}});
-        QCOMPARE(nullFloor.value("replyCount").toDouble(), 0.0);
-    }
+        const QVariantList replied = commentMap.value("beReplied").toList();
+        QCOMPARE(replied.size(), 1);
+        const QVariantMap reply = replied.first().toMap();
+        QCOMPARE(reply.value("id").toDouble(), 9.0);
+        QCOMPARE(reply.value("content").toString(), QStringLiteral("old"));
+        QCOMPARE(reply.value("userId").toDouble(), 8.0);
+        QCOMPARE(reply.value("user").toString(), QStringLiteral("v"));
 
-    // 热评带上这首歌的评论总数（data.totalCount）；没有时是 0
-    void hotCommentsCarryTheTotal()
-    {
-        const QJsonObject resp{{"data", QJsonObject{{"totalCount", 123456},
-                                                    {"comments", QJsonArray{QJsonObject{{"commentId", 1}}}}}}};
-        const QVariantMap hot = ncmHotComments(resp, 42);
-        QCOMPARE(hot.value("total").toDouble(), 123456.0);
-        QCOMPARE(hot.value("items").toList().size(), 1);
-        QCOMPARE(ncmHotComments(QJsonObject{}, 42).value("total").toDouble(), 0.0);
+        // 空头像保持空串，不追加尺寸参数；其余字段仍有确定默认值
+        const QVariantMap empty = commentToVariantMap(ncm::sdk::Comment{});
+        QVERIFY(empty.contains("avatar"));
+        QCOMPARE(empty.value("avatar").toString(), QString());
+        QCOMPARE(empty.value("replyCount").toDouble(), 0.0);
+        QVERIFY(empty.value("beReplied").toList().isEmpty());
     }
 
     void lrcTranslationMatchesTimestamp()

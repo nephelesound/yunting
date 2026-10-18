@@ -1,8 +1,9 @@
-// 通知计数：/api/pl/count。列表接口暂未归一化，前端先做角标与分类入口。
+// 通知计数：/api/pl/count。SDK 负责 typed 解析，这里只做缓存与 QML 兼容形状。
 #include "store.h"
 
 #include "json_util.h"
 #include "ncmclient.h"
+#include "sdk/notify.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -29,17 +30,19 @@ void Store::requestNotifications()
             emit requestFailed(QStringLiteral("notifications"), QStringLiteral("暂时取不到通知计数"));
             return;
         }
-        const int msg = r.value("msg").toInt();
-        const int comment = r.value("comment").toInt();
-        const int event = r.value("event").toInt();
-        const int follow = r.value("follow").toInt();
-        const int notice = r.value("notice").toInt();
-        const int forward = r.value("forward").toInt();
+        const auto parsed = sdk::parseNotificationCount(r);
+        if (!parsed) {
+            emit requestFailed(QStringLiteral("notifications"),
+                               QStringLiteral("暂时取不到通知计数"));
+            return;
+        }
+        const sdk::NotificationCount &count = *parsed.value;
+        const int total = count.msg + count.comment + count.event + count.follow
+                        + count.notice + count.forward;
         put("notifications", QVariantMap{
-            {"msg", msg}, {"comment", comment}, {"event", event}, {"follow", follow},
-            {"notice", notice}, {"forward", forward},
-            {"newProgramCount", r.value("newProgramCount").toInt()},
-            {"total", msg + comment + event + follow + notice + forward},
+            {"msg", count.msg}, {"comment", count.comment}, {"event", count.event},
+            {"follow", count.follow}, {"notice", count.notice}, {"forward", count.forward},
+            {"newProgramCount", count.newProgramCount}, {"total", total},
         }, false);
     });
 }

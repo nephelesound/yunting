@@ -11,6 +11,8 @@
 #include <QVariantList>
 #include <QVariantMap>
 
+namespace ncm::sdk { struct Comment; }
+
 // 可播性由 privilege 决定（账号相关：pl>0 可播，st<0 下架，cs 云盘，fee/payed 说明被什么挡住）；
 // 只有歌曲没带 privilege 时才退回 fee。结果写在 playable / blockedBy（""、"vip"、"paid"、"unavailable"）。
 QVariantMap ncmTrack(const QJsonObject &s, const QString &reason = QString());
@@ -25,11 +27,9 @@ QVariantMap ncmSearchPlaylist(const QJsonObject &p);
 QVariantMap ncmSearchAlbum(const QJsonObject &a);
 QVariantMap ncmSearchMv(const QJsonObject &m);
 QVariantList ncmTracks(const QJsonArray &items, const QJsonArray &privileges = QJsonArray());
-// 热门评论：v2 接口 data.comments 的取数形状（snapshot.py 的 hot_comments）
-QVariantMap ncmHotComments(const QJsonObject &resp, double songId);
-// 单条评论：热评、分页、楼中楼共用同一套字段，避免三个地方各写一份、字段漂移。
-// replyCount 来自 showFloorComment.replyCount，缺失为 0。
-QVariantMap ncmComment(const QJsonObject &c);
+// 评论的 QML 兼容形状：SDK 的 typed Comment → Store 现有 map（snapshot.py 的 hot_comments）。
+// 这是热评/分页/楼中楼共用的唯一边界转换；avatar 在这里按 96 方图缩放。
+QVariantMap commentToVariantMap(const ncm::sdk::Comment &c);
 // 账户与用户主页共用的 profile 映射：avatar/background 尺寸由调用方决定
 QVariantMap ncmProfile(const QJsonObject &p, int avatarPx, int backgroundPx);
 QVariantList ncmParseLrc(const QString &lrc, const QString &tlyric);
