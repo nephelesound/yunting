@@ -161,8 +161,6 @@ var worst = {
                                  { id: 902, name: "x", artist: "", album: "" }],
                          artists: [{ id: 2, name: "一只想要变成猫但是没有成功的柴犬Official", cover: BROKEN }],
                          albums: [], playlists: [{ id: 1, name: "【温柔女声】在深夜被治愈：适合一个人听的 100 首华语民谣与独立音乐", cover: C2, count: 100 }] },
-        searchUsers: { query: "x", items: [{ id: 2, name: "一只想要变成猫但是没有成功的柴犬Official", cover: BROKEN, followed: false, fans: 99999999, follows: 1284, playlists: 0, signature: "" },
-                                           { id: 3, name: "x", cover: "", followed: true, fans: 0, follows: 0, playlists: 0, signature: "" }] },
         user: { id: 2, name: "一只想要变成猫但是没有成功的柴犬Official", avatar: BROKEN, background: "", signature: "这是一段很长的签名，长到会在窄窗里换好几行，里面还有一个链接 https://music.163.com/ 和几个表情 🐕🐈",
                 followed: false, follows: 1284, followeds: 99999999, playlistCount: 0, vipType: 11, vipRights: {}, level: 10, listenSongs: 99999,
                 createTime: 0, mutual: false, playlists: [], restricted: false, failed: false },
