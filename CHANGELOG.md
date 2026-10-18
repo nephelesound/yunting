@@ -2,6 +2,16 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.4.0] - 2026-10-18
+
+### 变化
+- 音乐改由 mpv（libmpv）播放，与 KDE 的播放器 Haruna 同一选择：均衡器、低音与空间感用 mpv 自带的滤镜，调节时播放不中断；插拔耳机时自动跟随系统的默认输出。新增依赖 mpv。
+- 桌面歌词的按钮直接放在悬停底板上，不再另套一个工具栏的框，几组之间只用间距分开；按钮图标与歌词同色，深浅底板上都看得清。
+- 听歌排行的「最近一周 / 最近一月」改成与页面一致的切换标签，播放队列的「智能续播」改成开关：不再用按钮的勾选底，各控件样式下都一样。
+
+### 修复
+- 输出设备菜单里会出现两个「默认」。
+
 ## [0.3.0] - 2026-10-18
 
 ### 新增
@@ -56,6 +66,7 @@
 - 分享：链接、二维码、Telegram 与邮件，以及带封面与歌词的分享图。
 - 「关于」窗口与「复制诊断信息」，方便反馈问题。
 
+[0.4.0]: https://github.com/nephelesound/yunting/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/nephelesound/yunting/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/nephelesound/yunting/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/nephelesound/yunting/compare/v0.2.0...v0.2.1
