@@ -41,7 +41,8 @@ struct RadioProgram {
     qint64 createTime = 0;   // milliseconds
     qint64 duration = 0;     // seconds
     int serialNum = 0;
-    qint64 mainSongId = 0;
+    QString cover;           // coverUrl (may be empty; fall back to radio.picUrl)
+    qint64 mainSongId = 0;   // mainSong.id (fallback mainTrackId)
     QString mainSongName;
     qint64 mainSongDuration = 0; // seconds
     int fee = 0;

@@ -12,6 +12,9 @@
           "name": "新歌",
           "duration": 210500,
           "fee": 1,
+          "alia": [ "别名" ],
+          "sq": { "br": 999000 },
+          "mv": 77,
           "artists": [ { "id": 3, "name": "歌手" } ],
           "album": { "id": 4, "name": "专辑", "picUrl": "http://p1.music.126.net/new.jpg" }
         }

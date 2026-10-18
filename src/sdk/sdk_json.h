@@ -23,6 +23,8 @@ public:
     double number(const char *key, double fallback = 0.0);
     qint64 integer(const char *key, qint64 fallback = 0);
     bool boolean(const char *key, bool fallback = false);
+    // 接口里 sq/hr 既可能是 bool 也可能是对象：按 Python 真值语义判断（null/false/0 算没有）
+    bool truthy(const char *key) const;
     QJsonArray array(const char *key);
     QJsonObject object(const char *key);
     QStringList stringList(const char *key);

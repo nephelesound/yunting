@@ -44,12 +44,12 @@
 | P1 | 评论抱一抱 | `/weapi/comment/hug/list`、`/comment/hug` | 抱一抱用户列表 | `commentHugs:<songId>:<commentId>` |
 | P1 | 音乐百科 | `/api/link/page/parent/relation/construct/info`（明文 POST） | 简介、基本信息、MV、乐评、乐谱、回忆坐标等 block | `wiki:<songId>` |
 | P1 | 逐字歌词 | `/api/song/lyric/v1` | `yrc` / `klyric` / 翻译，可做卡拉 OK 和桌面歌词逐字填色 | `lyricsNew:<songId>` |
-| P2 | 精品歌单 | `/weapi/top/playlist/highquality`、`/playlist/highquality/tags` | 分类/标签/高赞歌单 | `discover:highquality` |
+| P2 | 精品歌单 | `/weapi/top/playlist/highquality`、`/playlist/highquality/tags` | 分类/标签/高赞歌单 | `discover:highquality:<cat>[:<before>]` / `discover:highqualityTags` |
 | P2 | 新歌 / 新专辑 | `/weapi/personalized/newsong`、`/album/new`、`/album/newest` | 推荐新歌、新碟 | `discover:newSongs` / `discover:newAlbums` |
 | P2 | 歌手/MV/专辑收藏列表 | `/weapi/artist/sublist`、`/album/sublist`、`/mv/sublist` | “我的关注/收藏”页 | `library:artists` / `library:albums` / `library:mvs` |
 | P2 | 歌曲下载地址 | `/weapi/song/enhance/download/url/v1` | `url` `size` `br` `type` `level` | `download:<songId>:<level>` |
 | P2 | 歌手粉丝 / 关注数 | `/weapi/artist/fans`、`/artist/follow/count` | 歌手社交信息 | `artistSocial:<id>` |
-| P3 | 播客 / 电台 | `/weapi/dj/detail`、`/dj/program/detail`、`/dj/sublist` | 电台与节目 | `dj:<id>` |
+| P3 | 播客 / 电台 | `/weapi/dj/detail`、`/dj/program/detail`、`/dj/sublist` | 电台与节目 | `radio:<id>[:<offset>]` |
 | P3 | 云盘写入 | `/weapi/cloud/upload/token`、`/cloud/import` | 上传/导入云盘 | 写操作，单独开关 |
 
 ## 字段补全建议
@@ -77,6 +77,19 @@
 | `data.commentReplies` | `commentReplies:<songId>:<commentId>[:<before>]` | `{ songId,commentId,before,more,items:[评论字段] }` |
 | `data.lyrics` | `lyrics:<songId>` | 句子表 `[{t,text,tr}]`；同槽的 `data.lyricsTrackId` 标明是哪首，`data.lyricsPureMusic` 为 true 表示纯音乐（空歌词是正确结果，界面说「纯音乐，请欣赏」） |
 | `data.lyricsNew` | `lyricsNew:<songId>` | `{ songId,lrc,tlyric,yrc,klyric,romalrc,lines:[{t,text,tr}] }` |
+| `data.searchSuggest` | `searchSuggest:<query>` | `{ query,order[],songs:[{id,name,artist,album}],artists:[{id,name,cover}],albums:[{id,name,artist,artistId}],playlists:[{id,name,cover,count}] }`；最新请求的查询优先，不落盘 |
+| `data.newSongs` | `discover:newSongs` | `[Track]`（`cover` 为原图 URL） |
+| `data.newAlbums` | `discover:newAlbums` | `[{ id,name,cover,artist,artistId,publishTime,size }]` |
+| `data.highqualityTags` | `discover:highqualityTags` | `[{ name,hot }]` |
+| `data.highquality` | `discover:highquality:<cat>[:<before>]` | `{ cat,before,nextBefore,more,items:[{id,name,cover,count,plays,description,creator}] }`；`cat=全部` 表示不筛分类，`before` 是本次请求游标（首页 0），`nextBefore` 传下一页 |
+| `data.recommendedMvs` | `discover:mvs` | `[{ id,name,cover,artist,artistId,duration,playCount,reason }]` |
+| `data.recommendedPrograms` | `discover:programs` | `[Program]` |
+| `data.radio` | `radio:<id>[:<offset>]` | `{ id,name,cover,description,dj:{id,name,avatar},programCount,subCount,playCount,offset,more,programs:[Program] }`；`offset=0` 时取详情，翻页复用同 id 详情 |
+
+`Track` 与 `ncmTrack` 同形：`id,name,artist,album,albumId,artistId,artists:[{id,name}],dur,fee,cover,alias,quality,mv,playable,blockedBy,reason`。
+`Program` 是节目版 Track：`id` 为主歌 id（真正播放的那首）、`name` 为节目名、`artist` 为主播、`album` 为电台、
+`albumId` 与 `artistId` 为 0、`artists:[{id:0,name:主播}]`、`dur` 为主歌秒数；另带
+`programId,radioId,serial,createTime,description`。没有可播放主歌 id 的节目不会返回。
 
 调用方式：页面里 `Source.need("<key>")`；数据槽到达后 `dataChanged` 会驱动绑定。
 只读信箱、社交列表、歌词、评论回复**不需要写操作**；只有账户级统计需要登录。

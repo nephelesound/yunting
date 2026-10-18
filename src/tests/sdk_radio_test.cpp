@@ -25,8 +25,8 @@ class SdkRadioTest : public QObject {
                              {"artists", QJsonArray{QJsonObject{{"name", "歌手"}}}}};
         return QJsonObject{{"id", 66}, {"name", "节目"}, {"description", "节目简介"},
                            {"createTime", 1700000000000.0}, {"duration", 794000},
-                           {"serialNum", 31}, {"mainSong", mainSong},
-                           {"radio", radioObject()}};
+                           {"serialNum", 31}, {"coverUrl", "http://program"},
+                           {"mainSong", mainSong}, {"radio", radioObject()}};
     }
 
 private slots:
@@ -51,7 +51,18 @@ private slots:
         QCOMPARE(out.mainSongId, qint64(55));
         QCOMPARE(out.mainSongDuration, qint64(65));
         QCOMPARE(out.artists, QStringList{QStringLiteral("歌手")});
+        QCOMPARE(out.cover, QStringLiteral("http://program"));
         QCOMPARE(out.radio.name, QStringLiteral("电台"));
+    }
+
+    // byradio 的部分节目只带 mainTrackId：播放 id 不能因此丢掉
+    void fallsBackToMainTrackId()
+    {
+        QJsonObject program{{"id", 66}, {"name", "节目"}, {"mainTrackId", 55}};
+        QJsonObject root{{"code", 200}, {"program", program}};
+        const auto result = parseRadioProgram(root);
+        QVERIFY2(result.ok(), qPrintable(result.error.message));
+        QCOMPARE(result.value->mainSongId, qint64(55));
     }
 
     void parsesRecommendations()

@@ -3,12 +3,15 @@
     {
       "songId": 1,
       "name": "新歌",
-      "artists": ["歌手"],
+      "artists": [ { "id": 3, "name": "歌手" } ],
       "albumId": 4,
       "albumName": "专辑",
       "cover": "http://p1.music.126.net/new.jpg",
       "duration": 210,
-      "fee": 1
+      "fee": 1,
+      "alias": "别名",
+      "quality": "lossless",
+      "mv": 77
     }
   ],
   "newAlbums": [

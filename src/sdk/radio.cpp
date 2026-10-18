@@ -57,9 +57,13 @@ Result<RadioProgram> programFrom(const QJsonObject &object, const QString &path,
     program.createTime = reader.integer("createTime");
     program.duration = reader.integer("duration") / 1000;
     program.serialNum = static_cast<int>(reader.integer("serialNum"));
+    program.cover = reader.string("coverUrl");
     const QJsonObject mainSong = reader.object("mainSong");
     JsonReader songReader(mainSong, path + QStringLiteral(".mainSong"));
+    // byradio 有时只给 mainTrackId（与 mainSong.id 同值），没有嵌套 mainSong
     program.mainSongId = songReader.integer("id");
+    if (program.mainSongId <= 0)
+        program.mainSongId = reader.integer("mainTrackId");
     program.mainSongName = songReader.string("name");
     program.mainSongDuration = songReader.integer("duration") / 1000;
     program.fee = static_cast<int>(songReader.integer("fee"));

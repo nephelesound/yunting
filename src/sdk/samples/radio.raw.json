@@ -14,6 +14,7 @@
           "createTime": 1700000000000,
           "duration": 794000,
           "serialNum": 31,
+          "coverUrl": "http://p1.music.126.net/program.jpg",
           "mainSong": {
             "id": 55,
             "name": "节目歌",
@@ -44,6 +45,7 @@
       "createTime": 1700000000000,
       "duration": 794000,
       "serialNum": 31,
+      "coverUrl": "http://p1.music.126.net/program.jpg",
       "mainSong": { "id": 55, "name": "节目歌", "duration": 65000, "fee": 0 },
       "radio": { "id": 7, "name": "电台", "picUrl": "http://p1.music.126.net/radio.jpg",
                  "desc": "电台简介", "programCount": 3, "subCount": 4,
@@ -56,6 +58,7 @@
     "more": false,
     "programs": [
       { "id": 66, "name": "节目", "duration": 794000,
+        "coverUrl": "http://p1.music.126.net/program.jpg",
         "mainSong": { "id": 55, "name": "节目歌", "duration": 65000 } }
     ]
   },

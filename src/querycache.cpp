@@ -96,7 +96,7 @@ qint64 QueryCache::freshFor(const QString &key)
 }
 
 // 落盘的只有不涉及隐私又值得留的：歌词与首屏；搜索词不写盘
-// （search: / searchUsers: / searchRadios: 都算搜索）
+// （search: / searchUsers: / searchRadios: / searchSuggest: 都算搜索）
 bool QueryCache::persistent(const QString &key)
 {
     // 百科可能含当前账号的回忆坐标，不能写进公共磁盘缓存；只放内存。

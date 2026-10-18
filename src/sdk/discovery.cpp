@@ -50,7 +50,38 @@ Result<QList<NewSong>> parseNewSongs(const QJsonObject &root)
         NewSong out;
         out.songId = songReader.integer("id");
         out.name = songReader.string("name");
-        out.artists = objectNameList(song.value(QStringLiteral("artists")).toArray());
+        const QJsonArray artistValues = songReader.array("artists");
+        if (!songReader.ok()) {
+            return Result<QList<NewSong>>::failure(
+                endpointError(ErrorKind::Parse, NewSongsPath, songReader.error(), songReader.path()));
+        }
+        for (qsizetype a = 0; a < artistValues.size(); ++a) {
+            JsonReader artistReader(artistValues.at(a).toObject(),
+                                    songReader.path() + QStringLiteral(".artists[%1]").arg(a));
+            NewSongArtist artist;
+            artist.id = artistReader.integer("id");
+            artist.name = artistReader.string("name");
+            if (!artistReader.ok()) {
+                return Result<QList<NewSong>>::failure(endpointError(
+                    ErrorKind::Parse, NewSongsPath, artistReader.error(), artistReader.path()));
+            }
+            if (artist.id > 0 || !artist.name.isEmpty())
+                out.artists.append(artist);
+        }
+        for (const char *key : {"alia", "alias", "tns", "transNames"}) {
+            const QStringList alias = songReader.stringList(key);
+            if (!alias.isEmpty()) {
+                out.alias = alias.first();
+                break;
+            }
+        }
+        out.quality = songReader.truthy("hr") || songReader.truthy("hrMusic")
+            ? QStringLiteral("hires")
+            : songReader.truthy("sq") || songReader.truthy("sqMusic")
+                  ? QStringLiteral("lossless") : QString();
+        out.mv = songReader.integer("mv");
+        if (out.mv <= 0)
+            out.mv = songReader.integer("mvid");
         const QJsonObject album = song.value(QStringLiteral("album")).toObject();
         JsonReader albumReader(album, songReader.path() + QStringLiteral(".album"));
         out.albumId = albumReader.integer("id");

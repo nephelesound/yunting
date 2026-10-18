@@ -83,6 +83,16 @@ bool JsonReader::boolean(const char *key, bool fallback)
     return value.toBool();
 }
 
+bool JsonReader::truthy(const char *key) const
+{
+    const QJsonValue value = m_object.value(QLatin1String(key));
+    if (value.isBool())
+        return value.toBool();
+    if (value.isDouble())
+        return value.toDouble() != 0;
+    return !value.isNull() && !value.isUndefined();
+}
+
 QJsonArray JsonReader::array(const char *key)
 {
     const QJsonValue value = m_object.value(QLatin1String(key));

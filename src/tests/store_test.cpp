@@ -125,6 +125,28 @@ class StoreTest : public QObject {
         return false;
     }
 
+    static QJsonObject radioObject()
+    {
+        return QJsonObject{
+            {"id", 7}, {"name", "电台"}, {"picUrl", "http://cover/radio.jpg"},
+            {"desc", "电台简介"}, {"playCount", 12}, {"programCount", 3}, {"subCount", 4},
+            {"dj", QJsonObject{{"userId", 99}, {"nickname", "主播"},
+                               {"avatarUrl", "http://cover/dj.jpg"}}}};
+    }
+
+    static QJsonObject programObject(int mainSongId = 55)
+    {
+        QJsonObject mainSong{{"name", "节目歌"}, {"duration", 65000}, {"fee", 0},
+                             {"artists", QJsonArray{QJsonObject{{"id", 9}, {"name", "歌手"}}}}};
+        if (mainSongId > 0)
+            mainSong.insert("id", mainSongId);
+        return QJsonObject{
+            {"id", 66}, {"name", "节目"}, {"description", "节目简介"},
+            {"createTime", 1700000000000.0}, {"duration", 794000}, {"serialNum", 31},
+            {"coverUrl", "http://cover/program.jpg"}, {"mainSong", mainSong},
+            {"radio", radioObject()}};
+    }
+
 private slots:
     void init()
     {
@@ -373,7 +395,8 @@ private slots:
             QStringLiteral("user:0"), QStringLiteral("artist:0"), QStringLiteral("album:0"),
             QStringLiteral("mv:0"), QStringLiteral("playlist:0"), QStringLiteral("artistSongs:0:0"),
             QStringLiteral("lyrics:0"), QStringLiteral("comments:0"), QStringLiteral("comments:0:0"),
-            QStringLiteral("commentReplies:0:0"),
+            QStringLiteral("commentReplies:0:0"), QStringLiteral("radio:0"),
+            QStringLiteral("radio:0:30"),
         };
         for (const QString &key : keys)
             m_store->request(key);
@@ -1639,6 +1662,369 @@ private slots:
         QVERIFY(wikiPersonal);
         QVERIFY(creatorsPersonal);
         QVERIFY(chorusPersonal);
+    }
+
+    // 搜索联想：最新查询赢；空白查询不发请求；联想不进磁盘缓存
+    void searchSuggestLatestWinsAndStaysOffDisk()
+    {
+        QHash<QString, FakeApi::Responder> pending;
+        int requests = 0;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/search/suggest/web") {
+                ++requests;
+                const QUrlQuery form(QString::fromUtf8(req.body));
+                pending.insert(form.queryItemValue(QStringLiteral("s"), QUrl::FullyDecoded),
+                               respond);
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        const auto reply = [](int id) {
+            return json(QJsonObject{
+                {"code", 200},
+                {"result", QJsonObject{
+                    {"order", QJsonArray{QStringLiteral("songs"), QStringLiteral("artists"),
+                                         QStringLiteral("albums"), QStringLiteral("playlists")}},
+                    {"songs", QJsonArray{QJsonObject{
+                        {"id", id}, {"name", "歌"},
+                        {"artists", QJsonArray{QJsonObject{{"id", 11}, {"name", "歌手"}}}},
+                        {"album", QJsonObject{{"id", 12}, {"name", "专辑"}}}}}},
+                    {"artists", QJsonArray{QJsonObject{
+                        {"id", 21}, {"name", "艺人"}, {"picUrl", "http://cover/artist.jpg"}}}},
+                    {"albums", QJsonArray{QJsonObject{
+                        {"id", 31}, {"name", "碟"},
+                        {"artist", QJsonObject{{"id", 21}, {"name", "艺人"}}}}}},
+                    {"playlists", QJsonArray{QJsonObject{
+                        {"id", 41}, {"name", "单"}, {"coverImgUrl", "http://cover/playlist.jpg"},
+                        {"trackCount", 7}}}}}}});
+        };
+
+        m_store->request(QStringLiteral("searchSuggest:first"));
+        QVERIFY(waitUntil([&] { return pending.contains(QStringLiteral("first")); }));
+        m_store->request(QStringLiteral("searchSuggest:second"));
+        QVERIFY(waitUntil([&] { return pending.contains(QStringLiteral("second")); }));
+
+        // 新查询先回、旧查询后回：旧结果必须被请求代号丢弃
+        pending.value(QStringLiteral("second"))(200, reply(2));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("searchSuggest").toMap().value("query").toString()
+                == QStringLiteral("second");
+        }));
+        pending.value(QStringLiteral("first"))(200, reply(1));
+        QTest::qWait(150);
+
+        const QVariantMap suggest = m_store->data().value("searchSuggest").toMap();
+        QCOMPARE(suggest.value("query").toString(), QStringLiteral("second"));
+        QCOMPARE(suggest.value("order").toList().size(), 4);
+        const QVariantMap song = suggest.value("songs").toList().first().toMap();
+        QCOMPARE(song.value("id").toDouble(), 2.0);
+        QCOMPARE(song.value("artist").toString(), QStringLiteral("歌手"));
+        QCOMPARE(song.value("album").toString(), QStringLiteral("专辑"));
+        QCOMPARE(suggest.value("artists").toList().first().toMap().value("cover").toString(),
+                 QStringLiteral("http://cover/artist.jpg"));
+        QCOMPARE(suggest.value("albums").toList().first().toMap().value("artistId").toDouble(), 21.0);
+        QCOMPARE(suggest.value("playlists").toList().first().toMap().value("count").toDouble(), 7.0);
+
+        const int before = requests;
+        m_store->request(QStringLiteral("searchSuggest:   "));
+        m_store->request(QStringLiteral("searchSuggest:"));
+        QTest::qWait(100);
+        QCOMPARE(requests, before);
+
+        // key 的第一段之后全是用户原文：查询里的冒号不能再被拆掉
+        m_store->request(QStringLiteral("searchSuggest:colon:query"));
+        QVERIFY(waitUntil([&] { return pending.contains(QStringLiteral("colon:query")); }));
+        pending.value(QStringLiteral("colon:query"))(200, reply(9));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("searchSuggest").toMap().value("query").toString()
+                == QStringLiteral("colon:query");
+        }));
+
+        // 搜索联想不落盘：重建 Store（只共享 SQLite 缓存）后同一查询必须重新发请求
+        const int beforeReopen = requests;
+        delete m_store;
+        m_store = new Store(m_client);
+        m_store->request(QStringLiteral("searchSuggest:second"));
+        QVERIFY(waitUntil([&] { return requests == beforeReopen + 1; }));
+        QVERIFY(pending.contains(QStringLiteral("second")));
+        pending.value(QStringLiteral("second"))(200, reply(5));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("searchSuggest").toMap()
+                       .value("songs").toList().value(0).toMap().value("id").toDouble() == 5.0;
+        }));
+    }
+
+    // 新歌直接进现有队列：字段与 ncmTrack 同形，封面保持原图
+    void discoverNewSongsUseQueueTrackShape()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/personalized/newsong") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"result", QJsonArray{QJsonObject{
+                        {"id", 1}, {"picUrl", "http://cover/fallback.jpg"},
+                        {"song", QJsonObject{
+                            {"id", 101}, {"name", "新歌"}, {"duration", 210500},
+                            {"fee", 1}, {"alia", QJsonArray{QStringLiteral("别名")}},
+                            {"sq", true}, {"mv", 77},
+                            {"artists", QJsonArray{
+                                QJsonObject{{"id", 3}, {"name", "歌手"}},
+                                QJsonObject{{"id", 4}, {"name", "合作"}}}},
+                            {"album", QJsonObject{{"id", 5}, {"name", "专辑"},
+                                                  {"picUrl", "http://cover/new.jpg"}}}}}}}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        m_store->request(QStringLiteral("discover:newSongs"));
+        QVERIFY(waitUntil([&] { return m_store->data().value("newSongs").toList().size() == 1; }));
+        const QVariantMap track = m_store->data().value("newSongs").toList().first().toMap();
+        QCOMPARE(track.value("id").toDouble(), 101.0);
+        QCOMPARE(track.value("artist").toString(), QStringLiteral("歌手 / 合作"));
+        QCOMPARE(track.value("artistId").toDouble(), 3.0);
+        QCOMPARE(track.value("artists").toList().at(1).toMap().value("id").toDouble(), 4.0);
+        QCOMPARE(track.value("albumId").toDouble(), 5.0);
+        QCOMPARE(track.value("album").toString(), QStringLiteral("专辑"));
+        QCOMPARE(track.value("dur").toDouble(), 210.0);
+        QCOMPARE(track.value("cover").toString(), QStringLiteral("http://cover/new.jpg"));
+        QCOMPARE(track.value("alias").toString(), QStringLiteral("别名"));
+        QCOMPARE(track.value("quality").toString(), QStringLiteral("lossless"));
+        QCOMPARE(track.value("mv").toDouble(), 77.0);
+        QCOMPARE(track.value("playable").toBool(), false);
+        QCOMPARE(track.value("blockedBy").toString(), QStringLiteral("vip"));
+        QVERIFY(track.contains("reason"));
+    }
+
+    void discoverNewAlbumsTagsAndMvs()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/album/new") {
+                respond(200, json(QJsonObject{
+                    {"code", 200}, {"total", 100},
+                    {"albums", QJsonArray{QJsonObject{
+                        {"id", 2}, {"name", "新碟"}, {"picUrl", "http://cover/album.jpg"},
+                        {"publishTime", 1700000000000.0},
+                        {"artist", QJsonObject{{"id", 8}, {"name", "主歌手"}}},
+                        {"size", 10}}}}}));
+                return;
+            }
+            if (req.path == "/api/playlist/highquality/tags") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"tags", QJsonArray{QJsonObject{
+                        {"id", 1}, {"name", "华语"}, {"type", 0}, {"category", 0},
+                        {"hot", true}}}}}));
+                return;
+            }
+            if (req.path == "/api/personalized/mv") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"result", QJsonArray{QJsonObject{
+                        {"id", 55}, {"type", 1}, {"name", "MV"}, {"copywriter", "推荐语"},
+                        {"picUrl", "http://cover/mv.jpg"}, {"duration", 214000.0},
+                        {"playCount", 99.0}, {"artistId", 8}, {"artistName", "主歌手"}}}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("discover:newAlbums"));
+        m_store->request(QStringLiteral("discover:highqualityTags"));
+        m_store->request(QStringLiteral("discover:mvs"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("newAlbums").toList().size() == 1
+                && m_store->data().value("highqualityTags").toList().size() == 1
+                && m_store->data().value("recommendedMvs").toList().size() == 1;
+        }));
+
+        const QVariantMap album = m_store->data().value("newAlbums").toList().first().toMap();
+        QCOMPARE(album.value("id").toDouble(), 2.0);
+        QCOMPARE(album.value("artist").toString(), QStringLiteral("主歌手"));
+        QCOMPARE(album.value("artistId").toDouble(), 8.0);
+        QCOMPARE(album.value("publishTime").toDouble(), 1700000000000.0);
+        QCOMPARE(album.value("size").toDouble(), 10.0);
+
+        const QVariantMap tag = m_store->data().value("highqualityTags").toList().first().toMap();
+        QCOMPARE(tag.value("name").toString(), QStringLiteral("华语"));
+        QCOMPARE(tag.value("hot").toBool(), true);
+
+        const QVariantMap mv = m_store->data().value("recommendedMvs").toList().first().toMap();
+        QCOMPARE(mv.value("id").toDouble(), 55.0);
+        QCOMPARE(mv.value("artist").toString(), QStringLiteral("主歌手"));
+        QCOMPARE(mv.value("artistId").toDouble(), 8.0);
+        QCOMPARE(mv.value("duration").toDouble(), 214.0);
+        QCOMPARE(mv.value("playCount").toDouble(), 99.0);
+        QCOMPARE(mv.value("reason").toString(), QStringLiteral("推荐语"));
+        QCOMPARE(mv.value("cover").toString(), QStringLiteral("http://cover/mv.jpg"));
+    }
+
+    // 精品歌单翻页沿用第一页的请求代号：旧页晚到不能覆盖新页
+    void highqualityPagingKeepsFirstPageToken()
+    {
+        QHash<QString, FakeApi::Responder> pending;
+        QStringList cats;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/playlist/highquality/list") {
+                const QUrlQuery form(QString::fromUtf8(req.body));
+                const QString cat = form.queryItemValue(QStringLiteral("cat"));
+                pending.insert(cat + u':' + form.queryItemValue(QStringLiteral("lasttime")),
+                               respond);
+                cats.append(cat);
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        const auto page = [](int id, double next) {
+            return json(QJsonObject{
+                {"code", 200}, {"more", true}, {"lasttime", next},
+                {"playlists", QJsonArray{QJsonObject{
+                    {"id", id}, {"name", "精品"}, {"coverImgUrl", "http://cover/hq.jpg"},
+                    {"description", "简介"}, {"trackCount", 12}, {"playCount", 34},
+                    {"creator", QJsonObject{{"userId", 9}, {"nickname", "歌单主"}}}}}}});
+        };
+
+        // 第一页与第二页共用第一页的请求代号；第二页仍按自己的游标取
+        m_store->request(QStringLiteral("discover:highquality:全部"));
+        QVERIFY(waitUntil([&] {
+            return pending.contains(QStringLiteral("全部:0"));
+        }));
+        m_store->request(QStringLiteral("discover:highquality:全部:777"));
+        QVERIFY(waitUntil([&] {
+            return pending.contains(QStringLiteral("全部:777"));
+        }));
+        pending.value(QStringLiteral("全部:777"))(200, page(6, 888));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("highquality").toMap().value("before").toDouble() == 777.0;
+        }));
+        const QVariantMap paged = m_store->data().value("highquality").toMap();
+        QCOMPARE(paged.value("cat").toString(), QStringLiteral("全部"));
+        QCOMPARE(paged.value("nextBefore").toDouble(), 888.0);
+        QCOMPARE(paged.value("more").toBool(), true);
+        const QVariantMap pagedItem = paged.value("items").toList().first().toMap();
+        QCOMPARE(pagedItem.value("id").toDouble(), 6.0);
+        QCOMPARE(pagedItem.value("count").toDouble(), 12.0);
+        QCOMPARE(pagedItem.value("plays").toDouble(), 34.0);
+        QCOMPARE(pagedItem.value("creator").toString(), QStringLiteral("歌单主"));
+
+        // 换分类会开始新代号：旧分类的第一页晚到不能覆盖新分类
+        m_store->request(QStringLiteral("discover:highquality:华语"));
+        QVERIFY(waitUntil([&] {
+            return pending.contains(QStringLiteral("华语:0"));
+        }));
+        pending.value(QStringLiteral("华语:0"))(200, page(7, 1000));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("highquality").toMap().value("cat").toString()
+                == QStringLiteral("华语");
+        }));
+        pending.value(QStringLiteral("全部:0"))(200, page(5, 999));
+        QTest::qWait(150);
+
+        const QVariantMap switched = m_store->data().value("highquality").toMap();
+        QCOMPARE(switched.value("cat").toString(), QStringLiteral("华语"));
+        QCOMPARE(switched.value("before").toDouble(), 0.0);
+        QCOMPARE(switched.value("items").toList().first().toMap().value("id").toDouble(), 7.0);
+        QCOMPARE(cats.size(), 3);
+        QCOMPARE(cats.at(0), QStringLiteral("全部"));
+        QCOMPARE(cats.at(1), QStringLiteral("全部"));
+        QCOMPARE(cats.at(2), QStringLiteral("华语"));
+    }
+
+    // 电台详情 + 一页节目；翻页复用槽里的详情，不再请求详情接口
+    void radioDetailThenProgramPagingReusesDetail()
+    {
+        int detailRequests = 0;
+        QHash<QString, FakeApi::Responder> pending;
+        QStringList asc;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/djradio/v2/get") {
+                ++detailRequests;
+                respond(200, json(QJsonObject{{"code", 200}, {"data", radioObject()}}));
+                return;
+            }
+            if (req.path == "/api/dj/program/byradio") {
+                const QUrlQuery form(QString::fromUtf8(req.body));
+                pending.insert(form.queryItemValue(QStringLiteral("offset")), respond);
+                asc.append(form.queryItemValue(QStringLiteral("asc")));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        const auto page = [] {
+            return json(QJsonObject{
+                {"code", 200}, {"count", 2}, {"more", true},
+                {"programs", QJsonArray{programObject(55), programObject(0)}}});
+        };
+
+        m_store->request(QStringLiteral("radio:7"));
+        QVERIFY(waitUntil([&] { return pending.contains(QStringLiteral("0")); }));
+        pending.value(QStringLiteral("0"))(200, page());
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("radio").toMap().value("id").toDouble() == 7.0
+                && m_store->data().value("radio").toMap().value("programs").toList().size() == 1;
+        }));
+        const QVariantMap radio = m_store->data().value("radio").toMap();
+        QCOMPARE(radio.value("name").toString(), QStringLiteral("电台"));
+        QCOMPARE(radio.value("offset").toDouble(), 0.0);
+        QCOMPARE(radio.value("more").toBool(), true);
+        const QVariantMap dj = radio.value("dj").toMap();
+        QCOMPARE(dj.value("id").toDouble(), 99.0);
+        QCOMPARE(dj.value("avatar").toString(), QStringLiteral("http://cover/dj.jpg"));
+        const QVariantMap program = radio.value("programs").toList().first().toMap();
+        QCOMPARE(program.value("id").toDouble(), 55.0);
+        QCOMPARE(program.value("name").toString(), QStringLiteral("节目"));
+        QCOMPARE(program.value("artist").toString(), QStringLiteral("主播"));
+        QCOMPARE(program.value("album").toString(), QStringLiteral("电台"));
+        QCOMPARE(program.value("albumId").toDouble(), 0.0);
+        QCOMPARE(program.value("artistId").toDouble(), 0.0);
+        QCOMPARE(program.value("artists").toList().first().toMap().value("name").toString(),
+                 QStringLiteral("主播"));
+        QCOMPARE(program.value("dur").toDouble(), 65.0);
+        QCOMPARE(program.value("cover").toString(), QStringLiteral("http://cover/program.jpg"));
+        QCOMPARE(program.value("programId").toDouble(), 66.0);
+        QCOMPARE(program.value("radioId").toDouble(), 7.0);
+        QCOMPARE(program.value("serial").toDouble(), 31.0);
+        QCOMPARE(program.value("createTime").toDouble(), 1700000000000.0);
+        QCOMPARE(program.value("description").toString(), QStringLiteral("节目简介"));
+
+        m_store->request(QStringLiteral("radio:7:30"));
+        QVERIFY(waitUntil([&] { return pending.contains(QStringLiteral("30")); }));
+        QCOMPARE(detailRequests, 1);   // 翻页复用槽里的详情
+        pending.value(QStringLiteral("30"))(200, page());
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("radio").toMap().value("offset").toDouble() == 30.0;
+        }));
+        QCOMPARE(m_store->data().value("radio").toMap().value("id").toDouble(), 7.0);
+        QCOMPARE(detailRequests, 1);
+        QCOMPARE(asc.size(), 2);
+        QCOMPARE(asc.at(0), QStringLiteral("false"));
+        QCOMPARE(asc.at(1), QStringLiteral("false"));
+    }
+
+    void discoverRecommendedProgramsFillProgramShape()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/personalized/djprogram") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"result", QJsonArray{QJsonObject{
+                        {"id", 66}, {"program", programObject(55)}}}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        m_store->request(QStringLiteral("discover:programs"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("recommendedPrograms").toList().size() == 1;
+        }));
+        const QVariantMap program =
+            m_store->data().value("recommendedPrograms").toList().first().toMap();
+        QCOMPARE(program.value("id").toDouble(), 55.0);
+        QCOMPARE(program.value("name").toString(), QStringLiteral("节目"));
+        QCOMPARE(program.value("artist").toString(), QStringLiteral("主播"));
+        QCOMPARE(program.value("album").toString(), QStringLiteral("电台"));
+        QCOMPARE(program.value("dur").toDouble(), 65.0);
+        QCOMPARE(program.value("programId").toDouble(), 66.0);
+        QCOMPARE(program.value("radioId").toDouble(), 7.0);
     }
 
 };

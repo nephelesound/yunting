@@ -97,6 +97,15 @@ Store::Store(NcmClient *client, QObject *parent)
         {"userSubcount", nullVariant()},
         {"commentReplies", nullVariant()},
         {"lyricsNew", nullVariant()},
+        // 匿名发现：形状见 docs/API-FRONTEND.md「已实现的新增数据槽」
+        {"searchSuggest", nullVariant()},
+        {"newSongs", QVariantList{}},
+        {"newAlbums", QVariantList{}},
+        {"highqualityTags", QVariantList{}},
+        {"highquality", nullVariant()},
+        {"recommendedMvs", QVariantList{}},
+        {"recommendedPrograms", QVariantList{}},
+        {"radio", nullVariant()},
     };
     m_personal = QVariantMap{
         {"account", nullVariant()},
@@ -124,7 +133,8 @@ Store::Store(NcmClient *client, QObject *parent)
     connect(this, &Store::requestFailed, this, [](const QString &key, const QString &message) {
         const QString kind = key.section(u':', 0, 0);
         const QString safe = (kind == QLatin1String("search") || kind == QLatin1String("searchUsers")
-                              || kind == QLatin1String("searchRadios"))
+                              || kind == QLatin1String("searchRadios")
+                              || kind == QLatin1String("searchSuggest"))
             ? kind + QStringLiteral(":<redacted>") : key;
         qWarning().noquote() << "request failed key=" << safe << "reason=" << message;
     });

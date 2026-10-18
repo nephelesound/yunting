@@ -1,4 +1,4 @@
-// Store 的按需加载单元：request(key) 的四个 key（lyrics / playlist / search / comments）与相似歌曲种子。
+// Store 的按需加载单元：request(key) 的分派表与歌词/歌单/搜索/评论等单槽请求。
 // 取数一律经 QueryCache（stale-while-revalidate + 在途去重 + 落盘）：同一首歌的歌词、同一个歌单、
 // 同一个搜索词，只在过期后才重新请求。首屏管线在 store.cpp；形状仍以 scripts/snapshot.py 为准。
 #include "store.h"
@@ -88,6 +88,8 @@ void Store::request(const QString &key)
              s.requestLyrics(k, k.section(u':', 1).toDouble()); }},
         {QStringLiteral("playlist:"), [](Store &s, const QString &k) {
              s.requestPlaylist(k, k.section(u':', 1).toDouble()); }},
+        {QStringLiteral("searchSuggest:"), [](Store &s, const QString &k) {
+             s.requestSearchSuggest(k, k.section(u':', 1)); }},
         {QStringLiteral("searchUsers:"), [](Store &s, const QString &k) {
              s.requestSearchUsers(k, k.section(u':', 1)); }},
         {QStringLiteral("searchRadios:"), [](Store &s, const QString &k) {
@@ -146,6 +148,22 @@ void Store::request(const QString &key)
                                      parts.value(3).toLongLong()); }},
         {QStringLiteral("lyricsNew:"), [](Store &s, const QString &k) {
              s.requestLyricsNew(k.section(u':', 1).toDouble()); }},
+        {QStringLiteral("discover:newSongs"), [](Store &s, const QString &k) {
+             if (k == QLatin1String("discover:newSongs")) s.requestNewSongs(); }},
+        {QStringLiteral("discover:newAlbums"), [](Store &s, const QString &k) {
+             if (k == QLatin1String("discover:newAlbums")) s.requestNewAlbums(); }},
+        {QStringLiteral("discover:highqualityTags"), [](Store &s, const QString &k) {
+             if (k == QLatin1String("discover:highqualityTags")) s.requestHighQualityTags(); }},
+        {QStringLiteral("discover:highquality:"), [](Store &s, const QString &k) {
+             const QStringList parts = k.split(u':');
+             s.requestHighQuality(parts.value(2), parts.value(3).toLongLong()); }},
+        {QStringLiteral("discover:mvs"), [](Store &s, const QString &k) {
+             if (k == QLatin1String("discover:mvs")) s.requestRecommendedMvs(); }},
+        {QStringLiteral("discover:programs"), [](Store &s, const QString &k) {
+             if (k == QLatin1String("discover:programs")) s.requestRecommendedPrograms(); }},
+        {QStringLiteral("radio:"), [](Store &s, const QString &k) {
+             const QStringList parts = k.split(u':');
+             s.requestRadio(parts.value(1).toDouble(), parts.value(2).toInt()); }},
         {QStringLiteral("fm:next"), [](Store &s, const QString &k) {
              if (k == QLatin1String("fm:next")) s.requestMoreFm(); }},
     };

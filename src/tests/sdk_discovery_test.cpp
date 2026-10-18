@@ -16,7 +16,9 @@ private slots:
         QJsonObject artist{{"id", 3}, {"name", "歌手"}};
         QJsonObject album{{"id", 4}, {"name", "专辑"}, {"picUrl", "http://cover"}};
         QJsonObject song{{"id", 1}, {"name", "新歌"}, {"duration", 210500},
-                         {"fee", 1}, {"artists", QJsonArray{artist}}, {"album", album}};
+                         {"fee", 1}, {"artists", QJsonArray{artist}}, {"album", album},
+                         {"alia", QJsonArray{QStringLiteral("别名")}},
+                         {"sq", QJsonObject{{"br", 999000}}}, {"mv", 77}};
         QJsonObject item{{"id", 1}, {"picUrl", "http://fallback"}, {"song", song}};
         QJsonObject root{{"code", 200}, {"result", QJsonArray{item}}};
 
@@ -26,11 +28,16 @@ private slots:
         const NewSong &out = result.value->first();
         QCOMPARE(out.songId, qint64(1));
         QCOMPARE(out.name, QStringLiteral("新歌"));
-        QCOMPARE(out.artists, QStringList{QStringLiteral("歌手")});
+        QCOMPARE(out.artists.size(), 1);
+        QCOMPARE(out.artists.first().id, qint64(3));
+        QCOMPARE(out.artists.first().name, QStringLiteral("歌手"));
         QCOMPARE(out.albumId, qint64(4));
         QCOMPARE(out.cover, QStringLiteral("http://cover"));
         QCOMPARE(out.duration, qint64(210));
         QCOMPARE(out.fee, 1);
+        QCOMPARE(out.alias, QStringLiteral("别名"));
+        QCOMPARE(out.quality, QStringLiteral("lossless"));
+        QCOMPARE(out.mv, qint64(77));
     }
 
     void parsesAlbums()

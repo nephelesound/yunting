@@ -21,15 +21,23 @@ class NcmClient;
 
 namespace ncm::sdk {
 
+struct NewSongArtist {
+    qint64 id = 0;          // result[].song.artists[].id
+    QString name;           // result[].song.artists[].name
+};
+
 struct NewSong {
     qint64 songId = 0;      // result[].song.id
     QString name;           // result[].song.name
-    QStringList artists;    // result[].song.artists[].name
+    QList<NewSongArtist> artists; // result[].song.artists[]（保留 id，队列里每位歌手要可点）
     qint64 albumId = 0;     // result[].song.album.id
     QString albumName;      // result[].song.album.name
     QString cover;          // result[].song.album.picUrl (fallback result[].picUrl)
     qint64 duration = 0;    // result[].song.duration / 1000
     int fee = 0;            // result[].song.fee
+    QString alias;          // song.alia[0] / alias / tns / transNames
+    QString quality;        // "hires" (hr|hrMusic) / "lossless" (sq|sqMusic) / ""
+    qint64 mv = 0;          // song.mv (fallback song.mvid)
 };
 
 struct NewAlbum {
