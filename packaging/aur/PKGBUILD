@@ -1,5 +1,6 @@
 # Maintainer: sudoskys <tururu02 at gmail dot com>
-# 云听：AUR 的 -git 包（跟主干构建）。本地试打包这个仓库的已提交内容：
+# 云听的 -git 包（跟主干构建）。不在 AUR 上：用户按 README「安装」克隆仓库后在这里 makepkg -si。
+# 本地试打包这个仓库的已提交内容：
 #   YUNTING_REPO="git+file://$(git rev-parse --show-toplevel)" makepkg -si
 # 改了这个文件后重新生成 .SRCINFO：makepkg --printsrcinfo > .SRCINFO
 pkgname=yunting-git
