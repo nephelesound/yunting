@@ -14,12 +14,10 @@ find_package(KF6Config REQUIRED)
 find_package(KF6I18n REQUIRED)         # kirigami-addons 的页面（「关于」）在 QML 里用 i18nd()
 find_package(OpenSSL REQUIRED COMPONENTS Crypto)
 find_package(LayerShellQt QUIET)
-find_package(PkgConfig QUIET)
-if (PkgConfig_FOUND)
-    pkg_check_modules(QRENCODE QUIET libqrencode)
-    pkg_check_modules(ZSTD QUIET libzstd)
-endif()
-option(YUNTING_EXPERIMENTAL_EQ "Build QAudioBufferOutput + biquad EQ path" ON)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(MPV REQUIRED IMPORTED_TARGET mpv)
+pkg_check_modules(QRENCODE QUIET libqrencode)
+pkg_check_modules(ZSTD QUIET libzstd)
 
 qt_add_executable(yunting
     main.cpp cli.h cli.cpp
@@ -42,8 +40,6 @@ qt_add_executable(yunting
     perf.h perf.cpp
     layershellhelper.h layershellhelper.cpp
     apicli.h apicli.cpp
-    eqprocessor.h eqprocessor.cpp
-    eqaudiosink.h eqaudiosink.cpp
 )
 
 # 界面 QML/JS 编进可执行文件：整个 prototype/ 目录挂到 qrc:/qt/qml/org/nephelesound/yunting/ 下，
@@ -81,11 +77,6 @@ qt_add_executable(querycache_test tests/querycache_test.cpp querycache.h queryca
 target_link_libraries(querycache_test PRIVATE Qt6::Core Qt6::Sql Qt6::Test Qt6::Network)
 add_test(NAME querycache COMMAND querycache_test)
 
-# 归一化形状：曲目导航字段、MV、云盘后备、LRC 译文
-qt_add_executable(eqprocessor_test tests/eqprocessor_test.cpp eqprocessor.h eqprocessor.cpp)
-target_link_libraries(eqprocessor_test PRIVATE Qt6::Core Qt6::Test)
-add_test(NAME eqprocessor COMMAND eqprocessor_test)
-
 qt_add_executable(form_test tests/form_test.cpp json_util.h)
 target_link_libraries(form_test PRIVATE Qt6::Core Qt6::Test)
 add_test(NAME form COMMAND form_test)
@@ -109,12 +100,12 @@ qt_add_executable(normalize_test tests/normalize_test.cpp normalize.h normalize.
 target_link_libraries(normalize_test PRIVATE Qt6::Core Qt6::Test)
 add_test(NAME normalize COMMAND normalize_test)
 
-# 音量/静音走 QAudioOutput，测试要能构造真实引擎（无窗口、无网络）
+# 音量/静音与播放走真实 libmpv（ao=null），测试要能构造真实引擎（无窗口、无网络）
 qt_add_executable(audioengine_test tests/audioengine_test.cpp audioengine.h audioengine.cpp
     ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp json_util.h crypto.h crypto.cpp
     normalize.h normalize.cpp perf.h perf.cpp)
 target_compile_options(audioengine_test PRIVATE -Wall -Wextra)
-target_link_libraries(audioengine_test PRIVATE Qt6::Core Qt6::Test Qt6::Network Qt6::Multimedia Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
+target_link_libraries(audioengine_test PRIVATE Qt6::Core Qt6::Test Qt6::Network PkgConfig::MPV Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
 add_test(NAME audioengine COMMAND audioengine_test)
 
 # 重试策略：seam 是本地 QTcpServer（I/O 边界），不 mock NcmClient 内部
@@ -143,16 +134,17 @@ qt_add_executable(audioengine_seek_test tests/audioengine_seek_test.cpp
     audioengine.h audioengine.cpp ncmclient.h ncmclient.cpp
     cookievault.h cookievault.cpp json_util.h crypto.h crypto.cpp normalize.h normalize.cpp perf.h perf.cpp)
 target_compile_options(audioengine_seek_test PRIVATE -Wall -Wextra)
-target_link_libraries(audioengine_seek_test PRIVATE Qt6::Core Qt6::Test Qt6::Network Qt6::Multimedia Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
+target_link_libraries(audioengine_seek_test PRIVATE Qt6::Core Qt6::Test Qt6::Network PkgConfig::MPV Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
 add_test(NAME audioengine_seek COMMAND audioengine_seek_test)
 
 # 任何测试都碰不到用户的真实凭据与缓存：会话总线不可达（钥匙串因此走后备文件），数据与缓存目录在构建目录里
-set_tests_properties(querycache normalize form eqprocessor clientidentity audioengine audioengine_seek retry cookievault store PROPERTIES ENVIRONMENT
+set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store PROPERTIES ENVIRONMENT
     "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent;XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/data;XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/cache;YUNTING_KEYCHAIN_SERVICE=yunting-test")
 
 target_link_libraries(yunting PRIVATE
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Qml Qt6::Quick Qt6::QuickControls2
     Qt6::Network Qt6::Multimedia Qt6::DBus Qt6::Sql
+    PkgConfig::MPV
     Qt6Keychain::Qt6Keychain
     KF6::StatusNotifierItem
     OpenSSL::Crypto
@@ -169,9 +161,6 @@ if (LayerShellQt_FOUND)
         target_compile_definitions(yunting PRIVATE YUNTING_RELATIVE_POINTER=1)
         target_link_libraries(yunting PRIVATE Qt6::WaylandClient)
     endif()
-endif()
-if (YUNTING_EXPERIMENTAL_EQ)
-    target_compile_definitions(yunting PRIVATE YUNTING_EXPERIMENTAL_EQ=1)
 endif()
 target_compile_definitions(yunting PRIVATE YUNTING_KSIGNALHANDLER=1 YUNTING_VERSION="${PROJECT_VERSION}")
 target_link_libraries(yunting PRIVATE KF6::CoreAddons KF6::I18nQml KF6::ColorScheme KF6::ConfigCore)

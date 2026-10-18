@@ -1,9 +1,11 @@
 #pragma once
 // AudioEngine：声音接缝（prototype/Playback.qml 消费）。接口与 SimEngine.qml 逐字段一致：
 // track（Playback 设置即开始取播放地址）· playing · position / duration（秒）· volume / muted。
-// volume 用对数（滑条）刻度：0–1 感知线性，喂给 QAudioOutput 前转线性刻度，
+// volume 用对数（滑条）刻度：0–1 感知线性，喂给 mpv 前转成线性幅度（mpv volume 是 0–100 的线性幅度），
 // 否则滑条前半段几乎听不出变化。muted 与音量互相独立，不互相改写。
-// 队列与「下一首」不在这里：自然播完只发 finished()，切歌规则只有 Playback 那一份。
+// 播放走 libmpv：audio-device=auto 跟随 PipeWire/PulseAudio 的系统默认输出；EQ、低音与
+// 空间感是 mpv 的 lavfi 滤镜。队列与「下一首」不在这里：自然播完只发 finished()，
+// 切歌规则只有 Playback 那一份。
 #include <QDateTime>
 #include <QElapsedTimer>
 #include <QHash>
@@ -13,14 +15,13 @@
 #include <QString>
 #include <QVariantList>
 #include <QVariantMap>
+#include <atomic>
 
 class NcmClient;
-class QAudioOutput;
-class QMediaPlayer;
-#ifdef YUNTING_EXPERIMENTAL_EQ
-class QAudioBufferOutput;
-class EqAudioSink;
-#endif
+struct mpv_handle;
+struct mpv_event;
+struct mpv_event_property;
+struct mpv_event_end_file;
 
 class AudioEngine : public QObject {
     Q_OBJECT
@@ -35,8 +36,7 @@ class AudioEngine : public QObject {
     Q_PROPERTY(QString quality READ quality WRITE setQuality NOTIFY qualityChanged)
     // 可选的音质档位（auto 在最前）：界面的音质菜单与命令行帮助都从这里取
     Q_PROPERTY(QStringList qualities READ qualities CONSTANT)
-    // DSP 可用（-DYUNTING_EXPERIMENTAL_EQ=OFF 时为 false，隐藏 EQ UI）；默认播放走系统
-    // QAudioOutput，只有 EQ 非平直时才切到自建 QAudioSink，避免主线程忙时拖累普通播放
+    // mpv 自带 lavfi 滤镜，恒可用
     Q_PROPERTY(bool eqAvailable READ eqAvailable CONSTANT)
     // 10 段增益（dB），band 0..9 = 31Hz..16kHz
     Q_PROPERTY(QVariantList eqGains READ eqGains NOTIFY eqGainsChanged)
@@ -48,6 +48,7 @@ class AudioEngine : public QObject {
     Q_PROPERTY(QString scrobbleMode READ scrobbleMode WRITE setScrobbleMode NOTIFY scrobbleModeChanged)
 public:
     explicit AudioEngine(NcmClient *client, QObject *parent = nullptr);
+    ~AudioEngine() override;
 
     QVariantMap track() const { return m_track; }
     bool playing() const { return m_playing; }
@@ -60,14 +61,7 @@ public:
     QString quality() const { return m_quality; }
     static QStringList qualityLevels();
     QStringList qualities() const { return qualityLevels(); }
-    bool eqAvailable() const
-    {
-#ifdef YUNTING_EXPERIMENTAL_EQ
-        return true;
-#else
-        return false;
-#endif
-    }
+    bool eqAvailable() const { return true; }
     QVariantList eqGains() const { return m_eqGains; }
     double bassBoost() const { return m_bassBoost; }
     double stereoWidth() const { return m_stereoWidth; }
@@ -90,12 +84,11 @@ public:
     // 预取下一首的播放地址：只填 URL 缓存，不改变当前曲目/播放状态。
     // 智能续播补队后调用，减少切歌时的取址等待。
     Q_INVOKABLE void prefetch(double songId);
-    // DSP：未启用 YUNTING_EXPERIMENTAL_EQ 时 no-op
     Q_INVOKABLE void setEqGain(int band, double db);
     Q_INVOKABLE void resetEq();
     // flat / pop / rock / bass / vocal / live / spatial
     Q_INVOKABLE void applyEqPreset(const QString &preset);
-    // 输出设备：返回 [{id, description}]；id 传回 setOutputDevice
+    // 输出设备：返回 [{id, description}]；id 传回 setOutputDevice（mpv 的 auto 项即「跟随系统默认」）
     Q_INVOKABLE QVariantList audioOutputs() const;
     Q_INVOKABLE void setOutputDevice(const QString &id);
 
@@ -126,16 +119,20 @@ signals:
 private:
     // 地址取不到即 failed；quality=auto 时按曲目元数据选档
     void resolveUrl(double songId);
-#ifdef YUNTING_EXPERIMENTAL_EQ
-    // 平直曲线不需要 DSP：继续用系统 QAudioOutput；任一参数非平直才切到自建 sink。
-    void updateEqActive();
-    void enableEq();
-    void disableEq();
-    // 运行中切换输出后端：QMediaPlayer 不会在播放中重挂音频输出，重新打开同一 URL 并回到原位置
-    void restartForOutput();
-#endif
     void startSource(const QString &url, const QString &level, int bitrate);
     QString effectiveLevel() const;
+    // mpv 事件：wakeup 回调只负责把 drainEvents 排进 Qt 线程
+    void drainEvents();
+    void discardEvents();
+    void handleEvent(const struct mpv_event *event);
+    void handleProperty(const struct mpv_event_property *property);
+    void onFileLoaded();
+    void onEndFile(const struct mpv_event_end_file *end);
+    void setPaused(bool paused);
+    // 滤镜链始终挂在一个带标签的 lavfi 上，运行中改参数只发 af-command
+    void applyFilters();
+    void updateFilter(const char *target, const char *command, double value);
+    void notePlaybackStarted();
     // 听歌打卡：startplay 写「最近播放」，play 写「听歌排行」；每首歌各一次
     void scrobbleStart();
     void scrobbleFinish();
@@ -152,18 +149,18 @@ private:
     QSet<QString> m_urlRequests;        // 在途的取址（songId:level）：同一首同一音质只发一次，避免重复 startSource
 
     NcmClient *m_client;
-    QMediaPlayer *m_player;
-    QAudioOutput *m_audio = nullptr;
-#ifdef YUNTING_EXPERIMENTAL_EQ
-    QAudioBufferOutput *m_bufferOutput = nullptr;
-    EqAudioSink *m_eqSink = nullptr;
-    bool m_eqActive = false;
-    bool m_eqBroken = false;   // sink 起不来：不再尝试切换，保留系统输出
-#endif
+    mpv_handle *m_mpv = nullptr;
+    // wakeup 回调在 mpv 自己的线程里读它；析构先把 mpv 停掉
+    std::atomic_bool m_destroying{false};
     QVariantMap m_track;
     bool m_playing = false;
     bool m_failed = false;
-    // 滑条刻度（对数感知）；写入 QAudioOutput 前经 convertVolume 转线性
+    bool m_urlReady = false;
+    bool m_fileLoaded = false;
+    bool m_atEof = false;
+    bool m_finishedEmitted = false;
+    QString m_sourceUrl;
+    // 滑条刻度（对数感知）；写入 mpv 前经 linearVolume 转线性幅度
     double m_volume = 0.7;
     bool m_muted = false;
     QString m_quality = QStringLiteral("auto");
@@ -178,8 +175,10 @@ private:
     QVariantList m_eqGains = QVariantList(10, 0.0);
     double m_bassBoost = 0;
     double m_stereoWidth = 1;
-    double m_pendingSeek = -1;
-    qint64 m_resumePosition = -1;   // 切换输出后端后，等媒体重新加载完再跳回的位置
+    double m_pendingSeek = -1;      // 秒；等文件加载完再应用
+    // time-pos / duration 在停止或结束后会不可用，缓存最后一个值给 QML
+    double m_position = 0;
+    double m_duration = 0;
     bool m_scrobbleStarted = false;
     bool m_scrobbleFinished = false;
     QElapsedTimer m_trackClock;

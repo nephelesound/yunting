@@ -73,6 +73,8 @@ class AudioEngineSeekTest : public QObject {
 private slots:
     void init()
     {
+        // 真实 mpv 引擎，但 ao=null：测试不碰声卡
+        qputenv("YUNTING_TEST_AO_NULL", "1");
         qputenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent");
         qputenv("XDG_DATA_HOME", m_dir.filePath("data").toUtf8());
         qputenv("XDG_CACHE_HOME", m_dir.filePath("cache").toUtf8());

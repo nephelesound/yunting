@@ -13,6 +13,7 @@ pkgbase = yunting-git
 	depends = qt6-base
 	depends = qt6-declarative
 	depends = qt6-multimedia
+	depends = mpv
 	depends = kirigami
 	depends = kirigami-addons
 	depends = kcoreaddons
