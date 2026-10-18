@@ -1,0 +1,51 @@
+{
+  "newSongs": [
+    {
+      "songId": 1,
+      "name": "新歌",
+      "artists": ["歌手"],
+      "albumId": 4,
+      "albumName": "专辑",
+      "cover": "http://p1.music.126.net/new.jpg",
+      "duration": 210,
+      "fee": 1
+    }
+  ],
+  "newAlbums": [
+    {
+      "id": 2,
+      "name": "新碟",
+      "cover": "http://p1.music.126.net/album.jpg",
+      "publishTime": 1700000000000,
+      "artistId": 8,
+      "artistName": "主歌手",
+      "artists": ["主歌手"],
+      "size": 10
+    }
+  ],
+  "highQualityPlaylists": {
+    "items": [
+      {
+        "id": 5,
+        "name": "精品歌单",
+        "cover": "http://p1.music.126.net/playlist.jpg",
+        "description": "简介",
+        "trackCount": 12,
+        "playCount": 34,
+        "subscribedCount": 56,
+        "creatorId": 9,
+        "creatorName": "歌单主",
+        "updateTime": 1700000000000
+      }
+    ],
+    "more": true,
+    "lasttime": 777
+  },
+  "tags": [
+    { "id": 5001, "name": "华语", "type": 0, "category": 0, "hot": false }
+  ],
+  "banners": [
+    { "typeTitle": "新碟", "imageUrl": "http://p1.music.126.net/banner.jpg",
+      "url": "orpheus://album/1", "targetType": 10, "targetId": 1 }
+  ]
+}

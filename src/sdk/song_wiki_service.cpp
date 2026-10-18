@@ -1,6 +1,7 @@
 #include "sdk/song_wiki_service.h"
 
 #include "ncmclient.h"
+#include "sdk/service.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -15,30 +16,6 @@ namespace {
 constexpr auto WikiPath = "api/link/page/parent/relation/construct/info";
 constexpr auto CreatorsPath = "api/song/creators";
 constexpr auto ChorusPath = "api/song/chorus";
-
-Error endpointError(ErrorKind kind, const char *endpoint, const QString &message,
-                    int code = 0)
-{
-    Error error;
-    error.kind = kind;
-    error.endpoint = QString::fromLatin1(endpoint);
-    error.code = code;
-    error.message = message;
-    return error;
-}
-
-int responseCode(const QJsonObject &root)
-{
-    if (!root.value(QStringLiteral("code")).isDouble())
-        return 0;
-    return root.value(QStringLiteral("code")).toInt();
-}
-
-QString responseMessage(const QJsonObject &root)
-{
-    return root.value(QStringLiteral("message")).toString(
-        root.value(QStringLiteral("msg")).toString());
-}
 
 } // namespace
 
@@ -79,10 +56,6 @@ void fetchSongWiki(NcmClient &client, SongWikiRequest request, QObject *context,
         if (state->callback)
             state->callback(std::move(result));
     };
-    const auto fail = [finish](ErrorKind kind, const char *endpoint,
-                               const QString &message, int code = 0) {
-        finish(Result<SongWiki>::failure(endpointError(kind, endpoint, message, code)));
-    };
     const auto optionalSettled = [state, finish] {
         if (--state->pending != 0 || state->done)
             return;
@@ -99,40 +72,32 @@ void fetchSongWiki(NcmClient &client, SongWikiRequest request, QObject *context,
     wikiForm.addQueryItem(QStringLiteral("extJson"),
                           QString::fromUtf8(QJsonDocument(ext).toJson(QJsonDocument::Compact)));
     wikiForm.addQueryItem(QStringLiteral("positionCode"), QStringLiteral("songWikiMainPosition"));
-    client.postForm(QString::fromLatin1(WikiPath), wikiForm, client.hasMusicU(),
-                    [state, finish, fail, optionalSettled](const QJsonDocument &doc, bool ok) {
-        const QJsonObject root = doc.object();
-        if (!ok) {
-            fail(ErrorKind::Network, WikiPath, QStringLiteral("wiki request failed"));
+    postFormJson(client, context, QString::fromLatin1(WikiPath), wikiForm,
+                 [state, finish, optionalSettled](Result<QJsonObject> root) {
+        if (!root) {
+            finish(Result<SongWiki>::failure(root.error));
             return;
         }
-        const int code = responseCode(root);
-        if (code != 200) {
-            fail(ErrorKind::Api, WikiPath, responseMessage(root), code);
-            return;
-        }
-        state->wiki = root;
+        state->wiki = *root.value;
         optionalSettled();
-    });
+    }, client.hasMusicU());
 
     QUrlQuery creatorsForm;
     creatorsForm.addQueryItem(QStringLiteral("songId"), QString::number(state->songId));
-    client.postForm(QString::fromLatin1(CreatorsPath), creatorsForm, false,
-                    [state, optionalSettled](const QJsonDocument &doc, bool ok) {
-        const QJsonObject root = doc.object();
-        if (ok && responseCode(root) == 200)
-            state->creators = root;
+    postFormJson(client, context, QString::fromLatin1(CreatorsPath), creatorsForm,
+                 [state, optionalSettled](Result<QJsonObject> root) {
+        if (root)
+            state->creators = *root.value;
         optionalSettled();
     });
 
     QUrlQuery chorusForm;
     chorusForm.addQueryItem(QStringLiteral("ids"),
                             QStringLiteral("[%1]").arg(state->songId));
-    client.postForm(QString::fromLatin1(ChorusPath), chorusForm, false,
-                    [state, optionalSettled](const QJsonDocument &doc, bool ok) {
-        const QJsonObject root = doc.object();
-        if (ok && responseCode(root) == 200)
-            state->chorus = root;
+    postFormJson(client, context, QString::fromLatin1(ChorusPath), chorusForm,
+                 [state, optionalSettled](Result<QJsonObject> root) {
+        if (root)
+            state->chorus = *root.value;
         optionalSettled();
     });
 }

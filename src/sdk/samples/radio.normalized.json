@@ -1,0 +1,38 @@
+{
+  "recommended": [
+    {
+      "id": 66,
+      "name": "节目",
+      "description": "节目简介",
+      "createTime": 1700000000000,
+      "duration": 794,
+      "serialNum": 31,
+      "mainSongId": 55,
+      "mainSongName": "节目歌",
+      "mainSongDuration": 65,
+      "fee": 0,
+      "artists": ["歌手"],
+      "radio": {
+        "id": 7,
+        "name": "电台",
+        "cover": "http://p1.music.126.net/radio.jpg",
+        "description": "电台简介",
+        "playCount": 12,
+        "programCount": 3,
+        "subCount": 4,
+        "djId": 99,
+        "djName": "主播",
+        "djAvatar": "http://p1.music.126.net/avatar.jpg"
+      }
+    }
+  ],
+  "programPage": {
+    "items": [
+      { "id": 66, "name": "节目", "duration": 794,
+        "mainSongId": 55, "mainSongName": "节目歌", "mainSongDuration": 65 }
+    ],
+    "count": 1,
+    "more": false,
+    "offset": 0
+  }
+}

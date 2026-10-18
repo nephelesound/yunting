@@ -1,0 +1,75 @@
+{
+  "recommended": {
+    "code": 200,
+    "result": [
+      {
+        "id": 66,
+        "type": 1,
+        "name": "节目",
+        "picUrl": "http://p1.music.126.net/program.jpg",
+        "program": {
+          "id": 66,
+          "name": "节目",
+          "description": "节目简介",
+          "createTime": 1700000000000,
+          "duration": 794000,
+          "serialNum": 31,
+          "mainSong": {
+            "id": 55,
+            "name": "节目歌",
+            "duration": 65000,
+            "fee": 0,
+            "artists": [ { "id": 0, "name": "歌手" } ]
+          },
+          "radio": {
+            "id": 7,
+            "name": "电台",
+            "picUrl": "http://p1.music.126.net/radio.jpg",
+            "desc": "电台简介",
+            "playCount": 12,
+            "programCount": 3,
+            "subCount": 4,
+            "dj": { "userId": 99, "nickname": "主播", "avatarUrl": "http://p1.music.126.net/avatar.jpg" }
+          }
+        }
+      }
+    ]
+  },
+  "program": {
+    "code": 200,
+    "program": {
+      "id": 66,
+      "name": "节目",
+      "description": "节目简介",
+      "createTime": 1700000000000,
+      "duration": 794000,
+      "serialNum": 31,
+      "mainSong": { "id": 55, "name": "节目歌", "duration": 65000, "fee": 0 },
+      "radio": { "id": 7, "name": "电台", "picUrl": "http://p1.music.126.net/radio.jpg",
+                 "desc": "电台简介", "programCount": 3, "subCount": 4,
+                 "dj": { "userId": 99, "nickname": "主播" } }
+    }
+  },
+  "page": {
+    "code": 200,
+    "count": 1,
+    "more": false,
+    "programs": [
+      { "id": 66, "name": "节目", "duration": 794000,
+        "mainSong": { "id": 55, "name": "节目歌", "duration": 65000 } }
+    ]
+  },
+  "station": {
+    "code": 200,
+    "data": {
+      "id": 7,
+      "name": "电台",
+      "picUrl": "http://p1.music.126.net/radio.jpg",
+      "desc": "电台简介",
+      "playCount": 12,
+      "programCount": 3,
+      "subCount": 4,
+      "dj": { "userId": 99, "nickname": "主播", "avatarUrl": "http://p1.music.126.net/avatar.jpg" }
+    }
+  }
+}

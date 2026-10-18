@@ -1,0 +1,65 @@
+{
+  "newSongs": {
+    "code": 200,
+    "result": [
+      {
+        "id": 1,
+        "type": 4,
+        "name": "新歌",
+        "picUrl": "http://p1.music.126.net/new.jpg",
+        "song": {
+          "id": 1,
+          "name": "新歌",
+          "duration": 210500,
+          "fee": 1,
+          "artists": [ { "id": 3, "name": "歌手" } ],
+          "album": { "id": 4, "name": "专辑", "picUrl": "http://p1.music.126.net/new.jpg" }
+        }
+      }
+    ]
+  },
+  "newAlbums": {
+    "code": 200,
+    "total": 500,
+    "albums": [
+      {
+        "id": 2,
+        "name": "新碟",
+        "picUrl": "http://p1.music.126.net/album.jpg",
+        "publishTime": 1700000000000,
+        "artist": { "id": 8, "name": "主歌手" },
+        "artists": [ { "id": 8, "name": "主歌手" } ],
+        "size": 10
+      }
+    ]
+  },
+  "highQualityPlaylists": {
+    "code": 200,
+    "more": true,
+    "lasttime": 777,
+    "playlists": [
+      {
+        "id": 5,
+        "name": "精品歌单",
+        "coverImgUrl": "http://p1.music.126.net/playlist.jpg",
+        "description": "简介",
+        "trackCount": 12,
+        "playCount": 34,
+        "subscribedCount": 56,
+        "creator": { "userId": 9, "nickname": "歌单主" },
+        "updateTime": 1700000000000
+      }
+    ]
+  },
+  "tags": {
+    "code": 200,
+    "tags": [ { "id": 5001, "name": "华语", "type": 0, "category": 0, "hot": false } ]
+  },
+  "banners": {
+    "code": 200,
+    "banners": [
+      { "typeTitle": "新碟", "imageUrl": "http://p1.music.126.net/banner.jpg",
+        "url": "orpheus://album/1", "targetType": 10, "targetId": 1 }
+    ]
+  }
+}
