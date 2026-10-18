@@ -22,6 +22,11 @@
     </p>
   </description>
   <releases>
+    <release version="0.5.3" date="2026-10-18">
+      <description>
+        <p>修复扫码登录取不到二维码、一直加载的问题。完整的更新日志见仓库里的 CHANGELOG.md。</p>
+      </description>
+    </release>
     <release version="0.5.2" date="2026-10-18">
       <description>
         <p>私信与评论区翻页时不再跳回开头。完整的更新日志见仓库里的 CHANGELOG.md。</p>

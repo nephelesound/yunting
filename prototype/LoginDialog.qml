@@ -28,7 +28,8 @@ Kirigami.Dialog {
     padding: Tokens.space6
     preferredWidth: Tokens.measureMax
 
-    onOpened: if (dialog.state === "idle" || dialog.state === "done") dialog.session.start()
+    onOpened: if (dialog.state === "idle" || dialog.state === "done" || dialog.state === "error")
+        dialog.session.start()
     onClosed: if (dialog.state !== "done") dialog.session.cancel()
     onStateChanged: if (dialog.state === "done") dialog.close()
 
@@ -56,14 +57,15 @@ Kirigami.Dialog {
             }
             BusyIndicator {
                 anchors.centerIn: parent
-                visible: dialog.session.qrContent.length === 0 && dialog.state !== "expired"
+                visible: dialog.session.qrContent.length === 0
+                         && dialog.state !== "expired" && dialog.state !== "error"
                 running: visible
             }
             Button {
                 anchors.centerIn: parent
-                visible: dialog.state === "expired"
+                visible: dialog.state === "expired" || dialog.state === "error"
                 icon.name: "view-refresh-symbolic"
-                text: "刷新二维码"
+                text: dialog.state === "error" ? "重新获取" : "刷新二维码"
                 onClicked: dialog.session.start()
             }
         }
@@ -73,6 +75,7 @@ Kirigami.Dialog {
             horizontalAlignment: Text.AlignHCenter
             text: dialog.state === "scanned" ? "已扫码，请在手机上确认登录"
                 : dialog.state === "expired" ? "二维码已过期"
+                : dialog.state === "error" ? "二维码获取失败"
                 : "打开网易云音乐 App，扫一扫"
             font.pixelSize: Tokens.textBase
             font.weight: Font.Medium
@@ -82,6 +85,7 @@ Kirigami.Dialog {
             horizontalAlignment: Text.AlignHCenter
             text: dialog.state === "scanned" ? "确认后这里会自动完成登录"
                 : dialog.state === "expired" ? "每个二维码只在几分钟内有效"
+                : dialog.state === "error" ? "检查网络后重试"
                 : "登录后可播放 VIP 曲目，并同步每日推荐与红心歌曲"
             font.pixelSize: Tokens.textSm
             color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)

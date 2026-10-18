@@ -38,14 +38,16 @@ void Session::start()
     emit qrContentChanged();
     setState(QStringLiteral("waiting"));
 
-    m_client->get("api/login/qrcode/unikey", QUrlQuery(), false,
+    // 网易当前要求 type=3；缺了这个参数会回 HTTP 200 + code 400「参数错误」。
+    m_client->get("api/login/qrcode/unikey", QUrlQuery{{QStringLiteral("type"), QStringLiteral("3")}}, false,
                   [this, generation](const QJsonDocument &doc, bool ok) {
         if (generation != m_generation)
             return;   // 期间 cancel() 或重新 start()：这份 unikey 已经过时
         const QString unikey = ok ? doc.object().value("unikey").toString() : QString();
         if (unikey.isEmpty()) {
             qWarning() << "cannot get login qrcode";
-            setState(QStringLiteral("idle"));
+            // 不能停在 idle：对话框会把「没有二维码」当成加载中，永远转圈。
+            setState(QStringLiteral("error"));
             return;
         }
         m_unikey = unikey;

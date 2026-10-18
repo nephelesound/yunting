@@ -1,6 +1,6 @@
 #pragma once
 // Session：扫码登录（prototype/LoginDialog.qml 消费）。状态机与 SimSession.qml 同接口：
-// idle → waiting →（scanned）→ done，或 waiting → expired；cancel() 从任何状态回 idle。
+// idle → waiting →（scanned）→ done；取码失败 → error；等待超时 → expired；cancel() 从任何状态回 idle。
 #include <QObject>
 #include <QString>
 
@@ -10,7 +10,7 @@ class Store;
 
 class Session : public QObject {
     Q_OBJECT
-    // idle | waiting | scanned | expired | done
+    // idle | waiting | scanned | expired | error | done
     Q_PROPERTY(QString state READ state NOTIFY stateChanged)
     // 二维码内容 https://music.163.com/login?codekey=<unikey>；没有时为空串
     Q_PROPERTY(QString qrContent READ qrContent NOTIFY qrContentChanged)
