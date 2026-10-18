@@ -1,0 +1,208 @@
+{
+  "personalizedMvs": {
+    "code": 200,
+    "category": 3,
+    "result": [
+      {
+        "id": 10973299,
+        "type": 5,
+        "name": "Mute",
+        "copywriter": "编辑推荐：孟美岐全新个人EP主打歌《Mute》",
+        "picUrl": "https://p1.music.126.net/T62FhTyq2Y-SY558NvME8g==/109951165498033031.jpg",
+        "canDislike": false,
+        "trackNumberUpdateTime": null,
+        "duration": 184000,
+        "playCount": 3348950,
+        "subed": false,
+        "artists": [
+          { "id": 12098023, "name": "孟美岐" }
+        ],
+        "artistName": "孟美岐",
+        "artistId": 12098023,
+        "alg": "featured"
+      },
+      {
+        "id": 10972428,
+        "type": 5,
+        "name": "Monster",
+        "copywriter": "编辑推荐：闪光如雷悚人，亦如福光闪现即逝",
+        "picUrl": "https://p1.music.126.net/AGz7jlrXKhMevr3LyCHQXw==/109951165482711353.jpg",
+        "canDislike": false,
+        "trackNumberUpdateTime": null,
+        "duration": 183000,
+        "playCount": 4190045,
+        "subed": false,
+        "artists": [
+          { "id": 956238, "name": "Shawn Mendes" }
+        ],
+        "artistName": "Shawn Mendes",
+        "artistId": 956238,
+        "alg": "featured"
+      }
+    ]
+  },
+  "privateContents": {
+    "code": 200,
+    "name": "独家放送",
+    "result": [
+      {
+        "id": 14514232,
+        "url": "",
+        "picUrl": "https://p2.music.126.net/ZfQoqzo0rTqe3sFKkDnGuw==/109951167211930348.jpg",
+        "sPicUrl": "https://p2.music.126.net/xLa1qgy1Mu3wRXFZ3GNLiA==/109951167211942016.jpg",
+        "type": 5,
+        "copywriter": "《超级面对面》第254期 keshi：我的音乐永远新鲜",
+        "name": "《超级面对面》第254期 keshi：我的音乐永远新鲜",
+        "alg": "featured"
+      },
+      {
+        "id": 14496631,
+        "url": "",
+        "picUrl": "https://p2.music.126.net/IVEDKgbd--myWBukXgreNg==/109951166983018052.jpg",
+        "sPicUrl": "https://p2.music.126.net/lx35fbctK2npbgPUwt2FXw==/109951166983009311.jpg",
+        "type": 5,
+        "copywriter": "《超级面对面》第252期 Alan Walker：和Walkers一起遨游宇宙",
+        "name": "《超级面对面》第252期 Alan Walker：和Walkers一起遨游宇宙",
+        "alg": "featured"
+      }
+    ]
+  },
+  "homepage": {
+    "code": 200,
+    "data": {
+      "cursor": "next-cursor",
+      "hasMore": true,
+      "blockCodeOrderList": [
+        "HOMEPAGE_BANNER",
+        "HOMEPAGE_BLOCK_PLAYLIST_RCMD",
+        "HOMEPAGE_BLOCK_NEW_ALBUM_NEW_SONG",
+        "HOMEPAGE_VOICEBOOK_RCMD"
+      ],
+      "blocks": [
+        {
+          "blockCode": "HOMEPAGE_BANNER",
+          "showType": "BANNER",
+          "extInfo": {
+            "banners": [
+              {
+                "pic": "http://p1.music.126.net/e8wtQuscq74yweCGuhM8TA==/109951169664474779.jpg",
+                "targetId": 0,
+                "mainTitle": null,
+                "targetType": 3000,
+                "typeTitle": "独家策划",
+                "url": "https://y.music.163.com/g/yida/470cb610d27249f09f9f6c3d595b9457",
+                "bannerId": "1717750651205666",
+                "alg": "banner-feature-1717750651205666"
+              }
+            ]
+          }
+        },
+        {
+          "blockCode": "HOMEPAGE_BLOCK_PLAYLIST_RCMD",
+          "showType": "HOMEPAGE_SLIDE_PLAYLIST",
+          "creatives": [
+            {
+              "creativeType": "list",
+              "uiElement": {
+                "mainTitle": {
+                  "title": "歌单推荐",
+                  "canShowTitleLogo": false
+                }
+              },
+              "resources": [
+                {
+                  "uiElement": {
+                    "mainTitle": {
+                      "title": "私人雷达",
+                      "canShowTitleLogo": false
+                    },
+                    "subTitle": {
+                      "title": "为你推荐",
+                      "canShowTitleLogo": false
+                    },
+                    "image": {
+                      "imageUrl": "http://p2.music.126.net/6m6ie6Krvh2wixhpi6Ltxg==/109951173781092765.jpg",
+                      "purePicture": false
+                    },
+                    "labelTexts": ["流行", "夜晚"],
+                    "rcmdShowType": "DEFAULT"
+                  },
+                  "resourceType": "list",
+                  "resourceId": "17837791376",
+                  "resourceUrl": null,
+                  "resourceExtInfo": {
+                    "playCount": 4899152,
+                    "highQuality": false,
+                    "hasListened": false,
+                    "specialType": 0
+                  },
+                  "action": "orpheus://nm/playlist/flow?source=HOMEPAGE_BLOCK_PLAYLIST_RCMD",
+                  "actionType": "orpheus",
+                  "valid": true,
+                  "alg": "bysong_rt",
+                  "logInfo": "ignored nested layout data"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "blockCode": "HOMEPAGE_BLOCK_NEW_ALBUM_NEW_SONG",
+          "showType": "HOMEPAGE_NEW_SONG_NEW_ALBUM",
+          "creatives": [
+            {
+              "creativeType": "NEW_SONG_HOMEPAGE",
+              "uiElement": {
+                "mainTitle": {
+                  "title": "新歌",
+                  "canShowTitleLogo": false
+                }
+              },
+              "resources": [
+                {
+                  "uiElement": {
+                    "mainTitle": {
+                      "title": "Thanks For The Lesson (feat. BIA)",
+                      "canShowTitleLogo": false
+                    },
+                    "image": {
+                      "imageUrl": "http://p1.music.126.net/YA1lBRiyh8mlnSM_pfM8rw==/109951174106854578.jpg",
+                      "purePicture": false
+                    },
+                    "rcmdShowType": "DEFAULT"
+                  },
+                  "resourceType": "song",
+                  "resourceId": "3447033086",
+                  "resourceUrl": null,
+                  "resourceExtInfo": {
+                    "hasListened": false,
+                    "songData": {
+                      "id": 3447033086,
+                      "name": "Thanks For The Lesson (feat. BIA)",
+                      "duration": 184338,
+                      "artists": [
+                        { "id": 13972037, "name": "Rosy赵露思" },
+                        { "id": 192408, "name": "Bia" }
+                      ]
+                    }
+                  },
+                  "action": "orpheus://song/3447033086",
+                  "actionType": "client_customized",
+                  "valid": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "blockCode": "HOMEPAGE_VOICEBOOK_RCMD",
+          "showType": "SLIDE_RCMDLIKE_VOICELIST",
+          "dslData": {
+            "blockCode": "HOMEPAGE_IMG_TEXT_VOICEBOOK_RCMD",
+            "items": []
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,142 @@
+{
+  "systemNotices": {
+    "more": true,
+    "nextTime": 1589466289378,
+    "items": [
+      {
+        "id": 49595824594,
+        "userId": 123170560,
+        "time": 1589466289377,
+        "queued": false,
+        "type": 0,
+        "payloadValid": true,
+        "payload": {
+          "type": 2,
+          "user": {
+            "id": 123170560,
+            "name": "收藏者",
+            "avatar": "https://p1.music.126.net/avatar.jpg"
+          },
+          "commentId": 0,
+          "commentContent": "",
+          "commentTime": 0,
+          "commentParentId": 0,
+          "playlistId": 153503871,
+          "playlistName": "我喜欢的音乐",
+          "playlistCover": "https://p1.music.126.net/cover.jpg",
+          "actionDesc": "",
+          "content": "",
+          "webUrl": "",
+          "nativeUrl": "",
+          "generalType": 0,
+          "resourceId": 0,
+          "specialResourceType": 0
+        }
+      },
+      {
+        "id": 49595824595,
+        "userId": 123170560,
+        "time": 1589466289378,
+        "queued": false,
+        "type": 0,
+        "payloadValid": true,
+        "payload": {
+          "type": 1,
+          "user": {
+            "id": 123170560,
+            "name": "通知用户",
+            "avatar": "https://p1.music.126.net/avatar2.jpg"
+          },
+          "commentId": 777,
+          "commentContent": "被赞的评论",
+          "commentTime": 1589466289378,
+          "commentParentId": 5,
+          "playlistId": 0,
+          "playlistName": "",
+          "playlistCover": "",
+          "actionDesc": "赞了你的评论",
+          "content": "通知正文",
+          "webUrl": "https://music.163.com/notice",
+          "nativeUrl": "orpheus://notice/1",
+          "generalType": 3,
+          "resourceId": 456,
+          "specialResourceType": 0
+        }
+      }
+    ]
+  },
+  "commentNotifications": {
+    "more": true,
+    "total": 12,
+    "nextBeforeTime": 1700000000000,
+    "items": [
+      {
+        "user": {
+          "id": 1,
+          "name": "回复者",
+          "avatar": "https://p1.music.126.net/replier.jpg"
+        },
+        "repliedUser": {
+          "id": 2,
+          "name": "我",
+          "avatar": "https://p1.music.126.net/me.jpg"
+        },
+        "repliedContent": "原评论",
+        "content": "回复内容",
+        "time": 1700000000000,
+        "parentCommentId": 99,
+        "resourceType": 4,
+        "commentLocationType": 1,
+        "combinedId": "1700000000000_2_4",
+        "expressionUrl": "https://p1.music.126.net/expr.png",
+        "repliedExpressionUrl": ""
+      }
+    ]
+  },
+  "forwardNotifications": {
+    "more": true,
+    "newCount": 3,
+    "lasttime": 1700000000001,
+    "offset": 0,
+    "items": [
+      {
+        "id": 777,
+        "userId": 42,
+        "time": 1700000000000,
+        "type": 1,
+        "payloadValid": true,
+        "message": "@了你",
+        "user": {
+          "id": 42,
+          "name": "阿婆主",
+          "avatar": "https://p1.music.126.net/u.jpg"
+        },
+        "eventType": 1,
+        "resourceKind": "song",
+        "resourceId": 111,
+        "resourceTitle": "分享的歌",
+        "resourceCover": "https://p1.music.126.net/song.jpg",
+        "resourceArtist": "歌手"
+      },
+      {
+        "id": 888,
+        "userId": 42,
+        "time": 1700000000001,
+        "type": 1,
+        "payloadValid": true,
+        "message": "分享歌单",
+        "user": {
+          "id": 0,
+          "name": "",
+          "avatar": ""
+        },
+        "eventType": 0,
+        "resourceKind": "playlist",
+        "resourceId": 321,
+        "resourceTitle": "分享歌单名",
+        "resourceCover": "https://p1.music.126.net/playlist.jpg",
+        "resourceArtist": "歌单主"
+      }
+    ]
+  }
+}

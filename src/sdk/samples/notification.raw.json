@@ -1,0 +1,75 @@
+{
+  "systemNotices": {
+    "code": 200,
+    "more": true,
+    "notices": [
+      {
+        "queued": false,
+        "id": "49595824594",
+        "userId": "123170560",
+        "time": 1589466289377,
+        "notice": "{\"type\":2,\"user\":{\"userId\":123170560,\"nickname\":\"收藏者\",\"avatarUrl\":\"https://p1.music.126.net/avatar.jpg\"},\"playlist\":{\"id\":153503871,\"name\":\"我喜欢的音乐\",\"coverImgUrl\":\"https://p1.music.126.net/cover.jpg\"}}",
+        "pushMsg": null,
+        "type": 0
+      },
+      {
+        "queued": false,
+        "id": 49595824595,
+        "userId": 123170560,
+        "time": 1589466289378,
+        "notice": "{\"type\":1,\"user\":{\"userId\":123170560,\"nickname\":\"通知用户\",\"avatarUrl\":\"https://p1.music.126.net/avatar2.jpg\"},\"comment\":{\"commentId\":777,\"content\":\"被赞的评论\",\"time\":1589466289378,\"parentCommentId\":5},\"generalNotice\":{\"actionDesc\":\"赞了你的评论\",\"content\":\"通知正文\",\"webUrl\":\"https://music.163.com/notice\",\"nativeUrl\":\"orpheus://notice/1\",\"type\":3,\"resourceId\":456,\"specialResourceType\":null}}",
+        "pushMsg": null,
+        "type": 0
+      }
+    ]
+  },
+  "commentNotifications": {
+    "code": 200,
+    "total": 12,
+    "more": true,
+    "comments": [
+      {
+        "user": {
+          "userId": 1,
+          "nickname": "回复者",
+          "avatarUrl": "https://p1.music.126.net/replier.jpg"
+        },
+        "beRepliedUser": {
+          "userId": 2,
+          "nickname": "我",
+          "avatarUrl": "https://p1.music.126.net/me.jpg"
+        },
+        "beRepliedContent": "原评论",
+        "time": 1700000000000,
+        "content": "回复内容",
+        "combindId": "1700000000000_2_4",
+        "expressionUrl": "https://p1.music.126.net/expr.png",
+        "commentLocationType": 1,
+        "parentCommentId": 99,
+        "resourceType": 4
+      }
+    ]
+  },
+  "forwardNotifications": {
+    "code": 200,
+    "newCount": 3,
+    "lasttime": 1700000000001,
+    "more": true,
+    "forwards": [
+      {
+        "id": 777,
+        "userId": 42,
+        "time": 1700000000000,
+        "type": 1,
+        "json": "{\"user\":{\"userId\":42,\"nickname\":\"阿婆主\",\"avatarUrl\":\"https://p1.music.126.net/u.jpg\"},\"type\":1,\"json\":\"{\\\"msg\\\":\\\"@了你\\\",\\\"event\\\":{\\\"id\\\":9001,\\\"type\\\":13,\\\"user\\\":{\\\"userId\\\":77,\\\"nickname\\\":\\\"动态作者\\\",\\\"avatarUrl\\\":\\\"https://p1.music.126.net/event.jpg\\\"},\\\"json\\\":\\\"{\\\\\\\"msg\\\\\\\":\\\\\\\"事件正文\\\\\\\",\\\\\\\"song\\\\\\\":{\\\\\\\"id\\\\\\\":111,\\\\\\\"name\\\\\\\":\\\\\\\"分享的歌\\\\\\\",\\\\\\\"artists\\\\\\\":[{\\\\\\\"name\\\\\\\":\\\\\\\"歌手\\\\\\\"}],\\\\\\\"album\\\\\\\":{\\\\\\\"picUrl\\\\\\\":\\\\\\\"https://p1.music.126.net/song.jpg\\\\\\\"}}}\\\"}}\"}"
+      },
+      {
+        "id": "888",
+        "userId": 42,
+        "time": 1700000000001,
+        "type": 1,
+        "json": "{\"json\":\"{\\\"msg\\\":\\\"分享歌单\\\",\\\"playlist\\\":{\\\"id\\\":321,\\\"name\\\":\\\"分享歌单名\\\",\\\"coverImgUrl\\\":\\\"https://p1.music.126.net/playlist.jpg\\\",\\\"creator\\\":{\\\"userId\\\":5,\\\"nickname\\\":\\\"歌单主\\\",\\\"avatarUrl\\\":\\\"\\\"}}}\"}"
+      }
+    ]
+  }
+}

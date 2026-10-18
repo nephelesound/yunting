@@ -1,0 +1,65 @@
+{
+  "artists": {
+    "items": [
+      {
+        "id": 17028,
+        "name": "水樹奈々",
+        "cover": "https://p1.music.126.net/kblHQZmf3IXDp67GVQD7bA==/109951164158292078.jpg",
+        "trans": "水树奈奈",
+        "alias": ["Mizuki Nana"],
+        "albumSize": 89,
+        "mvSize": 3,
+        "latestInfo": "新碟《戦姫絶唱シンフォギアXV キャラクターソング6》抢鲜上架"
+      }
+    ],
+    "count": 2,
+    "hasMore": true,
+    "offset": 0
+  },
+  "albums": {
+    "items": [
+      {
+        "id": 81347636,
+        "name": "戦姫絶唱シンフォギアXV キャラクターソング6",
+        "cover": "https://p1.music.126.net/68u951bt6jm-E4nCyuIuRw==/109951164342901886.jpg",
+        "artistId": 17028,
+        "artistName": "水樹奈々",
+        "artists": ["水樹奈々"],
+        "size": 4,
+        "subTime": 1568863447079,
+        "alias": ["战姬绝唱SYMPHOGEAR XV 角色歌6"]
+      }
+    ],
+    "count": 1,
+    "paidCount": 0,
+    "hasMore": false,
+    "offset": 0
+  },
+  "mvs": {
+    "items": [
+      {
+        "id": "5307442",
+        "type": 0,
+        "name": "你的微笑",
+        "cover": "https://p1.music.126.net/UIlOiMnUleUmaxyEXThmPw==/1426066585668185.jpg",
+        "duration": 265,
+        "playCount": 782783,
+        "creatorId": 11562,
+        "creatorName": "F.I.R"
+      },
+      {
+        "id": "4E673ABCA5B939B889FDE4A2B148C2BD",
+        "type": 1,
+        "name": "找到《往后余生》最好听的版本，配上这个MV，看哭了",
+        "cover": "https://p1.music.126.net/6B4jCaJQtfn60wuGKltX7Q==/109951163842985266.jpg",
+        "duration": 269,
+        "playCount": 2969673,
+        "creatorId": 19389416,
+        "creatorName": "全球趣音乐"
+      }
+    ],
+    "count": 2,
+    "hasMore": false,
+    "offset": 0
+  }
+}

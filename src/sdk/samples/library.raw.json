@@ -1,0 +1,91 @@
+{
+  "artists": {
+    "code": 200,
+    "count": 2,
+    "hasMore": true,
+    "data": [
+      {
+        "info": "新碟《戦姫絶唱シンフォギアXV キャラクターソング6》抢鲜上架",
+        "id": 17028,
+        "name": "水樹奈々",
+        "trans": "水树奈奈",
+        "alias": ["Mizuki Nana"],
+        "albumSize": 89,
+        "mvSize": 3,
+        "picId": 109951164158292080,
+        "picUrl": "https://p1.music.126.net/kblHQZmf3IXDp67GVQD7bA==/109951164158292078.jpg",
+        "img1v1Url": "https://p2.music.126.net/kblHQZmf3IXDp67GVQD7bA==/109951164158292078.jpg"
+      }
+    ]
+  },
+  "albums": {
+    "code": 200,
+    "count": 1,
+    "paidCount": 0,
+    "hasMore": false,
+    "data": [
+      {
+        "subTime": 1568863447079,
+        "msg": [],
+        "alias": ["战姬绝唱SYMPHOGEAR XV 角色歌6"],
+        "artists": [
+          {
+            "img1v1Id": 18686200114669624,
+            "topicPerson": 0,
+            "alias": [],
+            "picId": 0,
+            "albumSize": 0,
+            "musicSize": 0,
+            "briefDesc": "",
+            "followed": false,
+            "img1v1Url": "https://p1.music.126.net/VnZiScyynLG7atLIZ2YPkw==/18686200114669622.jpg",
+            "trans": "",
+            "picUrl": "https://p1.music.126.net/6y-UleORITEDbvrOLV0Q8A==/5639395138885805.jpg",
+            "name": "水樹奈々",
+            "id": 17028,
+            "img1v1Id_str": "18686200114669622"
+          }
+        ],
+        "picId": 109951164342901890,
+        "picUrl": "https://p1.music.126.net/68u951bt6jm-E4nCyuIuRw==/109951164342901886.jpg",
+        "name": "戦姫絶唱シンフォギアXV キャラクターソング6",
+        "id": 81347636,
+        "size": 4,
+        "transNames": []
+      }
+    ]
+  },
+  "mvs": {
+    "code": 200,
+    "count": 2,
+    "hasMore": false,
+    "data": [
+      {
+        "type": 0,
+        "title": "你的微笑",
+        "durationms": 265000,
+        "creator": [{ "userId": 11562, "userName": "F.I.R" }],
+        "playTime": 782783,
+        "coverUrl": "https://p1.music.126.net/UIlOiMnUleUmaxyEXThmPw==/1426066585668185.jpg",
+        "vid": "5307442",
+        "aliaName": null,
+        "transName": null,
+        "alg": null,
+        "markTypes": null
+      },
+      {
+        "type": 1,
+        "title": "找到《往后余生》最好听的版本，配上这个MV，看哭了",
+        "durationms": 269047,
+        "creator": [{ "userId": 19389416, "userName": "全球趣音乐" }],
+        "playTime": 2969673,
+        "coverUrl": "https://p1.music.126.net/6B4jCaJQtfn60wuGKltX7Q==/109951163842985266.jpg",
+        "vid": "4E673ABCA5B939B889FDE4A2B148C2BD",
+        "aliaName": null,
+        "transName": null,
+        "alg": null,
+        "markTypes": []
+      }
+    ]
+  }
+}

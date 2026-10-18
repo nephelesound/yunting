@@ -19,16 +19,40 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(QRENCODE QUIET libqrencode)
 pkg_check_modules(ZSTD QUIET libzstd)
 
-qt_add_executable(yunting
-    main.cpp cli.h cli.cpp
-    ncmclient.h ncmclient.cpp
-    cookievault.h cookievault.cpp
-    store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_comment.cpp store_user.cpp store_inbox.cpp store_stats.cpp store_notify.cpp store_social.cpp store_comment_extra.cpp store_lyrics_new.cpp store_on_demand.cpp store_wiki.cpp
+set(YUNTING_SDK_SOURCES
     sdk/sdk_json.h sdk/sdk_json.cpp sdk/service.h sdk/service.cpp
     sdk/song_wiki.h sdk/song_wiki.cpp sdk/song_wiki_service.h sdk/song_wiki_service.cpp
     sdk/discovery.h sdk/discovery.cpp
     sdk/radio.h sdk/radio.cpp
     sdk/social.h sdk/social.cpp
+    sdk/feed.h sdk/feed.cpp
+    sdk/video.h sdk/video.cpp
+    sdk/library.h sdk/library.cpp
+    sdk/notification.h sdk/notification.cpp
+)
+
+# Every SDK parser/service test crosses the same transport seam. Keep the source
+# list and link flags here so adding a module is one target call, not a copy of
+# CMake boilerplate.
+set(YUNTING_SDK_TEST_TRANSPORT
+    sdk/sdk_json.h sdk/sdk_json.cpp sdk/service.h sdk/service.cpp
+    ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp
+    crypto.h crypto.cpp perf.h perf.cpp)
+function(yunting_add_sdk_test name)
+    qt_add_executable(${name} tests/${name}_test.cpp ${ARGN} ${YUNTING_SDK_TEST_TRANSPORT})
+    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_options(${name} PRIVATE -Wall -Wextra)
+    target_link_libraries(${name} PRIVATE Qt6::Core Qt6::Network Qt6::Test
+        Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
+    add_test(NAME ${name} COMMAND ${name})
+endfunction()
+
+qt_add_executable(yunting
+    main.cpp cli.h cli.cpp
+    ncmclient.h ncmclient.cpp
+    cookievault.h cookievault.cpp
+    store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_comment.cpp store_user.cpp store_inbox.cpp store_stats.cpp store_notify.cpp store_social.cpp store_comment_extra.cpp store_lyrics_new.cpp store_on_demand.cpp store_wiki.cpp
+    ${YUNTING_SDK_SOURCES}
     session.h session.cpp
     querycache.h querycache.cpp
     imagecache.h
@@ -132,9 +156,6 @@ qt_add_executable(store_test tests/store_test.cpp
     store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_comment.cpp store_user.cpp store_inbox.cpp store_stats.cpp store_notify.cpp store_social.cpp store_comment_extra.cpp store_lyrics_new.cpp store_on_demand.cpp store_wiki.cpp
     sdk/sdk_json.h sdk/sdk_json.cpp sdk/service.h sdk/service.cpp
     sdk/song_wiki.h sdk/song_wiki.cpp sdk/song_wiki_service.h sdk/song_wiki_service.cpp
-    sdk/discovery.h sdk/discovery.cpp
-    sdk/radio.h sdk/radio.cpp
-    sdk/social.h sdk/social.cpp
     session.h session.cpp
     querycache.h querycache.cpp
     ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp
@@ -152,59 +173,19 @@ target_compile_options(audioengine_seek_test PRIVATE -Wall -Wextra)
 target_link_libraries(audioengine_seek_test PRIVATE Qt6::Core Qt6::Test Qt6::Network MpvQt::MpvQt Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
 add_test(NAME audioengine_seek COMMAND audioengine_seek_test)
 
-# SDK 的 typed 解析契约：不触碰网络，只校验 raw JSON -> structs / frontend map
-qt_add_executable(sdk_song_wiki_test tests/sdk_song_wiki_test.cpp
-    sdk/sdk_json.h sdk/sdk_json.cpp sdk/song_wiki.h sdk/song_wiki.cpp)
-target_include_directories(sdk_song_wiki_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_compile_options(sdk_song_wiki_test PRIVATE -Wall -Wextra)
-target_link_libraries(sdk_song_wiki_test PRIVATE Qt6::Core Qt6::Test)
-add_test(NAME sdk_song_wiki COMMAND sdk_song_wiki_test)
-
-qt_add_executable(sdk_discovery_test tests/sdk_discovery_test.cpp
-    sdk/sdk_json.h sdk/sdk_json.cpp sdk/service.h sdk/service.cpp sdk/discovery.h sdk/discovery.cpp
-    sdk/radio.h sdk/radio.cpp
-    sdk/social.h sdk/social.cpp
-    ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp
-    crypto.h crypto.cpp perf.h perf.cpp)
-target_include_directories(sdk_discovery_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_compile_options(sdk_discovery_test PRIVATE -Wall -Wextra)
-target_link_libraries(sdk_discovery_test PRIVATE Qt6::Core Qt6::Network Qt6::Test
-    Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
-add_test(NAME sdk_discovery COMMAND sdk_discovery_test)
-
-qt_add_executable(sdk_radio_test tests/sdk_radio_test.cpp
-    sdk/sdk_json.h sdk/sdk_json.cpp sdk/service.h sdk/service.cpp sdk/radio.h sdk/radio.cpp
-    sdk/social.h sdk/social.cpp
-    ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp
-    crypto.h crypto.cpp perf.h perf.cpp)
-target_include_directories(sdk_radio_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_compile_options(sdk_radio_test PRIVATE -Wall -Wextra)
-target_link_libraries(sdk_radio_test PRIVATE Qt6::Core Qt6::Network Qt6::Test
-    Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
-add_test(NAME sdk_radio COMMAND sdk_radio_test)
-
-qt_add_executable(sdk_social_test tests/sdk_social_test.cpp
-    sdk/sdk_json.h sdk/sdk_json.cpp sdk/service.h sdk/service.cpp sdk/social.h sdk/social.cpp
-    ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp
-    crypto.h crypto.cpp perf.h perf.cpp)
-target_include_directories(sdk_social_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_compile_options(sdk_social_test PRIVATE -Wall -Wextra)
-target_link_libraries(sdk_social_test PRIVATE Qt6::Core Qt6::Network Qt6::Test
-    Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
-add_test(NAME sdk_social COMMAND sdk_social_test)
-
-qt_add_executable(sdk_service_test tests/sdk_service_test.cpp
-    sdk/sdk_json.h sdk/sdk_json.cpp sdk/service.h sdk/service.cpp
-    ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp
-    crypto.h crypto.cpp perf.h perf.cpp)
-target_include_directories(sdk_service_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_compile_options(sdk_service_test PRIVATE -Wall -Wextra)
-target_link_libraries(sdk_service_test PRIVATE Qt6::Core Qt6::Network Qt6::Test
-    Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
-add_test(NAME sdk_service COMMAND sdk_service_test)
+# SDK typed parser/service tests; the function owns transport and link flags.
+yunting_add_sdk_test(sdk_song_wiki sdk/song_wiki.h sdk/song_wiki.cpp)
+yunting_add_sdk_test(sdk_discovery sdk/discovery.h sdk/discovery.cpp)
+yunting_add_sdk_test(sdk_radio sdk/radio.h sdk/radio.cpp)
+yunting_add_sdk_test(sdk_social sdk/social.h sdk/social.cpp)
+yunting_add_sdk_test(sdk_feed sdk/feed.h sdk/feed.cpp)
+yunting_add_sdk_test(sdk_video sdk/video.h sdk/video.cpp)
+yunting_add_sdk_test(sdk_library sdk/library.h sdk/library.cpp)
+yunting_add_sdk_test(sdk_notification sdk/notification.h sdk/notification.cpp)
+yunting_add_sdk_test(sdk_service)
 
 # 任何测试都碰不到用户的真实凭据与缓存：会话总线不可达（钥匙串因此走后备文件），数据与缓存目录在构建目录里
-set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store sdk_song_wiki sdk_discovery sdk_radio sdk_social sdk_service PROPERTIES ENVIRONMENT
+set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store sdk_song_wiki sdk_discovery sdk_radio sdk_social sdk_feed sdk_video sdk_library sdk_notification sdk_service PROPERTIES ENVIRONMENT
     "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent;XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/data;XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/cache;YUNTING_KEYCHAIN_SERVICE=yunting-test")
 
 target_link_libraries(yunting PRIVATE

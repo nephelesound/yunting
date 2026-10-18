@@ -1,0 +1,107 @@
+{
+  "timeline": {
+    "items": [
+      {
+        "vid": "A1B2C3D4E5F60718",
+        "type": 1,
+        "title": "示例视频",
+        "description": "示例视频简介",
+        "cover": "https://p1.music.126.net/cover.jpg",
+        "threadId": "R_VI_62_A1B2C3D4E5F60718",
+        "duration": 213,
+        "previewDuration": 5,
+        "publishTime": 0,
+        "playCount": 12345,
+        "praisedCount": 7,
+        "commentCount": 8,
+        "shareCount": 9,
+        "subscribeCount": 0,
+        "praised": false,
+        "subscribed": true,
+        "hasRelatedGameAd": false,
+        "authType": 0,
+        "width": 1920,
+        "height": 1080,
+        "previewUrl": "",
+        "creator": {
+          "userId": 42,
+          "nickname": "创作者",
+          "avatarUrl": "https://p1.music.126.net/avatar.jpg",
+          "signature": "签名"
+        },
+        "groups": [
+          { "id": 5100, "name": "音乐" },
+          { "id": 11137, "name": "现场" }
+        ],
+        "resolutions": [
+          { "resolution": 480, "size": 15794913 },
+          { "resolution": 1080, "size": 45648236 }
+        ],
+        "urlInfo": {
+          "vid": "A1B2C3D4E5F60718",
+          "url": "https://vodkgeyttp9.vod.126.net/vodkgeyttp8/example.mp4?ts=1700000000&sign=abc",
+          "size": 45648236,
+          "validityTime": 1200,
+          "needPay": false,
+          "resolution": 1080
+        }
+      }
+    ],
+    "more": true,
+    "offset": 0
+  },
+  "detail": {
+    "vid": "A1B2C3D4E5F60718",
+    "type": 0,
+    "title": "示例视频",
+    "description": "示例视频简介",
+    "cover": "https://p1.music.126.net/detail-cover.jpg",
+    "threadId": "R_VI_62_A1B2C3D4E5F60718",
+    "duration": 213,
+    "previewDuration": 0,
+    "publishTime": 1700000000000,
+    "playCount": 88,
+    "praisedCount": 11,
+    "commentCount": 12,
+    "shareCount": 13,
+    "subscribeCount": 14,
+    "praised": false,
+    "subscribed": false,
+    "hasRelatedGameAd": true,
+    "authType": 1,
+    "width": 1920,
+    "height": 1080,
+    "previewUrl": "",
+    "creator": {
+      "userId": 42,
+      "nickname": "创作者",
+      "avatarUrl": "https://p1.music.126.net/avatar.jpg",
+      "signature": "签名"
+    },
+    "groups": [
+      { "id": 5100, "name": "音乐" }
+    ],
+    "resolutions": [
+      { "resolution": 480, "size": 15794913 },
+      { "resolution": 1080, "size": 45648236 }
+    ],
+    "urlInfo": {
+      "vid": "",
+      "url": "",
+      "size": 0,
+      "validityTime": 0,
+      "needPay": false,
+      "resolution": 0
+    }
+  },
+  "playUrls": [
+    {
+      "vid": "A1B2C3D4E5F60718",
+      "url": "https://vodkgeyttp9.vod.126.net/vodkgeyttp8/example_uhd.mp4?ts=1700000000&sign=def",
+      "size": 45648236,
+      "validityTime": 1200,
+      "needPay": false,
+      "resolution": 1080
+    }
+  ]
+}

@@ -1562,17 +1562,22 @@ private slots:
         const QByteArray wikiJson = json(wikiRoot);
         const QByteArray creatorsJson = json(creatorsRoot);
         const QByteArray chorusJson = json(chorusRoot);
-        m_api->handler = [wikiJson, creatorsJson, chorusJson](const FakeApi::Request &req,
-                                                              const FakeApi::Responder &respond) {
+        bool wikiPersonal = false;
+        bool creatorsPersonal = false;
+        bool chorusPersonal = false;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
             if (req.path == "/api/link/page/parent/relation/construct/info") {
+                wikiPersonal = req.headers.contains("MUSIC_U=test");
                 respond(200, wikiJson);
                 return;
             }
             if (req.path == "/api/song/creators") {
+                creatorsPersonal = req.headers.contains("MUSIC_U=test");
                 respond(200, creatorsJson);
                 return;
             }
             if (req.path == "/api/song/chorus") {
+                chorusPersonal = req.headers.contains("MUSIC_U=test");
                 respond(200, chorusJson);
                 return;
             }
@@ -1595,6 +1600,9 @@ private slots:
         QCOMPARE(wiki.value("memory").toMap().value("period").toString(), QStringLiteral("深夜"));
         QCOMPARE(wiki.value("chorus").toMap().value("start").toDouble(), 42.402);
         QCOMPARE(wiki.value("empty").toBool(), false);
+        QVERIFY(wikiPersonal);
+        QVERIFY(creatorsPersonal);
+        QVERIFY(chorusPersonal);
     }
 
 };

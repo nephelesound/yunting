@@ -1,0 +1,117 @@
+{
+  "timeline": {
+    "code": 200,
+    "hasmore": true,
+    "msg": "发现了更多新内容",
+    "datas": [
+      {
+        "type": 1,
+        "displayed": false,
+        "alg": "special_first_page_rcmd",
+        "extAlg": null,
+        "data": {
+          "alg": "special_first_page_rcmd",
+          "scm": "1.music-video-timeline.video_timeline.video.181017.-295043608",
+          "threadId": "R_VI_62_A1B2C3D4E5F60718",
+          "coverUrl": "https://p1.music.126.net/cover.jpg",
+          "height": 1080,
+          "width": 1920,
+          "title": "示例视频",
+          "description": "示例视频简介",
+          "commentCount": 8,
+          "shareCount": 9,
+          "resolutions": [
+            { "resolution": 480, "size": 15794913 },
+            { "resolution": 1080, "size": 45648236 }
+          ],
+          "creator": {
+            "userId": 42,
+            "nickname": "创作者",
+            "avatarUrl": "https://p1.music.126.net/avatar.jpg",
+            "signature": "签名"
+          },
+          "urlInfo": {
+            "id": "A1B2C3D4E5F60718",
+            "url": "https://vodkgeyttp9.vod.126.net/vodkgeyttp8/example.mp4?ts=1700000000&sign=abc",
+            "size": 45648236,
+            "validityTime": 1200,
+            "needPay": false,
+            "payInfo": null,
+            "r": 1080
+          },
+          "videoGroup": [
+            { "id": 5100, "name": "音乐", "alg": null },
+            { "id": 11137, "name": "现场", "alg": null }
+          ],
+          "previewUrl": null,
+          "previewDurationms": 5999,
+          "hasRelatedGameAd": false,
+          "markTypes": [],
+          "relateSong": [],
+          "relatedInfo": null,
+          "videoUserLiveInfo": null,
+          "vid": "A1B2C3D4E5F60718",
+          "durationms": 213999,
+          "playTime": 12345,
+          "praisedCount": 7,
+          "praised": false,
+          "subscribed": true
+        }
+      }
+    ]
+  },
+  "detail": {
+    "code": 200,
+    "message": "success",
+    "data": {
+      "vid": "A1B2C3D4E5F60718",
+      "creator": {
+        "userId": 42,
+        "nickname": "创作者",
+        "avatarUrl": "https://p1.music.126.net/avatar.jpg",
+        "signature": "签名",
+        "followed": false
+      },
+      "coverUrl": "https://p1.music.126.net/detail-cover.jpg",
+      "title": "示例视频",
+      "description": "示例视频简介",
+      "durationms": 213999,
+      "threadId": "R_VI_62_A1B2C3D4E5F60718",
+      "playTime": 88,
+      "praisedCount": 11,
+      "commentCount": 12,
+      "shareCount": 13,
+      "subscribeCount": 14,
+      "publishTime": 1700000000000,
+      "avatarUrl": "https://p1.music.126.net/avatar.jpg",
+      "width": 1920,
+      "height": 1080,
+      "resolutions": [
+        { "resolution": 480, "size": 15794913 },
+        { "resolution": 1080, "size": 45648236 }
+      ],
+      "videoGroup": [
+        { "id": 5100, "name": "音乐", "alg": null }
+      ],
+      "hasRelatedGameAd": true,
+      "advertisement": false,
+      "authType": 1,
+      "markTypes": [],
+      "videoUserLiveInfo": null
+    }
+  },
+  "playUrls": {
+    "code": 200,
+    "urls": [
+      {
+        "id": "A1B2C3D4E5F60718",
+        "url": "https://vodkgeyttp9.vod.126.net/vodkgeyttp8/example_uhd.mp4?ts=1700000000&sign=def",
+        "size": 45648236,
+        "validityTime": 1200,
+        "needPay": false,
+        "payInfo": null,
+        "r": 1080
+      }
+    ]
+  }
+}

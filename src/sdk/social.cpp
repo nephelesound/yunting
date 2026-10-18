@@ -179,12 +179,13 @@ void setUserFollowed(NcmClient &client, qint64 userId, bool followed, QObject *c
     if (userId <= 0) {
         if (callback)
             callback(Result<UserFollowState>::failure(
-                endpointError(ErrorKind::InvalidRequest, QStringLiteral("api/user/follow"),
+                endpointError(ErrorKind::InvalidRequest, QStringLiteral("user/follow"),
                               QStringLiteral("userId must be positive"))));
         return;
     }
-    const QString endpoint = (followed ? QStringLiteral("api/user/follow/")
-                                       : QStringLiteral("api/user/delfollow/"))
+    // NcmClient::postWeapi prefixes /weapi/; use the transport-relative path.
+    const QString endpoint = (followed ? QStringLiteral("user/follow/")
+                                       : QStringLiteral("user/delfollow/"))
         + QString::number(userId);
     postWeapiJson(client, context, endpoint, {}, true,
                   [callback = std::move(callback), userId, followed]

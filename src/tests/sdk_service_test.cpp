@@ -125,6 +125,24 @@ private slots:
         QCOMPARE(result->error.kind, ErrorKind::Network);
     }
 
+    void weapiUsesRelativePathAndPersonalCookie()
+    {
+        HttpStub stub;
+        QVERIFY(stub.listen(QHostAddress::LocalHost));
+        NcmClient client(nullptr, false);
+        client.setApiBase(QStringLiteral("http://127.0.0.1:%1/").arg(stub.serverPort()));
+        client.adoptCookies(QJsonDocument(QJsonArray{
+            QJsonObject{{"MUSIC_U", "session"}, {"__csrf", "csrf"}}}));
+
+        std::optional<Result<QJsonObject>> result;
+        postWeapiJson(client, nullptr, QStringLiteral("artist/sublist"), {}, true,
+                      [&](Result<QJsonObject> value) { result = std::move(value); });
+        QVERIFY(waitFor([&] { return result.has_value(); }));
+        QVERIFY(result->ok());
+        QVERIFY(stub.headers.contains("POST /weapi/artist/sublist"));
+        QVERIFY(stub.headers.contains("MUSIC_U=session"));
+    }
+
     void personalFlagControlsCookie()
     {
         HttpStub stub;
