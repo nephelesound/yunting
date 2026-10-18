@@ -5,9 +5,9 @@
 // 当前句随播放从左到右点亮：引擎的进度几次一秒，点亮走逐帧时钟（与引擎进度对齐），所以是连续的。
 // 观感：纯白的字配不透明度，直接压在桌面上，没有底板、没有阴影。还没唱到的字与第二行半透明，唱到的字点亮成全白。
 // 应用读不到窗口背后的壁纸（Wayland 不给），白字在亮壁纸上看不见，所以字色可换成纯黑，由用户按壁纸选。
-// 悬停时字的后面出现一块方角的半透明底板（白字是黑，黑字是白），正上方是一条标准工具栏
-//（QQC2 ToolBar + ToolButton，样式与配色全由系统画，不自绘）：字号、「样式」菜单（字色、唱到的字的颜色、
-// 文字阴影）、第二行、复位、锁定、关闭。菜单开在自己的窗口里（popupType: Window）：
+// 悬停时字的后面出现一块方角的半透明底板（白字是黑，黑字是白），按钮直接放在底板上方（一块面，不另套工具栏的框）：
+// 系统的 ToolButton，几组之间只用间距分开：字号、「样式」菜单（字色、唱到的字的颜色、文字阴影）、
+// 第二行（开着时图标是强调色）、复位、锁定、关闭。菜单开在自己的窗口里（popupType: Window）：
 // 歌词窗口很矮，菜单留在窗口里会被裁成方角、挤成一团。文字阴影默认关，可选柔和 / 浓，颜色与字相反。
 // 锁定后点击穿透，在播放条关掉再打开即解锁。样式与位置只在应用里记住（persist），原型与截图不读不写。
 pragma ComponentBehavior: Bound
@@ -89,7 +89,7 @@ Window {
     title: "云听 · 桌面歌词"
     color: "transparent"
     width: Math.min(2 * Tokens.trackColumn + Tokens.measureMax, lyricsWindow.screenWidth - 2 * Tokens.space6)   // 至多 960
-    height: tools.implicitHeight + Tokens.space2 + textColumn.implicitHeight
+    height: Tokens.space1 + tools.implicitHeight + Tokens.space2 + textColumn.implicitHeight
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
            | (lyricsWindow.locked ? Qt.WindowTransparentForInput : 0)
 
@@ -216,14 +216,36 @@ Window {
         }
 
         // 一个工具按钮：系统的 ToolButton，图标、悬停、按下、勾选都由样式画；悬停一会儿显示说明
+        // 底板上的按钮：系统的 flat ToolButton 画悬停与按下的框（KDE 工具栏按钮的样子），
+        // 图标与文字由 contentItem 按字色画——底板可深可浅，样式按系统配色画的图标在深底板上看不见。
+        // 不给按钮设 icon：样式会在底下再画一个系统色的图标，与这里的叠成两个
         component Tool: ToolButton {
+            id: tool
+            property string iconName
+            property color tint: lyricsWindow.ink
+            flat: true
+            // 样式只画框：IconOnly 且没有 icon 时它不画任何图标与文字（text 只当提示与无障碍名称用）
             display: AbstractButton.IconOnly
+            // 与应用里其他图标按钮同一尺寸：32 的方按钮、16 的图标居中
+            implicitWidth: Tokens.height8
+            implicitHeight: Tokens.height8
             ToolTip.text: text
             ToolTip.visible: hovered
             ToolTip.delay: 600
+            contentItem: Item {
+                Kirigami.Icon {
+                    anchors.centerIn: parent
+                    width: Tokens.iconSm
+                    height: Tokens.iconSm
+                    source: tool.iconName
+                    color: tool.tint
+                    isMask: true
+                }
+            }
         }
 
-        // 悬停底板：托住工具栏与歌词，宽度跟着字走（至少与工具栏同宽），方角，与工具栏一致
+        // 悬停底板：托住按钮与歌词的唯一一块面（Metro：内容在前，不在面里再套一个工具栏的框），
+        // 宽度跟着字走（至少与按钮一行同宽），方角
         Rectangle {
             visible: stage.active
             anchors.horizontalCenter: parent.horizontalCenter
@@ -234,40 +256,44 @@ Window {
             color: Qt.alpha(lyricsWindow.backing, Tokens.desktopPlate)
         }
 
-        // 工具栏：悬停（或拖动）时出现在歌词正上方。一天要碰很多次，出现与消失都不做动画；
-        // 位置一直留着，窗口高度不随悬停跳动。标准 ToolBar：底色与边线是系统工具栏的样子
-        ToolBar {
+        // 按钮：悬停（或拖动）时直接放在底板上，没有自己的工具栏底与分隔线，几组之间只用间距分开。
+        // 一天要碰很多次，出现与消失都不做动画；位置一直留着，窗口高度不随悬停跳动。
+        // 按钮见上面的 Tool：系统的 flat ToolButton，图标与文字按字色画
+        RowLayout {
             id: tools
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
+            anchors.topMargin: Tokens.space1
             visible: stage.active
+            spacing: 0
 
-            RowLayout {
-                spacing: 0
                 Tool {
-                    icon.name: "format-font-size-less"
+                    iconName: "format-font-size-less"
                     text: "字号缩小"
                     enabled: lyricsWindow.sizeStep > 0
                     onClicked: lyricsWindow.sizeStep--
                 }
                 Tool {
-                    icon.name: "format-font-size-more"
+                    iconName: "format-font-size-more"
                     text: "字号放大"
                     enabled: lyricsWindow.sizeStep < Tokens.desktopLyricSizes.length - 1
                     onClicked: lyricsWindow.sizeStep++
                 }
-                ToolSeparator {}
-                // 「样式」：带文字的菜单按钮（KDE 工具栏里打开菜单的按钮的惯常写法），字色、唱到的字、阴影都在里面
-                ToolButton {
+                Item { implicitWidth: Tokens.space4 }
+                // 「样式」：打开菜单的按钮，字色、唱到的字、阴影都在里面
+                Tool {
                     id: styleButton
-                    icon.name: "format-text-color"
-                    text: "样式"
-                    display: AbstractButton.TextBesideIcon
+                    iconName: "format-text-color"
+                    text: "样式（字色、唱到的字、阴影）"
+                    Accessible.role: Accessible.ButtonMenu
                     down: styleMenu.visible
                     onClicked: styleMenu.popup(styleButton, 0, styleButton.height)
                     Menu {
                         id: styleMenu
                         popupType: Popup.Window
+                        // 菜单是系统菜单的样子，不跟着按钮所在的底板配色
+                        Kirigami.Theme.colorSet: Kirigami.Theme.Window
+                        Kirigami.Theme.inherit: false
                         MenuItem {
                             text: "白字（暗壁纸）"
                             checkable: true
@@ -323,30 +349,29 @@ Window {
                     }
                 }
                 Tool {
-                    icon.name: "view-list-text"
-                    text: "显示译文或下一句"
-                    checkable: true
-                    checked: lyricsWindow.showSecond
-                    onToggled: lyricsWindow.showSecond = checked
+                    iconName: "view-list-text"
+                    // 开着用强调色的图标表示，不用勾选底（勾选底是又一层框，且各控件样式画得不一样）
+                    tint: lyricsWindow.showSecond ? Kirigami.Theme.highlightColor : lyricsWindow.ink
+                    text: lyricsWindow.showSecond ? "只显示当前句" : "显示译文或下一句"
+                    onClicked: lyricsWindow.showSecond = !lyricsWindow.showSecond
                 }
-                ToolSeparator {}
+                Item { implicitWidth: Tokens.space4 }
                 Tool {
-                    icon.name: "edit-reset-symbolic"
+                    iconName: "edit-reset-symbolic"
                     text: "回到默认位置"
                     visible: lyricsWindow.layerShell !== null
                     onClicked: lyricsWindow.placeDefault()
                 }
                 Tool {
-                    icon.name: "object-locked-symbolic"
+                    iconName: "object-locked-symbolic"
                     text: "锁定（鼠标穿透；在播放条关掉再打开即解锁）"
                     onClicked: lyricsWindow.locked = true
                 }
                 Tool {
-                    icon.name: "window-close-symbolic"
+                    iconName: "window-close-symbolic"
                     text: "关闭桌面歌词"
                     onClicked: lyricsWindow.closeRequested()
                 }
-            }
         }
 
         // 歌词：直接压在桌面上。字重取 DemiBold：半透明的笔画细了会被壁纸吃掉。

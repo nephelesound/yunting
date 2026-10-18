@@ -11,6 +11,7 @@ Row {
     property var items: []        // [{ key, text }]
     property string current
     property int rowHeight: Tokens.height10
+    property int fontSize: Tokens.text2xl   // 区块里的小筛选（例如听歌排行的一周 / 一月）用正文字号
 
     signal activated(string key)
 
@@ -25,7 +26,7 @@ Row {
             height: pivot.rowHeight
             verticalAlignment: Text.AlignVCenter
             text: modelData.text
-            font.pixelSize: Tokens.text2xl
+            font.pixelSize: pivot.fontSize
             font.weight: Font.Light
             // 键盘：非当前项进 Tab 顺序，回车 / 空格切换；聚焦时与悬停同样提亮，并加下划线
             activeFocusOnTab: !tab.active

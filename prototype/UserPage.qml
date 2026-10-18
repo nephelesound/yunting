@@ -262,19 +262,15 @@ ScreenFrame {
                 RowLayout {
                     Layout.rightMargin: Tokens.pageMargin
                     spacing: Tokens.space1
-                    ButtonGroup { id: rankRange }
-                    Repeater {
-                        model: [{ key: "week", text: "最近一周" }, { key: "month", text: "最近一月" }]
-                        delegate: Button {
-                            required property var modelData
-                            ButtonGroup.group: rankRange
-                            implicitHeight: Tokens.height8
-                            flat: true
-                            checkable: true
-                            checked: page.rankType === modelData.key
-                            text: modelData.text
-                            onClicked: page.rankType = modelData.key
-                        }
+                    // 一周 / 一月：与页面上的枢轴同一种写法（当前项实色、其余淡出），不用勾选的按钮底：
+                    // 勾选底由用户的控件样式画，换台机器样子就不一样
+                    Pivot {
+                        items: [{ key: "week", text: "最近一周" }, { key: "month", text: "最近一月" }]
+                        current: page.rankType
+                        rowHeight: Tokens.height8
+                        fontSize: Tokens.textBase
+                        spacing: Tokens.space4
+                        onActivated: key => page.rankType = key
                     }
                     Item { Layout.fillWidth: true }
                     Label {

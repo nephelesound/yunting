@@ -129,18 +129,13 @@ Kirigami.OverlayDrawer {
                 font.pixelSize: Tokens.textSm
                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             }
-            // 智能续播：与「清空」同一套 flat 文本按钮，不引入 Switch；只在本机算口味
-            Button {
-                implicitHeight: Tokens.height8
-                flat: true
-                checkable: true
+            // 智能续播：一直开着或关着的设置，用系统的开关（Switch）；不用勾选的按钮底，
+            // 勾选底由用户的控件样式画，换台机器样子就不一样。只在本机算口味
+            Switch {
                 checked: panel.smartEnabled
-                icon.name: "media-playlist-append-symbolic"
-                icon.width: Tokens.iconSm
-                icon.height: Tokens.iconSm
-                text: "智能"
+                text: "智能续播"
                 font.pixelSize: Tokens.textSm
-                onClicked: panel.smartToggled(checked)
+                onToggled: panel.smartToggled(checked)
                 ToolTip.text: panel.smartEnabled
                     ? "智能续播已开启：按本机播放/跳过/红心记录补充队列"
                     : "开启智能续播：按本机口味补充队列，不上传数据"
