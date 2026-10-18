@@ -16,13 +16,6 @@ namespace {
 constexpr auto SuggestPath = "api/search/suggest/web";
 constexpr auto ResultPath = "searchSuggest.result";
 
-template <typename T>
-Result<T> parseFailure(const JsonReader &reader, const QString &path)
-{
-    return Result<T>::failure(
-        endpointError(ErrorKind::Parse, SuggestPath, reader.error(), path));
-}
-
 QString indexedPath(const QString &arrayPath, qsizetype index)
 {
     return arrayPath + QLatin1Char('[') + QString::number(index) + QLatin1Char(']');
@@ -83,7 +76,7 @@ Result<SearchSuggestArtist> artistFrom(const QJsonObject &object, const QString 
     if (artist.id <= 0)
         reader.fail(QStringLiteral("id must be positive"));
     if (!reader.ok())
-        return parseFailure<SearchSuggestArtist>(reader, path);
+        return parseFailure<SearchSuggestArtist>(QString::fromLatin1(SuggestPath), reader, path);
     return Result<SearchSuggestArtist>::success(artist);
 }
 
@@ -96,7 +89,7 @@ Result<SearchSuggestSong> songFrom(const QJsonObject &object, const QString &pat
     song.alias = reader.stringList("alias");
     const QJsonArray artistValues = reader.array("artists");
     if (!reader.ok())
-        return parseFailure<SearchSuggestSong>(reader, path);
+        return parseFailure<SearchSuggestSong>(QString::fromLatin1(SuggestPath), reader, path);
 
     const QString artistsPath = path + QStringLiteral(".artists");
     song.artists.reserve(artistValues.size());
@@ -108,25 +101,26 @@ Result<SearchSuggestSong> songFrom(const QJsonObject &object, const QString &pat
         JsonReader artistReader(*item.value, artistPath);
         const QString name = artistReader.string("name");
         if (!artistReader.ok())
-            return parseFailure<SearchSuggestSong>(artistReader, artistPath);
+            return parseFailure<SearchSuggestSong>(QString::fromLatin1(SuggestPath), artistReader, artistPath);
         if (!name.isEmpty())
             song.artists.append(name);
     }
 
     const QJsonObject album = reader.object("album");
     if (!reader.ok())
-        return parseFailure<SearchSuggestSong>(reader, path);
+        return parseFailure<SearchSuggestSong>(QString::fromLatin1(SuggestPath), reader, path);
     JsonReader albumReader(album, path + QStringLiteral(".album"));
     song.albumId = albumReader.integer("id");
     song.albumName = albumReader.string("name");
     song.duration = reader.integer("duration") / 1000;
     if (!albumReader.ok())
-        return parseFailure<SearchSuggestSong>(albumReader,
+        return parseFailure<SearchSuggestSong>(QString::fromLatin1(SuggestPath),
+                                               albumReader,
                                                path + QStringLiteral(".album"));
     if (song.id <= 0)
         reader.fail(QStringLiteral("id must be positive"));
     if (!reader.ok())
-        return parseFailure<SearchSuggestSong>(reader, path);
+        return parseFailure<SearchSuggestSong>(QString::fromLatin1(SuggestPath), reader, path);
     return Result<SearchSuggestSong>::success(song);
 }
 
@@ -140,18 +134,18 @@ Result<SearchSuggestAlbum> albumFrom(const QJsonObject &object, const QString &p
     album.publishTime = reader.integer("publishTime");
     album.size = reader.integer("size");
     if (!reader.ok())
-        return parseFailure<SearchSuggestAlbum>(reader, path);
+        return parseFailure<SearchSuggestAlbum>(QString::fromLatin1(SuggestPath), reader, path);
 
     const QString artistPath = path + QStringLiteral(".artist");
     JsonReader artistReader(artist, artistPath);
     album.artistId = artistReader.integer("id");
     album.artistName = artistReader.string("name");
     if (!artistReader.ok())
-        return parseFailure<SearchSuggestAlbum>(artistReader, artistPath);
+        return parseFailure<SearchSuggestAlbum>(QString::fromLatin1(SuggestPath), artistReader, artistPath);
     if (album.id <= 0)
         reader.fail(QStringLiteral("id must be positive"));
     if (!reader.ok())
-        return parseFailure<SearchSuggestAlbum>(reader, path);
+        return parseFailure<SearchSuggestAlbum>(QString::fromLatin1(SuggestPath), reader, path);
     return Result<SearchSuggestAlbum>::success(album);
 }
 
@@ -170,7 +164,7 @@ Result<SearchSuggestPlaylist> playlistFrom(const QJsonObject &object,
     if (playlist.id <= 0)
         reader.fail(QStringLiteral("id must be positive"));
     if (!reader.ok())
-        return parseFailure<SearchSuggestPlaylist>(reader, path);
+        return parseFailure<SearchSuggestPlaylist>(QString::fromLatin1(SuggestPath), reader, path);
     return Result<SearchSuggestPlaylist>::success(playlist);
 }
 
