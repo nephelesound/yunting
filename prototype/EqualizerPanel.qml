@@ -198,7 +198,7 @@ Popup {
         Label {
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignHCenter
-            text: "EQ · 低音 · 空间感"
+            text: "均衡器、低音与空间感"
             font.pixelSize: Tokens.textXs
             color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             elide: Text.ElideRight

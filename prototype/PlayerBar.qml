@@ -231,7 +231,7 @@ Item {
                 icon.source: bar.together ? "" : Tokens.queueIcon
                 icon.name: bar.together ? "group-symbolic" : ""
                 icon.color: bar.together ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor
-                text: bar.together ? bar.togetherText + " · 播放队列" : "播放队列"
+                text: bar.together ? "播放队列\n" + bar.togetherText : "播放队列"
                 onClicked: bar.queueRequested()
             }
         }

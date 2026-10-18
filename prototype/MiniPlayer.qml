@@ -32,7 +32,7 @@ Window {
     readonly property string second: mini.playing && mini.line && mini.line.text ? mini.line.text
         : mini.track ? mini.track.artist : ""
 
-    title: "云听 · 迷你播放器"
+    title: "迷你播放器 — 云听"   // KDE 窗口标题的写法：「内容 — 应用」
     width: Tokens.wideRow + 2 * mini.shadowRoom      // 面宽 480：五个按钮之外给曲名留约 190 宽
     height: Tokens.hudHeight + 2 * mini.shadowRoom   // 面高 80，与播放条同高
     minimumWidth: width

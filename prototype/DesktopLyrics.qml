@@ -88,7 +88,7 @@ Window {
     property real dragLeft
     property real dragBottomGap
 
-    title: "云听 · 桌面歌词"
+    title: "桌面歌词 — 云听"   // KDE 窗口标题的写法：「内容 — 应用」
     color: "transparent"
     width: Math.min(2 * Tokens.trackColumn + Tokens.measureMax, lyricsWindow.screenWidth - 2 * Tokens.space6)   // 至多 960
     height: Tokens.space1 + tools.implicitHeight + Tokens.space2 + textColumn.implicitHeight

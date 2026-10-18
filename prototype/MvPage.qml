@@ -153,23 +153,11 @@ ScreenFrame {
             anchors.bottom: parent.bottom
             spacing: Tokens.space1
 
-            Label {
+            // MV 名只在页头面包屑里（与列表页同一约定），这里不重复。歌手可点（去歌手页），播放次数是数值 + 说明；两条事实之间只用间距
+            Facts {
                 Layout.fillWidth: true
-                text: page.mv.name || "MV"
-                font.pixelSize: Tokens.text2xl
-                font.weight: Font.Light
-                elide: Text.ElideRight
-            }
-            // 歌手可点（去歌手页），播放次数只是文字
-            LinkText {
-                Layout.fillWidth: true
-                visible: parts.length > 0
-                separator: " · "
-                parts: [{ text: page.mv.artist || "", artistId: page.mv.artistId || 0 },
-                        { text: page.mv.playCount > 0 ? Format.count(page.mv.playCount) + " 次播放" : "" }].filter(p => p.text.length > 0)
-                font.pixelSize: Tokens.textSm
-                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
-                elide: Text.ElideRight
+                items: (page.mv.artist ? [{ label: page.mv.artist, artistId: page.mv.artistId || 0 }] : [])
+                    .concat(page.mv.playCount > 0 ? [{ value: Format.count(page.mv.playCount), label: "次播放" }] : [])
             }
         }
     }
