@@ -13,7 +13,7 @@ class SdkSocialTest : public QObject {
 
     static QJsonObject eventObject()
     {
-        QJsonObject user{{"userId", 1}, {"nickname", "网易云音乐"},
+        QJsonObject user{{"userId", 1}, {"nickname", "示例用户"},
                          {"avatarUrl", "http://avatar"}};
         QJsonObject resource{{"id", 42}, {"name", "分享歌单"}, {"imgUrl", "http://cover"},
                              {"webUrl", "https://music.163.com/x"}, {"eventType", 13}};
@@ -38,7 +38,7 @@ private slots:
         const UserEvent &event = result.value->items.first();
         QCOMPARE(event.id, qint64(9));
         QCOMPARE(event.actionName, QStringLiteral("宝藏音乐"));
-        QCOMPARE(event.user.name, QStringLiteral("网易云音乐"));
+        QCOMPARE(event.user.name, QStringLiteral("示例用户"));
         QCOMPARE(event.title, QStringLiteral("标题"));
         QCOMPARE(event.likeCount, qint64(7));
         QCOMPARE(event.resource.id, qint64(42));

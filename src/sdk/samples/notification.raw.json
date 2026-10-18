@@ -6,18 +6,18 @@
       {
         "queued": false,
         "id": "49595824594",
-        "userId": "123170560",
+        "userId": "1001",
         "time": 1589466289377,
-        "notice": "{\"type\":2,\"user\":{\"userId\":123170560,\"nickname\":\"收藏者\",\"avatarUrl\":\"https://p1.music.126.net/avatar.jpg\"},\"playlist\":{\"id\":153503871,\"name\":\"我喜欢的音乐\",\"coverImgUrl\":\"https://p1.music.126.net/cover.jpg\"}}",
+        "notice": "{\"type\":2,\"user\":{\"userId\":1001,\"nickname\":\"收藏者\",\"avatarUrl\":\"https://p1.music.126.net/avatar.jpg\"},\"playlist\":{\"id\":153503871,\"name\":\"我喜欢的音乐\",\"coverImgUrl\":\"https://p1.music.126.net/cover.jpg\"}}",
         "pushMsg": null,
         "type": 0
       },
       {
         "queued": false,
         "id": 49595824595,
-        "userId": 123170560,
+        "userId": 1001,
         "time": 1589466289378,
-        "notice": "{\"type\":1,\"user\":{\"userId\":123170560,\"nickname\":\"通知用户\",\"avatarUrl\":\"https://p1.music.126.net/avatar2.jpg\"},\"comment\":{\"commentId\":777,\"content\":\"被赞的评论\",\"time\":1589466289378,\"parentCommentId\":5},\"generalNotice\":{\"actionDesc\":\"赞了你的评论\",\"content\":\"通知正文\",\"webUrl\":\"https://music.163.com/notice\",\"nativeUrl\":\"orpheus://notice/1\",\"type\":3,\"resourceId\":456,\"specialResourceType\":null}}",
+        "notice": "{\"type\":1,\"user\":{\"userId\":1001,\"nickname\":\"通知用户\",\"avatarUrl\":\"https://p1.music.126.net/avatar2.jpg\"},\"comment\":{\"commentId\":777,\"content\":\"被赞的评论\",\"time\":1589466289378,\"parentCommentId\":5},\"generalNotice\":{\"actionDesc\":\"赞了你的评论\",\"content\":\"通知正文\",\"webUrl\":\"https://music.163.com/notice\",\"nativeUrl\":\"orpheus://notice/1\",\"type\":3,\"resourceId\":456,\"specialResourceType\":null}}",
         "pushMsg": null,
         "type": 0
       }

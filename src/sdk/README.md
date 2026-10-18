@@ -38,6 +38,10 @@ NcmClient                 传输（cookie、weapi/明文、超时）
 - `discovery.h/.cpp`：推荐新歌、新碟、精品歌单、精品标签、首页 banner 的 typed 模型与请求。
 - `radio.h/.cpp`：推荐节目、电台详情、节目详情、电台节目分页的 typed 模型与请求。
 - `social.h/.cpp`：用户动态流的 typed 模型、只读请求，以及用户关注/取关写请求（需要登录 cookie，不重试）。
+- `feed.h/.cpp`：个性化 MV、独家内容、首页 block 的 typed 模型与请求。
+- `video.h/.cpp`：视频时间线、详情、签名播放地址。
+- `notification.h/.cpp`：系统通知、评论通知、@我/转发通知（登录 weapi）。
+- `library.h/.cpp`：歌手/专辑/MV 收藏列表分页（登录 weapi）。
 - `service.h/.cpp`：唯一的 HTTP code/错误/context/JSON 信封 seam，所有 service 共用。
 - `samples/`：
   - `song_wiki.request.json`：参数与三个 form 的形态。
@@ -47,6 +51,10 @@ NcmClient                 传输（cookie、weapi/明文、超时）
   - `discovery.raw.json` / `discovery.normalized.json`：发现页四类数据。
   - `radio.raw.json` / `radio.normalized.json`：播客/电台数据；节目播放用 `mainSongId` 走现有歌曲取址。
   - `social.raw.json` / `social.normalized.json`：用户动态流。
+  - `feed.raw.json` / `feed.normalized.json`：首页/独家/个性化 MV。
+  - `video.raw.json` / `video.normalized.json`：视频时间线、详情、播放地址。
+  - `notification.raw.json` / `notification.normalized.json`：三类通知。
+  - `library.raw.json` / `library.normalized.json`：三类收藏列表。
 
 ## 用法
 
@@ -79,6 +87,9 @@ ncm::sdk::fetchRadioPrograms(client, radioId, 30, 0, false, this,
     [](auto result) { /* RadioProgramPage */ });
 ncm::sdk::fetchUserEvents(client, userId, -1, 20, false, this,
     [](auto result) { /* EventPage */ });
+ncm::sdk::fetchRecommendedVideos(client, 0, this, [](auto result) { /* VideoTimelinePage */ });
+ncm::sdk::fetchSubscribedArtists(client, 25, 0, this,
+    [](auto result) { /* SubscribedArtistPage */ });
 ```
 
 程序只给出 `mainSongId`；播放地址由现有歌曲取址服务负责，SDK 不重复音频协议。

@@ -5,7 +5,7 @@
     "items": [
       {
         "id": 49595824594,
-        "userId": 123170560,
+        "userId": 1001,
         "time": 1589466289377,
         "queued": false,
         "type": 0,
@@ -13,7 +13,7 @@
         "payload": {
           "type": 2,
           "user": {
-            "id": 123170560,
+            "id": 1001,
             "name": "收藏者",
             "avatar": "https://p1.music.126.net/avatar.jpg"
           },
@@ -35,7 +35,7 @@
       },
       {
         "id": 49595824595,
-        "userId": 123170560,
+        "userId": 1001,
         "time": 1589466289378,
         "queued": false,
         "type": 0,
@@ -43,7 +43,7 @@
         "payload": {
           "type": 1,
           "user": {
-            "id": 123170560,
+            "id": 1001,
             "name": "通知用户",
             "avatar": "https://p1.music.126.net/avatar2.jpg"
           },

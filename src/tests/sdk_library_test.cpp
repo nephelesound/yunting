@@ -53,8 +53,8 @@ class SdkLibraryTest : public QObject {
             {"type", 0},
             {"title", "你的微笑"},
             {"durationms", 265000},
-            {"creator", QJsonArray{QJsonObject{{"userId", 11562},
-                                               {"userName", "F.I.R"}}}},
+            {"creator", QJsonArray{QJsonObject{{"userId", 1001},
+                                               {"userName", "示例艺人"}}}},
             {"playTime", 782783},
             {"coverUrl", "https://p1.music.126.net/mv.jpg"},
             {"vid", vid},
@@ -133,8 +133,8 @@ private slots:
         QCOMPARE(mv.cover, QStringLiteral("https://p1.music.126.net/mv.jpg"));
         QCOMPARE(mv.duration, qint64(265));
         QCOMPARE(mv.playCount, qint64(782783));
-        QCOMPARE(mv.creatorId, qint64(11562));
-        QCOMPARE(mv.creatorName, QStringLiteral("F.I.R"));
+        QCOMPARE(mv.creatorId, qint64(1001));
+        QCOMPARE(mv.creatorName, QStringLiteral("示例艺人"));
         QCOMPARE(page.items.at(1).id,
                  QStringLiteral("4E673ABCA5B939B889FDE4A2B148C2BD"));
     }

@@ -44,8 +44,8 @@
         "cover": "https://p1.music.126.net/UIlOiMnUleUmaxyEXThmPw==/1426066585668185.jpg",
         "duration": 265,
         "playCount": 782783,
-        "creatorId": 11562,
-        "creatorName": "F.I.R"
+        "creatorId": 1001,
+        "creatorName": "示例艺人"
       },
       {
         "id": "4E673ABCA5B939B889FDE4A2B148C2BD",
@@ -54,8 +54,8 @@
         "cover": "https://p1.music.126.net/6B4jCaJQtfn60wuGKltX7Q==/109951163842985266.jpg",
         "duration": 269,
         "playCount": 2969673,
-        "creatorId": 19389416,
-        "creatorName": "全球趣音乐"
+        "creatorId": 1002,
+        "creatorName": "示例用户"
       }
     ],
     "count": 2,

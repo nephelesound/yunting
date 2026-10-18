@@ -26,7 +26,7 @@ class SdkNotificationTest : public QObject {
     {
         return QJsonObject{
             {"type", 2},
-            {"user", userObject(123170560, "收藏者", "http://avatar")},
+            {"user", userObject(1001, "收藏者", "http://avatar")},
             {"playlist", QJsonObject{
                  {"id", 153503871},
                  {"name", "我喜欢的音乐"},
@@ -39,7 +39,7 @@ class SdkNotificationTest : public QObject {
     {
         return QJsonObject{
             {"type", 1},
-            {"user", userObject(123170560, "通知用户", "http://avatar2")},
+            {"user", userObject(1001, "通知用户", "http://avatar2")},
             {"comment", QJsonObject{
                  {"commentId", 777},
                  {"content", "被赞的评论"},
@@ -128,9 +128,9 @@ private slots:
             {"more", true},
             {"notices", QJsonArray{
                  noticeRow(playlistPayload(), QStringLiteral("49595824594"),
-                           QStringLiteral("123170560"), 1589466289377),
+                           QStringLiteral("1001"), 1589466289377),
                  noticeRow(generalPayload(), QJsonValue(qint64(49595824595)),
-                           QJsonValue(qint64(123170560)), 1589466289378),
+                           QJsonValue(qint64(1001)), 1589466289378),
              }},
         };
 
@@ -143,13 +143,13 @@ private slots:
 
         const SystemNotice &playlistNotice = page.items.at(0);
         QCOMPARE(playlistNotice.id, qint64(49595824594));
-        QCOMPARE(playlistNotice.userId, qint64(123170560));
+        QCOMPARE(playlistNotice.userId, qint64(1001));
         QCOMPARE(playlistNotice.time, qint64(1589466289377));
         QCOMPARE(playlistNotice.queued, false);
         QCOMPARE(playlistNotice.type, 0);
         QVERIFY(playlistNotice.payloadValid);
         QCOMPARE(playlistNotice.payload.type, 2);
-        QCOMPARE(playlistNotice.payload.user.id, qint64(123170560));
+        QCOMPARE(playlistNotice.payload.user.id, qint64(1001));
         QCOMPARE(playlistNotice.payload.user.name, QStringLiteral("收藏者"));
         QCOMPARE(playlistNotice.payload.user.avatar, QStringLiteral("http://avatar"));
         QCOMPARE(playlistNotice.payload.playlistId, qint64(153503871));
