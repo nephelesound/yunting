@@ -22,6 +22,11 @@
     </p>
   </description>
   <releases>
+    <release version="0.3.0" date="2026-10-18">
+      <description>
+        <p>中性灰的系统配色下，界面按强调色染上一点色调。完整的更新日志见仓库里的 CHANGELOG.md。</p>
+      </description>
+    </release>
     <release version="0.2.2" date="2026-10-17">
       <description>
         <p>桌面歌词的控制条改成 KDE 标准工具栏，修复透明区域变黑。完整的更新日志见仓库里的 CHANGELOG.md。</p>
