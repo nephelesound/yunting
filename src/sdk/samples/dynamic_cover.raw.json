@@ -1,11 +1,9 @@
 {
   "code": 200,
   "data": {
-    "url": "https://cdn.example/dynamic-cover.mp4",
-    "coverUrl": "https://cdn.example/static-cover.jpg",
-    "width": 1080,
-    "height": 1920,
-    "size": 123456,
-    "format": "mp4"
+    "videoPlayUrl": "https://cdn.example/dynamic-cover.mp4",
+    "height": 0,
+    "weight": 0,
+    "needTransition": true
   }
 }

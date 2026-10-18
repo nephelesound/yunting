@@ -1,0 +1,44 @@
+{
+  "query": "歌手甲",
+  "artists": [
+    {
+      "id": 1,
+      "name": "歌手甲",
+      "cover": "http://p1.music.126.net/artist.jpg",
+      "alias": ["Alias A"]
+    }
+  ],
+  "songs": [
+    {
+      "id": 11,
+      "name": "歌曲甲",
+      "artists": ["歌手甲", "歌手乙"],
+      "alias": ["副标题"],
+      "albumId": 21,
+      "albumName": "专辑甲",
+      "duration": 215
+    }
+  ],
+  "albums": [
+    {
+      "id": 21,
+      "name": "专辑甲",
+      "artistId": 1,
+      "artistName": "歌手甲",
+      "publishTime": 1700000000000,
+      "size": 10
+    }
+  ],
+  "playlists": [
+    {
+      "id": 31,
+      "name": "歌单甲",
+      "cover": "http://p1.music.126.net/playlist.jpg",
+      "description": "歌单简介",
+      "trackCount": 20,
+      "playCount": 100,
+      "creatorId": 41
+    }
+  ],
+  "order": ["songs", "artists", "albums", "playlists"]
+}

@@ -643,6 +643,42 @@ private slots:
         QCOMPARE(tracks.at(2).toMap().value("id").toDouble(), 2.0);
     }
 
+    // 歌单描述写：成功后更新本地详情并作废缓存；失败由 playlistActionFailed 处理。
+    void playlistDescriptionUpdatesLocalDetail()
+    {
+        bool wrote = false;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/v6/playlist/detail") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"playlist", QJsonObject{
+                        {"id", 501}, {"name", "P"}, {"description", "old"},
+                        {"trackCount", 0}, {"tracks", QJsonArray{}}, {"trackIds", QJsonArray{}}}}}));
+                return;
+            }
+            if (req.path == "/weapi/playlist/desc/update") {
+                wrote = true;
+                respond(200, "{\"code\":200}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("playlist:501"));
+        QVERIFY(waitUntil([&] {
+            return m_store->personal().value("playlistDetails").toMap()
+                .value(QStringLiteral("501")).toMap().value("description").toString()
+                == QStringLiteral("old");
+        }));
+
+        QSignalSpy changed(m_store, &Store::playlistChanged);
+        m_store->setPlaylistDescription(501, QStringLiteral("new description"));
+        QVERIFY(waitUntil([&] { return wrote && changed.count() > 0; }));
+        const QVariantMap detail = m_store->personal().value("playlistDetails").toMap()
+            .value(QStringLiteral("501")).toMap();
+        QCOMPARE(detail.value("description").toString(), QStringLiteral("new description"));
+    }
+
     // 关注歌手 / 收藏专辑：成功后发对应 changed，不依赖当前详情是否已加载
     void followAndAlbumSubscribeEmitChanges()
     {

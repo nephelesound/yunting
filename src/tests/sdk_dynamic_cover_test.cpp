@@ -13,9 +13,10 @@ private slots:
     void parsesKnownAndAliasFields()
     {
         QJsonObject data{
-            {"dynamicCoverUrl", "https://cdn.example/cover.mp4"},
+            {"videoPlayUrl", "https://cdn.example/cover.mp4"},
             {"coverUrl", "https://cdn.example/cover.jpg"},
-            {"width", 1080}, {"height", 1920}, {"size", 12345.0}, {"format", "mp4"},
+            {"weight", 1080}, {"height", 1920}, {"size", 12345.0},
+            {"format", "mp4"}, {"needTransition", true},
         };
         const auto result = parseDynamicCover(
             QJsonObject{{"code", 200}, {"data", data}}, 7);
@@ -28,6 +29,7 @@ private slots:
         QCOMPARE(result.value->height, 1920);
         QCOMPARE(result.value->size, qint64(12345));
         QCOMPARE(result.value->format, QStringLiteral("mp4"));
+        QVERIFY(result.value->needTransition);
     }
 
     void nullDataMeansNoCover()

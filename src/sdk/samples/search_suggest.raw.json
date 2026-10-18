@@ -1,0 +1,74 @@
+{
+  "code": 200,
+  "result": {
+    "order": ["songs", "artists", "albums", "playlists"],
+    "artists": [
+      {
+        "id": 1,
+        "name": "歌手甲",
+        "picUrl": "http://p1.music.126.net/artist.jpg",
+        "alias": ["Alias A"],
+        "alia": ["Alias A"],
+        "albumSize": 12,
+        "musicSize": 34,
+        "picId": 1001,
+        "fansGroup": null
+      }
+    ],
+    "songs": [
+      {
+        "id": 11,
+        "name": "歌曲甲",
+        "artists": [
+          { "id": 1, "name": "歌手甲", "picUrl": null, "alias": [] },
+          { "id": 2, "name": "歌手乙", "picUrl": null, "alias": [] }
+        ],
+        "album": {
+          "id": 21,
+          "name": "专辑甲",
+          "artist": { "id": 3, "name": "专辑歌手", "picUrl": null },
+          "publishTime": 1700000000000,
+          "size": 10,
+          "picId": 2002
+        },
+        "duration": 215500,
+        "alias": ["副标题"],
+        "fee": 1,
+        "mvid": 3003,
+        "status": 0,
+        "rtype": 0,
+        "ftype": 0
+      }
+    ],
+    "albums": [
+      {
+        "id": 21,
+        "name": "专辑甲",
+        "artist": { "id": 1, "name": "歌手甲", "picUrl": "http://p1.music.126.net/artist.jpg" },
+        "publishTime": 1700000000000,
+        "size": 10,
+        "copyrightId": 4004,
+        "status": 1,
+        "picId": 2002,
+        "mark": 0
+      }
+    ],
+    "playlists": [
+      {
+        "id": 31,
+        "name": "歌单甲",
+        "coverImgUrl": "http://p1.music.126.net/playlist.jpg",
+        "creator": null,
+        "subscribed": false,
+        "trackCount": 20,
+        "userId": 41,
+        "playCount": 100,
+        "bookCount": 5,
+        "specialType": 0,
+        "description": "歌单简介",
+        "highQuality": false,
+        "playlistType": "UGC"
+      }
+    ]
+  }
+}

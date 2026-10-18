@@ -69,6 +69,7 @@ public:
     Q_INVOKABLE void addSongToPlaylist(double playlistId, double songId);
     Q_INVOKABLE void removeSongFromPlaylist(double playlistId, double songId);
     Q_INVOKABLE void renamePlaylist(double id, const QString &name);
+    Q_INVOKABLE void setPlaylistDescription(double id, const QString &description);
     Q_INVOKABLE void deletePlaylist(double id);
     Q_INVOKABLE void reorderPlaylists(const QVariantList &ids);
     // 歌单内曲目排序：pid + 完整的新顺序 trackIds

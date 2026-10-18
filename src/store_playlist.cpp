@@ -278,6 +278,40 @@ void Store::renamePlaylist(double id, const QString &name)
     });
 }
 
+void Store::setPlaylistDescription(double id, const QString &description)
+{
+    playlistWrite(QStringLiteral("playlist/desc/update"),
+                  QJsonObject{{"id", num(id)}, {"desc", description}},
+                  QStringLiteral("更新歌单描述"), [this, id, description](const QJsonObject &) {
+        const auto updateIn = [this, id, description](const char *key) {
+            QVariantList cards = m_personal.value(QLatin1String(key)).toList();
+            bool changed = false;
+            for (QVariant &v : cards) {
+                QVariantMap card = v.toMap();
+                if (card.value("id").toDouble() == id) {
+                    card.insert("description", description);
+                    v = card;
+                    changed = true;
+                }
+            }
+            if (changed)
+                put(key, cards, true);
+        };
+        updateIn("playlists");
+        updateIn("mine");
+        updateIn("subscribed");
+        QVariantMap details = m_personal.value("playlistDetails").toMap();
+        if (details.contains(num(id))) {
+            QVariantMap detail = details.value(num(id)).toMap();
+            detail.insert("description", description);
+            details.insert(num(id), detail);
+            put("playlistDetails", details, true);
+        }
+        m_cache.forget(QStringLiteral("playlist:") + num(id));
+        emit playlistChanged(id);
+    });
+}
+
 void Store::deletePlaylist(double id)
 {
     const QString ids = QStringLiteral("[%1]").arg(num(id));

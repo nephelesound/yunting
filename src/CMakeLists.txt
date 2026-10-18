@@ -30,6 +30,7 @@ set(YUNTING_SDK_SOURCES
     sdk/library.h sdk/library.cpp
     sdk/notification.h sdk/notification.cpp
     sdk/dynamic_cover.h sdk/dynamic_cover.cpp
+    sdk/search_suggest.h sdk/search_suggest.cpp
 )
 
 # Every SDK parser/service test crosses the same transport seam. Keep the source
@@ -184,10 +185,11 @@ yunting_add_sdk_test(sdk_video sdk/video.h sdk/video.cpp)
 yunting_add_sdk_test(sdk_library sdk/library.h sdk/library.cpp)
 yunting_add_sdk_test(sdk_notification sdk/notification.h sdk/notification.cpp)
 yunting_add_sdk_test(sdk_dynamic_cover sdk/dynamic_cover.h sdk/dynamic_cover.cpp)
+yunting_add_sdk_test(sdk_search_suggest sdk/search_suggest.h sdk/search_suggest.cpp)
 yunting_add_sdk_test(sdk_service)
 
 # 任何测试都碰不到用户的真实凭据与缓存：会话总线不可达（钥匙串因此走后备文件），数据与缓存目录在构建目录里
-set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store sdk_song_wiki sdk_discovery sdk_radio sdk_social sdk_feed sdk_video sdk_library sdk_notification sdk_dynamic_cover sdk_service PROPERTIES ENVIRONMENT
+set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store sdk_song_wiki sdk_discovery sdk_radio sdk_social sdk_feed sdk_video sdk_library sdk_notification sdk_dynamic_cover sdk_search_suggest sdk_service PROPERTIES ENVIRONMENT
     "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent;XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/data;XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/cache;YUNTING_KEYCHAIN_SERVICE=yunting-test")
 
 target_link_libraries(yunting PRIVATE
