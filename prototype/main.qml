@@ -506,6 +506,8 @@ Kirigami.ApplicationWindow {
             root.fullscreenShown = true;
         else if (root.startOverlay === "share")
             Qt.callLater(() => root.shareTrack(root.currentTrack || root.openList.tracks[0]));
+        else if (root.startOverlay === "reorder")
+            Qt.callLater(() => (root.pageStack.currentItem as PlaylistsPage).reordering = true)
         else if (root.startOverlay === "suggest")
             Qt.callLater(() => (root.pageStack.currentItem as SearchPage).showSuggestions())
         else if (root.startOverlay === "describe")
