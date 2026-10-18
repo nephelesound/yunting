@@ -1,6 +1,7 @@
 // 应用入口：定义应用身份，然后把命令行与界面启动交给 Cli::run（src/cli.cpp）。
 // QML 编进可执行文件的 Qt 资源（qrc:/qt/qml/org/nephelesound/yunting/），资源清单见 CMakeLists.txt。
 #include "cli.h"
+#include "colortone.h"
 
 #include <KAboutData>
 #include <QApplication>
@@ -29,6 +30,8 @@ int main(int argc, char *argv[])
     about.addAuthor(QStringLiteral("Nephele Sound"), QStringLiteral("维护"), QString(),
                     QStringLiteral("https://github.com/nephelesound"));
     KAboutData::setApplicationData(about);
+    // 系统配色是中性灰时给本应用染上强调色的色调（要在任何窗口之前，缓存目录要用到上面的应用名）
+    ColorTone::apply();
     // 任务栏/窗口图标：装好后走主题；从源码运行时用内嵌 SVG，避免显示通用占位图标
     QIcon appIcon = QIcon::fromTheme(QStringLiteral("io.github.nephelesound.Yunting"));
     if (appIcon.isNull())

@@ -9,6 +9,8 @@ find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Qml Quick QuickControls2 N
 find_package(Qt6Keychain REQUIRED)
 find_package(KF6StatusNotifierItem REQUIRED)
 find_package(KF6CoreAddons REQUIRED)   # KAboutData（「关于」页）、KSignalHandler
+find_package(KF6ColorScheme REQUIRED)  # 中性配色下的应用色调（colortone.cpp）
+find_package(KF6Config REQUIRED)
 find_package(KF6I18n REQUIRED)         # kirigami-addons 的页面（「关于」）在 QML 里用 i18nd()
 find_package(OpenSSL REQUIRED COMPONENTS Crypto)
 find_package(LayerShellQt QUIET)
@@ -34,6 +36,7 @@ qt_add_executable(yunting
     tray.h tray.cpp
     clipboardhelper.h
     diagnostics.h diagnostics.cpp
+    colortone.h colortone.cpp
     powerinhibitor.h powerinhibitor.cpp
     crypto.h crypto.cpp
     perf.h perf.cpp
@@ -93,6 +96,9 @@ qt_add_executable(clipboardhelper_test tests/clipboardhelper_test.cpp clipboardh
 target_link_libraries(clipboardhelper_test PRIVATE Qt6::Gui Qt6::Test)
 add_test(NAME clipboardhelper COMMAND clipboardhelper_test)
 set_tests_properties(clipboardhelper PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+qt_add_executable(colortone_test tests/colortone_test.cpp colortone.h colortone.cpp)
+target_link_libraries(colortone_test PRIVATE Qt6::Widgets Qt6::Test KF6::ColorScheme KF6::ConfigCore)
+add_test(NAME colortone COMMAND colortone_test)
 qt_add_executable(diagnostics_test tests/diagnostics_test.cpp diagnostics.h diagnostics.cpp)
 target_link_libraries(diagnostics_test PRIVATE Qt6::Gui Qt6::Test)
 add_test(NAME diagnostics COMMAND diagnostics_test)
@@ -168,7 +174,7 @@ if (YUNTING_EXPERIMENTAL_EQ)
     target_compile_definitions(yunting PRIVATE YUNTING_EXPERIMENTAL_EQ=1)
 endif()
 target_compile_definitions(yunting PRIVATE YUNTING_KSIGNALHANDLER=1 YUNTING_VERSION="${PROJECT_VERSION}")
-target_link_libraries(yunting PRIVATE KF6::CoreAddons KF6::I18nQml)
+target_link_libraries(yunting PRIVATE KF6::CoreAddons KF6::I18nQml KF6::ColorScheme KF6::ConfigCore)
 if (QRENCODE_FOUND)
     target_sources(yunting PRIVATE qrcodeimage.h qrcodeimage.cpp)
     target_compile_definitions(yunting PRIVATE YUNTING_QRCODE=1)
