@@ -253,6 +253,85 @@ private slots:
         QCOMPARE(page.value("message").toString(), QStringLiteral("用户隐私无权限查看"));
     }
 
+    // 用户主页本身被隐私挡住：页面内说明，不当作网络失败。
+    void privateUserProfileIsInlineRestriction()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/weapi/v1/user/detail/9") {
+                respond(200, "{\"code\":-460,\"message\":\"用户隐私无权限查看\"}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        QSignalSpy restricted(m_store, &Store::requestRestricted);
+        QSignalSpy failed(m_store, &Store::requestFailed);
+
+        m_store->request(QStringLiteral("user:9"));
+        QVERIFY(waitUntil([&] { return restricted.count() == 1; }));
+        QCOMPARE(failed.count(), 0);
+        QCOMPARE(restricted.first().at(0).toString(), QStringLiteral("user:9"));
+        const QVariantMap user = m_store->data().value("user").toMap();
+        QCOMPARE(user.value("id").toDouble(), 9.0);
+        QCOMPARE(user.value("restricted").toBool(), true);
+        QCOMPARE(user.value("message").toString(), QStringLiteral("用户隐私无权限查看"));
+    }
+
+    // 旧页面的回包晚于新页面时必须丢弃：单槽数据由最新请求代号拥有。
+    void staleAlbumResponseCannotOverwriteNewSlot()
+    {
+        FakeApi::Responder first;
+        FakeApi::Responder second;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/v1/album/1") {
+                first = respond;
+                return;
+            }
+            if (req.path == "/api/v1/album/2") {
+                second = respond;
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("album:1"));
+        QVERIFY(waitUntil([&] { return static_cast<bool>(first); }));
+        m_store->request(QStringLiteral("album:2"));
+        QVERIFY(waitUntil([&] { return static_cast<bool>(second); }));
+
+        second(200, json(QJsonObject{
+            {"code", 200}, {"album", QJsonObject{{"id", 2}, {"name", "B"},
+                {"artists", QJsonArray{}}, {"publishTime", 0}}}, {"songs", QJsonArray{}}}));
+        QVERIFY(waitUntil([&] { return m_store->data().value("album").toMap().value("id").toDouble() == 2; }));
+
+        first(200, json(QJsonObject{
+            {"code", 200}, {"album", QJsonObject{{"id", 1}, {"name", "A"},
+                {"artists", QJsonArray{}}, {"publishTime", 0}}}, {"songs", QJsonArray{}}}));
+        QTest::qWait(150);
+        QCOMPARE(m_store->data().value("album").toMap().value("id").toDouble(), 2.0);
+    }
+
+    // 页面退栈时 id 会短暂归零：这些 key 不能发网络请求，也不能报失败。
+    void zeroIdsNeverHitNetwork()
+    {
+        int requests = 0;
+        m_api->handler = [&](const FakeApi::Request &, const FakeApi::Responder &respond) {
+            ++requests;
+            respond(200, "{\"code\":200}");
+        };
+        QSignalSpy failed(m_store, &Store::requestFailed);
+        const QStringList keys{
+            QStringLiteral("user:0"), QStringLiteral("artist:0"), QStringLiteral("album:0"),
+            QStringLiteral("mv:0"), QStringLiteral("playlist:0"), QStringLiteral("artistSongs:0:0"),
+            QStringLiteral("lyrics:0"), QStringLiteral("comments:0"), QStringLiteral("comments:0:0"),
+            QStringLiteral("commentReplies:0:0"),
+        };
+        for (const QString &key : keys)
+            m_store->request(key);
+        QTest::qWait(200);
+        QCOMPARE(requests, 0);
+        QCOMPARE(failed.count(), 0);
+    }
+
     // 歌单写成功后，下一次 playlist:<id> 请求必须重新取，不能拿写前的详情
     void playlistWriteInvalidatesCachedDetail()
     {

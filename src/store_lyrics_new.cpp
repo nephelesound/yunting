@@ -15,6 +15,7 @@ void Store::requestLyricsNew(double songId)
     if (songId <= 0)
         return;
     const QString key = QStringLiteral("lyricsNew:") + num(songId);
+    const quint64 token = m_requests.begin(QStringLiteral("lyricsNew"));
     m_cache.query(key,
         [this, songId](QueryCache::Done done) {
             // 逐字歌词是增强项：公开接口，不依赖登录 cookie；失败由 QueryCache 统一收口，
@@ -42,5 +43,8 @@ void Store::requestLyricsNew(double songId)
                 }, true);
             });
         },
-        [this](const QVariant &lyrics) { put("lyricsNew", lyrics, false); });
+        [this, token](const QVariant &lyrics) {
+            if (m_requests.current(QStringLiteral("lyricsNew"), token))
+                put("lyricsNew", lyrics, false);
+        });
 }

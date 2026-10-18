@@ -157,6 +157,9 @@ void Store::request(const QString &key)
 // 歌词：单槽（lyricsTrackId + lyrics），QML 只看当前这首；缓存按歌分开，切回来直接命中
 void Store::requestLyrics(const QString &key, double songId)
 {
+    if (!(songId > 0))
+        return;
+    const quint64 token = m_requests.begin(QStringLiteral("lyrics"));
     m_cache.query(key,
         [this, songId](QueryCache::Done done) {
             m_client->get("api/song/lyric", query({{"id", num(songId)}, {"lv", "1"}, {"tv", "-1"}}), false,
@@ -175,7 +178,9 @@ void Store::requestLyrics(const QString &key, double songId)
                 done(ncmParseLrc(lrc, tlyric), ok && businessOk(resp));
             });
         },
-        [this, songId](const QVariant &lines) {
+        [this, songId, token](const QVariant &lines) {
+            if (!m_requests.current(QStringLiteral("lyrics"), token))
+                return;
             put("lyricsTrackId", songId, false);
             put("lyrics", lines, false);
         });
@@ -184,6 +189,8 @@ void Store::requestLyrics(const QString &key, double songId)
 // 歌单曲目：累积在 personal.playlistDetails[<id>]
 void Store::requestPlaylist(const QString &key, double playlistId)
 {
+    if (!(playlistId > 0))
+        return;
     m_cache.query(key,
         [this, playlistId](QueryCache::Done done) {
             fetchPlaylistTracks(playlistId, true,
@@ -280,6 +287,9 @@ void Store::requestSearch(const QString &key, const QString &raw)
 // 登录态每次取网络（liked 是本人状态）；匿名态仍用缓存。
 void Store::requestCommentPage(const QString &key, double songId, int offset)
 {
+    if (!(songId > 0) || offset < 0)
+        return;
+    const quint64 token = m_requests.begin(QStringLiteral("commentPage"));
     // 登录后评论带「我」的 liked；缓存不能作为点赞状态的权威（写过之后旧行会
     // 立刻过时）。因此登录态走 refresh：每次都取网络，匿名态仍走 query 缓存。
     auto fetch = [this, songId, offset](QueryCache::Done done) {
@@ -339,7 +349,10 @@ void Store::requestCommentPage(const QString &key, double songId, int offset)
                                        : QString();
             (*fetch)(cursor.isEmpty() ? 0 : offset, cursor);
     };
-    auto deliver = [this](const QVariant &page) { put("commentPage", page, false); };
+    auto deliver = [this, token](const QVariant &page) {
+        if (m_requests.current(QStringLiteral("commentPage"), token))
+            put("commentPage", page, false);
+    };
     if (m_client->hasMusicU())
         m_cache.refresh(key, fetch, deliver);
     else
@@ -350,6 +363,9 @@ void Store::requestCommentPage(const QString &key, double songId, int offset)
 // 保持接口顺序，最多 10 条。
 void Store::requestComments(const QString &key, double songId)
 {
+    if (!(songId > 0))
+        return;
+    const quint64 token = m_requests.begin(QStringLiteral("comments"));
     auto fetch = [this, songId](QueryCache::Done done) {
             m_client->get(QStringLiteral("api/v2/resource/comments"),
                           query({{"threadId", QStringLiteral("R_SO_4_%1").arg(qlonglong(songId))},
@@ -360,7 +376,10 @@ void Store::requestComments(const QString &key, double songId)
                 done(ncmHotComments(resp, songId), ok && businessOk(resp));
             });
     };
-    auto deliver = [this](const QVariant &comments) { put("comments", comments, false); };
+    auto deliver = [this, token](const QVariant &comments) {
+        if (m_requests.current(QStringLiteral("comments"), token))
+            put("comments", comments, false);
+    };
     if (m_client->hasMusicU())
         m_cache.refresh(key, fetch, deliver);
     else
@@ -372,6 +391,9 @@ void Store::requestComments(const QString &key, double songId)
 // 专辑失败仍返回歌手与热歌，页面不会整页空白。
 void Store::requestArtist(const QString &key, double artistId)
 {
+    if (!(artistId > 0))
+        return;
+    const quint64 token = m_requests.begin(QStringLiteral("artist"));
     m_cache.query(key,
         [this, artistId](QueryCache::Done done) {
             struct State {
@@ -434,12 +456,18 @@ void Store::requestArtist(const QString &key, double artistId)
                     finish();
             });
         },
-        [this](const QVariant &artist) { put("artist", artist, false); });
+        [this, token](const QVariant &artist) {
+            if (m_requests.current(QStringLiteral("artist"), token))
+                put("artist", artist, false);
+        });
 }
 
 // 专辑页：专辑信息 + 完整曲目（接口一次返回全部）
 void Store::requestAlbum(const QString &key, double albumId)
 {
+    if (!(albumId > 0))
+        return;
+    const quint64 token = m_requests.begin(QStringLiteral("album"));
     m_cache.query(key,
         [this, albumId](QueryCache::Done done) {
             m_client->get(QStringLiteral("api/v1/album/%1").arg(qlonglong(albumId)), {}, false,
@@ -468,7 +496,10 @@ void Store::requestAlbum(const QString &key, double albumId)
                      true);
             });
         },
-        [this](const QVariant &album) { put("album", album, false); });
+        [this, token](const QVariant &album) {
+            if (m_requests.current(QStringLiteral("album"), token))
+                put("album", album, false);
+        });
 }
 
 
@@ -476,6 +507,10 @@ void Store::requestAlbum(const QString &key, double albumId)
 // 排序固定按热度；接口一次 50 首，total/more 由响应给出。
 void Store::requestArtistSongs(const QString &key, double artistId, int offset)
 {
+    if (!(artistId > 0))
+        return;
+    const quint64 token = offset > 0 ? m_requests.token(QStringLiteral("artistSongs"))
+                                     : m_requests.begin(QStringLiteral("artistSongs"));
     m_cache.query(key,
         [this, artistId, offset](QueryCache::Done done) {
             m_client->get(QStringLiteral("api/v1/artist/songs"),
@@ -494,13 +529,19 @@ void Store::requestArtistSongs(const QString &key, double artistId, int offset)
                      ok && resp.value("code").toInt() == 200);
             });
         },
-        [this](const QVariant &page) { put("artistSongs", page, false); });
+        [this, token](const QVariant &page) {
+            if (m_requests.current(QStringLiteral("artistSongs"), token))
+                put("artistSongs", page, false);
+        });
 }
 
 
 // MV：详情走缓存；播放地址是签名 URL，过期即失效，每次打开都重新取（不进缓存）
 void Store::requestMv(const QString &key, double mvId)
 {
+    if (!(mvId > 0))
+        return;
+    const quint64 token = m_requests.begin(QStringLiteral("mv"));
     // 同一个 MV 再打开：先清掉上一次的地址，新地址回来前界面不能拿着死链
     const QVariantMap shown = m_data.value(QStringLiteral("mv")).toMap();
     if (shown.value("id").toDouble() == mvId && !shown.value("url").toString().isEmpty()) {
@@ -520,8 +561,8 @@ void Store::requestMv(const QString &key, double mvId)
         bool urlSettled = false;
     };
     auto state = std::make_shared<State>();
-    const auto deliver = [this, state] {
-        if (!state->detailOk || !state->urlSettled)
+    const auto deliver = [this, state, token] {
+        if (!m_requests.current(QStringLiteral("mv"), token) || !state->detailOk || !state->urlSettled)
             return;
         QVariantMap mv = state->mv;
         mv.insert("url", state->url.value("url", QString{}));

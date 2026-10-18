@@ -74,10 +74,11 @@ void Store::requestListenRank(const QString &type)
     const QString kind = (type == QLatin1String("week")) ? QStringLiteral("week")
                                                          : QStringLiteral("month");
     const quint64 epoch = m_epoch;
+    const quint64 token = m_requests.begin(QStringLiteral("listenRank"));
     m_client->get(QStringLiteral("api/content/activity/listen/data/song/play/rank"),
                   query({{"type", kind}}), true,
-                  [this, kind, epoch](const QJsonDocument &doc, bool ok) {
-        if (epoch != m_epoch)
+                  [this, kind, epoch, token](const QJsonDocument &doc, bool ok) {
+        if (epoch != m_epoch || !m_requests.current(QStringLiteral("listenRank"), token))
             return;
         const QString failure = requestFailure(doc, ok);
         if (!failure.isEmpty()) {

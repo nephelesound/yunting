@@ -14,9 +14,10 @@ void Store::requestNotifications()
     if (!m_client->hasMusicU())
         return;
     const quint64 epoch = m_epoch;
+    const quint64 token = m_requests.begin(QStringLiteral("notifications"));
     m_client->get(QStringLiteral("api/pl/count"), {}, true,
-                  [this, epoch](const QJsonDocument &doc, bool ok) {
-        if (epoch != m_epoch)
+                  [this, epoch, token](const QJsonDocument &doc, bool ok) {
+        if (epoch != m_epoch || !m_requests.current(QStringLiteral("notifications"), token))
             return;
         const QString failure = requestFailure(doc, ok);
         if (!failure.isEmpty()) {

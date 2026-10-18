@@ -32,13 +32,6 @@ QString pageKey(const QString &kind, double uid, int offset)
     return offset > 0 ? key + u':' + QString::number(offset) : key;
 }
 
-// 对方设置隐私是账号状态，不是网络失败：不重试、不弹全局错误，页面内说明。
-QString privacyMessage(const QJsonObject &body)
-{
-    const QString message = body.value("message").toString(body.value("msg").toString());
-    return message.contains(QStringLiteral("隐私")) || message.contains(QStringLiteral("无权限"))
-        ? message : QString();
-}
 } // namespace
 
 void Store::requestUserFollows(double uid, int offset)
@@ -46,13 +39,15 @@ void Store::requestUserFollows(double uid, int offset)
     if (uid <= 0)
         return;
     const quint64 epoch = m_epoch;
+    const quint64 token = offset > 0 ? m_requests.token(QStringLiteral("userFollows"))
+                                     : m_requests.begin(QStringLiteral("userFollows"));
     m_client->get(QStringLiteral("api/user/getfollows/%1").arg(qlonglong(uid)),
                   query({{"offset", QString::number(offset)}, {"limit", "30"}, {"order", "true"}}), true,
-                  [this, uid, offset, epoch](const QJsonDocument &doc, bool ok) {
-        if (epoch != m_epoch)
+                  [this, uid, offset, epoch, token](const QJsonDocument &doc, bool ok) {
+        if (epoch != m_epoch || !m_requests.current(QStringLiteral("userFollows"), token))
             return;
         const QJsonObject r = body(doc);
-        const QString restricted = privacyMessage(r);
+        const QString restricted = Store::privacyMessage(r);
         if (!restricted.isEmpty()) {
             const QString key = pageKey(QStringLiteral("userFollows"), uid, offset);
             put("userFollows", QVariantMap{{"userId", uid}, {"offset", offset},
@@ -84,13 +79,15 @@ void Store::requestUserFolloweds(double uid, int offset)
     if (uid <= 0)
         return;
     const quint64 epoch = m_epoch;
+    const quint64 token = offset > 0 ? m_requests.token(QStringLiteral("userFolloweds"))
+                                     : m_requests.begin(QStringLiteral("userFolloweds"));
     m_client->get(QStringLiteral("api/user/getfolloweds/%1").arg(qlonglong(uid)),
                   query({{"offset", QString::number(offset)}, {"limit", "30"}}), true,
-                  [this, uid, offset, epoch](const QJsonDocument &doc, bool ok) {
-        if (epoch != m_epoch)
+                  [this, uid, offset, epoch, token](const QJsonDocument &doc, bool ok) {
+        if (epoch != m_epoch || !m_requests.current(QStringLiteral("userFolloweds"), token))
             return;
         const QJsonObject r = body(doc);
-        const QString restricted = privacyMessage(r);
+        const QString restricted = Store::privacyMessage(r);
         if (!restricted.isEmpty()) {
             const QString key = pageKey(QStringLiteral("userFolloweds"), uid, offset);
             put("userFolloweds", QVariantMap{{"userId", uid}, {"offset", offset},

@@ -22,6 +22,20 @@ class NcmClient;
 class QNetworkInformation;
 class QTimer;
 
+// 一个数据槽的请求代号。页面切换会开始新代号；旧请求晚到时凭代号丢弃，
+// 不把上一页的数据写进当前槽。只在同一槽内递增，不参与跨槽排序。
+class RequestLedger {
+public:
+    quint64 begin(const QString &slot) { return ++m_tokens[slot]; }
+    // 分页请求沿用当前页所属的代号：不能每翻一页就把上一页尚未落地的结果作废。
+    quint64 token(const QString &slot) const { return m_tokens.value(slot); }
+    bool current(const QString &slot, quint64 token) const { return m_tokens.value(slot) == token; }
+    void clear() { m_tokens.clear(); }
+
+private:
+    QHash<QString, quint64> m_tokens;
+};
+
 class Store : public QObject {
     Q_OBJECT
     // 与 Data.js / Personal.js 同形；没有 MUSIC_U 时 personal 是匿名替身。
@@ -146,6 +160,8 @@ private:
     bool isLiked(double songId) const;
     // 首屏快照落盘：只存首屏字段，搜索/评论/详情等按需数据不写进 screen:data
     void persistScreenData();
+    // 网易的预期内隐私拒绝（用户主页/关注粉丝）：页面内说明，不当网络错误。
+    static QString privacyMessage(const QJsonObject &body);
     // 个人请求失败的唯一收尾：分类、会话过期置位、每种失败固定一句给用户的话。
     // 返回空串表示服务器已接受（业务码 200）；分类只看传输结果与业务码，不看 message 文本。
     QString requestFailure(const NcmClient::Response &response);
@@ -209,6 +225,7 @@ private:
     QNetworkInformation *m_netInfo = nullptr;
     bool m_refreshOwed = false;      // 离线期间欠下的恢复刷新；到账后只还一次
     QueryCache m_cache;              // 按需数据与首屏快照的缓存（~/.cache/yunting/queries.db，SQLite）
+    RequestLedger m_requests;        // 单槽数据的请求代号：旧页面晚到的回包不能覆盖新页面
     int m_pending = 0;               // 首屏在途请求计数
     quint64 m_epoch = 0;             // 退出登录/换账号时递增，旧账号的回包不再写入
     quint64 m_searchGeneration = 0;   // 每次搜索递增：旧搜索的晚到结果不能覆盖新词

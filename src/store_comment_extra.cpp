@@ -12,8 +12,10 @@ using namespace ncm;
 
 void Store::requestCommentReplies(double songId, double commentId, qint64 before)
 {
-    if (songId <= 0 || commentId <= 0)
+    if (!(songId > 0) || !(commentId > 0))
         return;
+    const quint64 token = before > 0 ? m_requests.token(QStringLiteral("commentReplies"))
+                                     : m_requests.begin(QStringLiteral("commentReplies"));
     const QString thread = QStringLiteral("R_SO_4_%1").arg(num(songId));
     m_client->postWeapi(QStringLiteral("resource/comment/floor/get"),
                         QJsonObject{{"parentCommentId", num(commentId)},
@@ -21,7 +23,9 @@ void Store::requestCommentReplies(double songId, double commentId, qint64 before
                                     {"time", QString::number(before)},
                                     {"limit", 20}},
                         true,
-                        [this, songId, commentId, before](const QJsonDocument &doc, bool ok) {
+                        [this, songId, commentId, before, token](const QJsonDocument &doc, bool ok) {
+        if (!m_requests.current(QStringLiteral("commentReplies"), token))
+            return;
         const QJsonObject root = body(doc);
         if (!ok || root.value("code").toInt() != 200) {
             // 按请求 key 报错：界面按 commentReplies:<songId>:<commentId> 找到这一槽并重试

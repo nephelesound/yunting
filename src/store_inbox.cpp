@@ -127,13 +127,15 @@ void Store::requestInbox(int offset)
     if (!m_client->hasMusicU())
         return;
     const quint64 epoch = m_epoch;
+    const quint64 token = offset > 0 ? m_requests.token(QStringLiteral("inbox"))
+                                     : m_requests.begin(QStringLiteral("inbox"));
     m_client->postWeapi(QStringLiteral("msg/private/users"),
                         QJsonObject{{"offset", offset},
                                     {"limit", 30},
                                     {"total", QStringLiteral("true")}},
                         true,
-                        [this, offset, epoch](const NcmClient::Response &response) {
-        if (epoch != m_epoch)
+                        [this, offset, epoch, token](const NcmClient::Response &response) {
+        if (epoch != m_epoch || !m_requests.current(QStringLiteral("inbox"), token))
             return;
         const QString failure = requestFailure(response);
         if (!failure.isEmpty()) {
@@ -163,14 +165,16 @@ void Store::requestInboxThread(double userId, qint64 before)
     if (!m_client->hasMusicU() || userId <= 0)
         return;
     const quint64 epoch = m_epoch;
+    const quint64 token = before > 0 ? m_requests.token(QStringLiteral("inboxThread"))
+                                     : m_requests.begin(QStringLiteral("inboxThread"));
     m_client->postWeapi(QStringLiteral("msg/private/history"),
                         QJsonObject{{"userId", num(userId)},
                                     {"limit", 30},
                                     {"time", QString::number(before)},
                                     {"total", QStringLiteral("true")}},
                         true,
-                        [this, userId, before, epoch](const NcmClient::Response &response) {
-        if (epoch != m_epoch)
+                        [this, userId, before, epoch, token](const NcmClient::Response &response) {
+        if (epoch != m_epoch || !m_requests.current(QStringLiteral("inboxThread"), token))
             return;
         const QString failure = requestFailure(response);
         if (!failure.isEmpty()) {

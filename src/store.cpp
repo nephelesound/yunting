@@ -49,6 +49,13 @@ QString failureMessage(NcmClient::Failure failure, const QJsonObject &body)
 }
 } // namespace
 
+QString Store::privacyMessage(const QJsonObject &body)
+{
+    const QString message = body.value("message").toString(body.value("msg").toString());
+    return message.contains(QStringLiteral("隐私")) || message.contains(QStringLiteral("无权限"))
+        ? message : QString();
+}
+
 Store::Store(NcmClient *client, QObject *parent)
     : QObject(parent), m_client(client),
       m_cache(QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/queries.db")
@@ -110,7 +117,15 @@ Store::Store(NcmClient *client, QObject *parent)
     m_client->setCallbackContext(this);
     // QueryCache 的失败只在这里汇总成 QML 可消费的通用失败信号；成功仍走 dataChanged
     connect(&m_cache, &QueryCache::fetchFailed, this, [this](const QString &key) {
-        emit requestFailed(key, QStringLiteral("网络不可用，请稍后再试"));
+        emit requestFailed(key, QStringLiteral("请求失败，请稍后再试"));
+    });
+    // 失败日志：key 足够定位，但搜索 key 带用户输入，不能原样写进日志。
+    connect(this, &Store::requestFailed, this, [](const QString &key, const QString &message) {
+        const QString kind = key.section(u':', 0, 0);
+        const QString safe = (kind == QLatin1String("search") || kind == QLatin1String("searchUsers")
+                              || kind == QLatin1String("searchRadios"))
+            ? kind + QStringLiteral(":<redacted>") : key;
+        qWarning().noquote() << "request failed key=" << safe << "reason=" << message;
     });
     restoreScreen();
     // 换账号检测只认 userId：昵称会重复（「音乐爱好者」），不能当身份
@@ -255,6 +270,7 @@ void Store::resetPersonal()
 {
     m_debouncedWrites.clear();
     m_writeDebounce.stop();
+    m_requests.clear();
     m_commentLikes.clear();
     // 私信与账号绑定：退出 / 换账号时不能留在内存里
     put("inbox", nullVariant(), false);
