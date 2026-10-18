@@ -2,10 +2,7 @@
   "songId": 7,
   "available": true,
   "url": "https://cdn.example/dynamic-cover.mp4",
-  "coverUrl": "",
   "width": 0,
   "height": 0,
-  "size": 0,
-  "format": "",
   "needTransition": true
 }

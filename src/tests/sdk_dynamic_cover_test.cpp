@@ -14,9 +14,7 @@ private slots:
     {
         QJsonObject data{
             {"videoPlayUrl", "https://cdn.example/cover.mp4"},
-            {"coverUrl", "https://cdn.example/cover.jpg"},
-            {"weight", 1080}, {"height", 1920}, {"size", 12345.0},
-            {"format", "mp4"}, {"needTransition", true},
+            {"weight", 1080}, {"height", 1920}, {"needTransition", true},
         };
         const auto result = parseDynamicCover(
             QJsonObject{{"code", 200}, {"data", data}}, 7);
@@ -24,11 +22,8 @@ private slots:
         QCOMPARE(result.value->songId, qint64(7));
         QVERIFY(result.value->available);
         QCOMPARE(result.value->url, QStringLiteral("https://cdn.example/cover.mp4"));
-        QCOMPARE(result.value->coverUrl, QStringLiteral("https://cdn.example/cover.jpg"));
         QCOMPARE(result.value->width, 1080);
         QCOMPARE(result.value->height, 1920);
-        QCOMPARE(result.value->size, qint64(12345));
-        QCOMPARE(result.value->format, QStringLiteral("mp4"));
         QVERIFY(result.value->needTransition);
     }
 

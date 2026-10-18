@@ -45,17 +45,13 @@ Result<DynamicCover> parseDynamicCover(const QJsonObject &root, qint64 songId)
     if (data.isEmpty())
         return Result<DynamicCover>::success(cover);
 
-    cover.url = firstString(data, {"videoPlayUrl", "url", "dynamicCoverUrl",
-                                   "dynamicCoverVideoUrl", "videoUrl"});
-    cover.coverUrl = firstString(data, {"coverUrl", "picUrl"});
-    cover.format = firstString(data, {"format", "type"});
+    cover.url = firstString(data, {"videoPlayUrl", "url"});
 
     JsonReader dataReader(data, QStringLiteral("dynamicCover.data"));
     cover.width = static_cast<int>(dataReader.integer("width"));
     if (cover.width == 0)
         cover.width = static_cast<int>(dataReader.integer("weight")); // upstream typo
     cover.height = static_cast<int>(dataReader.integer("height"));
-    cover.size = dataReader.integer("size");
     cover.needTransition = dataReader.boolean("needTransition");
     if (!dataReader.ok())
         return Result<DynamicCover>::failure(

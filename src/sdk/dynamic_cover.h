@@ -23,12 +23,9 @@ namespace ncm::sdk {
 struct DynamicCover {
     qint64 songId = 0;
     bool available = false;
-    QString url;       // data.videoPlayUrl / data.url / data.dynamicCoverUrl / data.dynamicCoverVideoUrl
-    QString coverUrl;  // data.coverUrl / data.picUrl (static fallback)
+    QString url;       // data.videoPlayUrl (live); data.url accepted as fallback
     int width = 0;     // data.width, fallback data.weight (upstream typo)
     int height = 0;    // data.height
-    qint64 size = 0;   // data.size: bytes
-    QString format;    // data.format / data.type (e.g. mp4/webp/gif)
     bool needTransition = false; // data.needTransition
 };
 
