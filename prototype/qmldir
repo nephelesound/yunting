@@ -61,5 +61,6 @@ SavedPage SavedPage.qml
 ResourceRow ResourceRow.qml
 NoticeRow NoticeRow.qml
 SimListenTogether SimListenTogether.qml
+SimDownloads SimDownloads.qml
 ListenTogetherLink ListenTogetherLink.qml
 CommentsPane CommentsPane.qml

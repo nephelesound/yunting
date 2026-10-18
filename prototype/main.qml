@@ -67,6 +67,15 @@ Kirigami.ApplicationWindow {
         function onLeftRoom() { root.notify("一起听已结束"); }
     }
 
+    // 下载：应用里是 C++ DownloadManager，原型里是替身（截图 harness 用 downloadsFilled 放几首已下载的）
+    property bool downloadsFilled: false
+    SimDownloads { id: simDownloads; filled: root.downloadsFilled }
+    Connections {
+        target: Source
+        function onDownloadFinished(name) { root.notify("已下载" + Source.quoted(name)); }
+        function onDownloadFailed(name, message) { root.fail("没能下载" + Source.quoted(name) + "：" + message); }
+    }
+
     // 用好友发来的链接加入：链接或房间号都行
     Kirigami.PromptDialog {
         id: joinDialog
@@ -235,6 +244,7 @@ Kirigami.ApplicationWindow {
     // 换数据源。原型（没有 backend）的「正在播放」从热歌榜第 3 首开始、停在 1:23，截图才有内容可看
     function applyFixture() {
         Source.live = root.backend ? root.backend.store : null;
+        Source.downloads = root.backend ? root.backend.downloads : simDownloads;
         if (root.backend)
             return;
         // 按路径创建：Snapshot 不在 qmldir 里，打包的应用不带它与快照数据

@@ -97,6 +97,28 @@ Menu {
         text: "从这个歌单中移除"
         onTriggered: trackMenu.removeRequested(trackMenu.context.playlistId, trackMenu.track)
     }
+    // 下载：按当前音质（自动时取无损，拿不到会降档）；下着时显示进度，点一下取消；下好了可以删
+    MenuItem {
+        id: downloadItem
+        readonly property real songId: trackMenu.track ? trackMenu.track.id : 0
+        readonly property string phase: downloadItem.songId > 0 ? Source.downloadState(downloadItem.songId) : "none"
+        visible: Source.downloads !== null && trackMenu.loggedIn && downloadItem.songId > 0
+        height: visible ? implicitHeight : 0
+        icon.name: downloadItem.phase === "done" ? "edit-delete" : downloadItem.phase === "active" ? "dialog-cancel" : "download"
+        text: downloadItem.phase === "done" ? "删除下载"
+            : downloadItem.phase === "active" ? "正在下载 " + Math.round((Source.downloading[downloadItem.songId] || 0) * 100) + "%（点此取消）"
+            : "下载"
+        onTriggered: {
+            if (downloadItem.phase === "done")
+                Source.removeDownload(downloadItem.songId);
+            else if (downloadItem.phase === "active")
+                Source.cancelDownload(downloadItem.songId);
+            else {
+                const quality = trackMenu.player.engine.quality;
+                Source.download(trackMenu.track, quality === "auto" ? "lossless" : quality);
+            }
+        }
+    }
 
     MenuSeparator {}
 

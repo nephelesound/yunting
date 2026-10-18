@@ -273,9 +273,10 @@ QtObject {
                  failed: Boolean(source.failure("search:" + query)) };
     }
 
-    // 一位小数且去掉多余的 .0：59.9 GB / 60 GB。取整会把将满显示成「60 / 60」
-    function gigabytes(bytes) {
-        return Number((bytes / 1073741824).toFixed(1)) + " GB";
+    // 不到 1 GB 按 MB 写（几首下载的歌写成「0.1 GB」看不出多少）；
+    // 以上一位小数且去掉多余的 .0：59.9 GB / 60 GB。取整会把将满显示成「60 / 60」
+    function fileSize(bytes) {
+        return bytes < 1073741824 ? Math.round(bytes / 1048576) + " MB" : Number((bytes / 1073741824).toFixed(1)) + " GB";
     }
 
     // 歌手 / 专辑：data 里只放最近取回的一个，id 对上才用；没对上就向 live 要，先给同形的空值
@@ -401,6 +402,61 @@ QtObject {
     }
     // 未读私信数（自己的主页上「私信」旁边用）：打开自己的主页、离开私信页时各取一次通知计数，不在后台轮询
     readonly property int unreadMessages: source.d.notifications ? source.d.notifications.msg : 0
+
+    // 下载：应用里是 C++ DownloadManager，原型里是 SimDownloads（都由 main 装上）。
+    // downloaded 是下好的（带 id/name/artist/album/cover/size/level/path）；正在下的进度只在信号里，记在 downloading
+    property var downloads: null
+    readonly property var downloaded: source.downloads ? source.downloads.downloads : []
+    property var downloading: ({})   // songId → 已下比例 0–1
+    signal downloadFinished(string name)
+    signal downloadFailed(string name, string message)
+    function downloadState(songId) {
+        if (source.downloading[songId] !== undefined)
+            return "active";
+        return source.downloaded.some(d => d.id === songId) ? "done" : "none";
+    }
+    // 下好的文件当曲目放：播放器按 id 先找本地文件
+    function downloadedTrack(d) {
+        return { id: d.id, name: d.name, artist: d.artist, album: d.album, albumId: 0, artistId: 0,
+                 artists: [{ id: 0, name: d.artist }], cover: d.cover, dur: 0, fee: 0, alias: "", quality: d.level || "",
+                 reason: "", mv: 0, playable: true };
+    }
+    property var downloadNames: ({})   // songId → 歌名（下完 / 失败时提示用）
+    function download(track, level) {
+        if (!source.downloads || source.downloadState(track.id) !== "none")
+            return;
+        source.downloadNames = Object.assign({}, source.downloadNames, { [track.id]: track.name });
+        source.downloading = Object.assign({}, source.downloading, { [track.id]: 0 });
+        source.downloads.downloadTrack(track, level);
+    }
+    function forgetDownload(songId) {
+        const active = Object.assign({}, source.downloading);
+        delete active[songId];
+        source.downloading = active;
+    }
+    // 先忘掉再取消：取消会同步发出 failed（「下载已取消」），那时已不在 downloading 里，不当失败提示
+    function cancelDownload(songId) {
+        source.forgetDownload(songId);
+        if (source.downloads)
+            source.downloads.cancel(songId);
+    }
+    function removeDownload(songId) { if (source.downloads) source.downloads.remove(songId); }
+    readonly property Connections _downloads: Connections {
+        target: source.downloads
+        function onProgress(songId, received, total) {
+            source.downloading = Object.assign({}, source.downloading, { [songId]: total > 0 ? received / total : 0 });
+        }
+        function onFinished(songId, path) {
+            source.forgetDownload(songId);
+            source.downloadFinished(source.downloadNames[songId] || "");
+        }
+        function onFailed(songId, message) {
+            if (source.downloading[songId] === undefined)
+                return;
+            source.forgetDownload(songId);
+            source.downloadFailed(source.downloadNames[songId] || "", message);
+        }
+    }
 
     // 自己的累计听歌时长（秒）与升级进度；还没取到时为 0 / null
     readonly property real listenSeconds: source.d.listenTotal ? source.d.listenTotal.seconds : 0
@@ -663,9 +719,18 @@ QtObject {
         case "recent": return {
             heading: "最近播放", cover: source.sized(source.firstCover(source.recent.tracks), 560), tracks: source.recent.tracks,
             facts: [source.songs(source.recent.total)], description: "", emptyText: "还没有播放记录" };
+        case "downloads": {
+            const tracks = source.downloaded.map(d => source.downloadedTrack(d));
+            const bytes = source.downloaded.reduce((n, d) => n + (d.size || 0), 0);
+            return {
+                heading: "本地下载", cover: source.sized(source.firstCover(tracks), 560), tracks: tracks,
+                facts: [source.songs(tracks.length)].concat(bytes > 0 ? [{ value: source.fileSize(bytes), label: "" }] : []),
+                description: "", folder: source.downloads ? source.downloads.directory : "",
+                emptyText: "还没有下载的歌：在歌曲的菜单里点「下载」" };
+        }
         case "cloud": return {
             heading: "音乐云盘", cover: source.sized(source.firstCover(source.cloud.tracks), 560), tracks: source.cloud.tracks,
-            facts: [source.songs(source.cloud.count), { value: source.gigabytes(source.cloud.size), label: "/ " + source.gigabytes(source.cloud.maxSize) }],
+            facts: [source.songs(source.cloud.count), { value: source.fileSize(source.cloud.size), label: "/ " + source.fileSize(source.cloud.maxSize) }],
             description: "", emptyText: "云盘里还没有歌，可以在官方客户端上传" };
         default: {
             // 推荐歌单：key = "playlist:<序号>"，快照只带了前几个的曲目

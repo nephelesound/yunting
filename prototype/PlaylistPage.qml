@@ -119,6 +119,17 @@ ScreenFrame {
                     text: page.reordering ? "完成" : "排序"
                     onClicked: page.reordering = !page.reordering
                 }
+                // 本地下载：文件就在这个文件夹里，交给文件管理器（还没下过时文件夹可能还不存在）
+                Button {
+                    visible: (page.list.folder || "") !== "" && page.list.tracks.length > 0
+                    implicitHeight: Tokens.height8
+                    flat: true
+                    icon.name: "folder-open"
+                    icon.width: Tokens.iconSm
+                    icon.height: Tokens.iconSm
+                    text: "打开文件夹"
+                    onClicked: Qt.openUrlExternally("file://" + page.list.folder)
+                }
                 IconButton {
                     visible: page.hasListActions
                     icon.name: "overflow-menu"

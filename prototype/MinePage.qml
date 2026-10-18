@@ -54,9 +54,10 @@ ScreenFrame {
         { key: "liked", title: "我喜欢的音乐", cover: Source.list("liked").cover, symbol: "love-symbolic", caption: Source.pe.liked.count > 0 ? Source.pe.liked.count + " 首" : "还没有红心歌曲" },
         { key: "cloud", title: "音乐云盘", symbol: "folder-cloud-symbolic",
           caption: page.cloud.count === 0 ? "还没有上传的歌"
-                 : page.cloud.maxSize > 0 ? page.cloud.count + " 首  已用 " + Source.gigabytes(page.cloud.size) + " / " + Source.gigabytes(page.cloud.maxSize)
+                 : page.cloud.maxSize > 0 ? page.cloud.count + " 首  已用 " + Source.fileSize(page.cloud.size) + " / " + Source.fileSize(page.cloud.maxSize)
                  : page.cloud.count + " 首" },
-    ]
+    ].concat(Source.downloads ? [{ key: "downloads", title: "本地下载", symbol: "folder-download-symbolic",
+                                  caption: Source.downloaded.length > 0 ? Source.downloaded.length + " 首" : "还没有下载的歌" }] : [])
 
     ColumnLayout {
         id: body
