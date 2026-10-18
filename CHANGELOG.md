@@ -2,6 +2,14 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.4.2] - 2026-10-18
+
+### 修复
+- 拖动桌面歌词时窗口不跟手：暂停或歌词没在变化时，窗口要等下一次重画才挪到新位置，于是卡住、跳着走。现在每挪一下都立即生效。
+
+### 变化
+- 桌面歌词悬停时的底板铺满整个歌词窗口，不再随每句歌词的长短伸缩。
+
 ## [0.4.1] - 2026-10-18
 
 ### 修复
@@ -72,6 +80,7 @@
 - 分享：链接、二维码、Telegram 与邮件，以及带封面与歌词的分享图。
 - 「关于」窗口与「复制诊断信息」，方便反馈问题。
 
+[0.4.2]: https://github.com/nephelesound/yunting/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/nephelesound/yunting/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/nephelesound/yunting/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/nephelesound/yunting/compare/v0.2.2...v0.3.0
