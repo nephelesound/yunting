@@ -13,11 +13,14 @@ prototype/Personal.js
 *.jpeg
 *.webp
 
-# 文档：公开的只有 README；其余 Markdown（设计、开发手册、进度笔记）只在本地。
+# 文档：README 与 SDK/进度/前端 API 规格入库；其余 Markdown 只在本地。
 # 参考库也在 docs/ 下，用 `make refs` 按 SHA 复原
 *.md
 !README.md
 !AGENTS.md
 !CHANGELOG.md
 !src/sdk/README.md
-docs/
+!PROGRESS.md
+!docs/
+docs/*
+!docs/API-FRONTEND.md

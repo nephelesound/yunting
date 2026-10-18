@@ -23,27 +23,6 @@ constexpr auto SystemNoticesPath = "msg/notices";
 constexpr auto CommentNotificationsPath = "v1/user/comments/";
 constexpr auto ForwardNotificationsPath = "forwards/get";
 
-template <typename T>
-Result<T> parseFailure(const char *endpoint, const JsonReader &reader, const QString &path)
-{
-    return Result<T>::failure(
-        endpointError(ErrorKind::Parse, endpoint, reader.error(), path));
-}
-
-template <typename T>
-Result<T> missingFailure(const char *endpoint, const QString &path)
-{
-    return Result<T>::failure(endpointError(
-        ErrorKind::Parse, endpoint, path + QStringLiteral(": missing array"), path));
-}
-
-template <typename T>
-Result<T> itemTypeFailure(const char *endpoint, const QString &path)
-{
-    return Result<T>::failure(endpointError(
-        ErrorKind::Parse, endpoint, path + QStringLiteral(": expected object"), path));
-}
-
 // Notification ids are strings in captured notice responses but numbers in
 // other recordings; forward video ids are also sometimes non-numeric strings.
 // JsonReader intentionally rejects mixed shapes, so identity fields get this

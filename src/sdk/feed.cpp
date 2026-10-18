@@ -17,25 +17,10 @@ constexpr auto PersonalizedMvsPath = "api/personalized/mv";
 constexpr auto PrivateContentsPath = "api/personalized/privatecontent";
 constexpr auto HomepagePath = "api/homepage/block/page";
 
-template <typename T>
-Result<T> parseFailure(const char *endpoint, const JsonReader &reader, const QString &path)
-{
-    return Result<T>::failure(
-        endpointError(ErrorKind::Parse, endpoint, reader.error(), path));
-}
-
 Error objectFailure(const char *endpoint, const QString &path)
 {
     return endpointError(ErrorKind::Parse, endpoint,
                          path + QStringLiteral(": expected object"), path);
-}
-
-template <typename T>
-Result<T> missingFailure(const char *endpoint, const QString &path, const char *what)
-{
-    return Result<T>::failure(endpointError(
-        ErrorKind::Parse, endpoint,
-        path + QStringLiteral(": missing ") + QLatin1String(what), path));
 }
 
 // Homepage ids are strings in the current API, but the endpoint occasionally

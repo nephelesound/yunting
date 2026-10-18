@@ -20,28 +20,6 @@ constexpr auto ArtistSublistPath = "artist/sublist";
 constexpr auto AlbumSublistPath = "album/sublist";
 constexpr auto MvSublistPath = "cloudvideo/allvideo/sublist";
 
-template <typename T>
-Result<T> parseFailure(const char *endpoint, const JsonReader &reader, const QString &path)
-{
-    return Result<T>::failure(
-        endpointError(ErrorKind::Parse, endpoint, reader.error(), path));
-}
-
-template <typename T>
-Result<T> missingListFailure(const char *endpoint, const QString &path)
-{
-    return Result<T>::failure(endpointError(
-        ErrorKind::Parse, endpoint,
-        path + QStringLiteral(": missing array"), path));
-}
-
-template <typename T>
-Result<T> itemTypeFailure(const char *endpoint, const QString &path)
-{
-    return Result<T>::failure(endpointError(
-        ErrorKind::Parse, endpoint, path + QStringLiteral(": expected object"), path));
-}
-
 Result<SubscribedArtist> artistFrom(const QJsonObject &object, const QString &path,
                                     const char *endpoint)
 {
@@ -152,7 +130,7 @@ Result<SubscribedArtistPage> parseSubscribedArtists(const QJsonObject &root)
         return parseFailure<SubscribedArtistPage>(
             ArtistSublistPath, reader, QStringLiteral("library.artists"));
     if (!reader.has("data"))
-        return missingListFailure<SubscribedArtistPage>(
+        return missingFailure<SubscribedArtistPage>(
             ArtistSublistPath, QStringLiteral("library.artists.data"));
 
     SubscribedArtistPage page;
@@ -183,7 +161,7 @@ Result<SubscribedAlbumPage> parseSubscribedAlbums(const QJsonObject &root)
         return parseFailure<SubscribedAlbumPage>(
             AlbumSublistPath, reader, QStringLiteral("library.albums"));
     if (!reader.has("data"))
-        return missingListFailure<SubscribedAlbumPage>(
+        return missingFailure<SubscribedAlbumPage>(
             AlbumSublistPath, QStringLiteral("library.albums.data"));
 
     SubscribedAlbumPage page;
@@ -215,7 +193,7 @@ Result<SubscribedMvPage> parseSubscribedMvs(const QJsonObject &root)
         return parseFailure<SubscribedMvPage>(
             MvSublistPath, reader, QStringLiteral("library.mvs"));
     if (!reader.has("data"))
-        return missingListFailure<SubscribedMvPage>(
+        return missingFailure<SubscribedMvPage>(
             MvSublistPath, QStringLiteral("library.mvs.data"));
 
     SubscribedMvPage page;
