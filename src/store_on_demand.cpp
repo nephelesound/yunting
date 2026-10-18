@@ -10,6 +10,7 @@
 #include "sdk/comment.h"
 #include "sdk/mv_page.h"
 #include "sdk/search_people.h"
+#include "sdk/track.h"
 
 #include <QDateTime>
 #include <QSet>
@@ -56,7 +57,11 @@ void Store::maybeFetchSimilar()
     fetch("api/v1/discovery/simiSong",
           query({{"songid", m_similarSeed.value("id").toString()}, {"limit", "20"}}), false,
           [this](const QJsonDocument &doc, bool /*ok*/) {
-        QVariantMap similar{{"seed", m_similarSeed}, {"tracks", ncmTracks(arr(body(doc), "songs"))}};
+        const auto parsed = sdk::parseTracks(arr(body(doc), "songs"));
+        if (!parsed)
+            return;
+        QVariantMap similar{{"seed", m_similarSeed},
+                            {"tracks", sdk::tracksToVariantList(*parsed.value)}};
         put("similar", similar, true);
     });
 }
@@ -68,13 +73,16 @@ void Store::requestMoreFm()
     fetch("api/v1/radio/get", {}, true, [this](const QJsonDocument &doc, bool ok) {
         if (!ok)
             return;
+        const auto parsed = sdk::parseTracks(arr(body(doc), "data"));
+        if (!parsed)
+            return;
         QVariantList tracks = m_personal.value("fm").toMap().value("tracks").toList();
         QSet<double> seen;
         for (const QVariant &t : std::as_const(tracks))
             seen.insert(t.toMap().value("id").toDouble());
-        for (const QVariant &t : ncmTracks(arr(body(doc), "data"))) {
-            if (!seen.contains(t.toMap().value("id").toDouble()))
-                tracks.append(t);
+        for (const sdk::Track &track : *parsed.value) {
+            if (!seen.contains(static_cast<double>(track.id)))
+                tracks.append(sdk::trackToVariantMap(track));
         }
         put("fm", QVariantMap{{"tracks", tracks}}, true);
     });
@@ -299,7 +307,11 @@ void Store::requestSearch(const QString &key, const QString &raw)
                 m_client->get("api/search/get", query({{"s", raw}, {"type", type}, {"limit", limit}}), false,
                               [this, pending, done, field, pick](const QJsonDocument &doc, bool ok) {
                     const QJsonObject resp = body(doc);
-                    pending->result.insert(QLatin1String(field), pick(resp.value("result").toObject()));
+                    const QVariant picked = pick(resp.value("result").toObject());
+                    if (picked.isValid())
+                        pending->result.insert(QLatin1String(field), picked);
+                    else
+                        pending->ok = false;
                     pending->ok = pending->ok && ok && businessOk(resp);
                     if (--pending->left != 0)
                         return;
@@ -333,7 +345,12 @@ void Store::requestSearch(const QString &key, const QString &raw)
                 return QVariant(out);
             };
             // 单曲给 100 首（页面自己按高度截）；艺人/歌单/专辑各 30 个，足够一屏与「更多」展开
-            part("1", "100", "songs", [](const QJsonObject &r) { return QVariant(ncmTracks(arr(r, "songs"))); });
+            part("1", "100", "songs", [](const QJsonObject &r) -> QVariant {
+                const auto parsed = sdk::parseTracks(arr(r, "songs"));
+                if (!parsed)
+                    return {};
+                return QVariant(sdk::tracksToVariantList(*parsed.value));
+            });
             part("100", "30", "artists", [list](const QJsonObject &r) { return list(r, "artists", ncmSearchArtist); });
             part("1000", "30", "playlists", [list](const QJsonObject &r) { return list(r, "playlists", ncmSearchPlaylist); });
             part("10", "30", "albums", [list](const QJsonObject &r) { return list(r, "albums", ncmSearchAlbum); });
@@ -496,7 +513,8 @@ void Store::requestArtist(const QString &key, double artistId)
             m_client->get(QStringLiteral("api/v1/artist/%1").arg(qlonglong(artistId)), {}, false,
                           [state, finish](const QJsonDocument &doc, bool ok) {
                 const QJsonObject a = body(doc).value("artist").toObject();
-                if (ok && !a.isEmpty()) {
+                const auto tracks = sdk::parseTracks(arr(body(doc), "hotSongs"));
+                if (ok && !a.isEmpty() && tracks) {
                     QVariantList aliases;
                     for (const QJsonValue &v : arr(a, "alias"))
                         aliases.append(v.toString());
@@ -509,7 +527,7 @@ void Store::requestArtist(const QString &key, double artistId)
                         {"followed", a.value("followed").toBool()},
                         {"musicSize", a.value("musicSize").toDouble()},
                         {"albumSize", a.value("albumSize").toDouble()},
-                        {"tracks", ncmTracks(arr(body(doc), "hotSongs"))},
+                        {"tracks", sdk::tracksToVariantList(*tracks.value)},
                     };
                     state->artistOk = true;
                 }
@@ -559,6 +577,11 @@ void Store::requestAlbum(const QString &key, double albumId)
                     done({}, false);
                     return;
                 }
+                const auto tracks = sdk::parseTracks(arr(resp, "songs"));
+                if (!tracks) {
+                    done({}, false);
+                    return;
+                }
                 const QJsonArray artists = arr(a, "artists");
                 const QJsonObject first = artists.isEmpty() ? a.value("artist").toObject()
                                                             : artists.first().toObject();
@@ -572,7 +595,7 @@ void Store::requestAlbum(const QString &key, double albumId)
                          {"company", a.value("company").toString()},
                          {"subscribed", a.value("isSub").toBool()},
                          {"publishTime", a.value("publishTime").toDouble()},
-                         {"tracks", ncmTracks(arr(resp, "songs"))},
+                         {"tracks", sdk::tracksToVariantList(*tracks.value)},
                      },
                      true);
             });
@@ -599,7 +622,12 @@ void Store::requestArtistSongs(const QString &key, double artistId, int offset)
                                  {"offset", QString::number(offset)}, {"order", "hot"}}), false,
                           [done, artistId, offset](const QJsonDocument &doc, bool ok) {
                 const QJsonObject resp = body(doc);
-                const QVariantList tracks = ncmTracks(arr(resp, "songs"));
+                const auto parsed = sdk::parseTracks(arr(resp, "songs"));
+                if (!parsed) {
+                    done({}, false);
+                    return;
+                }
+                const QVariantList tracks = sdk::tracksToVariantList(*parsed.value);
                 const double total = resp.value("total").toDouble();
                 done(QVariantMap{{"artistId", artistId},
                                  {"offset", offset},

@@ -1,12 +1,12 @@
 #include "normalize.h"
 #include "json_util.h"
 #include "sdk/comment.h"
+#include "sdk/track.h"
 
 #include <QDate>
 #include <QDateTime>
 #include <QRegularExpression>
 #include <QMap>
-#include <QStringList>
 #include <cmath>
 
 using namespace ncm;
@@ -25,138 +25,37 @@ double numOr(const QJsonObject &o, const char *key, double fallback = 0)
     return v.isDouble() ? v.toDouble() : fallback;
 }
 
-// Python 的 x 真值：null、缺失、false、0 算「没有」，对象与非零数字算「有」
-bool truthy(const QJsonObject &o, const char *key)
-{
-    const QJsonValue v = o.value(QLatin1String(key));
-    if (v.isBool())
-        return v.toBool();
-    if (v.isDouble())
-        return v.toDouble() != 0;
-    return !v.isNull() && !v.isUndefined();
-}
-
-struct Playability {
-    bool playable;
-    QString blockedBy;
-};
-
-// privilege 是接口对「当前账号」的回答：st<0 已下架，cs 云盘，pl>0 能播。
-// pl 为 0 时用 fee/payed 说明被什么挡住；没有 privilege（如相似歌曲、搜索旧接口）才退回 fee。
-Playability trackPlayability(const QJsonObject &song, const QJsonObject &privilege)
-{
-    const QJsonObject p = privilege.isEmpty() ? song.value("privilege").toObject() : privilege;
-    if (p.isEmpty()) {
-        const double fee = numOr(song, "fee");
-        if (fee == 4)
-            return {false, QStringLiteral("paid")};
-        if (fee == 1)
-            return {false, QStringLiteral("vip")};
-        return {true, QString()};
-    }
-    const double fee = p.contains("fee") ? numOr(p, "fee") : numOr(song, "fee");
-    if (numOr(p, "st") < 0)
-        return {false, QStringLiteral("unavailable")};
-    if (truthy(p, "cs"))
-        return {true, QString()};
-    if (numOr(p, "pl") > 0)
-        return {true, QString()};
-    if (fee == 1)
-        return {false, QStringLiteral("vip")};
-    if (fee == 4 && !truthy(p, "payed"))
-        return {false, QStringLiteral("paid")};
-    return {false, QStringLiteral("unavailable")};
-}
 } // namespace
 
 QString ncmSized(const QJsonValue &url, int px)
 {
-    const QString s = url.isString() ? url.toString() : QString();
-    return s.isEmpty() ? QString() : s + QStringLiteral("?param=%1y%2").arg(px).arg(px);
-}
-
-QVariantMap ncmTrack(const QJsonObject &s, const QString &reason)
-{
-    return ncmTrack(s, QJsonObject{}, reason);
-}
-
-QVariantMap ncmTrack(const QJsonObject &s, const QJsonObject &privilege, const QString &reason)
-{
-    // 新旧两种歌曲结构（ar/al/dt 与 artists/album/duration）
-    const QJsonArray artists = s.value("ar").isArray() ? s.value("ar").toArray()
-                                                       : s.value("artists").toArray();
-    const QJsonObject album = s.value("al").isObject() ? s.value("al").toObject()
-                                                       : s.value("album").toObject();
-    QStringList names;
-    QVariantList artistList; // 每位歌手各自可点：{ id, name }
-    for (const QJsonValue &a : artists) {
-        const QJsonObject o = a.toObject();
-        names.append(o.value("name").toString());
-        artistList.append(QVariantMap{{"id", o.value("id").toDouble()}, {"name", o.value("name").toString()}});
-    }
-    const double dt = numOr(s, "dt") != 0 ? numOr(s, "dt") : numOr(s, "duration");
-    // 别名/译名取第一项（新结构 alia，旧结构 alias，再退 tns/transNames）；quality 看有没有更高一档音频
-    QString alias;
-    for (const char *key : {"alia", "alias", "tns", "transNames"}) {
-        const QJsonArray list = s.value(QLatin1String(key)).toArray();
-        if (!list.isEmpty()) {
-            alias = list.first().toString();
-            break;
-        }
-    }
-    const QString quality = truthy(s, "hr") || truthy(s, "hrMusic") ? QStringLiteral("hires")
-        : truthy(s, "sq") || truthy(s, "sqMusic") ? QStringLiteral("lossless") : QString();
-
-    const QJsonObject firstArtist = artists.isEmpty() ? QJsonObject() : artists.first().toObject();
-    const Playability play = trackPlayability(s, privilege);
-    return {
-        {"id", numOr(s, "id")},
-        {"name", textOr(s, "name")},
-        {"artist", names.join(QStringLiteral(" / "))},
-        {"artistId", firstArtist.value("id").toDouble()},
-        {"artists", artistList},
-        {"albumId", album.value("id").toDouble()},
-        {"album", textOr(album, "name")},
-        {"dur", std::floor(dt / 1000)}, // Python 的 // 1000
-        {"fee", numOr(s, "fee")},
-        {"cover", ncmSized(album.value("picUrl"), 120)},
-        {"alias", alias},
-        {"quality", quality},
-        {"mv", numOr(s, "mv") != 0 ? numOr(s, "mv") : numOr(s, "mvid")},
-        {"playable", play.playable},
-        {"blockedBy", play.blockedBy},
-        // 推荐理由只有每日推荐带（data.recommendReasons 里 songId 对上的那条），其余为空
-        {"reason", reason},
-    };
+    return sdk::sizedUrl(url.isString() ? url.toString() : QString(), px);
 }
 
 QVariantMap ncmCloudTrack(const QJsonObject &item)
 {
     // 云盘是账号自己的上传，接口不给 playable 时也必须能播
+    sdk::Track track;
     if (item.value("simpleSong").isObject()) {
-        QVariantMap track = ncmTrack(item.value("simpleSong").toObject());
-        track.insert("playable", true);
-        track.insert("blockedBy", QString());
-        return track;
+        const auto parsed = sdk::parseTrack(item.value("simpleSong").toObject());
+        if (parsed) {
+            track = *parsed.value;
+            QVariantMap map = sdk::trackToVariantMap(track);
+            map.insert("playable", true);
+            map.insert("blockedBy", QString());
+            return map;
+        }
     }
-    return {
-        {"id", numOr(item, "songId")},
-        {"name", textOr(item, "songName", textOr(item, "fileName"))},
-        {"artist", textOr(item, "artist")},
-        {"artistId", 0.0},
-        {"artists", QVariantList{}},
-        {"albumId", 0.0},
-        {"album", textOr(item, "album")},
-        {"dur", 0},
-        {"fee", 0},
-        {"cover", QString()},
-        {"alias", QString()},
-        {"quality", QString()},
-        {"mv", 0},
-        {"playable", true},
-        {"blockedBy", QString()},
-        {"reason", QString()},
-    };
+    track.id = static_cast<qint64>(numOr(item, "songId"));
+    track.name = textOr(item, "songName", textOr(item, "fileName"));
+    track.albumName = textOr(item, "album");
+    QVariantMap map = sdk::trackToVariantMap(track);
+    // 云盘条目只有单个 artist 文本，没有可点的歌手 id 列表
+    map.insert("artist", textOr(item, "artist"));
+    map.insert("artists", QVariantList{});
+    map.insert("playable", true);
+    map.insert("blockedBy", QString());
+    return map;
 }
 
 QVariantMap ncmProfile(const QJsonObject &p, int avatarPx, int backgroundPx)
@@ -206,29 +105,6 @@ QVariantMap commentToVariantMap(const sdk::Comment &c)
         {"beReplied", replied},
         // 楼中楼回复数只在新版接口的 showFloorComment 里；没有这个对象（旧接口、无回复）归 0
         {"replyCount", static_cast<double>(c.replyCount)},
-    };
-}
-
-// 歌单/推荐卡片：id/name/cover/count/reason 供现有磁贴；description/playCount/creator/updateTime
-// 是给详情/悬停信息预留的只读字段，不改变页面当前用法。
-QVariantMap ncmPlaylistCard(const QJsonObject &p, const char *coverKey)
-{
-    const double count = numOr(p, "trackCount");
-    const QJsonObject creator = p.value("creator").toObject();
-    return {
-        {"id", numOr(p, "id")},
-        {"name", textOr(p, "name")},
-        {"cover", ncmSized(p.value(QLatin1String(coverKey)), 300)},
-        {"count", count},
-        // 卡片只补只读展示字段；详情页需要的曲目仍由 playlistDetails 提供
-        {"description", ncmFirstLine(p.value("description").toString())},
-        {"playCount", p.value("playCount").toDouble()},
-        {"creatorId", creator.value("userId").toDouble()},
-        {"creatorName", textOr(creator, "nickname")},
-        {"updateTime", p.value("updateTime").toDouble()},
-        {"subscribed", p.value("subscribed").toBool()},
-        // copywriter 是推荐理由（首页磁贴的信息气味），没有时退回曲目数，这个回退在 QML 里做
-        {"reason", textOr(p, "copywriter")},
     };
 }
 
@@ -286,30 +162,6 @@ QVariantMap ncmSearchMv(const QJsonObject &m)
         {"duration", std::floor(numOr(m, "duration") / 1000)},
         {"playCount", numOr(m, "playCount")},
     };
-}
-
-QHash<double, QJsonObject> ncmPrivilegeIndex(const QJsonArray &privileges)
-{
-    QHash<double, QJsonObject> out;
-    out.reserve(privileges.size());
-    for (const QJsonValue &v : privileges) {
-        const QJsonObject p = v.toObject();
-        if (!p.isEmpty())
-            out.insert(p.value("id").toDouble(), p);
-    }
-    return out;
-}
-
-QVariantList ncmTracks(const QJsonArray &items, const QJsonArray &privileges)
-{
-    const QHash<double, QJsonObject> byId = ncmPrivilegeIndex(privileges);
-    QVariantList out;
-    out.reserve(items.size());
-    for (const QJsonValue &v : items) {
-        const QJsonObject song = v.toObject();
-        out.append(ncmTrack(song, byId.value(song.value("id").toDouble())));
-    }
-    return out;
 }
 
 // 译文按取整到两位小数的时间戳对上同一句，没有为 ""

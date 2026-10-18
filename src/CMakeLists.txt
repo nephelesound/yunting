@@ -21,6 +21,7 @@ pkg_check_modules(ZSTD QUIET libzstd)
 
 set(YUNTING_SDK_SOURCES
     sdk/sdk_json.h sdk/sdk_json.cpp sdk/service.h sdk/service.cpp
+    sdk/track.h sdk/track.cpp
     sdk/song_wiki.h sdk/song_wiki.cpp sdk/song_wiki_service.h sdk/song_wiki_service.cpp
     sdk/discovery.h sdk/discovery.cpp
     sdk/radio.h sdk/radio.cpp
@@ -137,14 +138,18 @@ add_test(NAME diagnostics COMMAND diagnostics_test)
 
 
 
-qt_add_executable(normalize_test tests/normalize_test.cpp normalize.h normalize.cpp json_util.h)
+qt_add_executable(normalize_test tests/normalize_test.cpp normalize.h normalize.cpp json_util.h
+    sdk/track.h sdk/track.cpp sdk/sdk_json.h sdk/sdk_json.cpp sdk/sdk_result.h)
+target_include_directories(normalize_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(normalize_test PRIVATE Qt6::Core Qt6::Test)
 add_test(NAME normalize COMMAND normalize_test)
 
 # 音量/静音与播放走真实 libmpv（ao=null），测试要能构造真实引擎（无窗口、无网络）
 qt_add_executable(audioengine_test tests/audioengine_test.cpp audioengine.h audioengine.cpp
     ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp json_util.h crypto.h crypto.cpp
-    normalize.h normalize.cpp perf.h perf.cpp)
+    normalize.h normalize.cpp perf.h perf.cpp
+    sdk/track.h sdk/track.cpp sdk/sdk_json.h sdk/sdk_json.cpp sdk/sdk_result.h)
+target_include_directories(audioengine_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_options(audioengine_test PRIVATE -Wall -Wextra)
 target_link_libraries(audioengine_test PRIVATE Qt6::Core Qt6::Test Qt6::Network MpvQt::MpvQt Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
 add_test(NAME audioengine COMMAND audioengine_test)
@@ -181,6 +186,7 @@ qt_add_executable(store_test tests/store_test.cpp
     session.h session.cpp
     querycache.h querycache.cpp
     ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp
+    sdk/track.h sdk/track.cpp
     normalize.h normalize.cpp json_util.h crypto.h crypto.cpp perf.h perf.cpp)
 target_include_directories(store_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_options(store_test PRIVATE -Wall -Wextra)
@@ -190,15 +196,20 @@ add_test(NAME store COMMAND store_test)
 # 切歌时挂起的 seek 不能落到下一首：本地假接口 + 本地 WAV
 qt_add_executable(audioengine_seek_test tests/audioengine_seek_test.cpp
     audioengine.h audioengine.cpp ncmclient.h ncmclient.cpp
-    cookievault.h cookievault.cpp json_util.h crypto.h crypto.cpp normalize.h normalize.cpp perf.h perf.cpp)
+    cookievault.h cookievault.cpp json_util.h crypto.h crypto.cpp normalize.h normalize.cpp perf.h perf.cpp
+    sdk/track.h sdk/track.cpp sdk/sdk_json.h sdk/sdk_json.cpp sdk/sdk_result.h)
+target_include_directories(audioengine_seek_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_options(audioengine_seek_test PRIVATE -Wall -Wextra)
 target_link_libraries(audioengine_seek_test PRIVATE Qt6::Core Qt6::Test Qt6::Network MpvQt::MpvQt Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
 add_test(NAME audioengine_seek COMMAND audioengine_seek_test)
 
 # SDK typed parser/service tests; the function owns transport and link flags.
 yunting_add_sdk_test(sdk_song_wiki sdk/song_wiki.h sdk/song_wiki.cpp)
-yunting_add_sdk_test(sdk_discovery sdk/discovery.h sdk/discovery.cpp)
-yunting_add_sdk_test(sdk_radio sdk/radio.h sdk/radio.cpp)
+yunting_add_sdk_test(sdk_track sdk/track.h sdk/track.cpp)
+yunting_add_sdk_test(sdk_discovery sdk/discovery.h sdk/discovery.cpp
+    sdk/track.h sdk/track.cpp)
+yunting_add_sdk_test(sdk_radio sdk/radio.h sdk/radio.cpp
+    sdk/track.h sdk/track.cpp)
 yunting_add_sdk_test(sdk_social sdk/social.h sdk/social.cpp)
 yunting_add_sdk_test(sdk_feed sdk/feed.h sdk/feed.cpp)
 yunting_add_sdk_test(sdk_video sdk/video.h sdk/video.cpp)
@@ -216,7 +227,7 @@ yunting_add_sdk_test(mv_page sdk/mv_page.h sdk/mv_page.cpp)
 yunting_add_sdk_test(account_feed sdk/account_feed.h sdk/account_feed.cpp)
 
 # 任何测试都碰不到用户的真实凭据与缓存：会话总线不可达（钥匙串因此走后备文件），数据与缓存目录在构建目录里
-set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store sdk_song_wiki sdk_discovery sdk_radio sdk_social sdk_feed sdk_video sdk_library sdk_notification sdk_dynamic_cover sdk_search_suggest sdk_service notify lyrics user_social comment search_people mv_page account_feed PROPERTIES ENVIRONMENT
+set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store sdk_song_wiki sdk_track sdk_discovery sdk_radio sdk_social sdk_feed sdk_video sdk_library sdk_notification sdk_dynamic_cover sdk_search_suggest sdk_service notify lyrics user_social comment search_people mv_page account_feed PROPERTIES ENVIRONMENT
     "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent;XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/data;XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/cache;YUNTING_KEYCHAIN_SERVICE=yunting-test")
 
 target_link_libraries(yunting PRIVATE

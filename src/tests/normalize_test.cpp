@@ -2,35 +2,12 @@
 #include "../normalize.h"
 #include "../sdk/comment.h"
 
-#include <QJsonArray>
 #include <QJsonObject>
 #include <QTest>
 
 class NormalizeTest : public QObject {
     Q_OBJECT
 private slots:
-    void trackKeepsNavigationIds()
-    {
-        const QJsonObject song{
-            {"id", 1},
-            {"name", "晴天"},
-            {"ar", QJsonArray{QJsonObject{{"id", 6452}, {"name", "周杰伦"}}}},
-            {"al", QJsonObject{{"id", 32311}, {"name", "叶惠美"},
-                               {"picUrl", "http://p1.music.126.net/x.jpg"}}},
-            {"dt", 269000},
-            {"alia", QJsonArray{"晴天 (Live)"}},
-            {"hr", QJsonObject{{"br", 999000}}},
-        };
-        const QVariantMap t = ncmTrack(song);
-        QCOMPARE(t.value("artistId").toDouble(), 6452);
-        QCOMPARE(t.value("albumId").toDouble(), 32311);
-        QCOMPARE(t.value("dur").toDouble(), 269);
-        QCOMPARE(t.value("alias").toString(), QStringLiteral("晴天 (Live)"));
-        QCOMPARE(t.value("quality").toString(), QStringLiteral("hires"));
-        QCOMPARE(t.value("cover").toString(),
-                 QStringLiteral("http://p1.music.126.net/x.jpg?param=120y120"));
-    }
-
     void mvSearchUsesSeconds()
     {
         const QJsonObject mv{{"id", 522365}, {"name", "美人鱼"},
@@ -55,79 +32,9 @@ private slots:
         QVERIFY(t.contains("quality"));
     }
 
-    // 播放权限来自 privilege（账号相关）：pl>0 可播，st<0 不可播；没有 privilege 才退回 fee。
-    void privilegeDecidesPlayability()
+    // 云盘条目始终可播（普通曲目的 privilege/fee 规则已迁到 sdk_track 测试）
+    void cloudTrackAlwaysPlayable()
     {
-        const auto withPrivilege = [](double fee, QJsonObject privilege) {
-            QJsonObject song{{"id", 1}, {"name", "某首歌"}, {"fee", fee}};
-            song.insert("privilege", privilege);
-            return ncmTrack(song);
-        };
-
-        // 非会员账号：会员曲的 pl 为 0（接口的 cs 是布尔 false，不能当成云盘）
-        const QVariantMap vipOnly = withPrivilege(1, {{"id", 1}, {"fee", 1}, {"st", 0}, {"pl", 0}, {"cs", false}});
-        QCOMPARE(vipOnly.value("playable").toBool(), false);
-        QCOMPARE(vipOnly.value("blockedBy").toString(), QStringLiteral("vip"));
-
-        // 云盘曲：cs 为 true 时即便 pl 为 0 也能播
-        const QVariantMap cloudPrivilege = withPrivilege(0, {{"id", 1}, {"fee", 0}, {"st", 0}, {"pl", 0}, {"cs", true}});
-        QCOMPARE(cloudPrivilege.value("playable").toBool(), true);
-        QCOMPARE(cloudPrivilege.value("blockedBy").toString(), QString());
-
-        // 同一首歌，会员账号的 pl 大于 0
-        const QVariantMap vipAccount = withPrivilege(1, {{"id", 1}, {"fee", 1}, {"st", 0}, {"pl", 320000}});
-        QCOMPARE(vipAccount.value("playable").toBool(), true);
-        QCOMPARE(vipAccount.value("blockedBy").toString(), QString());
-
-        // 付费专辑未购买
-        const QVariantMap paid = withPrivilege(4, {{"id", 1}, {"fee", 4}, {"payed", 0}, {"st", 0}, {"pl", 0}});
-        QCOMPARE(paid.value("playable").toBool(), false);
-        QCOMPARE(paid.value("blockedBy").toString(), QStringLiteral("paid"));
-
-        // 已下架/灰色：st 为负
-        QJsonObject gone{{"id", 1}, {"name", "已下架"}, {"fee", 0}};
-        gone.insert("privilege", QJsonObject{{"id", 1}, {"fee", 0}, {"st", -200}, {"pl", 0}});
-        const QVariantMap unavailable = ncmTrack(gone);
-        QCOMPARE(unavailable.value("playable").toBool(), false);
-        QCOMPARE(unavailable.value("blockedBy").toString(), QStringLiteral("unavailable"));
-    }
-
-    // 平行数组 privileges 按 id 对上 songs；没对上的歌退回自己的 privilege/fee
-    void tracksJoinParallelPrivilegesById()
-    {
-        const QJsonArray songs{
-            QJsonObject{{"id", 11}, {"name", "会员曲"}, {"fee", 1}},
-            QJsonObject{{"id", 22}, {"name", "付费曲"}, {"fee", 4}},
-            QJsonObject{{"id", 33}, {"name", "无权限信息"}, {"fee", 0}},
-        };
-        const QJsonArray privileges{
-            QJsonObject{{"id", 11}, {"fee", 1}, {"st", 0}, {"pl", 320000}},
-            QJsonObject{{"id", 22}, {"fee", 4}, {"payed", 0}, {"st", 0}, {"pl", 0}},
-            QJsonObject{{"id", 99}, {"fee", 1}, {"st", 0}, {"pl", 320000}},
-        };
-        const QVariantList tracks = ncmTracks(songs, privileges);
-        QCOMPARE(tracks.size(), 3);
-        QCOMPARE(tracks.at(0).toMap().value("playable").toBool(), true);
-        QCOMPARE(tracks.at(1).toMap().value("playable").toBool(), false);
-        QCOMPARE(tracks.at(1).toMap().value("blockedBy").toString(), QStringLiteral("paid"));
-        QCOMPARE(tracks.at(2).toMap().value("playable").toBool(), true);
-    }
-
-    // 没有 privilege 时退回 fee；云盘曲目始终可播
-    void missingPrivilegeFallsBackToFee()
-    {
-        const QVariantMap paid = ncmTrack(QJsonObject{{"id", 2}, {"name", "付费"}, {"fee", 4}});
-        QCOMPARE(paid.value("playable").toBool(), false);
-        QCOMPARE(paid.value("blockedBy").toString(), QStringLiteral("paid"));
-
-        const QVariantMap vip = ncmTrack(QJsonObject{{"id", 3}, {"name", "会员"}, {"fee", 1}});
-        QCOMPARE(vip.value("playable").toBool(), false);
-        QCOMPARE(vip.value("blockedBy").toString(), QStringLiteral("vip"));
-
-        const QVariantMap free = ncmTrack(QJsonObject{{"id", 4}, {"name", "免费"}, {"fee", 0}});
-        QCOMPARE(free.value("playable").toBool(), true);
-        QCOMPARE(free.value("blockedBy").toString(), QString());
-
         const QVariantMap cloud = ncmCloudTrack(QJsonObject{{"songId", 5}, {"songName", "上传的歌"},
                                                            {"fee", 4}});
         QCOMPARE(cloud.value("playable").toBool(), true);

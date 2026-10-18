@@ -10,6 +10,7 @@
 // Every field comment names its raw JSON path. Timestamps are milliseconds;
 // durations are seconds. URLs are raw; frontend owns image sizing.
 #include "sdk/sdk_result.h"
+#include "sdk/track.h"
 
 #include <QList>
 #include <QObject>
@@ -39,6 +40,10 @@ struct NewSong {
     QString quality;        // "hires" (hr|hrMusic) / "lossless" (sq|sqMusic) / ""
     qint64 mv = 0;          // song.mv (fallback song.mvid)
 };
+
+// NewSong → the shared queue track. Cover stays raw (the discovery map keeps the
+// original URL); playability falls back to fee because this endpoint sends no privilege.
+Track trackFromNewSong(const NewSong &song);
 
 struct NewAlbum {
     qint64 id = 0;

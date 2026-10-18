@@ -38,6 +38,16 @@ private slots:
         QCOMPARE(out.alias, QStringLiteral("别名"));
         QCOMPARE(out.quality, QStringLiteral("lossless"));
         QCOMPARE(out.mv, qint64(77));
+
+        // 队列 map：共用 Track 适配器，发现页保留原图封面
+        const Track track = trackFromNewSong(out);
+        QCOMPARE(track.id, qint64(1));
+        QCOMPARE(track.cover, QStringLiteral("http://cover"));
+        const QVariantMap map = trackToVariantMap(track, QString(), 0);
+        QCOMPARE(map.value("cover").toString(), QStringLiteral("http://cover"));
+        QCOMPARE(map.value("playable").toBool(), false);
+        QCOMPARE(map.value("blockedBy").toString(), QStringLiteral("vip"));
+        QCOMPARE(map.size(), 16);
     }
 
     void parsesAlbums()

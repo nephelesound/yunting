@@ -46,60 +46,55 @@ Result<QList<NewSong>> parseNewSongs(const QJsonObject &root)
                 endpointError(ErrorKind::Parse, NewSongsPath, itemReader.error(), itemReader.path()));
         if (song.isEmpty())
             continue;
-        JsonReader songReader(song, itemReader.path() + QStringLiteral(".song"));
+        // 歌曲本体只经 Track 解析；这里只保留新歌接口特有的封面回退
+        const auto parsedTrack = parseTrack(song);
+        if (!parsedTrack) {
+            return Result<QList<NewSong>>::failure(endpointError(
+                ErrorKind::Parse, NewSongsPath, parsedTrack.error.message,
+                parsedTrack.error.path));
+        }
+        const Track &track = *parsedTrack.value;
         NewSong out;
-        out.songId = songReader.integer("id");
-        out.name = songReader.string("name");
-        const QJsonArray artistValues = songReader.array("artists");
-        if (!songReader.ok()) {
-            return Result<QList<NewSong>>::failure(
-                endpointError(ErrorKind::Parse, NewSongsPath, songReader.error(), songReader.path()));
-        }
-        for (qsizetype a = 0; a < artistValues.size(); ++a) {
-            JsonReader artistReader(artistValues.at(a).toObject(),
-                                    songReader.path() + QStringLiteral(".artists[%1]").arg(a));
-            NewSongArtist artist;
-            artist.id = artistReader.integer("id");
-            artist.name = artistReader.string("name");
-            if (!artistReader.ok()) {
-                return Result<QList<NewSong>>::failure(endpointError(
-                    ErrorKind::Parse, NewSongsPath, artistReader.error(), artistReader.path()));
-            }
+        out.songId = track.id;
+        out.name = track.name;
+        out.artists.reserve(track.artists.size());
+        for (const TrackArtist &artist : track.artists) {
             if (artist.id > 0 || !artist.name.isEmpty())
-                out.artists.append(artist);
+                out.artists.append(NewSongArtist{artist.id, artist.name});
         }
-        for (const char *key : {"alia", "alias", "tns", "transNames"}) {
-            const QStringList alias = songReader.stringList(key);
-            if (!alias.isEmpty()) {
-                out.alias = alias.first();
-                break;
-            }
-        }
-        out.quality = songReader.truthy("hr") || songReader.truthy("hrMusic")
-            ? QStringLiteral("hires")
-            : songReader.truthy("sq") || songReader.truthy("sqMusic")
-                  ? QStringLiteral("lossless") : QString();
-        out.mv = songReader.integer("mv");
-        if (out.mv <= 0)
-            out.mv = songReader.integer("mvid");
-        const QJsonObject album = song.value(QStringLiteral("album")).toObject();
-        JsonReader albumReader(album, songReader.path() + QStringLiteral(".album"));
-        out.albumId = albumReader.integer("id");
-        out.albumName = albumReader.string("name");
-        out.cover = albumReader.string("picUrl");
-        out.duration = songReader.integer("duration") / 1000;
-        out.fee = static_cast<int>(songReader.integer("fee"));
+        out.albumId = track.albumId;
+        out.albumName = track.albumName;
+        out.cover = track.cover;
+        out.duration = track.duration;
+        out.fee = static_cast<int>(track.fee);
+        out.alias = track.alias;
+        out.quality = track.quality;
+        out.mv = track.mv;
         if (out.cover.isEmpty())
             out.cover = itemReader.string("picUrl");
-        if (!songReader.ok() || !albumReader.ok()) {
-            const QString error = !songReader.ok() ? songReader.error() : albumReader.error();
-            return Result<QList<NewSong>>::failure(
-                endpointError(ErrorKind::Parse, NewSongsPath, error, itemReader.path()));
-        }
         if (out.songId > 0)
             songs.append(out);
     }
     return Result<QList<NewSong>>::success(songs);
+}
+
+Track trackFromNewSong(const NewSong &song)
+{
+    Track track;
+    track.id = song.songId;
+    track.name = song.name;
+    track.artists.reserve(song.artists.size());
+    for (const NewSongArtist &artist : song.artists)
+        track.artists.append(TrackArtist{artist.id, artist.name});
+    track.albumId = song.albumId;
+    track.albumName = song.albumName;
+    track.cover = song.cover;
+    track.duration = song.duration;
+    track.fee = song.fee;
+    track.alias = song.alias;
+    track.quality = song.quality;
+    track.mv = song.mv;
+    return track;
 }
 
 Result<QList<NewAlbum>> parseNewAlbums(const QJsonObject &root)

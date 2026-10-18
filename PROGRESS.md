@@ -154,7 +154,8 @@
 ## 未偿债务 / 迁移
 
 - [x] 已迁 typed SDK：comments（热评/分页/楼中楼）、普通+逐字歌词、用户社交（关注/粉丝/等级/计数）、通知计数、MV 详情、用户/电台搜索、首页榜单/热搜/红心 id。
-- [ ] 仍未迁：playlist / search 主体 / artist / album / account 的每日推荐与个人列表 / inbox；这些的嵌套 track、playlist card 仍经旧 `QJsonObject -> QVariantMap` 归一化，下一批先统一 typed 边界再迁。
+- [x] 曲目/歌单卡片 typed 边界：`sdk::Track` / `sdk::PlaylistCard`，可播性集中在 `playability()`；新歌与电台节目复用同一个 `Track` 适配器。
+- [ ] 仍未迁：playlist / search 主体 / artist / album / account 的每日推荐与个人列表 / inbox。它们的嵌套 track 与 playlist card 已改走 typed 边界，下一步可直接把这些端点的请求/响应迁到 typed service，不再被重复的可播性与字段回退挡住。
 - [ ] feed/video/library/notification/search_suggest/dynamic_cover 的 Store/前端接线（SDK 已完成，调用方待接）。
 - [ ] 歌单隐私/封面/导入；云盘写入；下载地址。
 - [ ] 一起听：先做 status/check 只读模型，实时同步需 IM/RPC 通道。

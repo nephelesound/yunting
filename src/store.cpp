@@ -3,6 +3,7 @@
 #include "ncmclient.h"
 #include "normalize.h"
 #include "sdk/sdk_result.h"
+#include "sdk/track.h"
 
 #include <QDate>
 #include <QEventLoop>
@@ -488,7 +489,13 @@ void Store::fetchPlaylistTracks(double id, bool personal, TracksCallback callbac
             callback({}, {}, false);
             return;
         }
-        const QVariantList loaded = ncmTracks(arr(playlist, "tracks"), arr(body(doc), "privileges"));
+        const auto parsed = sdk::parseTracks(arr(playlist, "tracks"),
+                                             arr(body(doc), "privileges"));
+        if (!parsed) {
+            callback({}, playlist, false);
+            return;
+        }
+        const QVariantList loaded = sdk::tracksToVariantList(*parsed.value);
 
         QHash<double, QVariantMap> byId;
         byId.reserve(loaded.size());
@@ -572,9 +579,14 @@ void Store::fetchSongDetails(const QList<double> &ids, bool personal,
             const QJsonValue code = doc.object().value("code");
             if (!ok || (!code.isUndefined() && code.toInt() != 200))
                 state->ok = false;
-            for (const QVariant &v : ncmTracks(arr(body(doc), "songs"), arr(body(doc), "privileges"))) {
-                const QVariantMap track = v.toMap();
-                state->tracks.insert(track.value("id").toDouble(), track);
+            const auto parsed = sdk::parseTracks(arr(body(doc), "songs"),
+                                                 arr(body(doc), "privileges"));
+            if (!parsed) {
+                state->ok = false;
+            } else {
+                for (const sdk::Track &track : *parsed.value)
+                    state->tracks.insert(static_cast<double>(track.id),
+                                         sdk::trackToVariantMap(track));
             }
             if (--state->left == 0)
                 callback(state->tracks, state->ok);

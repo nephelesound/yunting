@@ -53,6 +53,22 @@ private slots:
         QCOMPARE(out.artists, QStringList{QStringLiteral("歌手")});
         QCOMPARE(out.cover, QStringLiteral("http://program"));
         QCOMPARE(out.radio.name, QStringLiteral("电台"));
+
+        // 节目 map：主歌 id + 文档里的节目覆盖，另带节目字段；封面保持原图
+        const QVariantMap map = programToVariantMap(out);
+        QCOMPARE(map.value("id").toDouble(), 55.0);
+        QCOMPARE(map.value("name").toString(), QStringLiteral("节目"));
+        QCOMPARE(map.value("artist").toString(), QStringLiteral("主播"));
+        QCOMPARE(map.value("album").toString(), QStringLiteral("电台"));
+        QCOMPARE(map.value("cover").toString(), QStringLiteral("http://program"));
+        QCOMPARE(map.value("dur").toDouble(), 65.0);
+        QCOMPARE(map.value("playable").toBool(), true);
+        QCOMPARE(map.value("programId").toDouble(), 66.0);
+        QCOMPARE(map.value("radioId").toDouble(), 7.0);
+        QCOMPARE(map.value("serial").toDouble(), 31.0);
+        QCOMPARE(map.value("createTime").toDouble(), 1700000000000.0);
+        QCOMPARE(map.value("description").toString(), QStringLiteral("节目简介"));
+        QCOMPARE(map.size(), 21);
     }
 
     // byradio 的部分节目只带 mainTrackId：播放 id 不能因此丢掉

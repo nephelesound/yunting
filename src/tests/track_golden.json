@@ -1,0 +1,1111 @@
+{
+    "cards": [
+        {
+            "coverKey": "coverImgUrl",
+            "expected": {
+                "count": 12,
+                "cover": "http://cover/p.jpg?param=300y300",
+                "creatorId": 9,
+                "creatorName": "歌单主",
+                "description": "第一行",
+                "id": 5,
+                "name": "歌单",
+                "playCount": 34,
+                "reason": "推荐语",
+                "subscribed": true,
+                "updateTime": 1700000000000
+            },
+            "name": "fullCoverImgUrl",
+            "playlist": {
+                "copywriter": "推荐语",
+                "coverImgUrl": "http://cover/p.jpg",
+                "creator": {
+                    "nickname": "歌单主",
+                    "userId": 9
+                },
+                "description": "第一行\n第二行",
+                "id": 5,
+                "name": "歌单",
+                "playCount": 34,
+                "subscribed": true,
+                "trackCount": 12,
+                "updateTime": 1700000000000
+            }
+        },
+        {
+            "coverKey": "picUrl",
+            "expected": {
+                "count": 12,
+                "cover": "http://cover/recommended.jpg?param=300y300",
+                "creatorId": 9,
+                "creatorName": "歌单主",
+                "description": "第一行",
+                "id": 5,
+                "name": "歌单",
+                "playCount": 34,
+                "reason": "推荐语",
+                "subscribed": true,
+                "updateTime": 1700000000000
+            },
+            "name": "recommendedPicUrl",
+            "playlist": {
+                "copywriter": "推荐语",
+                "creator": {
+                    "nickname": "歌单主",
+                    "userId": 9
+                },
+                "description": "第一行\n第二行",
+                "id": 5,
+                "name": "歌单",
+                "picUrl": "http://cover/recommended.jpg",
+                "playCount": 34,
+                "subscribed": true,
+                "trackCount": 12,
+                "updateTime": 1700000000000
+            }
+        },
+        {
+            "coverKey": "coverImgUrl",
+            "expected": {
+                "count": 12,
+                "cover": "http://p1.music.126.net/playlist.jpg?param=300y300",
+                "creatorId": 9,
+                "creatorName": "歌单主",
+                "description": "简介",
+                "id": 5,
+                "name": "精品歌单",
+                "playCount": 34,
+                "reason": "",
+                "subscribed": false,
+                "updateTime": 1700000000000
+            },
+            "name": "discoverySampleCard",
+            "playlist": {
+                "coverImgUrl": "http://p1.music.126.net/playlist.jpg",
+                "creator": {
+                    "nickname": "歌单主",
+                    "userId": 9
+                },
+                "description": "简介",
+                "id": 5,
+                "name": "精品歌单",
+                "playCount": 34,
+                "subscribedCount": 56,
+                "trackCount": 12,
+                "updateTime": 1700000000000
+            }
+        },
+        {
+            "coverKey": "coverImgUrl",
+            "expected": {
+                "count": 0,
+                "cover": "",
+                "creatorId": 0,
+                "creatorName": "",
+                "description": "",
+                "id": 0,
+                "name": "",
+                "playCount": 0,
+                "reason": "",
+                "subscribed": false,
+                "updateTime": 0
+            },
+            "name": "emptyCard",
+            "playlist": {
+            }
+        }
+    ],
+    "trackLists": [
+        {
+            "expected": [
+                {
+                    "album": "",
+                    "albumId": 0,
+                    "alias": "",
+                    "artist": "",
+                    "artistId": 0,
+                    "artists": [
+                    ],
+                    "blockedBy": "",
+                    "cover": "",
+                    "dur": 0,
+                    "fee": 1,
+                    "id": 11,
+                    "mv": 0,
+                    "name": "会员曲",
+                    "playable": true,
+                    "quality": "",
+                    "reason": ""
+                },
+                {
+                    "album": "",
+                    "albumId": 0,
+                    "alias": "",
+                    "artist": "",
+                    "artistId": 0,
+                    "artists": [
+                    ],
+                    "blockedBy": "paid",
+                    "cover": "",
+                    "dur": 0,
+                    "fee": 4,
+                    "id": 22,
+                    "mv": 0,
+                    "name": "付费曲",
+                    "playable": false,
+                    "quality": "",
+                    "reason": ""
+                },
+                {
+                    "album": "",
+                    "albumId": 0,
+                    "alias": "",
+                    "artist": "",
+                    "artistId": 0,
+                    "artists": [
+                    ],
+                    "blockedBy": "",
+                    "cover": "",
+                    "dur": 0,
+                    "fee": 0,
+                    "id": 33,
+                    "mv": 0,
+                    "name": "无权限信息",
+                    "playable": true,
+                    "quality": "",
+                    "reason": ""
+                },
+                {
+                    "album": "",
+                    "albumId": 0,
+                    "alias": "",
+                    "artist": "",
+                    "artistId": 0,
+                    "artists": [
+                    ],
+                    "blockedBy": "unavailable",
+                    "cover": "",
+                    "dur": 0,
+                    "fee": 0,
+                    "id": 44,
+                    "mv": 0,
+                    "name": "下架",
+                    "playable": false,
+                    "quality": "",
+                    "reason": ""
+                },
+                {
+                    "album": "",
+                    "albumId": 0,
+                    "alias": "",
+                    "artist": "",
+                    "artistId": 0,
+                    "artists": [
+                    ],
+                    "blockedBy": "",
+                    "cover": "",
+                    "dur": 0,
+                    "fee": 0,
+                    "id": 55,
+                    "mv": 0,
+                    "name": "云盘",
+                    "playable": true,
+                    "quality": "",
+                    "reason": ""
+                }
+            ],
+            "name": "parallelPrivileges",
+            "privileges": [
+                {
+                    "fee": 1,
+                    "id": 11,
+                    "pl": 320000,
+                    "st": 0
+                },
+                {
+                    "fee": 4,
+                    "id": 22,
+                    "payed": 0,
+                    "pl": 0,
+                    "st": 0
+                },
+                {
+                    "fee": 1,
+                    "id": 99,
+                    "pl": 320000,
+                    "st": 0
+                },
+                {
+                    "fee": 0,
+                    "id": 44,
+                    "pl": 0,
+                    "st": -200
+                },
+                {
+                    "cs": true,
+                    "fee": 0,
+                    "id": 55,
+                    "pl": 0,
+                    "st": 0
+                }
+            ],
+            "songs": [
+                {
+                    "fee": 1,
+                    "id": 11,
+                    "name": "会员曲"
+                },
+                {
+                    "fee": 4,
+                    "id": 22,
+                    "name": "付费曲"
+                },
+                {
+                    "fee": 0,
+                    "id": 33,
+                    "name": "无权限信息"
+                },
+                {
+                    "fee": 0,
+                    "id": 44,
+                    "name": "下架"
+                },
+                {
+                    "fee": 0,
+                    "id": 55,
+                    "name": "云盘"
+                }
+            ]
+        },
+        {
+            "expected": [
+                {
+                    "album": "专辑",
+                    "albumId": 4,
+                    "alias": "别名",
+                    "artist": "歌手",
+                    "artistId": 3,
+                    "artists": [
+                        {
+                            "id": 3,
+                            "name": "歌手"
+                        }
+                    ],
+                    "blockedBy": "vip",
+                    "cover": "http://p1.music.126.net/new.jpg?param=120y120",
+                    "dur": 210,
+                    "fee": 1,
+                    "id": 1,
+                    "mv": 77,
+                    "name": "新歌",
+                    "playable": false,
+                    "quality": "lossless",
+                    "reason": ""
+                },
+                {
+                    "album": "",
+                    "albumId": 0,
+                    "alias": "",
+                    "artist": "歌手",
+                    "artistId": 0,
+                    "artists": [
+                        {
+                            "id": 0,
+                            "name": "歌手"
+                        }
+                    ],
+                    "blockedBy": "",
+                    "cover": "",
+                    "dur": 65,
+                    "fee": 0,
+                    "id": 55,
+                    "mv": 0,
+                    "name": "节目歌",
+                    "playable": true,
+                    "quality": "",
+                    "reason": ""
+                },
+                {
+                    "album": "",
+                    "albumId": 0,
+                    "alias": "",
+                    "artist": "Rosy赵露思 / Bia",
+                    "artistId": 13972037,
+                    "artists": [
+                        {
+                            "id": 13972037,
+                            "name": "Rosy赵露思"
+                        },
+                        {
+                            "id": 192408,
+                            "name": "Bia"
+                        }
+                    ],
+                    "blockedBy": "",
+                    "cover": "",
+                    "dur": 184,
+                    "fee": 0,
+                    "id": 3447033086,
+                    "mv": 0,
+                    "name": "Thanks For The Lesson (feat. BIA)",
+                    "playable": true,
+                    "quality": "",
+                    "reason": ""
+                },
+                {
+                    "album": "专辑甲",
+                    "albumId": 21,
+                    "alias": "副标题",
+                    "artist": "歌手甲 / 歌手乙",
+                    "artistId": 1,
+                    "artists": [
+                        {
+                            "id": 1,
+                            "name": "歌手甲"
+                        },
+                        {
+                            "id": 2,
+                            "name": "歌手乙"
+                        }
+                    ],
+                    "blockedBy": "vip",
+                    "cover": "",
+                    "dur": 215,
+                    "fee": 1,
+                    "id": 11,
+                    "mv": 3003,
+                    "name": "歌曲甲",
+                    "playable": false,
+                    "quality": "",
+                    "reason": ""
+                }
+            ],
+            "name": "sampleSongsWithoutPrivileges",
+            "songs": [
+                {
+                    "album": {
+                        "id": 4,
+                        "name": "专辑",
+                        "picUrl": "http://p1.music.126.net/new.jpg"
+                    },
+                    "alia": [
+                        "别名"
+                    ],
+                    "artists": [
+                        {
+                            "id": 3,
+                            "name": "歌手"
+                        }
+                    ],
+                    "duration": 210500,
+                    "fee": 1,
+                    "id": 1,
+                    "mv": 77,
+                    "name": "新歌",
+                    "sq": {
+                        "br": 999000
+                    }
+                },
+                {
+                    "artists": [
+                        {
+                            "id": 0,
+                            "name": "歌手"
+                        }
+                    ],
+                    "duration": 65000,
+                    "fee": 0,
+                    "id": 55,
+                    "name": "节目歌"
+                },
+                {
+                    "artists": [
+                        {
+                            "id": 13972037,
+                            "name": "Rosy赵露思"
+                        },
+                        {
+                            "id": 192408,
+                            "name": "Bia"
+                        }
+                    ],
+                    "duration": 184338,
+                    "id": 3447033086,
+                    "name": "Thanks For The Lesson (feat. BIA)"
+                },
+                {
+                    "album": {
+                        "id": 21,
+                        "name": "专辑甲"
+                    },
+                    "alias": [
+                        "副标题"
+                    ],
+                    "artists": [
+                        {
+                            "id": 1,
+                            "name": "歌手甲"
+                        },
+                        {
+                            "id": 2,
+                            "name": "歌手乙"
+                        }
+                    ],
+                    "duration": 215500,
+                    "fee": 1,
+                    "id": 11,
+                    "mvid": 3003,
+                    "name": "歌曲甲"
+                }
+            ]
+        }
+    ],
+    "tracks": [
+        {
+            "expected": {
+                "album": "叶惠美",
+                "albumId": 32311,
+                "alias": "晴天 (Live)",
+                "artist": "周杰伦",
+                "artistId": 6452,
+                "artists": [
+                    {
+                        "id": 6452,
+                        "name": "周杰伦"
+                    }
+                ],
+                "blockedBy": "",
+                "cover": "http://p1.music.126.net/x.jpg?param=120y120",
+                "dur": 269,
+                "fee": 0,
+                "id": 1,
+                "mv": 0,
+                "name": "晴天",
+                "playable": true,
+                "quality": "hires",
+                "reason": ""
+            },
+            "name": "normalizeNavigation",
+            "song": {
+                "al": {
+                    "id": 32311,
+                    "name": "叶惠美",
+                    "picUrl": "http://p1.music.126.net/x.jpg"
+                },
+                "alia": [
+                    "晴天 (Live)"
+                ],
+                "ar": [
+                    {
+                        "id": 6452,
+                        "name": "周杰伦"
+                    }
+                ],
+                "dt": 269000,
+                "hr": {
+                    "br": 999000
+                },
+                "id": 1,
+                "name": "晴天"
+            }
+        },
+        {
+            "expected": {
+                "album": "旧专辑",
+                "albumId": 21,
+                "alias": "旧别名",
+                "artist": "A / B",
+                "artistId": 11,
+                "artists": [
+                    {
+                        "id": 11,
+                        "name": "A"
+                    },
+                    {
+                        "id": 12,
+                        "name": "B"
+                    }
+                ],
+                "blockedBy": "",
+                "cover": "http://cover/legacy.jpg?param=120y120",
+                "dur": 185,
+                "fee": 0,
+                "id": 2,
+                "mv": 33,
+                "name": "旧结构",
+                "playable": true,
+                "quality": "lossless",
+                "reason": ""
+            },
+            "name": "legacyArtistsAlbumDuration",
+            "song": {
+                "album": {
+                    "id": 21,
+                    "name": "旧专辑",
+                    "picUrl": "http://cover/legacy.jpg"
+                },
+                "alias": [
+                    "旧别名"
+                ],
+                "artists": [
+                    {
+                        "id": 11,
+                        "name": "A"
+                    },
+                    {
+                        "id": 12,
+                        "name": "B"
+                    }
+                ],
+                "duration": 185500,
+                "fee": 0,
+                "id": 2,
+                "mvid": 33,
+                "name": "旧结构",
+                "sq": true
+            }
+        },
+        {
+            "expected": {
+                "album": "",
+                "albumId": 0,
+                "alias": "",
+                "artist": "",
+                "artistId": 0,
+                "artists": [
+                ],
+                "blockedBy": "",
+                "cover": "",
+                "dur": 1,
+                "fee": 0,
+                "id": 3,
+                "mv": 0,
+                "name": "无专辑",
+                "playable": true,
+                "quality": "",
+                "reason": ""
+            },
+            "name": "missingAlbum",
+            "song": {
+                "ar": [
+                ],
+                "dt": 1000,
+                "id": 3,
+                "name": "无专辑"
+            }
+        },
+        {
+            "expected": {
+                "album": "",
+                "albumId": 0,
+                "alias": "translated",
+                "artist": "歌手",
+                "artistId": 5,
+                "artists": [
+                    {
+                        "id": 5,
+                        "name": "歌手"
+                    }
+                ],
+                "blockedBy": "",
+                "cover": "",
+                "dur": 61,
+                "fee": 0,
+                "id": 4,
+                "mv": 0,
+                "name": "译名",
+                "playable": true,
+                "quality": "",
+                "reason": ""
+            },
+            "name": "tnsAndDurationFallback",
+            "song": {
+                "al": {
+                },
+                "ar": [
+                    {
+                        "id": 5,
+                        "name": "歌手"
+                    }
+                ],
+                "dt": 0,
+                "duration": 61000,
+                "id": 4,
+                "name": "译名",
+                "tns": [
+                    "translated"
+                ]
+            }
+        },
+        {
+            "expected": {
+                "album": "叶惠美",
+                "albumId": 32311,
+                "alias": "晴天 (Live)",
+                "artist": "周杰伦",
+                "artistId": 6452,
+                "artists": [
+                    {
+                        "id": 6452,
+                        "name": "周杰伦"
+                    }
+                ],
+                "blockedBy": "vip",
+                "cover": "http://p1.music.126.net/x.jpg?param=120y120",
+                "dur": 269,
+                "fee": 1,
+                "id": 5,
+                "mv": 0,
+                "name": "晴天",
+                "playable": false,
+                "quality": "hires",
+                "reason": ""
+            },
+            "name": "embeddedPrivilegeVip",
+            "song": {
+                "al": {
+                    "id": 32311,
+                    "name": "叶惠美",
+                    "picUrl": "http://p1.music.126.net/x.jpg"
+                },
+                "alia": [
+                    "晴天 (Live)"
+                ],
+                "ar": [
+                    {
+                        "id": 6452,
+                        "name": "周杰伦"
+                    }
+                ],
+                "dt": 269000,
+                "fee": 1,
+                "hr": {
+                    "br": 999000
+                },
+                "id": 5,
+                "name": "晴天",
+                "privilege": {
+                    "cs": false,
+                    "fee": 1,
+                    "id": 5,
+                    "pl": 0,
+                    "st": 0
+                }
+            }
+        },
+        {
+            "expected": {
+                "album": "",
+                "albumId": 0,
+                "alias": "",
+                "artist": "",
+                "artistId": 0,
+                "artists": [
+                ],
+                "blockedBy": "",
+                "cover": "",
+                "dur": 1,
+                "fee": 0,
+                "id": 6,
+                "mv": 0,
+                "name": "无专辑",
+                "playable": true,
+                "quality": "",
+                "reason": ""
+            },
+            "name": "embeddedPrivilegeCloud",
+            "song": {
+                "ar": [
+                ],
+                "dt": 1000,
+                "id": 6,
+                "name": "无专辑",
+                "privilege": {
+                    "cs": true,
+                    "fee": 0,
+                    "id": 6,
+                    "pl": 0,
+                    "st": 0
+                }
+            }
+        },
+        {
+            "expected": {
+                "album": "",
+                "albumId": 0,
+                "alias": "",
+                "artist": "",
+                "artistId": 0,
+                "artists": [
+                ],
+                "blockedBy": "unavailable",
+                "cover": "",
+                "dur": 1,
+                "fee": 0,
+                "id": 7,
+                "mv": 0,
+                "name": "无专辑",
+                "playable": false,
+                "quality": "",
+                "reason": ""
+            },
+            "name": "embeddedPrivilegeGone",
+            "song": {
+                "ar": [
+                ],
+                "dt": 1000,
+                "id": 7,
+                "name": "无专辑",
+                "privilege": {
+                    "fee": 0,
+                    "id": 7,
+                    "pl": 0,
+                    "st": -200
+                }
+            }
+        },
+        {
+            "expected": {
+                "album": "",
+                "albumId": 0,
+                "alias": "",
+                "artist": "",
+                "artistId": 0,
+                "artists": [
+                ],
+                "blockedBy": "paid",
+                "cover": "",
+                "dur": 1,
+                "fee": 4,
+                "id": 8,
+                "mv": 0,
+                "name": "无专辑",
+                "playable": false,
+                "quality": "",
+                "reason": ""
+            },
+            "name": "paidUnpurchased",
+            "song": {
+                "ar": [
+                ],
+                "dt": 1000,
+                "fee": 4,
+                "id": 8,
+                "name": "无专辑",
+                "privilege": {
+                    "fee": 4,
+                    "id": 8,
+                    "payed": 0,
+                    "pl": 0,
+                    "st": 0
+                }
+            }
+        },
+        {
+            "expected": {
+                "album": "",
+                "albumId": 0,
+                "alias": "",
+                "artist": "",
+                "artistId": 0,
+                "artists": [
+                ],
+                "blockedBy": "unavailable",
+                "cover": "",
+                "dur": 1,
+                "fee": 4,
+                "id": 9,
+                "mv": 0,
+                "name": "无专辑",
+                "playable": false,
+                "quality": "",
+                "reason": ""
+            },
+            "name": "paidPurchasedButStillBlocked",
+            "song": {
+                "ar": [
+                ],
+                "dt": 1000,
+                "fee": 4,
+                "id": 9,
+                "name": "无专辑",
+                "privilege": {
+                    "fee": 4,
+                    "id": 9,
+                    "payed": 1,
+                    "pl": 0,
+                    "st": 0
+                }
+            }
+        },
+        {
+            "expected": {
+                "album": "专辑",
+                "albumId": 4,
+                "alias": "别名",
+                "artist": "歌手",
+                "artistId": 3,
+                "artists": [
+                    {
+                        "id": 3,
+                        "name": "歌手"
+                    }
+                ],
+                "blockedBy": "vip",
+                "cover": "http://p1.music.126.net/new.jpg?param=120y120",
+                "dur": 210,
+                "fee": 1,
+                "id": 1,
+                "mv": 77,
+                "name": "新歌",
+                "playable": false,
+                "quality": "lossless",
+                "reason": ""
+            },
+            "name": "discoverySampleSong",
+            "song": {
+                "album": {
+                    "id": 4,
+                    "name": "专辑",
+                    "picUrl": "http://p1.music.126.net/new.jpg"
+                },
+                "alia": [
+                    "别名"
+                ],
+                "artists": [
+                    {
+                        "id": 3,
+                        "name": "歌手"
+                    }
+                ],
+                "duration": 210500,
+                "fee": 1,
+                "id": 1,
+                "mv": 77,
+                "name": "新歌",
+                "sq": {
+                    "br": 999000
+                }
+            }
+        },
+        {
+            "expected": {
+                "album": "",
+                "albumId": 0,
+                "alias": "",
+                "artist": "歌手",
+                "artistId": 0,
+                "artists": [
+                    {
+                        "id": 0,
+                        "name": "歌手"
+                    }
+                ],
+                "blockedBy": "",
+                "cover": "",
+                "dur": 65,
+                "fee": 0,
+                "id": 55,
+                "mv": 0,
+                "name": "节目歌",
+                "playable": true,
+                "quality": "",
+                "reason": ""
+            },
+            "name": "radioSampleMainSong",
+            "song": {
+                "artists": [
+                    {
+                        "id": 0,
+                        "name": "歌手"
+                    }
+                ],
+                "duration": 65000,
+                "fee": 0,
+                "id": 55,
+                "name": "节目歌"
+            }
+        },
+        {
+            "expected": {
+                "album": "",
+                "albumId": 0,
+                "alias": "",
+                "artist": "Rosy赵露思 / Bia",
+                "artistId": 13972037,
+                "artists": [
+                    {
+                        "id": 13972037,
+                        "name": "Rosy赵露思"
+                    },
+                    {
+                        "id": 192408,
+                        "name": "Bia"
+                    }
+                ],
+                "blockedBy": "",
+                "cover": "",
+                "dur": 184,
+                "fee": 0,
+                "id": 3447033086,
+                "mv": 0,
+                "name": "Thanks For The Lesson (feat. BIA)",
+                "playable": true,
+                "quality": "",
+                "reason": ""
+            },
+            "name": "feedSampleSong",
+            "song": {
+                "artists": [
+                    {
+                        "id": 13972037,
+                        "name": "Rosy赵露思"
+                    },
+                    {
+                        "id": 192408,
+                        "name": "Bia"
+                    }
+                ],
+                "duration": 184338,
+                "id": 3447033086,
+                "name": "Thanks For The Lesson (feat. BIA)"
+            }
+        },
+        {
+            "expected": {
+                "album": "专辑甲",
+                "albumId": 21,
+                "alias": "副标题",
+                "artist": "歌手甲 / 歌手乙",
+                "artistId": 1,
+                "artists": [
+                    {
+                        "id": 1,
+                        "name": "歌手甲"
+                    },
+                    {
+                        "id": 2,
+                        "name": "歌手乙"
+                    }
+                ],
+                "blockedBy": "vip",
+                "cover": "",
+                "dur": 215,
+                "fee": 1,
+                "id": 11,
+                "mv": 3003,
+                "name": "歌曲甲",
+                "playable": false,
+                "quality": "",
+                "reason": ""
+            },
+            "name": "suggestSampleSong",
+            "song": {
+                "album": {
+                    "id": 21,
+                    "name": "专辑甲"
+                },
+                "alias": [
+                    "副标题"
+                ],
+                "artists": [
+                    {
+                        "id": 1,
+                        "name": "歌手甲"
+                    },
+                    {
+                        "id": 2,
+                        "name": "歌手乙"
+                    }
+                ],
+                "duration": 215500,
+                "fee": 1,
+                "id": 11,
+                "mvid": 3003,
+                "name": "歌曲甲"
+            }
+        },
+        {
+            "expected": {
+                "album": "叶惠美",
+                "albumId": 32311,
+                "alias": "晴天 (Live)",
+                "artist": "周杰伦",
+                "artistId": 6452,
+                "artists": [
+                    {
+                        "id": 6452,
+                        "name": "周杰伦"
+                    }
+                ],
+                "blockedBy": "",
+                "cover": "http://p1.music.126.net/x.jpg?param=120y120",
+                "dur": 269,
+                "fee": 0,
+                "id": 1,
+                "mv": 0,
+                "name": "晴天",
+                "playable": true,
+                "quality": "hires",
+                "reason": "每日推荐"
+            },
+            "name": "dailyReason",
+            "reason": "每日推荐",
+            "song": {
+                "al": {
+                    "id": 32311,
+                    "name": "叶惠美",
+                    "picUrl": "http://p1.music.126.net/x.jpg"
+                },
+                "alia": [
+                    "晴天 (Live)"
+                ],
+                "ar": [
+                    {
+                        "id": 6452,
+                        "name": "周杰伦"
+                    }
+                ],
+                "dt": 269000,
+                "hr": {
+                    "br": 999000
+                },
+                "id": 1,
+                "name": "晴天"
+            }
+        },
+        {
+            "expected": {
+                "album": "",
+                "albumId": 0,
+                "alias": "",
+                "artist": "",
+                "artistId": 0,
+                "artists": [
+                ],
+                "blockedBy": "",
+                "cover": "",
+                "dur": 0,
+                "fee": 1,
+                "id": 11,
+                "mv": 0,
+                "name": "会员曲",
+                "playable": true,
+                "quality": "",
+                "reason": ""
+            },
+            "name": "explicitPrivilegePlayable",
+            "privilege": {
+                "fee": 1,
+                "id": 11,
+                "pl": 320000,
+                "st": 0
+            },
+            "song": {
+                "fee": 1,
+                "id": 11,
+                "name": "会员曲"
+            }
+        }
+    ]
+}

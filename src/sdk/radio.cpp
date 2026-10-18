@@ -59,15 +59,23 @@ Result<RadioProgram> programFrom(const QJsonObject &object, const QString &path,
     program.serialNum = static_cast<int>(reader.integer("serialNum"));
     program.cover = reader.string("coverUrl");
     const QJsonObject mainSong = reader.object("mainSong");
-    JsonReader songReader(mainSong, path + QStringLiteral(".mainSong"));
-    // byradio 有时只给 mainTrackId（与 mainSong.id 同值），没有嵌套 mainSong
-    program.mainSongId = songReader.integer("id");
+    // 主歌本体只经 Track 解析；byradio 有时只给 mainTrackId（与 mainSong.id 同值）
+    const auto parsedSong = parseTrack(mainSong);
+    if (!parsedSong) {
+        return Result<RadioProgram>::failure(endpointError(
+            ErrorKind::Parse, endpoint, parsedSong.error.message,
+            path + QStringLiteral(".mainSong")));
+    }
+    const Track &song = *parsedSong.value;
+    program.mainSongId = song.id;
     if (program.mainSongId <= 0)
         program.mainSongId = reader.integer("mainTrackId");
-    program.mainSongName = songReader.string("name");
-    program.mainSongDuration = songReader.integer("duration") / 1000;
-    program.fee = static_cast<int>(songReader.integer("fee"));
-    program.artists = objectNameList(mainSong.value(QStringLiteral("artists")).toArray());
+    program.mainSongName = song.name;
+    program.mainSongDuration = song.duration;
+    program.fee = static_cast<int>(song.fee);
+    for (const TrackArtist &artist : song.artists)
+        if (!artist.name.isEmpty())
+            program.artists.append(artist.name);
     const QJsonObject radio = reader.object("radio");
     if (!radio.isEmpty()) {
         const auto parsed = radioFrom(radio, path + QStringLiteral(".radio"), endpoint);
@@ -78,9 +86,6 @@ Result<RadioProgram> programFrom(const QJsonObject &object, const QString &path,
     if (!reader.ok())
         return Result<RadioProgram>::failure(
             endpointError(ErrorKind::Parse, endpoint, reader.error(), path));
-    if (!songReader.ok())
-        return Result<RadioProgram>::failure(
-            endpointError(ErrorKind::Parse, endpoint, songReader.error(), path));
     return Result<RadioProgram>::success(program);
 }
 
@@ -164,6 +169,44 @@ Result<RadioProgram> parseRadioProgram(const QJsonObject &root)
                           QStringLiteral("radio.program.program: missing object"),
                           QStringLiteral("radio.program.program")));
     return programFrom(program, QStringLiteral("radio.program.program"), ProgramPath);
+}
+
+Track trackFromProgram(const RadioProgram &program, const QString &radioName,
+                       const QString &djName, const QString &radioCover)
+{
+    const QString album = program.radio.name.isEmpty() ? radioName : program.radio.name;
+    const QString host = program.radio.djName.isEmpty() ? djName : program.radio.djName;
+    QString cover = program.cover;
+    if (cover.isEmpty())
+        cover = program.radio.cover;
+    if (cover.isEmpty())
+        cover = radioCover;
+
+    Track track;
+    track.id = program.mainSongId;
+    // 节目名/主播/电台/封面是 Program 文档里的覆盖，不取主歌自己的元数据
+    track.name = program.name;
+    track.artists.append(TrackArtist{0, host});
+    track.albumName = album;
+    track.cover = cover;
+    track.duration = program.mainSongDuration;
+    track.fee = program.fee;
+    return track;
+}
+
+QVariantMap programToVariantMap(const RadioProgram &program, const QString &radioName,
+                                const QString &djName, const QString &radioCover,
+                                qint64 radioId)
+{
+    QVariantMap map = trackToVariantMap(
+        trackFromProgram(program, radioName, djName, radioCover), QString(), 0);
+    const qint64 stationId = program.radio.id > 0 ? program.radio.id : radioId;
+    map.insert("programId", static_cast<double>(program.id));
+    map.insert("radioId", static_cast<double>(stationId));
+    map.insert("serial", static_cast<double>(program.serialNum));
+    map.insert("createTime", static_cast<double>(program.createTime));
+    map.insert("description", program.description);
+    return map;
 }
 
 Result<RadioStation> parseRadioStation(const QJsonObject &root)

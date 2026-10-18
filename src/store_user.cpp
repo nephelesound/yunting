@@ -4,6 +4,7 @@
 #include "json_util.h"
 #include "ncmclient.h"
 #include "normalize.h"
+#include "sdk/track.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -81,10 +82,13 @@ void Store::requestUser(const QString &key, double uid)
                 }
                 if (ok && root.value("code").toInt() == 200) {
                     for (const QJsonValue &v : arr(root, "playlist")) {
-                        const QJsonObject p = v.toObject();
-                        QVariantMap card = ncmPlaylistCard(p, "coverImgUrl");
-                        card.insert("owned", p.value("creator").toObject().value("userId").toDouble() == uid);
-                        card.insert("description", ncmFirstLine(p.value("description").toString()));
+                        const auto parsedCard =
+                            sdk::parsePlaylistCard(v.toObject(), "coverImgUrl");
+                        if (!parsedCard)
+                            continue;
+                        QVariantMap card = sdk::playlistCardToVariantMap(*parsedCard.value);
+                        card.insert("owned",
+                                    static_cast<double>(parsedCard.value->creatorId) == uid);
                         state->playlists.append(card);
                     }
                 }

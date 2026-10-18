@@ -99,7 +99,7 @@
 （与关注 / 粉丝、私信一样），`more` 为 false 时没有下一页。`next` 是游标或 offset，由 Store 给，界面原样带回。
 这些槽在没取之前是 `null`；`[]` 表示取到了但是空的。
 
-`Track` 与 `ncmTrack` 同形：`id,name,artist,album,albumId,artistId,artists:[{id,name}],dur,fee,cover,alias,quality,mv,playable,blockedBy,reason`。
+`Track` 由 `sdk::trackToVariantMap()` 生成：`id,name,artist,album,albumId,artistId,artists:[{id,name}],dur,fee,cover,alias,quality,mv,playable,blockedBy,reason`；发现页与节目传 `coverPx=0`，`cover` 保留原图 URL，其余槽位是 120 方图。
 `Program` 是节目版 Track：`id` 为主歌 id（真正播放的那首）、`name` 为节目名、`artist` 为主播、`album` 为电台、
 `albumId` 与 `artistId` 为 0、`artists:[{id:0,name:主播}]`、`dur` 为主歌秒数；另带
 `programId,radioId,serial,createTime,description`。没有可播放主歌 id 的节目不会返回。

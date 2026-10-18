@@ -4,6 +4,7 @@
 #include "json_util.h"
 #include "ncmclient.h"
 #include "normalize.h"
+#include "sdk/track.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -46,8 +47,11 @@ QString payloadKind(const QJsonObject &payload)
 QVariantMap normalizePayload(const QJsonObject &payload)
 {
     QVariantMap out{{"text", payloadText(payload)}, {"kind", payloadKind(payload)}};
-    if (payload.value("song").isObject())
-        out.insert("song", ncmTrack(payload.value("song").toObject()));
+    if (payload.value("song").isObject()) {
+        const auto track = sdk::parseTrack(payload.value("song").toObject());
+        if (track)
+            out.insert("song", sdk::trackToVariantMap(*track.value));
+    }
     if (payload.value("album").isObject()) {
         const QJsonObject a = payload.value("album").toObject();
         out.insert("album", QVariantMap{
@@ -58,9 +62,10 @@ QVariantMap normalizePayload(const QJsonObject &payload)
         });
     }
     if (payload.value("playlist").isObject()) {
-        const QJsonObject p = payload.value("playlist").toObject();
-        QVariantMap card = ncmPlaylistCard(p, "coverImgUrl");
-        out.insert("playlist", card);
+        const auto card = sdk::parsePlaylistCard(payload.value("playlist").toObject(),
+                                                 "coverImgUrl");
+        if (card)
+            out.insert("playlist", sdk::playlistCardToVariantMap(*card.value));
     }
     if (payload.value("mv").isObject()) {
         const QJsonObject m = payload.value("mv").toObject();

@@ -4,6 +4,7 @@
 #include "json_util.h"
 #include "normalize.h"
 #include "sdk/account_feed.h"
+#include "sdk/track.h"
 
 #include <QDate>
 #include <QJsonArray>
@@ -168,7 +169,10 @@ void Store::fetchPublicPersonal()
 {
     // 私人漫游：匿名时也是公共流，登录后是个人的；snapshot.py 同样带 cookie 取
     fetch("api/v1/radio/get", {}, true, [this](const QJsonDocument &doc, bool /*ok*/) {
-        put("fm", QVariantMap{{"tracks", ncmTracks(arr(body(doc), "data"))}}, true);
+        const auto parsed = sdk::parseTracks(arr(body(doc), "data"));
+        if (!parsed)
+            return;
+        put("fm", QVariantMap{{"tracks", sdk::tracksToVariantList(*parsed.value)}}, true);
     });
 }
 
@@ -176,9 +180,13 @@ void Store::fetchAnonymousPlaylists()
 {
     // snapshot.py 匿名分支：公共推荐歌单，曲目与简介留空，点开再取
     fetch("api/personalized/playlist", query({{"limit", "12"}}), false, [this](const QJsonDocument &doc, bool /*ok*/) {
+        const auto parsed = sdk::parsePlaylistCards(arr(body(doc), "result"), "picUrl");
+        if (!parsed)
+            return;
         QVariantList cards;
-        for (const QJsonValue &v : arr(body(doc), "result")) {
-            QVariantMap card = ncmPlaylistCard(v.toObject(), "picUrl");
+        cards.reserve(parsed.value->size());
+        for (const sdk::PlaylistCard &parsedCard : *parsed.value) {
+            QVariantMap card = sdk::playlistCardToVariantMap(parsedCard);
             card.insert("tracks", QVariantList{});
             card.insert("description", QString{});
             cards.append(card);
@@ -224,12 +232,14 @@ void Store::fetchDaily()
             QJsonArray privileges = arr(data, "privileges");
             if (privileges.isEmpty())
                 privileges = arr(body(doc), "privileges");
-            QVariantList tracks = ncmTracks(take(arr(data, "dailySongs"), 30), privileges);
-            for (QVariant &v : tracks) {
-                QVariantMap track = v.toMap();
-                track.insert("reason", reasons.value(track.value("id").toDouble()));
-                v = track;
-            }
+            const auto parsed = sdk::parseTracks(take(arr(data, "dailySongs"), 30), privileges);
+            if (!parsed)
+                return;
+            QVariantList tracks;
+            tracks.reserve(parsed.value->size());
+            for (const sdk::Track &track : *parsed.value)
+                tracks.append(sdk::trackToVariantMap(
+                    track, reasons.value(static_cast<double>(track.id))));
             put("daily", QVariantMap{
                              {"date", date},
                              {"day", QString::number(today.day())},
@@ -250,10 +260,12 @@ void Store::fetchUserLists(double uid)
             return;
         QVariantList mine, subscribed;
         for (int i = 1; i < lists.size(); ++i) {
-            const QJsonObject p = lists.at(i).toObject();
-            QVariantMap card = ncmPlaylistCard(p, "coverImgUrl");
-            const bool owned = p.value("creator").toObject().value("userId").toDouble() == uid;
-            (owned ? &mine : &subscribed)->append(card);
+            const auto parsedCard = sdk::parsePlaylistCard(lists.at(i).toObject(), "coverImgUrl");
+            if (!parsedCard)
+                continue;
+            const bool owned = static_cast<double>(parsedCard.value->creatorId) == uid;
+            (owned ? &mine : &subscribed)->append(
+                sdk::playlistCardToVariantMap(*parsedCard.value));
         }
         put("mine", mine, true);
         put("subscribed", subscribed, true);
@@ -289,12 +301,14 @@ void Store::fetchHeart(const QVariantMap &seed, const QJsonObject &likedList)
                  {"count", "1"}}), true,
           [this, seed](const QJsonDocument &doc, bool /*ok*/) {
         const QJsonObject resp = body(doc);
-        const QHash<double, QJsonObject> privileges = ncmPrivilegeIndex(arr(resp, "privileges"));
-        QVariantList tracks;
-        for (const QJsonValue &x : arr(resp, "data")) {
-            const QJsonObject song = x.toObject().value("songInfo").toObject();
-            tracks.append(ncmTrack(song, privileges.value(song.value("id").toDouble())));
-        }
+        const QJsonArray entries = arr(resp, "data");
+        QJsonArray songs;
+        for (const QJsonValue &x : entries)
+            songs.append(x.toObject().value("songInfo").toObject());
+        const auto parsed = sdk::parseTracks(songs, arr(resp, "privileges"));
+        if (!parsed)
+            return;
+        QVariantList tracks = sdk::tracksToVariantList(*parsed.value);
         put("heart", QVariantMap{{"seed", seed}, {"tracks", tracks.mid(0, 30)}}, true);
         // radar / tail 由 fetchAccount 独立发起，不挂在这条链尾
     });
@@ -317,10 +331,13 @@ void Store::fetchRadar()
 void Store::fetchTail()
 {
     fetch("api/v1/discovery/recommend/resource", {}, true, [this](const QJsonDocument &doc, bool /*ok*/) {
+        const auto parsed = sdk::parsePlaylistCards(arr(body(doc), "recommend"), "picUrl");
+        if (!parsed)
+            return;
         QVariantList cards;
-        const QJsonArray recommend = arr(body(doc), "recommend");
-        for (const QJsonValue &v : recommend) {
-            QVariantMap card = ncmPlaylistCard(v.toObject(), "picUrl");
+        cards.reserve(parsed.value->size());
+        for (const sdk::PlaylistCard &parsedCard : *parsed.value) {
+            QVariantMap card = sdk::playlistCardToVariantMap(parsedCard);
             card.insert("tracks", QVariantList{});
             card.insert("description", QString{});
             cards.append(card);
@@ -345,14 +362,14 @@ void Store::fetchTail()
         QJsonArray privilegeList = arr(record, "privileges");
         if (privilegeList.isEmpty())
             privilegeList = arr(resp, "privileges");
-        const QHash<double, QJsonObject> privileges = ncmPrivilegeIndex(privilegeList);
-        QVariantList tracks;
-        for (const QJsonValue &x : arr(record, "list")) {
-            const QJsonObject song = x.toObject().value("data").toObject();
-            tracks.append(ncmTrack(song, privileges.value(song.value("id").toDouble())));
-        }
+        QJsonArray songs;
+        for (const QJsonValue &x : arr(record, "list"))
+            songs.append(x.toObject().value("data").toObject());
+        const auto parsed = sdk::parseTracks(songs, privilegeList);
+        if (!parsed)
+            return;
         put("recent", QVariantMap{{"total", record.value("total").toDouble()},
-                                  {"tracks", tracks}}, true);
+                                  {"tracks", sdk::tracksToVariantList(*parsed.value)}}, true);
     });
 
     // 云盘用 offset 分页：接口单页上限 200，逐页取到 count 或空页为止（最多 1000 首）

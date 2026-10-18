@@ -10,6 +10,7 @@
 // Audio playback is not duplicated here: a program exposes mainSongId, which the
 // existing song-URL service can resolve. The SDK only owns metadata.
 #include "sdk/sdk_result.h"
+#include "sdk/track.h"
 
 #include <QList>
 #include <QObject>
@@ -49,6 +50,18 @@ struct RadioProgram {
     QStringList artists;     // mainSong.artists[].name
     RadioStation radio;      // nested radio (may be partial from recommendations)
 };
+
+// Program → the shared queue track. The playable id is mainSongId; name/artist/
+// album/cover follow the documented Program overrides (program name, host,
+// radio name, program cover with radio/detail fallbacks), so the main song's own
+// metadata is not used for those positions.
+Track trackFromProgram(const RadioProgram &program, const QString &radioName = {},
+                       const QString &djName = {}, const QString &radioCover = {});
+// Program → QML map: the shared track map (raw cover) plus the program-only
+// fields programId/radioId/serial/createTime/description.
+QVariantMap programToVariantMap(const RadioProgram &program, const QString &radioName = {},
+                                const QString &djName = {}, const QString &radioCover = {},
+                                qint64 radioId = 0);
 
 struct RadioProgramPage {
     QList<RadioProgram> items;

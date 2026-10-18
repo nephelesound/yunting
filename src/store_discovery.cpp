@@ -18,93 +18,6 @@ constexpr int kNewAlbumLimit = 30;
 constexpr int kHighQualityLimit = 20;
 constexpr int kRadioProgramLimit = 30;
 
-struct Playability {
-    bool playable;
-    QString blockedBy;
-};
-
-// 与 ncmTrack 在没有 privilege 时的退回规则一致：只看 fee。
-Playability playabilityForFee(int fee)
-{
-    if (fee == 4)
-        return {false, QStringLiteral("paid")};
-    if (fee == 1)
-        return {false, QStringLiteral("vip")};
-    return {true, QString()};
-}
-
-// 推荐新歌 → 队列曲目。字段含义与 ncmTrack 相同；cover 保持原图 URL。
-QVariantMap newSongTrack(const sdk::NewSong &song)
-{
-    QStringList names;
-    QVariantList artists;
-    artists.reserve(song.artists.size());
-    for (const sdk::NewSongArtist &artist : song.artists) {
-        names.append(artist.name);
-        artists.append(QVariantMap{{"id", static_cast<double>(artist.id)},
-                                   {"name", artist.name}});
-    }
-    const Playability play = playabilityForFee(song.fee);
-    return {
-        {"id", static_cast<double>(song.songId)},
-        {"name", song.name},
-        {"artist", names.join(QStringLiteral(" / "))},
-        {"artistId", artists.isEmpty() ? 0.0
-                                       : static_cast<double>(song.artists.first().id)},
-        {"artists", artists},
-        {"albumId", static_cast<double>(song.albumId)},
-        {"album", song.albumName},
-        {"dur", static_cast<double>(song.duration)},
-        {"fee", static_cast<double>(song.fee)},
-        {"cover", song.cover},
-        {"alias", song.alias},
-        {"quality", song.quality},
-        {"mv", static_cast<double>(song.mv)},
-        {"playable", play.playable},
-        {"blockedBy", play.blockedBy},
-        {"reason", QString()},
-    };
-}
-
-// 电台节目 → 队列曲目。id 是主歌 id（真正播放的那首），专辑/歌手位置换成电台/主播；
-// 节目自己缺 radio 时用详情页的电台信息补。
-QVariantMap programTrack(const sdk::RadioProgram &program, const QString &radioName,
-                         const QString &djName, const QString &radioCover, qint64 radioId)
-{
-    const QString album = program.radio.name.isEmpty() ? radioName : program.radio.name;
-    const QString host = program.radio.djName.isEmpty() ? djName : program.radio.djName;
-    QString cover = program.cover;
-    if (cover.isEmpty())
-        cover = program.radio.cover;
-    if (cover.isEmpty())
-        cover = radioCover;
-    const qint64 stationId = program.radio.id > 0 ? program.radio.id : radioId;
-    const Playability play = playabilityForFee(program.fee);
-    return {
-        {"id", static_cast<double>(program.mainSongId)},
-        {"name", program.name},
-        {"artist", host},
-        {"artistId", 0.0},
-        {"artists", QVariantList{QVariantMap{{"id", 0.0}, {"name", host}}}},
-        {"albumId", 0.0},
-        {"album", album},
-        {"dur", static_cast<double>(program.mainSongDuration)},
-        {"fee", static_cast<double>(program.fee)},
-        {"cover", cover},
-        {"alias", QString()},
-        {"quality", QString()},
-        {"mv", 0.0},
-        {"playable", play.playable},
-        {"blockedBy", play.blockedBy},
-        {"reason", QString()},
-        {"programId", static_cast<double>(program.id)},
-        {"radioId", static_cast<double>(stationId)},
-        {"serial", static_cast<double>(program.serialNum)},
-        {"createTime", static_cast<double>(program.createTime)},
-        {"description", program.description},
-    };
-}
-
 QVariantMap radioBase(const sdk::RadioStation &radio)
 {
     return {
@@ -217,7 +130,8 @@ void Store::requestNewSongs()
                 QVariantList tracks;
                 tracks.reserve(result.value->size());
                 for (const sdk::NewSong &song : *result.value)
-                    tracks.append(newSongTrack(song));
+                    tracks.append(sdk::trackToVariantMap(sdk::trackFromNewSong(song),
+                                                         QString(), 0));
                 done(tracks, true);
             });
         },
@@ -386,7 +300,7 @@ void Store::requestRecommendedPrograms()
                 for (const sdk::RadioProgram &program : *result.value) {
                     if (program.mainSongId <= 0)
                         continue;
-                    programs.append(programTrack(program, {}, {}, {}, 0));
+                    programs.append(sdk::programToVariantMap(program));
                 }
                 done(programs, true);
             });
@@ -434,11 +348,12 @@ void Store::requestRadio(double radioId, int offset)
                 for (const sdk::RadioProgram &program : state->programs) {
                     if (program.mainSongId <= 0)
                         continue;
-                    programs.append(programTrack(program,
-                                                 state->detail.value("name").toString(),
-                                                 dj.value("name").toString(),
-                                                 state->detail.value("cover").toString(),
-                                                 static_cast<qint64>(radioId)));
+                    programs.append(sdk::programToVariantMap(
+                        program,
+                        state->detail.value("name").toString(),
+                        dj.value("name").toString(),
+                        state->detail.value("cover").toString(),
+                        static_cast<qint64>(radioId)));
                 }
                 QVariantMap page = state->detail;
                 // 下一页的 offset 按服务器给的条数算（没有主歌而被跳过的节目也占位）

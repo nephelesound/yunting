@@ -25,7 +25,7 @@ NcmClient                 传输（cookie、weapi/明文、超时）
 ```
 
 - `song_wiki_service.cpp` 是三段响应的唯一合并点。
-- `song_wiki.cpp` 是 raw JSON 的唯一读取点。
+- `song_wiki.cpp` / `track.cpp` 是各自响应 raw JSON 的唯一读取点。`Track`/`PlaylistCard` 是所有嵌套歌曲与歌单卡片的共享边界，可播性只在 `playability()` 计算；旧 QML map 只经 `trackToVariantMap()` / `playlistCardToVariantMap()` 生成（发现页与节目用 `coverPx=0` 保留原图 URL）。
 - `Store::requestWiki()` 只拿 `Result<SongWiki>`，再调用 `toVariantMap()` 交给旧前端。
 - 新前端接入应优先使用 `SongWiki` 或 `toJson()`；不要把 `QJsonObject` 再拆到页面里。
 
@@ -33,6 +33,7 @@ NcmClient                 传输（cookie、weapi/明文、超时）
 
 - `sdk_result.h`：`Result<T>`、`ErrorKind`、`Error`。
 - `sdk_json.h/.cpp`：带 path 的 typed `JsonReader`。
+- `track.h/.cpp`：`Track` / `PlaylistCard` typed 模型、唯一的 `playability()`、legacy QML map 适配；新歌与节目各自转成一个 `Track`。
 - `song_wiki.h/.cpp`：DTO、解析、归一化、legacy map 适配。
 - `song_wiki_service.h/.cpp`：三个请求的组合与回调。
 - `discovery.h/.cpp`：推荐新歌、新碟、精品歌单、精品标签、首页 banner 的 typed 模型与请求。
