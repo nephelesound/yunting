@@ -902,6 +902,47 @@ private slots:
         QCOMPARE(page.value("items").toList().first().toMap().value("replyCount").toDouble(), 5.0);
     }
 
+    // 歌单评论用 A_PL_0_ 线程，槽位与歌曲评论分离；分页也走同一套 cursor 逻辑
+    void playlistCommentsUsePlaylistThread()
+    {
+        QList<QByteArray> threads;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path != "/api/v2/resource/comments") {
+                respond(200, "{\"code\":200}");
+                return;
+            }
+            const QUrlQuery q(QString::fromLatin1(req.query));
+            threads.append(q.queryItemValue(QStringLiteral("threadId")).toUtf8());
+            const QJsonObject comment{
+                {"commentId", 501}, {"content", "playlist comment"}, {"likedCount", 2},
+                {"time", 10}, {"liked", false},
+                {"user", QJsonObject{{"userId", 7}, {"nickname", "u"}}},
+            };
+            respond(200, json(QJsonObject{{"code", 200}, {"data", QJsonObject{
+                {"comments", QJsonArray{comment}}, {"cursor", "10"},
+                {"hasMore", false}, {"totalCount", 1}}}}));
+        };
+
+        m_store->request(QStringLiteral("playlistComments:42"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("playlistComments").toMap().value("playlistId").toDouble() == 42;
+        }));
+        QCOMPARE(m_store->data().value("playlistComments").toMap().value("items").toList().size(), 1);
+        QVERIFY(!threads.isEmpty());
+        QCOMPARE(threads.first(), QByteArray("A_PL_0_42"));
+
+        m_store->request(QStringLiteral("playlistComments:42:0"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("playlistCommentPage").toMap().value("playlistId").toDouble() == 42;
+        }));
+        const QVariantMap page = m_store->data().value("playlistCommentPage").toMap();
+        QCOMPARE(page.value("offset").toInt(), 0);
+        QCOMPARE(page.value("items").toList().size(), 1);
+        QCOMPARE(page.value("total").toDouble(), 1.0);
+        QVERIFY(threads.size() >= 2);
+        QCOMPARE(threads.last(), QByteArray("A_PL_0_42"));
+    }
+
     // 冷启动直接要第 N 页（CLI / 缓存清空）时没有上一页的 cursor：从头顺序补，不能把第一页当成第 N 页
     void commentPageAfterColdOffsetWalksCursors()
     {

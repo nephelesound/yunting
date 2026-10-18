@@ -77,6 +77,9 @@ Store::Store(NcmClient *client, QObject *parent)
                                {"albums", QVariantList{}}, {"mvs", QVariantList{}}}},
         {"hotSearches", QVariantList{}},
         {"comments", QVariantMap{{"songId", 0.0}, {"items", QVariantList{}}}},
+        // 歌单评论：{ playlistId, offsets/total/more/items }；初始空/ null
+        {"playlistComments", QVariantMap{{"playlistId", 0.0}, {"items", QVariantList{}}}},
+        {"playlistCommentPage", nullVariant()},
         // 全部评论分页：{ songId, offset, total, more, items }；初始 null
         {"commentPage", nullVariant()},
         {"searchUsers", nullVariant()},
@@ -104,6 +107,7 @@ Store::Store(NcmClient *client, QObject *parent)
         {"forwards", nullVariant()},
         {"dynamicCover", nullVariant()},
         {"commentReplies", nullVariant()},
+        {"playlistCommentReplies", nullVariant()},
         {"lyricsNew", nullVariant()},
         // 匿名发现：形状见 docs/API-FRONTEND.md「已实现的新增数据槽」。没取之前是 null，[] 是取到了但为空
         {"searchSuggest", nullVariant()},

@@ -192,6 +192,17 @@ private:
     void requestSearchRadios(const QString &key, const QString &raw);
     void requestComments(const QString &key, double songId);
     void requestCommentPage(const QString &key, double songId, int offset);
+    void requestHotCommentsFor(const QString &key, const QString &threadId, double ownerId,
+                               const QString &ownerKey, const QString &slot);
+    void requestCommentPageFor(const QString &key, const QString &threadId, double ownerId,
+                               const QString &ownerKey, int offset, const QString &slot);
+    void requestCommentRepliesFor(const QString &threadId, double ownerId,
+                                  const QString &ownerKey, const QString &slot,
+                                  const QString &failureKey, double commentId, qint64 before);
+    // 歌单评论：A_PL_0_<id>，键为 playlistComments:<id>[:<offset>]；只读
+    void requestPlaylistComments(const QString &key, double playlistId);
+    void requestPlaylistCommentPage(const QString &key, double playlistId, int offset);
+    void requestPlaylistCommentReplies(double playlistId, double commentId, qint64 before);
     void requestArtist(const QString &key, double artistId);
     void requestArtistSongs(const QString &key, double artistId, int offset);
     void requestAlbum(const QString &key, double albumId);

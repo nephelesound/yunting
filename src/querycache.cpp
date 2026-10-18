@@ -87,8 +87,9 @@ qint64 QueryCache::freshFor(const QString &key)
         return 5 * 60;
     if (key.startsWith(QLatin1String("commentCursor:")))
         return 60 * 60;
-    if (key.startsWith(QLatin1String("comments:"))) {
-        // 热门评论 comments:<id>；分页 comments:<id>:<offset> 随时间追加，短一些
+    if (key.startsWith(QLatin1String("comments:"))
+        || key.startsWith(QLatin1String("playlistComments:"))) {
+        // 热门评论 <id>；分页 <id>:<offset> 随时间追加，短一些
         return key.count(u':') >= 2 ? 60 * 60 : kDay;
     }
     // playlist: / user: / search*（不落盘）与其余按需数据：一天

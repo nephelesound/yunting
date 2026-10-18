@@ -60,10 +60,11 @@
 |---|---|---|
 | 音乐百科 | 🟡 SDK 已接 | typed SDK + `wiki:<id>` Store 缓存已落地；`src/sdk/` 有 structs、校验、service、raw/normalized sample 与 JSON Schema。前端：正在播放页「百科」栏（副歌可点跳转）；真实账号未验 |
 | 通知列表 | 🟡 已接 | Store `notify:notices|comments|forwards`；前端：消息页「评论 / @我 / 通知」；live 仍需登录验证 |
+| 评论读取 | 🟡 已接 | 歌曲热评/分页/楼中楼；歌单评论热评/分页/楼中楼（`A_PL_0_`）已接。歌单评论点赞未接 |
 | 评论写 | ❌ 暂缓 | 发评论/回复依赖 xeapi，与当前 Web cookie 上下文冲突；点赞、楼中楼读取已接 |
 | 评论抱一抱 / 举报 / 删除 | ❌ 未接 | `comment/hug`、`comment/report`、`comment/delete` 等 |
 | 内容发现 | 🟡 部分 | 前端「发现」页：排行榜、新歌、新碟、精品歌单（按分类）、推荐 MV、播客；banner、首页 block、独家内容不接（多为广告与编辑位） |
-| 曲目扩展 | 🟡 部分 | 已有逐字歌词、MV、百科创作者/副歌；动态封面在正在播放页（登录后，无声循环，只在这一页播放时解码）。下载地址/歌词标记未接 |
+| 曲目扩展 | 🟡 部分 | 已有逐字歌词、MV、百科创作者/副歌、动态封面；单曲下载 + 本地文件离线播放已接。歌词标记未接 |
 | 音乐库 | 🟡 部分 | 歌单写（含描述，歌单页「编辑简介…」）、歌手/专辑收藏、用户关注/取关；收藏的歌手/专辑/MV 在「我的」第二排与「全部收藏」页；歌单隐私/封面/导入未接 |
 | 云盘 | 🟡 只读 | 已有分页读取；上传、导入、删除未接 |
 | 媒体扩展 | 🟡 部分 | 播客/电台已接（发现 › 播客、搜索 › 电台、电台页，节目按主歌播放）；视频时间线/详情/播放地址只有 SDK，没有视频页（收藏里的视频暂不列出） |
@@ -104,7 +105,7 @@
 
 ## 暂缓
 
-- [ ] 下载 / 离线音频（优先级后移）
+- [x] 下载 / 离线音频：下载 URL、文件落盘、AudioEngine 本地文件优先播放；`--download-selftest` live 验证 25 MB FLAC，离线 WAV smoke 通过
 - [ ] 本地音乐库（ID3 / CUE / iPod）
 - [x] MV / 视频播放 UI（搜索 MV、曲目菜单、独立播放页）
 - [ ] 评论写：发评论/回复走 xeapi（客户端认证），与 Web cookie 上下文冲突；点赞已走 weapi
@@ -168,7 +169,9 @@
 
 ## 验证
 
-- [x] `make test` 35/35
+- [x] `make test` 36/36
+- [x] `--download-selftest 108485`：真实下载 25,291,762 字节 FLAC 后清理；本地 WAV 离线播放 smoke 通过
+- [x] `--store-key playlistComments:3778678`：真实歌单热评 319,443 条；`playlistComments:3778678:0` 分页落地
 - [x] `--listen-together-selftest`：真实建房、同步两首歌单、结束；随后 status inRoom=false
 - [x] `--refresh-session`：真实 `login/token/refresh` 返回 ok，并重拉首屏
 - [x] `make contract` 登录 + 匿名

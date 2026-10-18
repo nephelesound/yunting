@@ -13,36 +13,54 @@ using namespace ncm;
 
 void Store::requestCommentReplies(double songId, double commentId, qint64 before)
 {
-    if (!(songId > 0) || !(commentId > 0))
+    requestCommentRepliesFor(QStringLiteral("R_SO_4_%1").arg(num(songId)), songId,
+                             QStringLiteral("songId"), QStringLiteral("commentReplies"),
+                             QStringLiteral("commentReplies:%1:%2")
+                                 .arg(num(songId), num(commentId)),
+                             commentId, before);
+}
+
+void Store::requestPlaylistCommentReplies(double playlistId, double commentId, qint64 before)
+{
+    requestCommentRepliesFor(QStringLiteral("A_PL_0_%1").arg(num(playlistId)), playlistId,
+                             QStringLiteral("playlistId"),
+                             QStringLiteral("playlistCommentReplies"),
+                             QStringLiteral("playlistCommentReplies:%1:%2")
+                                 .arg(num(playlistId), num(commentId)),
+                             commentId, before);
+}
+
+void Store::requestCommentRepliesFor(const QString &threadId, double ownerId,
+                                     const QString &ownerKey, const QString &slot,
+                                     const QString &failureKey, double commentId, qint64 before)
+{
+    if (!(ownerId > 0) || !(commentId > 0))
         return;
-    const quint64 token = before > 0 ? m_requests.token(QStringLiteral("commentReplies"))
-                                     : m_requests.begin(QStringLiteral("commentReplies"));
-    const QString thread = QStringLiteral("R_SO_4_%1").arg(num(songId));
+    const quint64 token = before > 0 ? m_requests.token(slot)
+                                     : m_requests.begin(slot);
     m_client->postWeapi(QStringLiteral("resource/comment/floor/get"),
                         QJsonObject{{"parentCommentId", num(commentId)},
-                                    {"threadId", thread},
+                                    {"threadId", threadId},
                                     {"time", QString::number(before)},
                                     {"limit", 20}},
                         true,
-                        [this, songId, commentId, before, token](const QJsonDocument &doc, bool ok) {
-        if (!m_requests.current(QStringLiteral("commentReplies"), token))
+                        [this, ownerId, ownerKey, slot, failureKey, commentId, before, token]
+                        (const QJsonDocument &doc, bool ok) {
+        if (!m_requests.current(slot, token))
             return;
         const QJsonObject root = body(doc);
         if (!ok || root.value("code").toInt() != 200) {
-            // 按请求 key 报错：界面按 commentReplies:<songId>:<commentId> 找到这一槽并重试
-            emit requestFailed(QStringLiteral("commentReplies:%1:%2").arg(num(songId), num(commentId)),
-                               QStringLiteral("暂时取不到评论回复"));
+            emit requestFailed(failureKey, QStringLiteral("暂时取不到评论回复"));
             return;
         }
         const auto parsed = sdk::parseCommentReplies(root);
         if (!parsed) {
-            emit requestFailed(QStringLiteral("commentReplies:%1:%2").arg(num(songId), num(commentId)),
-                               QStringLiteral("暂时取不到评论回复"));
+            emit requestFailed(failureKey, QStringLiteral("暂时取不到评论回复"));
             return;
         }
         QVariantList items;
         if (before > 0) {
-            const QVariant old = m_data.value("commentReplies");
+            const QVariant old = m_data.value(slot);
             if (old.toMap().value("commentId").toDouble() == commentId)
                 items = old.toMap().value("items").toList();
         }
@@ -51,8 +69,8 @@ void Store::requestCommentReplies(double songId, double commentId, qint64 before
         const qint64 next = parsed.value->comments.isEmpty()
                                 ? before
                                 : parsed.value->comments.last().time;
-        put("commentReplies", QVariantMap{
-            {"songId", songId}, {"commentId", commentId}, {"before", next},
+        put(slot.toUtf8().constData(), QVariantMap{
+            {ownerKey, ownerId}, {"commentId", commentId}, {"before", next},
             {"more", parsed.value->more}, {"items", items},
         }, false);
     });

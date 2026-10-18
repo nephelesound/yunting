@@ -32,14 +32,14 @@ constexpr int kCommentPageSize = 20;
 
 // 全部评论按 offset 对外（comments:<id>:<offset>），v2 接口却按 cursor 翻页：cursor 是上一页
 // 最后一条的时间。它单独存进 QueryCache，与页面同寿命，缓存命中时也能接着翻页。
-QString commentCursorKey(double songId, int offset)
+QString commentCursorKey(const QString &threadId, int offset)
 {
-    return QStringLiteral("commentCursor:%1:%2").arg(qlonglong(songId)).arg(offset);
+    return QStringLiteral("commentCursor:%1:%2").arg(threadId).arg(offset);
 }
 
-QUrlQuery commentPageQuery(double songId, int offset, const QString &cursor)
+QUrlQuery commentPageQuery(const QString &threadId, int offset, const QString &cursor)
 {
-    QUrlQuery q = query({{"threadId", QStringLiteral("R_SO_4_%1").arg(qlonglong(songId))},
+    QUrlQuery q = query({{"threadId", threadId},
                          {"pageNo", QString::number(offset / kCommentPageSize + 1)},
                          {"pageSize", QString::number(kCommentPageSize)},
                          {"sortType", "3"}});
@@ -111,6 +111,17 @@ void Store::request(const QString &key)
                  s.requestCommentPage(k, parts.at(1).toDouble(), parts.at(2).toInt());
              else
                  s.requestComments(k, parts.value(1).toDouble()); }},
+        {QStringLiteral("playlistComments:"), [](Store &s, const QString &k) {
+             const QStringList parts = k.split(u':');
+             if (parts.size() >= 3)
+                 s.requestPlaylistCommentPage(k, parts.at(1).toDouble(), parts.at(2).toInt());
+             else
+                 s.requestPlaylistComments(k, parts.value(1).toDouble()); }},
+        {QStringLiteral("playlistCommentReplies:"), [](Store &s, const QString &k) {
+             const QStringList parts = k.split(u':');
+             s.requestPlaylistCommentReplies(parts.value(1).toDouble(),
+                                             parts.value(2).toDouble(),
+                                             parts.value(3).toLongLong()); }},
         {QStringLiteral("artistSongs:"), [](Store &s, const QString &k) {
              const QStringList parts = k.split(u':');
              s.requestArtistSongs(k, parts.value(1).toDouble(), parts.value(2).toInt()); }},
@@ -367,21 +378,36 @@ void Store::requestSearch(const QString &key, const QString &raw)
 // 登录态每次取网络（liked 是本人状态）；匿名态仍用缓存。
 void Store::requestCommentPage(const QString &key, double songId, int offset)
 {
-    if (!(songId > 0) || offset < 0)
+    requestCommentPageFor(key, QStringLiteral("R_SO_4_%1").arg(qlonglong(songId)), songId,
+                          QStringLiteral("songId"), offset, QStringLiteral("commentPage"));
+}
+
+void Store::requestPlaylistCommentPage(const QString &key, double playlistId, int offset)
+{
+    requestCommentPageFor(key, QStringLiteral("A_PL_0_%1").arg(qlonglong(playlistId)),
+                          playlistId, QStringLiteral("playlistId"), offset,
+                          QStringLiteral("playlistCommentPage"));
+}
+
+void Store::requestCommentPageFor(const QString &key, const QString &threadId, double ownerId,
+                                  const QString &ownerKey, int offset, const QString &slot)
+{
+    if (!(ownerId > 0) || offset < 0)
         return;
-    const quint64 token = m_requests.begin(QStringLiteral("commentPage"));
+    const quint64 token = m_requests.begin(slot);
     // 登录后评论带「我」的 liked；缓存不能作为点赞状态的权威（写过之后旧行会
     // 立刻过时）。因此登录态走 refresh：每次都取网络，匿名态仍走 query 缓存。
-    auto fetch = [this, songId, offset](QueryCache::Done done) {
+    auto fetch = [this, threadId, ownerId, ownerKey, offset, slot](QueryCache::Done done) {
             // 正常翻页时上一页的 cursor 已记录；冷启动直接要第 N 页时从头顺序补游标，
             // 不能把第一页当成第 N 页。走到目标页之前的回包只用于取 cursor。
             const auto fetch = std::make_shared<std::function<void(int, const QString &)>>();
-            *fetch = [this, songId, offset, done, fetch](int pageOffset, const QString &cursor) {
+            *fetch = [this, threadId, ownerId, ownerKey, offset, done, fetch, slot]
+                     (int pageOffset, const QString &cursor) {
                 // 登录后带上 cookie：评论的 liked 是「我」的状态，匿名请求永远是 false。
-                // 匿名时 hasMusicU() 仍为 false，不改变公开数据的请求形状。
                 m_client->get(QStringLiteral("api/v2/resource/comments"),
-                              commentPageQuery(songId, pageOffset, cursor), m_client->hasMusicU(),
-                              [this, songId, offset, done, fetch, pageOffset](const QJsonDocument &doc, bool ok) {
+                              commentPageQuery(threadId, pageOffset, cursor), m_client->hasMusicU(),
+                              [this, threadId, ownerId, ownerKey, offset, done, fetch, pageOffset, slot]
+                              (const QJsonDocument &doc, bool ok) {
                     const QJsonObject resp = body(doc);
                     if (!ok || resp.value("code").toInt() != 200) {
                         done({}, false);
@@ -420,23 +446,25 @@ void Store::requestCommentPage(const QString &key, double songId, int offset)
                     const bool more = parsed.value->hasMore;
                     const QString next = parsed.value->cursor;
                     if (more && !items.isEmpty() && !next.isEmpty())
-                        m_cache.remember(commentCursorKey(songId, offset + int(items.size())), next);
-                    done(QVariantMap{{"songId", songId},
-                                     {"offset", offset},
-                                     {"total", total},
-                                     {"more", more},
-                                     {"items", items}},
-                         true);
+                        m_cache.remember(commentCursorKey(threadId, offset + int(items.size())), next);
+                    QVariantMap result{
+                        {ownerKey, ownerId},
+                        {"offset", offset},
+                        {"total", total},
+                        {"more", more},
+                        {"items", items},
+                    };
+                    done(result, true);
                 });
             };
             const QString cursor = offset > 0
-                                       ? m_cache.peek(commentCursorKey(songId, offset)).toString()
+                                       ? m_cache.peek(commentCursorKey(threadId, offset)).toString()
                                        : QString();
             (*fetch)(cursor.isEmpty() ? 0 : offset, cursor);
     };
-    auto deliver = [this, token](const QVariant &page) {
-        if (m_requests.current(QStringLiteral("commentPage"), token))
-            put("commentPage", page, false);
+    auto deliver = [this, token, slot](const QVariant &page) {
+        if (m_requests.current(slot, token))
+            put(slot.toUtf8().constData(), page, false);
     };
     if (m_client->hasMusicU())
         m_cache.refresh(key, fetch, deliver);
@@ -448,15 +476,29 @@ void Store::requestCommentPage(const QString &key, double songId, int offset)
 // 保持接口顺序，最多 10 条。
 void Store::requestComments(const QString &key, double songId)
 {
-    if (!(songId > 0))
+    requestHotCommentsFor(key, QStringLiteral("R_SO_4_%1").arg(qlonglong(songId)), songId,
+                          QStringLiteral("songId"), QStringLiteral("comments"));
+}
+
+void Store::requestPlaylistComments(const QString &key, double playlistId)
+{
+    requestHotCommentsFor(key, QStringLiteral("A_PL_0_%1").arg(qlonglong(playlistId)),
+                          playlistId, QStringLiteral("playlistId"),
+                          QStringLiteral("playlistComments"));
+}
+
+void Store::requestHotCommentsFor(const QString &key, const QString &threadId, double ownerId,
+                                  const QString &ownerKey, const QString &slot)
+{
+    if (!(ownerId > 0))
         return;
-    const quint64 token = m_requests.begin(QStringLiteral("comments"));
-    auto fetch = [this, songId](QueryCache::Done done) {
+    const quint64 token = m_requests.begin(slot);
+    auto fetch = [this, threadId, ownerId, ownerKey, slot](QueryCache::Done done) {
             m_client->get(QStringLiteral("api/v2/resource/comments"),
-                          query({{"threadId", QStringLiteral("R_SO_4_%1").arg(qlonglong(songId))},
+                          query({{"threadId", threadId},
                                  {"pageNo", "1"}, {"pageSize", "10"}, {"sortType", "2"}}),
                           m_client->hasMusicU(),
-                          [done, songId](const QJsonDocument &doc, bool ok) {
+                          [done, ownerId, ownerKey](const QJsonDocument &doc, bool ok) {
                 const QJsonObject resp = body(doc);
                 const bool success = ok && businessOk(resp);
                 const auto parsed = sdk::parseHotComments(resp);
@@ -468,22 +510,21 @@ void Store::requestComments(const QString &key, double songId)
                 items.reserve(parsed.value->comments.size());
                 for (const sdk::Comment &comment : parsed.value->comments)
                     items.append(commentToVariantMap(comment));
-                done(QVariantMap{{"songId", songId},
+                done(QVariantMap{{ownerKey, ownerId},
                                  {"total", static_cast<double>(parsed.value->total)},
                                  {"items", items}},
                      success);
             });
     };
-    auto deliver = [this, token](const QVariant &comments) {
-        if (m_requests.current(QStringLiteral("comments"), token))
-            put("comments", comments, false);
+    auto deliver = [this, token, slot](const QVariant &comments) {
+        if (m_requests.current(slot, token))
+            put(slot.toUtf8().constData(), comments, false);
     };
     if (m_client->hasMusicU())
         m_cache.refresh(key, fetch, deliver);
     else
         m_cache.query(key, fetch, deliver);
 }
-
 
 // 歌手页：热歌 50 首 + 专辑列表（一次 200 张；普通歌手够用）。两个请求独立，
 // 专辑失败仍返回歌手与热歌，页面不会整页空白。
