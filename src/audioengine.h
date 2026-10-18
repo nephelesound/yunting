@@ -1,8 +1,8 @@
 #pragma once
 // AudioEngine：声音接缝（prototype/Playback.qml 消费）。接口与 SimEngine.qml 逐字段一致：
 // track（Playback 设置即开始取播放地址）· playing · position / duration（秒）· volume / muted。
-// volume 用对数（滑条）刻度：0–1 感知线性，喂给 mpv 前转成线性幅度（mpv volume 是 0–100 的线性幅度），
-// 否则滑条前半段几乎听不出变化。muted 与音量互相独立，不互相改写。
+// volume 是滑条的 0–1，乘 100 即 mpv 的 volume：mpv 的音量本身是三次曲线（感知均匀），不再另做换算。
+// muted 与音量互相独立，不互相改写。
 // 播放走 libmpv：audio-device=auto 跟随 PipeWire/PulseAudio 的系统默认输出；EQ、低音与
 // 空间感是 mpv 的 lavfi 滤镜。队列与「下一首」不在这里：自然播完只发 finished()，
 // 切歌规则只有 Playback 那一份。
@@ -18,6 +18,7 @@
 
 class MpvController;
 class NcmClient;
+class QTimer;
 
 class AudioEngine : public QObject {
     Q_OBJECT
@@ -113,6 +114,8 @@ signals:
     void scrobbled(const QVariantMap &track);
 
 private:
+    // 设备列表变化后重新打开 mpv 的输出：仅靠 audio-device=auto 不会可靠地跟随热插拔
+    void reloadAudioOutput();
     // 地址取不到即 failed；quality=auto 时按曲目元数据选档
     void resolveUrl(double songId);
     void startSource(const QString &url, const QString &level, int bitrate);
@@ -152,11 +155,12 @@ private:
     bool m_atEof = false;
     bool m_finishedEmitted = false;
     QString m_sourceUrl;
-    // 滑条刻度（对数感知）；写入 mpv 前经 linearVolume 转线性幅度
+    // 滑条刻度 0–1；写入 mpv 时直接乘 100
     double m_volume = 0.7;
     bool m_muted = false;
     QString m_quality = QStringLiteral("auto");
     QString m_outputDeviceId;
+    QTimer *m_audioDeviceDebounce = nullptr;
     // 这次播放实际拿到的档位与码率；NCBL 上报用，不是曲目的最高可用档位
     QString m_playedLevel;
     int m_playedBitrate = 320000;

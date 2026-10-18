@@ -16,21 +16,11 @@
 #include <QTimer>
 #include <QUrlQuery>
 #include <algorithm>
-#include <cmath>
 #include <cstdio>
 
 using namespace ncm;
 
 namespace {
-// 滑条 0–1 是感知线性的对数刻度；mpv volume 是 0–100 的线性幅度，所以先换算再喂给 mpv。
-double linearVolume(double slider)
-{
-    slider = std::clamp(slider, 0.0, 1.0);
-    if (slider > 0.99)
-        return 1.0;
-    return -std::log(1.0 - slider) / std::log(100.0);
-}
-
 // 10 段均衡的频点与旧 DSP 路径一致；lavfi 的 equalizer 是峰值滤波，Q 也取同一个值。
 constexpr int kEqFrequencies[10] = {31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000};
 
@@ -103,7 +93,8 @@ AudioEngine::AudioEngine(NcmClient *client, QObject *parent)
     if (qEnvironmentVariableIsSet("YUNTING_TEST_AO_NULL"))
         option("ao", "null");
 
-    m_controller->setProperty(QStringLiteral("volume"), linearVolume(m_volume) * 100.0);
+    // mpv 的 volume 已是三次曲线；再叠一层对数换算会让 50% 的滑条几乎听不见
+    m_controller->setProperty(QStringLiteral("volume"), m_volume * 100.0);
     m_controller->setProperty(QStringLiteral("mute"), m_muted);
 
     connect(m_controller, &MpvController::propertyChanged, this, &AudioEngine::handleProperty);
@@ -115,6 +106,11 @@ AudioEngine::AudioEngine(NcmClient *client, QObject *parent)
     m_controller->observeProperty(QStringLiteral("pause"), MPV_FORMAT_FLAG);
     m_controller->observeProperty(QStringLiteral("idle-active"), MPV_FORMAT_FLAG);
     m_controller->observeProperty(QStringLiteral("eof-reached"), MPV_FORMAT_FLAG);
+    m_controller->observeProperty(QStringLiteral("audio-device-list"), MPV_FORMAT_NODE);
+    m_audioDeviceDebounce = new QTimer(this);
+    m_audioDeviceDebounce->setSingleShot(true);
+    m_audioDeviceDebounce->setInterval(100);
+    connect(m_audioDeviceDebounce, &QTimer::timeout, this, &AudioEngine::reloadAudioOutput);
 }
 
 AudioEngine::~AudioEngine() = default;
@@ -203,7 +199,7 @@ void AudioEngine::setVolume(double volume)
     if (clamped == m_volume)
         return;
     m_volume = clamped;
-    m_controller->setProperty(QStringLiteral("volume"), linearVolume(clamped) * 100.0);
+    m_controller->setProperty(QStringLiteral("volume"), clamped * 100.0);
     emit volumeChanged();
 }
 
@@ -342,6 +338,33 @@ QVariantList AudioEngine::audioOutputs() const
     return out;
 }
 
+void AudioEngine::reloadAudioOutput()
+{
+    if (qEnvironmentVariableIsSet("YUNTING_TEST_AO_NULL"))
+        return;
+    const QVariantList outputs = audioOutputs();
+    bool selectedPresent = m_outputDeviceId.isEmpty();
+    for (const QVariant &entry : outputs) {
+        if (entry.toMap().value("id").toString() == m_outputDeviceId) {
+            selectedPresent = true;
+            break;
+        }
+    }
+    if (!selectedPresent) {
+        m_outputDeviceId.clear();
+        emit outputDeviceChanged();
+    }
+    const QString target = m_outputDeviceId.isEmpty() ? QStringLiteral("auto") : m_outputDeviceId;
+    const int setError = m_controller->setProperty(QStringLiteral("audio-device"), target);
+    const QVariant reload = m_controller->command({QStringLiteral("ao-reload")});
+    if (setError < 0 || isMpvError(reload))
+        qWarning() << "mpv audio device reload failed:"
+                   << (setError < 0 ? MpvController::getError(setError) : MpvController::getError(
+                           qvariant_cast<ErrorReturn>(reload).error));
+    else
+        qCDebug(lcPerf) << "mpv audio device reloaded" << target;
+}
+
 void AudioEngine::setOutputDevice(const QString &id)
 {
     // 空 id 是「系统默认」（mpv 的 auto）；其余必须是列表里的设备，"auto" 本身不算
@@ -359,9 +382,11 @@ void AudioEngine::setOutputDevice(const QString &id)
         return;
     m_outputDeviceId = id;
     const int err = m_controller->setProperty(QStringLiteral("audio-device"), target);
-    // 设备不在了由 mpv 自己回退，这里只记一条警告，不重启播放
+    // 设备不在了由 mpv 自己回退；设置后强制重开 AO，正在播放的流才会跟到新设备。
     if (err < 0)
         qWarning() << "mpv audio-device failed:" << MpvController::getError(err);
+    else
+        m_controller->command({QStringLiteral("ao-reload")});
     emit outputDeviceChanged();
 }
 
@@ -505,6 +530,10 @@ void AudioEngine::handleProperty(const QString &name, const QVariant &value)
 {
     if (!value.isValid())
         return;
+    if (name == QLatin1String("audio-device-list")) {
+        m_audioDeviceDebounce->start();
+        return;
+    }
     if (name == QLatin1String("time-pos")) {
         m_position = value.toDouble();
         if (m_playing && m_position > 0)
