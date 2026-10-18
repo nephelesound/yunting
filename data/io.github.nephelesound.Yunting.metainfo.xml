@@ -4,23 +4,59 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
   <name>云听</name>
-  <summary>网易云音乐的 Linux 客户端</summary>
+  <summary>网易云音乐的非官方 Linux 客户端</summary>
   <developer id="io.github.nephelesound">
     <name>Nephele Sound</name>
   </developer>
   <url type="homepage">https://github.com/nephelesound/yunting</url>
   <url type="bugtracker">https://github.com/nephelesound/yunting/issues</url>
+  <url type="vcs-browser">https://github.com/nephelesound/yunting</url>
   <launchable type="desktop-id">io.github.nephelesound.Yunting.desktop</launchable>
   <provides>
     <binary>yunting</binary>
   </provides>
-  <content_rating type="oars-1.1"/>
+  <branding>
+    <color type="primary" scheme_preference="light">#f0d4dd</color>
+    <color type="primary" scheme_preference="dark">#8a5a6b</color>
+  </branding>
+  <!-- 显示别人的评论与私信（网易审核过的）；登录网易账号，听歌记录归在账号下 -->
+  <content_rating type="oars-1.1">
+    <content_attribute id="social-chat">moderate</content_attribute>
+    <content_attribute id="social-info">intense</content_attribute>
+  </content_rating>
   <description>
     <p>
       为 Linux 打造的网易云音乐客户端：原生 KDE/Qt 界面，个人推荐优先，
       支持 MPRIS 媒体键与系统托盘。
     </p>
+    <ul>
+      <li>每日推荐、私人漫游、心动模式与排行榜</li>
+      <li>逐行滚动的歌词、桌面歌词与评论区</li>
+      <li>和好友一起听，下载歌曲离线播放</li>
+      <li>扫码登录，红心、歌单与收藏和手机同步</li>
+    </ul>
+    <p>
+      云听由社区开发，不是网易云音乐的官方应用，与网易公司没有关联。
+    </p>
   </description>
+  <screenshots>
+    <screenshot type="default">
+      <caption>正在播放与逐行歌词</caption>
+      <image>https://raw.githubusercontent.com/nephelesound/yunting/master/data/screenshots/1-now-playing.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>发现：排行榜、新歌、新碟与精品歌单</caption>
+      <image>https://raw.githubusercontent.com/nephelesound/yunting/master/data/screenshots/2-discover.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>榜单与音质标记</caption>
+      <image>https://raw.githubusercontent.com/nephelesound/yunting/master/data/screenshots/3-chart.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>跟随系统的深色配色</caption>
+      <image>https://raw.githubusercontent.com/nephelesound/yunting/master/data/screenshots/4-dark.png</image>
+    </screenshot>
+  </screenshots>
   <releases>
     <release version="0.5.5" date="2026-10-18">
       <description>
