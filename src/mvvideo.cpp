@@ -65,6 +65,7 @@ void MvVideo::setSource(const QUrl &source)
     m_atEof = false;
     m_loadPending = false;
     setPlaying(false);
+    setHasFrame(false);
     setError(QString());
     emit sourceChanged();
     emit positionChanged();
@@ -137,6 +138,7 @@ void MvVideo::stop()
     m_loadPending = false;
     m_pendingSeek = -1;
     setPlaying(false);
+    setHasFrame(false);
     if (m_position != 0) {
         m_position = 0;
         emit positionChanged();
@@ -154,6 +156,7 @@ void MvVideo::load()
     m_fileLoaded = false;
     m_stopped = false;
     m_atEof = false;
+    setHasFrame(false);
     setError(QString());
     setProperty(QStringLiteral("pause"), false);
     const QVariant reply = commandBlocking(QStringList{QStringLiteral("loadfile"),
@@ -188,6 +191,14 @@ void MvVideo::setPlaying(bool playing)
     emit playingChanged();
 }
 
+void MvVideo::setHasFrame(bool hasFrame)
+{
+    if (hasFrame == m_hasFrame)
+        return;
+    m_hasFrame = hasFrame;
+    emit hasFrameChanged();
+}
+
 void MvVideo::setError(const QString &message)
 {
     if (message == m_errorString)
@@ -203,6 +214,9 @@ void MvVideo::onPropertyChanged(const QString &name, const QVariant &value)
     if (name == QLatin1String("time-pos")) {
         m_position = value.toDouble() * 1000.0;
         emit positionChanged();
+        // 播放时间走动 = 帧已经在出；文件刚加载时报的 0 还不算
+        if (m_fileLoaded && m_position > 0)
+            setHasFrame(true);
     } else if (name == QLatin1String("duration")) {
         const double duration = value.toDouble() * 1000.0;
         if (duration > 0) {

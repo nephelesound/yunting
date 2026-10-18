@@ -78,12 +78,27 @@ ScreenFrame {
             opacity: page.coverHidden ? 0 : 1
 
             // 动态封面（登录后，少数歌有的循环小视频）：盖在封面上，不出声。只在这一页、正在放歌时才转，
-            // 暂停、换歌或离开就把播放器拆掉（不在后台解码）；没有动态封面时就是普通封面
+            // 暂停、换歌或离开就把播放器拆掉（不在后台解码）；没有动态封面时就是普通封面。
+            // 与静态封面交叉淡化：第一帧出来之前渲染面是黑的，等 hasFrame 再淡入；不要了先淡出再拆。
+            // 换歌时旧画面先淡出到新歌的封面，再加载新地址（就地换地址，mpv 会先停成黑帧）
             Loader {
                 id: dynamicCover
                 readonly property string url: page.track && Source.live ? Source.dynamicCover(page.track.id) : ""
+                readonly property bool wanted: dynamicCover.url.length > 0 && page.visible && page.playing && !page.coverHidden
+                property string loaded: ""   // 播放器正在放的地址：只在完全淡出时换
+                readonly property var player: dynamicCover.item   // MvVideo 只在应用里注册（与 MvPage 同一写法）
+                readonly property bool shown: dynamicCover.wanted && dynamicCover.loaded === dynamicCover.url
+                    && dynamicCover.player !== null && dynamicCover.player.hasFrame === true
+                function swap() { if (dynamicCover.opacity === 0) dynamicCover.loaded = dynamicCover.url; }
+                onUrlChanged: dynamicCover.swap()
+                onOpacityChanged: dynamicCover.swap()
+                Component.onCompleted: dynamicCover.swap()
                 anchors.fill: parent
-                active: dynamicCover.url.length > 0 && page.visible && page.playing && !page.coverHidden
+                active: dynamicCover.wanted || dynamicCover.opacity > 0
+                opacity: dynamicCover.shown ? 1 : 0
+                Behavior on opacity {
+                    NumberAnimation { duration: Tokens.motionBase; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut }
+                }
                 sourceComponent: Qt.createComponent("org.nephelesound.yunting", "MvVideo")
                 Binding {
                     when: dynamicCover.item !== null
@@ -95,7 +110,7 @@ ScreenFrame {
                     when: dynamicCover.item !== null
                     target: dynamicCover.item
                     property: "source"
-                    value: dynamicCover.url
+                    value: dynamicCover.loaded
                 }
             }
         }

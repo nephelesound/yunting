@@ -14,6 +14,8 @@ class MvVideo : public MpvAbstractItem {
     Q_PROPERTY(double position READ position WRITE setPosition NOTIFY positionChanged)
     Q_PROPERTY(double duration READ duration NOTIFY durationChanged)
     Q_PROPERTY(QString errorString READ errorString NOTIFY errorStringChanged)
+    // 这个地址的画面已经出来了（加载后播放时间第一次走动）。之前渲染面是黑的：动态封面等它再淡入
+    Q_PROPERTY(bool hasFrame READ hasFrame NOTIFY hasFrameChanged)
 public:
     explicit MvVideo(QQuickItem *parent = nullptr);
 
@@ -23,6 +25,7 @@ public:
     double position() const { return m_position; }
     double duration() const { return m_duration; }
     QString errorString() const { return m_errorString; }
+    bool hasFrame() const { return m_hasFrame; }
 
     // 换地址即开始播放
     void setSource(const QUrl &source);
@@ -40,8 +43,10 @@ signals:
     void positionChanged();
     void durationChanged();
     void errorStringChanged();
+    void hasFrameChanged();
 
 private:
+    void setHasFrame(bool hasFrame);
     void load();
     void onRendererReady();
     void setPaused(bool paused);
@@ -57,6 +62,7 @@ private:
     double m_position = 0;
     double m_duration = 0;
     QString m_errorString;
+    bool m_hasFrame = false;
     bool m_fileLoaded = false;
     bool m_stopped = true;
     bool m_atEof = false;
