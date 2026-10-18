@@ -78,10 +78,14 @@ void CookieVault::pump()
     while (!m_pending.isEmpty() && m_mode == Mode::File) {
         const Op op = m_pending.takeFirst();
         if (op.write) {
-            writeFile(op.json);
-            emit saved(true);
+            emit saved(writeFile(op.json));
         } else {
-            emit loaded(loadFile());
+            bool ok = false;
+            const QByteArray data = loadFile(&ok);
+            if (ok)
+                emit loaded(data);
+            else
+                emit loadFailed();
         }
         if (op.migration)
             emit migrated();
@@ -120,7 +124,12 @@ void CookieVault::migrate()
         return;
     }
     const QByteArray json = legacy.readAll();
+    const bool readError = legacy.error() != QFileDevice::NoError;
     legacy.close();
+    if (readError) {
+        qCWarning(lcVault) << "cannot read legacy cookie file:" << legacy.errorString();
+        return;
+    }
     enqueue({true, true, json});
 }
 
@@ -131,16 +140,17 @@ void CookieVault::runSave(const QByteArray &json)
     job->setBinaryData(json);
     connect(job, &QKeychain::WritePasswordJob::finished, this, [this, json](QKeychain::Job *done) {
         const bool ok = done->error() == QKeychain::NoError;
+        bool stored = ok;
         if (!ok) {
             // 钥匙串写失败（用户拒绝、后端消失）：同一份数据退回后备文件，之后一直走文件
             logFallback(done->errorString().toUtf8().constData());
             m_mode = Mode::File;
-            writeFile(json);
+            stored = writeFile(json);
         }
         done->deleteLater();
         m_busy = false;
         pump();
-        emit saved(ok);
+        emit saved(stored);
     });
     job->start();
     m_busy = true;
@@ -189,8 +199,10 @@ void CookieVault::writeMigrated(const QByteArray &json)
             // 不用 qCInfo：本机日志配置会吞掉 info；qCDebug 在 --verbose 下可见（同 ncm.net）
             qCDebug(lcVault) << "cookie migration: legacy cookies.json imported into keychain";
         } else {
-            // 迁移写失败不切后备模式（本次启动已按 load 结果工作）；文件留着，下次启动再迁
+            // 迁移失败：退回文件存储，紧随其后的 load 会读这份仍然有效的 legacy 文件。
+            // 不能继续等钥匙串里的旧条目，否则会把已有登录态当成不存在。
             qCWarning(lcVault) << "cookie migration write failed:" << done->errorString();
+            m_mode = Mode::File;
         }
         done->deleteLater();
         m_busy = false;
@@ -201,7 +213,7 @@ void CookieVault::writeMigrated(const QByteArray &json)
     m_busy = true;
 }
 
-void CookieVault::writeFile(const QByteArray &json) const
+bool CookieVault::writeFile(const QByteArray &json) const
 {
     const QString dirPath = QFileInfo(m_fallbackPath).path();
     QDir().mkpath(dirPath);
@@ -215,9 +227,9 @@ void CookieVault::writeFile(const QByteArray &json) const
         QFile f;
         if (f.open(fd, QIODevice::WriteOnly, QFileDevice::AutoCloseHandle)) {
             if (f.write(json) == json.size())
-                return;
+                return true;
             qCWarning(lcVault) << "cannot write cookie file:" << m_fallbackPath << f.errorString();
-            return;
+            return false;
         }
         ::close(fd);
     }
@@ -225,18 +237,34 @@ void CookieVault::writeFile(const QByteArray &json) const
     QFile f(m_fallbackPath);
     if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         f.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);   // 登录凭据：只给本人读写
-        f.write(json);
+        if (f.write(json) == json.size())
+            return true;
+        qCWarning(lcVault) << "cannot write cookie file:" << m_fallbackPath << f.errorString();
     } else {
         qCWarning(lcVault) << "cannot write cookie file:" << m_fallbackPath << f.errorString();
     }
+    return false;
 }
 
-QByteArray CookieVault::loadFile() const
+QByteArray CookieVault::loadFile(bool *ok) const
 {
+    *ok = false;
     QFile f(m_fallbackPath);
-    if (!f.open(QIODevice::ReadOnly))
+    if (!f.exists()) {
+        *ok = true;   // 没有文件是权威的「没有凭据」，不是读失败
         return {};
-    return f.readAll();
+    }
+    if (!f.open(QIODevice::ReadOnly)) {
+        qCWarning(lcVault) << "cannot read cookie file:" << m_fallbackPath << f.errorString();
+        return {};
+    }
+    const QByteArray data = f.readAll();
+    if (f.error() != QFileDevice::NoError || data.size() != f.size()) {
+        qCWarning(lcVault) << "cannot read cookie file:" << m_fallbackPath << f.errorString();
+        return {};
+    }
+    *ok = true;
+    return data;
 }
 
 void CookieVault::logFallback(const char *why)

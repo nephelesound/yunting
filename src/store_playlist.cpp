@@ -367,6 +367,8 @@ void Store::reorderPlaylistTracks(double playlistId, const QVariantList &trackId
             details.insert(key, detail);
             put("playlistDetails", details, true);
         }
+        // 详情缓存里的顺序已经过时：下次从歌单页重新进入必须重新取
+        m_cache.forget(QStringLiteral("playlist:") + key);
         emit playlistChanged(playlistId);
     });
 }

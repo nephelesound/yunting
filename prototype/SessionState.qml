@@ -36,6 +36,14 @@ Item {
 
     Component.onCompleted: {
         const engine = persisted.player.engine;
+        // 音质要先于曲目恢复：否则 setTrack 会按默认 auto 取一次地址，紧接着换档又取一次
+        engine.volume = saved.volume;
+        engine.muted = saved.muted;
+        engine.quality = saved.quality;
+        if (saved.scrobbleMode === "legacy" || saved.scrobbleMode === "ncbl")
+            engine.scrobbleMode = saved.scrobbleMode;
+        persisted.player.mode = saved.mode;
+
         let queue = [];
         try {
             queue = JSON.parse(saved.queue);
@@ -48,12 +56,6 @@ Item {
             engine.playing = false;
             engine.seek(saved.position);
         }
-        engine.volume = saved.volume;
-        engine.muted = saved.muted;
-        engine.quality = saved.quality;
-        if (saved.scrobbleMode === "legacy" || saved.scrobbleMode === "ncbl")
-            engine.scrobbleMode = saved.scrobbleMode;
-        persisted.player.mode = saved.mode;
         if (persisted.pivots.includes(saved.page))
             persisted.window.switchPivot(saved.page);
         if (saved.width > 0 && saved.height > 0) {

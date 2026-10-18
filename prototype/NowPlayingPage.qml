@@ -491,7 +491,7 @@ ScreenFrame {
                     commentsEmpty.timedOut = false;
                     commentsTimeout.restart();
                     Source.need("comments:" + page.track.id);
-                    Source.moreComments(page.track.id);
+                    // 等热评落地后由 commentsReady 触发最新页，不能在这里抢先排序。
                 }
             }
         }

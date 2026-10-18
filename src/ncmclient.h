@@ -132,4 +132,5 @@ private:
     quint64 m_authGeneration = 0;
     QPointer<QObject> m_callbackContext;     // 存储已读出：可以发请求
     bool m_persist = true;    // jar 变了写回存储；匿名调试（不读存储）时绝不写，否则匿名 jar 会盖掉登录凭据
+    bool m_authDirty = false; // 存储读出前发生过登录/退出：read 回包不能再覆盖它
 };

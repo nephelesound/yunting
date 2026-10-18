@@ -1447,7 +1447,7 @@ private slots:
         m_store = nullptr;
         delete m_client;
         m_client = nullptr;
-        QVERIFY(ageCache(2 * 60 * 60));   // 2 小时：三种 key 都还在新鲜期内
+        QVERIFY(ageCache(5 * 60));   // 5 分钟：三种 key 都还在新鲜期内（歌单的 10 分钟是最短的）
 
         reopenStore();
         {

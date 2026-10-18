@@ -78,6 +78,44 @@ private slots:
         QCOMPARE(got, jar);
     }
 
+    // 后备文件存在但读不了：必须报 loadFailed，不能当成「没有凭据」让调用方覆盖它。
+    void unreadableFallbackFileFailsLoudly()
+    {
+        QTemporaryDir dir;
+        qputenv("XDG_DATA_HOME", dir.path().toUtf8());
+        CookieVault vault;
+        QVERIFY(QDir().mkpath(QFileInfo(vault.fallbackPath()).path()));
+        QFile f(vault.fallbackPath());
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("{}");
+        f.close();
+        QVERIFY(f.setPermissions(QFileDevice::Permissions()));
+        QEventLoop loop;
+        int loadedCount = 0;
+        int failedCount = 0;
+        connect(&vault, &CookieVault::loaded, &loop, [&] { ++loadedCount; loop.quit(); });
+        connect(&vault, &CookieVault::loadFailed, &loop, [&] { ++failedCount; loop.quit(); });
+        vault.load();
+        loop.exec();
+        QCOMPARE(failedCount, 1);
+        QCOMPARE(loadedCount, 0);
+    }
+
+    // 后备文件写不进去时 saved 必须是 false，不能假装凭据已保存。
+    void failedFallbackWriteIsReported()
+    {
+        QTemporaryDir dir;
+        qputenv("XDG_DATA_HOME", dir.path().toUtf8());
+        CookieVault vault;
+        QVERIFY(QDir().mkpath(vault.fallbackPath()));   // 目录占住文件路径
+        QEventLoop loop;
+        int savedOk = -1;
+        connect(&vault, &CookieVault::saved, &loop, [&](bool ok) { savedOk = ok ? 1 : 0; loop.quit(); });
+        vault.save("{}");
+        loop.exec();
+        QCOMPARE(savedOk, 0);
+    }
+
     void migrateWithoutFileEmitsOnce()
     {
         QTemporaryDir dir;

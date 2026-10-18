@@ -126,6 +126,10 @@ QtObject {
             if (playback.mode === 1) {
                 playback.engine.seek(0);
                 playback.engine.playing = true;
+            } else if (playback.queue.length === 1) {
+                // 列表循环/随机只剩一首时 next() 无处可去：重播当前这首，别停住
+                playback.engine.seek(0);
+                playback.engine.playing = true;
             } else {
                 playback.next();
             }

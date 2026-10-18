@@ -42,6 +42,7 @@ bool writeSilentWav(const QString &path, int seconds, int rate = 8000)
 class ApiServer : public QTcpServer {
 public:
     QString audioUrl;
+    int requests = 0;
 
     explicit ApiServer(QObject *parent = nullptr) : QTcpServer(parent)
     {
@@ -49,6 +50,7 @@ public:
             while (QTcpSocket *sock = nextPendingConnection()) {
                 connect(sock, &QTcpSocket::readyRead, this, [this, sock] {
                     sock->readAll();
+                    ++requests;
                     const QByteArray json = QJsonDocument(QJsonObject{
                         {"code", 200},
                         {"data", QJsonArray{QJsonObject{{"url", audioUrl}, {"expi", 1200}}}}})
@@ -224,6 +226,31 @@ private slots:
         QVERIFY(failedSpy.isEmpty());
     }
 
+    void qualityChangeReloadsCurrentTrack()
+    {
+        QVERIFY(writeSilentWav(m_dir.filePath("long.wav"), 3));
+        ApiServer api;
+        QVERIFY(api.listen(QHostAddress::LocalHost));
+        api.audioUrl = QUrl::fromLocalFile(m_dir.filePath("long.wav")).toString();
+
+        NcmClient client(nullptr, false);
+        client.setApiBase(QStringLiteral("http://127.0.0.1:%1/").arg(api.serverPort()));
+        AudioEngine audio(&client);
+        QSignalSpy failedSpy(&audio, &AudioEngine::failed);
+
+        audio.setTrack(QVariantMap{{"id", 6.0}, {"dur", 3.0}});
+        audio.setPlaying(true);
+        QVERIFY(waitFor([&] { return audio.position() > 0.1; }));
+        QVERIFY(waitFor([&] { return api.requests == 1; }));
+
+        audio.setQuality(QStringLiteral("higher"));
+        QCOMPARE(audio.quality(), QStringLiteral("higher"));
+        QVERIFY2(waitFor([&] { return api.requests == 2; }), "quality change did not refetch the URL");
+        QVERIFY2(waitFor([&] { return audio.position() > 0.1; }), "quality change did not resume playback");
+        QVERIFY(audio.playing());
+        QVERIFY(failedSpy.isEmpty());
+    }
+
     void missingFileEmitsFailed()
     {
         ApiServer api;
@@ -239,6 +266,7 @@ private slots:
         audio.setPlaying(true);
         QVERIFY2(waitFor([&] { return failedSpy.count() > 0; }), "missing file did not fail");
         QCOMPARE(failedSpy.takeFirst().at(0).toString(), QStringLiteral("暂时无法播放这首歌"));
+        QVERIFY(!audio.playing());   // 失败后界面不能停在「播放中」
     }
 
     void eqChangeDuringPlaybackKeepsPlaying()

@@ -74,13 +74,15 @@ NcmClient::NcmClient(QObject *parent, bool loadCookies)
     // 读到 jar 即 ready()，main 在那之后才允许 Store 发请求
     m_vault->migrate();
     connect(m_vault, &CookieVault::loaded, this, [this](const QByteArray &data) {
-        // 读出之前 jar 只可能因登录或导入而非空（匿名下发的 cookie 在那之前不收）：那份更新，留着
-        if (m_jar.isEmpty()) {
+        // 读出之前登录/退出过：内存里的 jar 是更新的权威状态，不能被迟到的磁盘内容覆盖。
+        if (!m_authDirty && m_jar.isEmpty()) {
             m_jar = jarFromJson(data);
             if (m_jar.isEmpty())
                 m_jar = jarFromArrayFile(data);   // 旧版 NcmClient 写的是数组形状
         }
         m_ready = true;
+        if (m_authDirty)
+            persistJar();   // 补写读出前发生的登录/退出
         emit ready();
     });
     // 读存储失败（不是「没有条目」）：不认空 jar，也不进入 ready。
@@ -126,23 +128,29 @@ int NcmClient::importGtk4()
     m_jar = jar;
 
     QEventLoop loop;
+    bool settled = false;
     bool stored = false;
-    connect(m_vault, &CookieVault::saved, &loop, [&](bool) {
-        stored = true;
+    connect(m_vault, &CookieVault::saved, &loop, [&](bool ok) {
+        settled = true;
+        stored = ok;
         loop.quit();
     });
     m_vault->save(jarToJson(m_jar));
-    if (!stored)   // 后备文件是同步发 saved 的；只有钥匙串路径才需要 exec
+    if (!settled)   // 后备文件是同步发 saved 的；只有钥匙串路径才需要 exec
         loop.exec();
-    return m_jar.size();
+    return stored ? m_jar.size() : -1;
 }
 
 // jar 变了就存一份进 vault（钥匙串或后备文件）。
 // 存储还没成功读出时绝不落盘：那会把空 jar 写在仍然完好的登录凭据上。
 void NcmClient::persistJar()
 {
-    if (!m_ready || !m_persist)
+    if (!m_persist)
         return;
+    if (!m_ready) {
+        m_authDirty = true;
+        return;
+    }
     m_vault->save(jarToJson(m_jar));
 }
 

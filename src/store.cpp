@@ -127,10 +127,11 @@ Store::Store(NcmClient *client, QObject *parent)
             ? kind + QStringLiteral(":<redacted>") : key;
         qWarning().noquote() << "request failed key=" << safe << "reason=" << message;
     });
-    restoreScreen();
-    // 换账号检测只认 userId：昵称会重复（「音乐爱好者」），不能当身份
+    // 换账号检测只认 userId：昵称会重复（「音乐爱好者」），不能当身份。
+    // 先读它，恢复个人缓存时才能丢掉属于另一个账号的快照。
     if (m_client->hasMusicU())
         m_accountUid = m_cache.peek(QStringLiteral("screen:uid")).toDouble();
+    restoreScreen();
 
     connect(m_client, &NcmClient::requestFinished, this, &Store::requestFinished);
     m_writeDebounce.setSingleShot(true);
@@ -189,7 +190,12 @@ void Store::restoreScreen()
             it = cachedData.erase(it);
     }
     overlay(m_data, cachedData);
-    overlay(m_personal, m_cache.peek(personalKey()).toMap());
+    const QVariantMap cachedPersonal = m_cache.peek(personalKey()).toMap();
+    const double cachedUid = cachedPersonal.value("account").toMap().value("id").toDouble();
+    // 登录态下个人快照可能属于上一个账号（例如换了 cookie 启动）：宁可不显示，也不串号。
+    // 没有 UID 的旧缓存或匿名快照照常恢复。
+    if (!m_client->hasMusicU() || m_accountUid <= 0 || cachedUid <= 0 || cachedUid == m_accountUid)
+        overlay(m_personal, cachedPersonal);
 }
 
 void Store::put(const char *key, const QVariant &value, bool personalSide)
@@ -283,6 +289,12 @@ void Store::resetPersonal()
     put("listenRank", nullVariant(), false);
     put("userFollows", nullVariant(), false);
     put("userFolloweds", nullVariant(), false);
+    // 按需详情里的 followed / subscribed / liked 都带账号状态：换账号后不能继续显示上一号的结果
+    for (const char *key : {"comments", "commentPage", "commentReplies",
+                            "artist", "album", "user"})
+        put(key, nullVariant(), false);
+    m_similarFired = false;
+    m_similarSeed.clear();
     m_personal = m_emptyPersonal;
     m_cache.remember(personalKey(), m_personal);
     emit personalChanged();

@@ -866,7 +866,8 @@ int run(QApplication &app)
     // 否则下一条匿名 Set-Cookie 之前进程就没了，旧 MUSIC_U 会留在钥匙串里。
     QObject::connect(&app, &QCoreApplication::aboutToQuit, &client, [&client] {
         std::fprintf(stderr, "aboutToQuit: flushing credentials\n");
-        client.flushCredentials(2000);
+        if (!client.flushCredentials(2000))
+            qWarning() << "credential flush timed out; credentials may not be persisted";
     });
 
     waitForClientReady(client);

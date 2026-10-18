@@ -81,6 +81,10 @@ qint64 QueryCache::freshFor(const QString &key)
         || key.startsWith(QLatin1String("artist:"))
         || key.startsWith(QLatin1String("mv:")))
         return 7 * kDay;
+    if (key.startsWith(QLatin1String("playlist:")))
+        return 10 * 60;
+    if (key.startsWith(QLatin1String("search")))
+        return 5 * 60;
     if (key.startsWith(QLatin1String("commentCursor:")))
         return 60 * 60;
     if (key.startsWith(QLatin1String("comments:"))) {

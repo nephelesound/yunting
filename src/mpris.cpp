@@ -66,7 +66,8 @@ public:
     Q_PROPERTY(QString LoopStatus READ LoopStatus)
     Q_PROPERTY(double Rate READ Rate WRITE setRate)
     Q_PROPERTY(bool Shuffle READ Shuffle)
-    Q_PROPERTY(QVariantMap Metadata READ Metadata CONSTANT)
+    // Metadata 会随曲目/歌词变化：不能声明成 CONSTANT，否则客户端可能不再响应 PropertiesChanged
+    Q_PROPERTY(QVariantMap Metadata READ Metadata NOTIFY dummy)
     Q_PROPERTY(double Volume READ Volume WRITE setVolume)
     Q_PROPERTY(qint64 Position READ Position)
     Q_PROPERTY(double MinimumRate READ MinimumRate CONSTANT)

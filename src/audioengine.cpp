@@ -227,6 +227,11 @@ void AudioEngine::setQuality(const QString &quality)
         return;
     m_quality = normalized;
     emit qualityChanged();
+    // 正在播放时换档要立刻生效：重新取址并从当前进度接上，而不是等下一首。
+    if (!m_track.isEmpty() && m_track.value("id").toDouble() > 0) {
+        m_pendingSeek = position();
+        resolveUrl(m_track.value("id").toDouble());
+    }
 }
 
 QString AudioEngine::effectiveLevel() const
@@ -461,11 +466,12 @@ void AudioEngine::resolveUrl(double songId)
             self->m_urls.insert(cacheKey, {url, played.level, played.bitrate,
                                            QDateTime::currentDateTimeUtc().addSecs(std::max(0, expi - 60))});
         }
-        // 用户可能已经切到别的歌：迟到的地址只进缓存，不播
-        if (self->m_track.value("id").toDouble() != songId)
+        // 用户可能已经切到别的歌或换了音质：迟到的地址只进缓存，不播
+        if (self->m_track.value("id").toDouble() != songId || level != self->effectiveLevel())
             return;
         if (url.isEmpty()) {
             self->m_failed = true;
+            self->setPlaying(false);   // 取址失败不是播放中：界面必须回到暂停态
             emit self->failed(QStringLiteral("暂时无法播放这首歌"));
             return;
         }
@@ -496,6 +502,7 @@ void AudioEngine::startSource(const QString &url, const QString &level, int bitr
     if (isMpvError(reply)) {
         if (!m_failed) {
             m_failed = true;
+            setPlaying(false);
             emit failed(QStringLiteral("暂时无法播放这首歌"));
         }
         qWarning() << "mpv loadfile failed:"
@@ -596,6 +603,7 @@ void AudioEngine::onEndFile(const QString &reason)
         if (m_failed)
             return;
         m_failed = true;
+        setPlaying(false);
         emit failed(QStringLiteral("暂时无法播放这首歌"));
         qWarning() << "playback error";
     }

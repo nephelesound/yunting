@@ -50,8 +50,8 @@ private:
     void runSave(const QByteArray &json);
     void readKeychain();
     void writeMigrated(const QByteArray &json);
-    void writeFile(const QByteArray &json) const;
-    QByteArray loadFile() const;
+    bool writeFile(const QByteArray &json) const;
+    QByteArray loadFile(bool *ok) const;
     void logFallback(const char *why);
 
     QString m_fallbackPath;
