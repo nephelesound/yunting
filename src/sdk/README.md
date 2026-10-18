@@ -42,6 +42,7 @@ NcmClient                 传输（cookie、weapi/明文、超时）
 - `video.h/.cpp`：视频时间线、详情、签名播放地址。
 - `notification.h/.cpp`：系统通知、评论通知、@我/转发通知（登录 weapi）。
 - `library.h/.cpp`：歌手/专辑/MV 收藏列表分页（登录 weapi）。
+- `dynamic_cover.h/.cpp`：动态封面 URL/尺寸/格式；匿名 301，登录后可用，字段兼容多种上游别名。
 - `service.h/.cpp`：唯一的 HTTP code/错误/context/JSON 信封 seam，所有 service 共用。
 - `samples/`：
   - `song_wiki.request.json`：参数与三个 form 的形态。
@@ -55,6 +56,7 @@ NcmClient                 传输（cookie、weapi/明文、超时）
   - `video.raw.json` / `video.normalized.json`：视频时间线、详情、播放地址。
   - `notification.raw.json` / `notification.normalized.json`：三类通知。
   - `library.raw.json` / `library.normalized.json`：三类收藏列表。
+  - `dynamic_cover.raw.json` / `dynamic_cover.normalized.json`：动态封面。
 
 ## 用法
 
