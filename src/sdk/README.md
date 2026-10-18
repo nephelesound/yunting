@@ -37,6 +37,7 @@ NcmClient                 传输（cookie、weapi/明文、超时）
 - `song_wiki_service.h/.cpp`：三个请求的组合与回调。
 - `discovery.h/.cpp`：推荐新歌、新碟、精品歌单、精品标签、首页 banner 的 typed 模型与请求。
 - `radio.h/.cpp`：推荐节目、电台详情、节目详情、电台节目分页的 typed 模型与请求。
+- `social.h/.cpp`：用户动态流的 typed 模型、只读请求，以及用户关注/取关写请求（需要登录 cookie，不重试）。
 - `samples/`：
   - `song_wiki.request.json`：参数与三个 form 的形态。
   - `song_wiki.raw.json`：三个上游响应的代表样例。
@@ -44,6 +45,7 @@ NcmClient                 传输（cookie、weapi/明文、超时）
   - `song_wiki.schema.json`：normalized 响应的 JSON Schema，可用于前端类型生成/校验。
   - `discovery.raw.json` / `discovery.normalized.json`：发现页四类数据。
   - `radio.raw.json` / `radio.normalized.json`：播客/电台数据；节目播放用 `mainSongId` 走现有歌曲取址。
+  - `social.raw.json` / `social.normalized.json`：用户动态流。
 
 ## 用法
 
@@ -74,6 +76,8 @@ ncm::sdk::fetchBanners(client, this, [](auto result) { /* QList<Banner> */ });
 ncm::sdk::fetchRecommendedPrograms(client, this, [](auto result) { /* QList<RadioProgram> */ });
 ncm::sdk::fetchRadioPrograms(client, radioId, 30, 0, false, this,
     [](auto result) { /* RadioProgramPage */ });
+ncm::sdk::fetchUserEvents(client, userId, -1, 20, false, this,
+    [](auto result) { /* EventPage */ });
 ```
 
 程序只给出 `mainSongId`；播放地址由现有歌曲取址服务负责，SDK 不重复音频协议。
