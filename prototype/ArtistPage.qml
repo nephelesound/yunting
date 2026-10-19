@@ -65,18 +65,13 @@ ScreenFrame {
                 }
             }
 
-            Label {
+            Blurb {
                 Layout.fillWidth: true
                 Layout.topMargin: Tokens.space2
-                visible: text.length > 0
                 // 别名放在简介前；简介里已经写了别名就不重复
                 text: page.artist.alias && !page.artist.description.includes(page.artist.alias)
                     ? page.artist.alias + "。" + page.artist.description : page.artist.description
-                font.pixelSize: Tokens.textSm
-                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
-                wrapMode: Text.Wrap
-                maximumLineCount: 3   // 与列表页的说明同一个截断
-                elide: Text.ElideRight
+                title: page.artist.name
             }
 
             RowLayout {
@@ -87,7 +82,7 @@ ScreenFrame {
                 AccentButton {
                     enabled: page.songs.length > 0
                     icon.name: "media-playback-start"
-                    text: "播放全部"
+                    text: "播放"
                     onClicked: page.playAllRequested()
                 }
                 // 窗格只有 280 宽：随机播放只留图标（悬停有提示），把位置让给有状态的「关注」

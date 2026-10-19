@@ -23,6 +23,7 @@ Item {
     Component { id: queueComponent; QueuePanel {} }
     Component { id: roomComponent; SimListenTogether {} }
     Component { id: barComponent; PlayerBar { width: root.width } }
+    Component { id: listPageComponent; PlaylistPage { width: root.width; height: root.height } }
     // 定位按钮：与歌单页、歌手页同一种接法（LocateCurrent 挂在 ListView 上）
     Component {
         id: locateComponent
@@ -445,6 +446,54 @@ Item {
             Source.setCommentLiked(Source.commentThread("playlist", 24381616), 9667509659, true);
             Source.live = saved;
             compare(calls, [["playlist", 24381616, 9667509659, true]]);
+        }
+
+        // 专辑页：没登录也能分享（专辑的 id 在 albumId）；长简介露 3 行，「展开全文」在对话框里给完整的一段
+        function test_albumPageSharesAndShowsTheFullDescription() {
+            const description = "这张专辑收录了十首歌。".repeat(40);
+            const page = createTemporaryObject(listPageComponent, root, {
+                loggedIn: false,
+                list: { heading: "专辑名", cover: "", facts: [], description: description, tracks: [],
+                        isAlbum: true, albumId: 32311, listId: 0 } });
+            const share = findChild(page, "shareList");
+            verify(share.visible, "专辑也能分享，不用登录");
+            const spy = createTemporaryObject(spyComponent, root, { target: page, signalName: "shareRequested" });
+            share.clicked();
+            compare(spy.count, 1);
+            compare(spy.signalArguments[0][0], "album");
+            compare(spy.signalArguments[0][1], 32311);
+
+            const more = findChild(page, "blurbMore");
+            tryVerify(() => more.visible, 1000, "截断了才给「展开全文」");
+            more.activated(0);
+            const dialog = findChild(page, "blurbDialog");
+            tryVerify(() => dialog.opened);
+            compare(dialog.message, description);
+            dialog.close();
+        }
+
+        // 左窗格只有 280 宽：每种页面、每种状态下的动作排都放得下，不伸出窗格
+        function test_listActionsFitThePane() {
+            const tracks = [root.track, Object.assign({}, root.track, { id: 900002 })];
+            const cases = [
+                { loggedIn: true, list: { isAlbum: true, albumId: 1, listId: 0, subscribed: false } },
+                { loggedIn: true, list: { isAlbum: true, albumId: 1, listId: 0, subscribed: true } },
+                { loggedIn: false, list: { isAlbum: true, albumId: 1, listId: 0, subscribed: false } },
+                { loggedIn: true, list: { listId: 2, owned: true } },
+                { loggedIn: true, list: { listId: 2, owned: true }, reordering: true },
+                { loggedIn: true, list: { listId: 2, subscribed: true } },
+                { loggedIn: false, list: { listId: 2 } },
+            ];
+            const tooWide = [];
+            for (const c of cases) {
+                const list = Object.assign({ heading: "名", cover: "", facts: [], description: "", tracks: tracks }, c.list);
+                const page = createTemporaryObject(listPageComponent, root,
+                    { loggedIn: c.loggedIn, list: list, reordering: c.reordering || false });
+                const row = findChild(page, "listActions");
+                if (row.implicitWidth > Tokens.trackColumn)
+                    tooWide.push(JSON.stringify(c) + " 宽 " + row.implicitWidth);
+            }
+            compare(tooWide, []);
         }
 
         // 在途的下载只看 DownloadManager.active：点了就算在下（不等进度），在下时再点不重复下，

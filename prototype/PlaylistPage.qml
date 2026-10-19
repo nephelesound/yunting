@@ -40,6 +40,10 @@ ScreenFrame {
 
     // 歌单才有操作：自己建的（「我喜欢的音乐」除外）改名/删除，别人的收藏/取消收藏
     readonly property bool hasListActions: (page.list.listId || 0) > 0 && page.loggedIn
+    readonly property real shareId: page.list.isAlbum ? (page.list.albumId || 0) : (page.list.listId || 0)
+    function share() {
+        page.shareRequested(page.list.isAlbum ? "album" : "playlist", page.shareId, page.list.heading, page.list.cover);
+    }
     readonly property bool canReorder: page.loggedIn && (page.list.owned || false)
         && (page.list.listId || 0) > 0 && (page.list.tracks || []).length > 1
 
@@ -70,26 +74,22 @@ ScreenFrame {
                 items: page.list.facts
             }
 
-            Label {
+            Blurb {
                 Layout.fillWidth: true
                 Layout.topMargin: Tokens.space2
-                visible: text.length > 0
                 text: page.list.description || ""
-                font.pixelSize: Tokens.textSm
-                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
-                wrapMode: Text.Wrap
-                maximumLineCount: 3
-                elide: Text.ElideRight
+                title: page.list.heading
             }
 
             RowLayout {
+                objectName: "listActions"
                 Layout.topMargin: Tokens.space4
                 spacing: Tokens.space2
 
                 AccentButton {
                     enabled: page.list.tracks.length > 0
                     icon.name: "media-playback-start"
-                    text: "播放全部"
+                    text: "播放"   // 在曲目列表上方，放的就是这一列；窗格 280 宽，留给后面带状态的动作
                     onClicked: page.playAllRequested()
                 }
                 // 与歌手页同一排：随机播放只留图标（悬停有提示），窗格 280 宽放得下其余带状态的动作
@@ -106,7 +106,7 @@ ScreenFrame {
                     icon.name: page.list.subscribed ? "bookmark-remove" : "bookmark-new"
                     icon.width: Tokens.iconSm
                     icon.height: Tokens.iconSm
-                    text: page.list.subscribed ? "已收藏" : "收藏专辑"
+                    text: page.list.subscribed ? "已收藏" : "收藏"   // 与歌手页的「关注 / 已关注」同一种写法
                     onClicked: page.albumSubscriptionToggled(page.list.albumId, !page.list.subscribed)
                 }
                 Button {
@@ -130,6 +130,15 @@ ScreenFrame {
                     text: "打开文件夹"
                     onClicked: Qt.openUrlExternally("file://" + page.list.folder)
                 }
+                // 分享不要账号，歌单与专辑都有（专辑的 id 在 albumId，listId 是 0）。
+                // 有「更多」（登录后的歌单）就放进它；没有就直接摆出来，不做只有一项的菜单
+                IconButton {
+                    objectName: "shareList"
+                    visible: page.shareId > 0 && !page.hasListActions
+                    icon.name: "document-share"
+                    text: "分享"
+                    onClicked: page.share()
+                }
                 IconButton {
                     visible: page.hasListActions
                     icon.name: "overflow-menu"
@@ -138,6 +147,11 @@ ScreenFrame {
                 }
                 Menu {
                     id: listMenu
+                    MenuItem {
+                        icon.name: "document-share"
+                        text: "分享…"
+                        onTriggered: page.share()
+                    }
                     MenuItem {
                         visible: page.list.owned || false
                         height: visible ? implicitHeight : 0
@@ -165,13 +179,6 @@ ScreenFrame {
                         icon.name: page.list.subscribed ? "bookmark-remove" : "bookmark-new"
                         text: page.list.subscribed ? "取消收藏" : "收藏歌单"
                         onTriggered: page.subscribeToggled(page.list.listId, page.list.heading, !page.list.subscribed)
-                    }
-                    MenuItem {
-                        icon.name: "document-share"
-                        text: "分享…"
-                        onTriggered: page.shareRequested(page.list.isAlbum ? "album" : "playlist",
-                                                        page.list.isAlbum ? page.list.albumId : page.list.listId,
-                                                        page.list.heading, page.list.cover)
                     }
                 }
             }
