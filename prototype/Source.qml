@@ -25,15 +25,25 @@ QtObject {
     readonly property var d: source.raw().data
     readonly property var p: source.raw().personal
 
-    // 按需加载：只有 live 来源需要（快照与压力数据是一次给全的）。key 见 DESIGN.md，Store 自己去重
+    // 按需加载：只有 live 来源需要（快照与压力数据是一次给全的）。key 见 DESIGN.md，Store 自己去重。
+    // 读数据的函数在绑定里调用它，所以失败过的 key 在冷却期内不自动再要：失败会写 requestFailures，
+    // 读它的绑定随之重算、又走到这里，不冷却就是一个请求失败、重要、再失败的死循环。
+    // 冷却过后，下次自然重算才再试一次；用户点「重试」（retryKey）立刻再要。
+    readonly property int retryCooldownMs: 30000
+    property var failedAt: ({})   // key → 失败时刻（毫秒）。就地修改：它不是绑定的依赖
     function need(key) {
-        if (source.live)
-            Qt.callLater(() => source.live.request(key));
+        if (!source.live)
+            return;
+        const at = source.failedAt[key];
+        if (at !== undefined && Date.now() - at < source.retryCooldownMs)
+            return;
+        Qt.callLater(() => source.live.request(key));
     }
     // 按需请求失败：Store 发来 requestFailed 后由 main 标记；页面可显示「重试」而不是一直转圈
     property var requestFailures: ({})
     property var requestRestrictions: ({})
     function markRequestFailed(key, message) {
+        source.failedAt[key] = Date.now();
         const f = Object.assign({}, source.requestFailures);
         f[key] = message || "请求失败";
         source.requestFailures = f;
@@ -54,6 +64,7 @@ QtObject {
     }
     function restriction(key) { return source.requestRestrictions[key] || ""; }
     function retryKey(key) {
+        delete source.failedAt[key];
         source.clearRequestFailure(key);
         source.need(key);
     }
@@ -64,6 +75,7 @@ QtObject {
     readonly property bool online: source.live ? source.live.online : !source.simulateOffline
     readonly property bool sessionExpired: source.live ? source.live.sessionExpired : source.simulateExpired
     function retry() {
+        source.failedAt = ({});   // 重新联网：失败过的页面数据下次读到时就再要
         if (source.live)
             source.live.refresh();
     }
@@ -239,6 +251,7 @@ QtObject {
         source.artistSongs = ({ owner: 0, items: [], total: 0, more: false, next: 0, loading: false })
         source.likedOverride = ({})
         source.requestFailures = ({})
+        source.failedAt = ({})
         source.requestRestrictions = ({})
     }
 
