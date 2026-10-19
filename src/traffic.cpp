@@ -4,6 +4,7 @@
 #include <QStringList>
 
 #include <algorithm>
+#include <vector>
 
 Q_LOGGING_CATEGORY(lcTraffic, "yunting.traffic", QtWarningMsg)
 
@@ -24,7 +25,7 @@ bool TrafficMeter::admit(const QString &method, const QString &path, const QStri
         while (!times.empty() && now - times.front() >= Second)
             times.pop_front();
         if (int(times.size()) >= RepeatLimit) {
-            ++m_refused;
+            m_refusedAt.push_back(now);
             if (warnOnce(QStringLiteral("repeat ") + key, now))
                 qCWarning(lcTraffic).noquote()
                     << "refused" << what << "- the same request" << RepeatLimit + 1
@@ -37,7 +38,6 @@ bool TrafficMeter::admit(const QString &method, const QString &path, const QStri
     m_lastMinute.push_back({now, what});
     const auto inLastSecond = std::count_if(m_lastMinute.cbegin(), m_lastMinute.cend(),
                                             [now](const Sent &s) { return now - s.at < Second; });
-    m_peakPerSecond = std::max(m_peakPerSecond, int(inLastSecond));
     if (inLastSecond > BurstPerSecond && warnOnce(QStringLiteral("burst"), now))
         qCWarning(lcTraffic).noquote() << "request burst:" << inLastSecond << "requests within 1 s;"
                                        << summary(now).section(u'\n', 1);
@@ -46,14 +46,24 @@ bool TrafficMeter::admit(const QString &method, const QString &path, const QStri
 
 QString TrafficMeter::summary(qint64 now) const
 {
+    // 都只算最近一分钟：峰值是这一分钟里任意 1 秒窗口的最多请求数
     QHash<QString, int> counts;
-    int total = 0;
+    std::vector<qint64> times;
     for (const Sent &s : m_lastMinute) {
         if (now - s.at < Minute) {
             ++counts[s.what];
-            ++total;
+            times.push_back(s.at);
         }
     }
+    const int total = int(times.size());
+    int peak = 0;
+    for (size_t first = 0, last = 0; last < times.size(); ++last) {
+        while (times[last] - times[first] >= Second)
+            ++first;
+        peak = std::max(peak, int(last - first + 1));
+    }
+    const auto refused = std::count_if(m_refusedAt.cbegin(), m_refusedAt.cend(),
+                                       [now](qint64 at) { return now - at < Minute; });
     QList<QPair<int, QString>> top;
     for (auto it = counts.cbegin(); it != counts.cend(); ++it)
         top.append({it.value(), it.key()});
@@ -62,7 +72,7 @@ QString TrafficMeter::summary(qint64 now) const
     for (qsizetype i = 0; i < std::min<qsizetype>(5, top.size()); ++i)
         busiest << QStringLiteral("%1 ×%2").arg(top.at(i).second).arg(top.at(i).first);
     return QStringLiteral("最近一分钟 %1 个请求，峰值 %2 个/秒，拒绝 %3 个重复请求\n%4")
-        .arg(total).arg(m_peakPerSecond).arg(m_refused)
+        .arg(total).arg(peak).arg(refused)
         .arg(busiest.isEmpty() ? QStringLiteral("（没有请求）") : busiest.join(QStringLiteral("，")));
 }
 
@@ -70,6 +80,10 @@ void TrafficMeter::forget(qint64 now)
 {
     while (!m_lastMinute.empty() && now - m_lastMinute.front().at >= Minute)
         m_lastMinute.pop_front();
+    while (!m_refusedAt.empty() && now - m_refusedAt.front() >= Minute)
+        m_refusedAt.pop_front();
+    for (auto it = m_lastWarned.begin(); it != m_lastWarned.end();)
+        it = now - it.value() >= WarnEvery ? m_lastWarned.erase(it) : std::next(it);
     for (auto it = m_sameRead.begin(); it != m_sameRead.end();) {
         std::deque<qint64> &times = it.value();
         while (!times.empty() && now - times.front() >= Second)

@@ -13,7 +13,7 @@ class TrafficMeter {
 public:
     // now 是单调毫秒（测试里直接给）；返回 false = 不要发这个请求
     bool admit(const QString &method, const QString &path, const QString &query, qint64 now);
-    // 最近一分钟的总数、峰值每秒、拒绝次数与最常请求的路径：放进「复制诊断信息」
+    // 最近一分钟的总数、峰值每秒、拒绝次数与最常请求的路径（全都只算这一分钟）：放进「复制诊断信息」
     QString summary(qint64 now) const;
 
     static constexpr int RepeatLimit = 3;         // 1 秒内同一个读请求最多发 3 次
@@ -28,8 +28,7 @@ private:
     bool warnOnce(const QString &key, qint64 now);
 
     std::deque<Sent> m_lastMinute;
+    std::deque<qint64> m_refusedAt;                  // 最近一分钟被拦下的时刻
     QHash<QString, std::deque<qint64>> m_sameRead;   // 路径 + 参数 → 最近 1 秒的发出时间
-    QHash<QString, qint64> m_lastWarned;             // 每种告警 10 秒内只打一次，免得日志本身成为风暴
-    int m_refused = 0;
-    int m_peakPerSecond = 0;
+    QHash<QString, qint64> m_lastWarned;             // 每种告警 10 秒内只打一次，免得日志本身成为风暴（过期即删）
 };

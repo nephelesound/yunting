@@ -397,6 +397,7 @@ void NcmClient::postClientLogAttempt(const QByteArray &multipart, const QString 
     request.setRawHeader("Accept-Language", "zh-CN,zh;q=0.8");
     request.setRawHeader("Cookie", cookie.toUtf8());
     request.setTransferTimeout(15 * 1000);
+    m_traffic.admit(QStringLiteral("POST"), request.url().path(), {}, m_clock.elapsed());   // 只计数
     QNetworkReply *reply = m_nam->post(request, multipart);
     connect(reply, &QNetworkReply::finished, this, [this, reply, callback, multipart, boundary,
                                                        cookie, attempt] {
@@ -506,8 +507,6 @@ void NcmClient::startGet(const QString &path, const QUrlQuery &query, bool perso
     if (!cookie.isEmpty()) {
         req.setRawHeader("Cookie", cookie.toUtf8());
     }
-    // 请求计数用（--verbose）：只记路径，不记 query（可能含搜索词）和请求头
-    qCDebug(lcNet).noquote() << "GET" << url.path() << (retrying ? QStringLiteral("(retry %1)").arg(attempt) : QStringLiteral(""));
     if (!m_traffic.admit(QStringLiteral("GET"), path, query.toString(), m_clock.elapsed())) {
         // 不发，按失败回调；放到下一轮事件循环，免得调用方在同一个调用栈里立刻再要一次
         QTimer::singleShot(0, this, [this, callback] {
@@ -516,6 +515,8 @@ void NcmClient::startGet(const QString &path, const QUrlQuery &query, bool perso
         });
         return;
     }
+    // 请求计数用（--verbose）：只记放行了的；只记路径，不记 query（可能含搜索词）和请求头
+    qCDebug(lcNet).noquote() << "GET" << url.path() << (retrying ? QStringLiteral("(retry %1)").arg(attempt) : QStringLiteral(""));
     QElapsedTimer timer;
     timer.start();
     const quint64 authGeneration = m_authGeneration;

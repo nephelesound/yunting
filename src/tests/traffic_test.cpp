@@ -51,6 +51,20 @@ private slots:
         QVERIFY(meter.summary(100).contains(QStringLiteral("峰值 41 个/秒")));
     }
 
+    // 峰值与拦下的次数也只算最近一分钟：一小时前的风暴不该还挂在诊断信息上
+    void oldStormLeavesTheSummary()
+    {
+        TrafficMeter meter;
+        QTest::ignoreMessage(QtWarningMsg, QRegularExpression("refused GET api/song/lyric"));
+        for (int i = 0; i <= TrafficMeter::RepeatLimit; ++i)
+            meter.admit("GET", "api/song/lyric", "id=1", 10 + i);
+        QVERIFY(meter.summary(100).contains(QStringLiteral("拒绝 1 个重复请求")));
+        meter.admit("GET", "api/hot", {}, 70000);
+        const QString later = meter.summary(70000);
+        QVERIFY2(later.contains(QStringLiteral("峰值 1 个/秒")), qPrintable(later));
+        QVERIFY2(later.contains(QStringLiteral("拒绝 0 个重复请求")), qPrintable(later));
+    }
+
     // 摘要只有路径与次数：参数里可能有搜索词，不能进诊断信息；一分钟前的不算
     void summaryNamesPathsOnlyAndForgets()
     {
