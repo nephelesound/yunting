@@ -14,6 +14,8 @@ Item {
     // 页头右上角自己的头像例外：那是自己的装扮，小也要看得见
     property string pendant
     property int pendantMinSize: Tokens.height8
+    // 解码尺寸：默认按显示的两倍。显示尺寸会变的地方（主页戴上挂件时头像缩小）给一个固定值，免得一缩就重新解码、闪一下占位
+    property int decodeSize: 2 * Math.max(avatar.width, avatar.height)
 
     readonly property bool hasImage: image.status === Image.Ready
 
@@ -42,8 +44,8 @@ Item {
         visible: avatar.hasImage
         radius: width / 2
         source: avatar.source
-        sourceSize.width: 2 * avatar.width
-        sourceSize.height: 2 * avatar.height
+        sourceSize.width: avatar.decodeSize
+        sourceSize.height: avatar.decodeSize
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
     }

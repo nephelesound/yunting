@@ -114,6 +114,7 @@ ScreenFrame {
                     anchors.centerIn: parent
                     width: parent.framed ? parent.width / 1.5 : parent.width
                     height: width
+                    decodeSize: 2 * Tokens.trackColumn
                     name: page.user.name
                     source: page.user.avatar
                 }

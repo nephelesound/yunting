@@ -2,7 +2,7 @@
 // Current-user avatar pendant SDK.
 //
 // Raw endpoint:
-//   GET /api/pendant/user/get   (personal MUSIC_U)
+//   /api/pendant/user/get   (personal MUSIC_U; accepts GET or POST, sent here as a form POST)
 //
 // The account/profile endpoints do not carry a pendant. This endpoint returns
 // data.pendantData for the signed-in user (or null when none is worn). The
