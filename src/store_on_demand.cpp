@@ -126,8 +126,6 @@ void Store::request(const QString &key)
              s.requestSimilarPlaylists(k, k.section(u':', 1).toDouble()); }},
         {QStringLiteral("defaultSearch"), [](Store &s, const QString &) {
              s.requestDefaultSearch(); }},
-        {QStringLiteral("avatarPendant"), [](Store &s, const QString &) {
-             s.requestAvatarPendant(); }},
         {QStringLiteral("artistSongs:"), [](Store &s, const QString &k) {
              const QStringList parts = k.split(u':');
              s.requestArtistSongs(k, parts.value(1).toDouble(), parts.value(2).toInt()); }},
@@ -411,7 +409,8 @@ void Store::requestSearch(const QString &key, const QString &raw)
 }
 
 // 当前账号正在佩戴的头像挂件。profile/account 接口都不带这个字段；没有挂件时
-// 服务端会返回 data.pendantData=null，这里落成 null 而不是失败。
+// 服务端会返回 data.pendantData=null。只写 account.avatarPendant，界面只读这一处，
+// 不再保留一份 data.avatarPendant 造成双写。
 void Store::requestAvatarPendant()
 {
     if (!m_client->hasMusicU())
@@ -422,28 +421,13 @@ void Store::requestAvatarPendant()
         [this, token, epoch](sdk::Result<sdk::AvatarPendant> result) {
         if (epoch != m_epoch || !m_requests.current(QStringLiteral("avatarPendant"), token))
             return;
-        if (!result) {
-            put("avatarPendant", QVariant::fromValue(nullptr), false);
+        if (!result)
             return;
-        }
-        const sdk::AvatarPendant &p = *result.value;
-        QVariantMap pendant{
-            {"id", static_cast<double>(p.id)},
-            {"name", p.name},
-            {"imageUrl", p.imageUrl},
-            {"imageAndroidUrl", p.androidUrl},
-            {"imageIosUrl", p.iosUrl},
-            {"imagePCUrl", p.pcUrl},
-            {"previewImageUrl", p.previewUrl},
-            {"type", p.type},
-            {"status", p.status},
-        };
-        put("avatarPendant", pendant, false);
         QVariantMap account = m_personal.value("account").toMap();
-        if (!account.isEmpty()) {
-            account.insert("avatarPendant", p.imageUrl);
-            put("account", account, true);
-        }
+        if (account.isEmpty())
+            return;
+        account.insert("avatarPendant", result.value->imageUrl);
+        put("account", account, true);
     });
 }
 

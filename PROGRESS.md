@@ -175,7 +175,7 @@
 - [x] `--store-key similarSongs:108485` / `similarPlaylists:108485`：按当前歌曲取相似歌曲与相似歌单，真实接口落地
 - [x] `--store-key defaultSearch`：真实默认搜索关键词落地
 - [x] 评论 `pendantData` / `avatarDetail`、用户社交与一起听成员装饰字段已进入数据映射
-- [x] `--store-key avatarPendant`：真实 `api/pendant/user/get` 返回本人挂件「跃龙门」；profile 接口确实没有该字段
+- [x] `--dump-store`：真实 `api/pendant/user/get` 返回本人挂件「跃龙门」，只写入 `account.avatarPendant`；profile 接口确实没有该字段
 - [x] `--store-key user:89941946`：`api/pendant/user/get?userId=` 返回对方挂件；用户主页已并入 `user.avatarPendant`
 - [x] `--listen-together-selftest`：真实建房、同步两首歌单、结束；随后 status inRoom=false
 - [x] `--refresh-session`：真实 `login/token/refresh` 返回 ok，并重拉首屏
