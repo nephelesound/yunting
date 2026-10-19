@@ -76,11 +76,14 @@ void Store::requestListenRank(const QString &type)
     const QString kind = (type == QLatin1String("week")) ? QStringLiteral("week")
                                                          : QStringLiteral("month");
     const quint64 epoch = m_epoch;
-    const quint64 token = m_requests.begin(QStringLiteral("listenRank"));
+    // Week and month share one ledger slot: the latest tab wins, and a late
+    // response for the previous tab must not overwrite the new tab's data.
+    const QString slot = QStringLiteral("listenRank");
+    const quint64 token = m_requests.begin(slot);
     m_client->get(QStringLiteral("api/content/activity/listen/data/song/play/rank"),
                   query({{"type", kind}}), true,
-                  [this, kind, epoch, token](const QJsonDocument &doc, bool ok) {
-        if (epoch != m_epoch || !m_requests.current(QStringLiteral("listenRank"), token))
+                  [this, kind, epoch, token, slot](const QJsonDocument &doc, bool ok) {
+        if (epoch != m_epoch || !m_requests.current(slot, token))
             return;
         const QString failure = requestFailure(doc, ok);
         if (!failure.isEmpty()) {

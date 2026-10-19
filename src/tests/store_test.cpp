@@ -2009,6 +2009,46 @@ private slots:
                  QVariantMap({{"id", 8.0}, {"name", QStringLiteral("Bob")}}));
     }
 
+    // 周 / 月快速切换：旧标签页的迟到回包不能覆盖新标签页的数据
+    void listenRankLatestTabWins()
+    {
+        FakeApi::Responder weekRespond;
+        bool weekCaptured = false;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path != "/api/content/activity/listen/data/song/play/rank") {
+                respond(200, "{\"code\":200}");
+                return;
+            }
+            const QUrlQuery q(QString::fromLatin1(req.query));
+            if (q.queryItemValue(QStringLiteral("type")) == QLatin1String("week")) {
+                weekCaptured = true;
+                weekRespond = respond; // hold the old tab response
+                return;
+            }
+            respond(200, json(QJsonObject{{"code", 200}, {"data", QJsonObject{
+                {"startTime", 2}, {"endTime", 3}, {"songCount", 1},
+                {"songItems", QJsonArray{QJsonObject{{"songId", 2}, {"songName", "Month"}}}}}}}));
+        };
+
+        m_store->request(QStringLiteral("listenRank:week"));
+        QVERIFY(waitUntil([&] { return weekCaptured; }));
+        m_store->request(QStringLiteral("listenRank:month"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("listenRank").toMap().value("type").toString()
+                == QStringLiteral("month");
+        }));
+
+        weekRespond(200, json(QJsonObject{{"code", 200}, {"data", QJsonObject{
+            {"startTime", 1}, {"endTime", 2}, {"songCount", 1},
+            {"songItems", QJsonArray{QJsonObject{{"songId", 1}, {"songName", "Week"}}}}}}}));
+        QTest::qWait(100);
+        QCOMPARE(m_store->data().value("listenRank").toMap().value("type").toString(),
+                 QStringLiteral("month"));
+        QCOMPARE(m_store->data().value("listenRank").toMap().value("items").toList()
+                     .first().toMap().value("name").toString(),
+                 QStringLiteral("Month"));
+    }
+
     // 结构不符的听歌足迹回包按对应请求 key 报一句用户能看懂的话，不写半份数据
     void malformedListenStatsReportUserFacingFailures()
     {

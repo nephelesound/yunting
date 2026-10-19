@@ -43,7 +43,12 @@ ScreenFrame {
     function load() {
         if (!(page.userId > 0))
             return;
-        if (page.pane === "rank" && page.own && page.rank.pending)
+        // Call Source.listenRank directly instead of reading page.rank: on a
+        // rankType change the page.rank binding may still expose the previous
+        // type and its pending=false, which skipped the request and left the
+        // month tab loading forever.
+        if (page.pane === "rank" && page.own
+                && Source.listenRank(page.rankType).pending)
             Source.need("listenRank:" + page.rankType);
         else if (page.pane === "follows" && page.follows.pending)
             Source.need("userFollows:" + page.userId);
