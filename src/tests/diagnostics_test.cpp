@@ -45,6 +45,15 @@ private slots:
         Diagnostics diagnostics;
         QVERIFY(diagnostics.report().startsWith(QStringLiteral("yunting ")));
         QVERIFY(diagnostics.report().contains(QStringLiteral("line 249")));
+        QVERIFY(!diagnostics.report().contains(QStringLiteral("流量：")));
+    }
+
+    // 网络出口给的流量摘要放进报告：排查请求风暴时一眼能看到最近的请求量
+    void reportIncludesTraffic()
+    {
+        Diagnostics diagnostics;
+        diagnostics.traffic = [] { return QStringLiteral("最近一分钟 3 个请求"); };
+        QVERIFY(diagnostics.report().contains(QStringLiteral("流量：最近一分钟 3 个请求")));
     }
 };
 

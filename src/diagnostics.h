@@ -6,9 +6,14 @@
 #include <QString>
 #include <QStringList>
 
+#include <functional>
+
 class Diagnostics : public QObject {
     Q_OBJECT
 public:
+    // 报告里的「流量」一段由网络出口给（NcmClient::trafficSummary）；不设就没有这一段
+    std::function<QString()> traffic;
+
     // 进程里只装一次；之后创建的 Diagnostics 都读同一份记录
     static void install();
     // 测试用：直接记一条（与日志处理器记的格式相同）

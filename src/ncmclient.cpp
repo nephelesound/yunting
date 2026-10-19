@@ -66,6 +66,7 @@ QMap<QString, QString> jarFromArrayFile(const QByteArray &json)
 NcmClient::NcmClient(QObject *parent, bool loadCookies)
     : QObject(parent), m_vault(new CookieVault(this)), m_nam(new QNetworkAccessManager(this))
 {
+    m_clock.start();
     if (!loadCookies) {
         m_ready = true;
         m_persist = false;
@@ -245,6 +246,7 @@ void NcmClient::postRaw(const QUrl &url, const QByteArray &body, const QString &
         req.setRawHeader("Cookie", cookie.toUtf8());
 
     qCDebug(lcNet).noquote() << "POST" << url.path();
+    m_traffic.admit(QStringLiteral("POST"), url.path(), {}, m_clock.elapsed());   // 写请求只计数
     QElapsedTimer timer;
     timer.start();
     const quint64 authGeneration = m_authGeneration;
@@ -506,6 +508,14 @@ void NcmClient::startGet(const QString &path, const QUrlQuery &query, bool perso
     }
     // 请求计数用（--verbose）：只记路径，不记 query（可能含搜索词）和请求头
     qCDebug(lcNet).noquote() << "GET" << url.path() << (retrying ? QStringLiteral("(retry %1)").arg(attempt) : QStringLiteral(""));
+    if (!m_traffic.admit(QStringLiteral("GET"), path, query.toString(), m_clock.elapsed())) {
+        // 不发，按失败回调；放到下一轮事件循环，免得调用方在同一个调用栈里立刻再要一次
+        QTimer::singleShot(0, this, [this, callback] {
+            if (callback && callbackContextAlive())
+                callback(QJsonDocument(), false);
+        });
+        return;
+    }
     QElapsedTimer timer;
     timer.start();
     const quint64 authGeneration = m_authGeneration;

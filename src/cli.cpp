@@ -96,7 +96,7 @@ struct CommandLine {
     QCommandLineOption apiPersonal{"api-personal", "Send stored cookies with --api get"};
     QCommandLineOption anonymous{"anonymous", "Skip keychain/cookies (read-only debugging)"};
     QCommandLineOption verbose{"verbose",
-                               "Print Qt/QML warnings to stderr (this machine's logging config may hide them)"};
+                               "Print warnings and this app's debug logs, including every request path, to stderr"};
     QCommandLineOption screenshot{"screenshot",
                                   "Load the UI, wait for live data, save a PNG of the window and exit",
                                   "file"};
@@ -924,6 +924,7 @@ int runGui(const CommandLine &cli, QApplication &app, Backend &backend)
     LayerShellHelper layerShell;
     ClipboardHelper clipboard;
     Diagnostics diagnostics;
+    diagnostics.traffic = [&client] { return client.trafficSummary(); };
     bool qrAvailable = false;
 #ifdef YUNTING_QRCODE
     engine.addImageProvider(QStringLiteral("qrcode"), new QrCodeImageProvider);
@@ -973,7 +974,7 @@ int run(QApplication &app)
     cli.parser.process(app);
 
     if (cli.parser.isSet(cli.verbose) || cli.parser.isSet(cli.screenshot)) {
-        // 警告以上一律打印；--verbose 时再打开本应用的 ncm.* 调试分类（网络请求路径等）
+        // 警告以上一律打印；--verbose 时再打开本应用的 yunting.* 调试分类（每个请求的路径、流量告警等）
         if (cli.parser.isSet(cli.verbose))
             QLoggingCategory::setFilterRules(QStringLiteral("yunting.*.debug=true"));
         qInstallMessageHandler([](QtMsgType type, const QMessageLogContext &ctx, const QString &msg) {

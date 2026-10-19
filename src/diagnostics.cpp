@@ -80,6 +80,8 @@ QString Diagnostics::report() const
         QStringLiteral("桌面：%1").arg(qEnvironmentVariable("XDG_CURRENT_DESKTOP")),
         QString(),
     };
+    if (traffic)
+        out << QStringLiteral("流量：") + traffic() << QString();
     const QStringList log = recent();
     if (log.isEmpty())
         out << QStringLiteral("（最近没有警告或错误）");

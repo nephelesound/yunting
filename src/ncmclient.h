@@ -3,6 +3,9 @@
 // 端点返回 JSON；归一化（snapshot.py 的形状）不在这里做，Store 负责。
 // cookie jar 的存取走 CookieVault（钥匙串，后备 600 文件）：构造时先迁移 legacy
 // 文件再读存储，读到 jar 后发 ready()，在那之前不得发个人请求。
+#include "traffic.h"
+
+#include <QElapsedTimer>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <functional>
@@ -110,6 +113,9 @@ explicit NcmClient(QObject *parent = nullptr, bool loadCookies = true);
     // jar 是否已从存储读出（ready() 发过）
     bool isReady() const { return m_ready; }
 
+    // 最近一分钟的流量（总数、峰值、被拒的重复请求、最常请求的路径），给「复制诊断信息」
+    QString trafficSummary() const { return m_traffic.summary(m_clock.elapsed()); }
+
 signals:
     // jar 已从存储读出，可以开始（个人）请求了
     void ready();
@@ -132,6 +138,8 @@ private:
 
     CookieVault *m_vault;
     QNetworkAccessManager *m_nam;
+    TrafficMeter m_traffic;      // 每个请求发出前都过它：计数，拦下循环造成的重复读请求
+    QElapsedTimer m_clock;
     QString m_apiBase = QStringLiteral("https://music.163.com/");
     QMap<QString, QString> m_jar;
     bool m_ready = false;

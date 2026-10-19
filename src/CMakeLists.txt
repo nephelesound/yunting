@@ -48,7 +48,7 @@ set(YUNTING_SDK_SOURCES
 # CMake boilerplate.
 set(YUNTING_SDK_TEST_TRANSPORT
     sdk/sdk_json.h sdk/sdk_json.cpp sdk/service.h sdk/service.cpp
-    ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp
+    ncmclient.h ncmclient.cpp traffic.h traffic.cpp cookievault.h cookievault.cpp
     crypto.h crypto.cpp perf.h perf.cpp)
 function(yunting_add_sdk_test name)
     qt_add_executable(${name} tests/${name}_test.cpp ${ARGN} ${YUNTING_SDK_TEST_TRANSPORT})
@@ -64,7 +64,7 @@ qt_add_executable(yunting
     listentogether.h listentogether.cpp
     downloadmanager.h downloadmanager.cpp
     downloadpaths.h
-    ncmclient.h ncmclient.cpp
+    ncmclient.h ncmclient.cpp traffic.h traffic.cpp
     cookievault.h cookievault.cpp
     store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_comment.cpp store_user.cpp store_inbox.cpp store_stats.cpp store_notify.cpp store_social.cpp store_user_events.cpp store_library.cpp store_resource.cpp store_comment_extra.cpp store_lyrics_new.cpp store_on_demand.cpp store_discovery.cpp store_wiki.cpp
     ${YUNTING_SDK_SOURCES}
@@ -140,6 +140,9 @@ add_test(NAME colortone COMMAND colortone_test)
 qt_add_executable(diagnostics_test tests/diagnostics_test.cpp diagnostics.h diagnostics.cpp)
 target_link_libraries(diagnostics_test PRIVATE Qt6::Gui Qt6::Test)
 add_test(NAME diagnostics COMMAND diagnostics_test)
+qt_add_executable(traffic_test tests/traffic_test.cpp traffic.h traffic.cpp)
+target_link_libraries(traffic_test PRIVATE Qt6::Core Qt6::Test)
+add_test(NAME traffic COMMAND traffic_test)
 
 
 
@@ -151,7 +154,7 @@ add_test(NAME normalize COMMAND normalize_test)
 
 # 音量/静音与播放走真实 libmpv（ao=null），测试要能构造真实引擎（无窗口、无网络）
 qt_add_executable(audioengine_test tests/audioengine_test.cpp audioengine.h audioengine.cpp
-    ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp json_util.h crypto.h crypto.cpp
+    ncmclient.h ncmclient.cpp traffic.h traffic.cpp cookievault.h cookievault.cpp json_util.h crypto.h crypto.cpp
     normalize.h normalize.cpp perf.h perf.cpp
     sdk/track.h sdk/track.cpp sdk/sdk_json.h sdk/sdk_json.cpp sdk/sdk_result.h)
 target_include_directories(audioengine_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -160,7 +163,7 @@ target_link_libraries(audioengine_test PRIVATE Qt6::Core Qt6::Test Qt6::Network 
 add_test(NAME audioengine COMMAND audioengine_test)
 
 # 重试策略：seam 是本地 QTcpServer（I/O 边界），不 mock NcmClient 内部
-qt_add_executable(retry_test tests/retry_test.cpp ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp crypto.h crypto.cpp perf.h perf.cpp)
+qt_add_executable(retry_test tests/retry_test.cpp ncmclient.h ncmclient.cpp traffic.h traffic.cpp cookievault.h cookievault.cpp crypto.h crypto.cpp perf.h perf.cpp)
 target_compile_options(retry_test PRIVATE -Wall -Wextra)
 target_link_libraries(retry_test PRIVATE Qt6::Core Qt6::Network Qt6::Test Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
 add_test(NAME retry COMMAND retry_test)
@@ -190,7 +193,7 @@ qt_add_executable(store_test tests/store_test.cpp
     sdk/account_feed.h sdk/account_feed.cpp
     session.h session.cpp
     querycache.h querycache.cpp
-    ncmclient.h ncmclient.cpp cookievault.h cookievault.cpp
+    ncmclient.h ncmclient.cpp traffic.h traffic.cpp cookievault.h cookievault.cpp
     sdk/track.h sdk/track.cpp
     normalize.h normalize.cpp json_util.h crypto.h crypto.cpp perf.h perf.cpp)
 target_include_directories(store_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -200,7 +203,7 @@ add_test(NAME store COMMAND store_test)
 
 # 切歌时挂起的 seek 不能落到下一首：本地假接口 + 本地 WAV
 qt_add_executable(audioengine_seek_test tests/audioengine_seek_test.cpp
-    audioengine.h audioengine.cpp ncmclient.h ncmclient.cpp
+    audioengine.h audioengine.cpp ncmclient.h ncmclient.cpp traffic.h traffic.cpp
     cookievault.h cookievault.cpp json_util.h crypto.h crypto.cpp normalize.h normalize.cpp perf.h perf.cpp
     sdk/track.h sdk/track.cpp sdk/sdk_json.h sdk/sdk_json.cpp sdk/sdk_result.h)
 target_include_directories(audioengine_seek_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
