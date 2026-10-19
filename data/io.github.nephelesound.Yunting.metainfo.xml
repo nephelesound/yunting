@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.8" date="2026-10-19">
+      <description>
+        <p>NetEase links open in the app: "open in client" on the web, links passed on the command line, and links copied in other apps (including phone short links), after asking. Albums and logged-out playlists can be shared, long descriptions open in full, and launching again returns to the open window.</p>
+        <p xml:lang="zh_CN">网易云的链接在云听里打开：网页上的「在客户端打开」、命令行里的链接、在别的程序里复制的链接（含手机分享的短链，先问一句）。专辑与未登录时的歌单可以分享，长简介可以展开，再次启动回到已经打开的窗口。</p>
+      </description>
+    </release>
     <release version="0.6.7" date="2026-10-19">
       <description>
         <p>The now-playing cover sits on the page with a thin contact shadow instead of floating above it.</p>
@@ -98,12 +104,6 @@
       <description>
         <p>Fixes a freeze when sharing a song that is not playing and endless retries after a failed request; adds request traffic monitoring and warnings.</p>
         <p xml:lang="zh_CN">修复分享不在播放的歌时应用卡死、请求失败后无限重试等问题，并加入请求流量的监测与告警。</p>
-      </description>
-    </release>
-    <release version="0.6.3" date="2026-10-19">
-      <description>
-        <p>Heart mode plays right away and improves as you listen; pausing and switching songs fade in and out; seeking no longer makes noise.</p>
-        <p xml:lang="zh_CN">心动模式改为点了就放、越听越准的播放方式；暂停与切歌淡入淡出；修复拖动进度条时的噪音。</p>
       </description>
     </release>
   </releases>
