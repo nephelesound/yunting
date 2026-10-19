@@ -280,26 +280,42 @@ void Store::fetchLiked(const QJsonObject &likedList)
                         [this, likedList](const QVariantList &tracks, const QJsonObject &liked, bool ok) {
         if (!ok)
             return;
-        put("liked", QVariantMap{{"id", liked.value("id").toDouble()},
-                                 {"count", liked.value("trackCount").toDouble()},
-                                 {"tracks", tracks}}, true);
-        // snapshot.py：心动模式以红心第一首为种子；红心为空就没有这一块
-        if (!tracks.isEmpty())
-            fetchHeart(tracks.at(0).toMap(), likedList);
+        putLiked(QVariantMap{{"id", liked.value("id").toDouble()},
+                             {"count", liked.value("trackCount").toDouble()},
+                             {"tracks", tracks}});
     });
 }
 
-void Store::fetchHeart(const QVariantMap &seed, const QJsonObject &likedList)
+// snapshot.py：心动模式以红心第一首为种子。红心列表只从这里写，首位一变（新点了红心、
+// 取消了第一首）心动模式就换种子重取；红心为空就没有这一块。
+void Store::putLiked(const QVariantMap &liked)
+{
+    put("liked", liked, true);
+    const QVariantList tracks = liked.value("tracks").toList();
+    const QVariantMap seed = tracks.isEmpty() ? QVariantMap{} : tracks.first().toMap();
+    const double seedId = seed.value("id").toDouble();
+    if (seedId == m_heartSeedId)
+        return;
+    m_heartSeedId = seedId;
+    if (seed.isEmpty())
+        put("heart", QVariant::fromValue(nullptr), true);
+    else
+        fetchHeart(seed, liked.value("id").toDouble());
+}
+
+void Store::fetchHeart(const QVariantMap &seed, double likedId)
 {
     m_similarSeed = seed;
     maybeFetchSimilar();
     fetch("api/playmode/intelligence/list",
           query({{"songId", seed.value("id").toString()},
                  {"type", "fromPlayAll"},
-                 {"playlistId", num(likedList.value("id").toDouble())},
+                 {"playlistId", num(likedId)},
                  {"startMusicId", seed.value("id").toString()},
                  {"count", "1"}}), true,
           [this, seed](const QJsonDocument &doc, bool /*ok*/) {
+        if (seed.value("id").toDouble() != m_heartSeedId)
+            return;   // 回包前红心首位又换了：等新种子那一次
         const QJsonObject resp = body(doc);
         const QJsonArray entries = arr(resp, "data");
         QJsonArray songs;

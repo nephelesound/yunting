@@ -140,7 +140,8 @@ private:
     void fetchDaily();
     void fetchUserLists(double uid);
     void fetchLiked(const QJsonObject &likedList);
-    void fetchHeart(const QVariantMap &seed, const QJsonObject &likedList);
+    void putLiked(const QVariantMap &liked);
+    void fetchHeart(const QVariantMap &seed, double likedId);
     void fetchRadar();
     void fetchTail();
     // 云盘分页的共享状态：递归回调只持有 state，不形成 shared_ptr 自环
@@ -270,6 +271,7 @@ private:
     QVariantMap m_emptyPersonal;     // 个人骨架（换账号时清回它）
     QVariantMap m_similarSeed;
     bool m_similarFired = false;
+    double m_heartSeedId = 0;        // 心动模式当前（或在途）的种子：红心第一首
     bool m_online = true;
     bool m_sessionExpired = false;
     QNetworkInformation *m_netInfo = nullptr;

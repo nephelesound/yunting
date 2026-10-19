@@ -537,6 +537,62 @@ private slots:
         QVERIFY(m_store->personal().value("liked").toMap().value("tracks").toList().isEmpty());
     }
 
+    // 心动模式以红心第一首为种子：新点的红心排到第一，心动模式跟着换；取消后换回原来的第一首
+    void heartFollowsTheFirstLikedSong()
+    {
+        const auto song = [](double id) {
+            return QJsonObject{{"id", id}, {"name", "song"},
+                               {"ar", QJsonArray{}}, {"al", QJsonObject{}}, {"dt", 1000}};
+        };
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/nuser/account/get") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"profile", QJsonObject{{"userId", 42}, {"nickname", "n"}}}}));
+            } else if (req.path == "/api/user/playlist") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"playlist", QJsonArray{QJsonObject{
+                        {"id", 100}, {"trackCount", 1},
+                        {"creator", QJsonObject{{"userId", 42}}}}}}}));
+            } else if (req.path == "/api/song/like/get") {
+                respond(200, "{\"code\":200,\"ids\":[7]}");
+            } else if (req.path == "/api/v6/playlist/detail") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"playlist", QJsonObject{{"id", 100}, {"name", "liked"}, {"trackCount", 1},
+                                             {"tracks", QJsonArray{song(7)}},
+                                             {"trackIds", QJsonArray{QJsonObject{{"id", 7}}}}}}}));
+            } else if (req.path == "/api/v3/song/detail") {
+                respond(200, json(QJsonObject{{"code", 200}, {"songs", QJsonArray{song(77)}}}));
+            } else if (req.path == "/api/playmode/intelligence/list") {
+                // 推荐的第一首 = 种子 × 10，看得出是哪一次请求的结果
+                const QUrlQuery query(QString::fromLatin1(req.query));
+                const double seed = query.queryItemValue(QStringLiteral("songId")).toDouble();
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"data", QJsonArray{QJsonObject{{"songInfo", song(seed * 10)}}}}}));
+            } else {
+                respond(200, "{\"code\":200}");
+            }
+        };
+        const auto heartIs = [&](double seed) {
+            const QVariantMap heart = m_store->personal().value("heart").toMap();
+            const QVariantList tracks = heart.value("tracks").toList();
+            return heart.value("seed").toMap().value("id").toDouble() == seed
+                && !tracks.isEmpty() && tracks.first().toMap().value("id").toDouble() == seed * 10;
+        };
+
+        m_store->refresh();
+        QVERIFY(waitUntil([&] { return heartIs(7); }));
+
+        m_store->setLiked(77, true);
+        QVERIFY(waitUntil([&] { return heartIs(77); }));
+
+        m_store->setLiked(77, false);
+        QVERIFY(waitUntil([&] { return heartIs(7); }));
+    }
+
     // 从排行榜收藏：卡片不在 personal/搜索结果里，也要用排行榜已有的名字与封面
     void subscribingChartKeepsItsName()
     {

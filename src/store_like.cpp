@@ -126,7 +126,7 @@ void Store::setLikedLocal(double songId, bool liked)
         return;
     QVariantMap likedMap = raw.toMap();
     likedMap.insert("count", std::max(0.0, likedMap.value("count").toDouble() + (liked ? 1 : -1)));
-    put("liked", likedMap, true);
+    putLiked(likedMap);
 }
 
 bool Store::isLiked(double songId) const
@@ -201,7 +201,7 @@ void Store::addLikedTrack(double songId)
     if (!known.isEmpty()) {
         tracks.prepend(known);
         liked.insert("tracks", tracks);
-        put("liked", liked, true);
+        putLiked(liked);
         return;
     }
     // 本地没有这首歌（比如从播放条直接红心）：取一次详情再插到列表首位
@@ -223,7 +223,7 @@ void Store::addLikedTrack(double songId)
                 return;
         tracks.prepend(details.value(songId));
         liked.insert("tracks", tracks);
-        put("liked", liked, true);
+        putLiked(liked);
     });
 }
 
@@ -238,5 +238,5 @@ void Store::removeLikedTrack(double songId)
         if (tracks.at(i).toMap().value("id").toDouble() == songId)
             tracks.removeAt(i);
     liked.insert("tracks", tracks);
-    put("liked", liked, true);
+    putLiked(liked);
 }

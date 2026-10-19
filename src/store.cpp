@@ -277,6 +277,7 @@ void Store::refresh()
     // 种子可能换人（匿名热歌第一首 → 登录后红心第一首），重新竞速一次
     m_similarFired = false;
     m_similarSeed.clear();
+    m_heartSeedId = 0;
     fetchAnonymous();
     fetchPublicPersonal();   // 漫游是公共接口：匿名也取（带 cookie 时是个人的）
     if (m_client->hasMusicU())
@@ -346,6 +347,7 @@ void Store::resetPersonal()
         put(key, nullVariant(), false);
     m_similarFired = false;
     m_similarSeed.clear();
+    m_heartSeedId = 0;
     m_personal = m_emptyPersonal;
     m_cache.remember(personalKey(), m_personal);
     emit personalChanged();
@@ -368,6 +370,7 @@ void Store::logout()
     m_accountUid = 0;
     m_similarFired = false;
     m_similarSeed.clear();
+    m_heartSeedId = 0;
     refresh();
     emit loggedOut();
 }
