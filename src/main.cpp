@@ -45,7 +45,8 @@ bool linkWithoutDisplay(int argc, char *argv[])
 }
 
 // 已有云听在运行：把参数交给它（KDBusService 的 CommandLine，与第二次启动走同一条路），连同拉起这个进程的
-// 激活令牌，那边才能把窗口提到前面（Wayland 不许没有令牌的窗口抢焦点）。没在运行返回空。
+// 激活令牌，那边才能把窗口提到前面（Wayland 不许没有令牌的窗口抢焦点）。没在运行返回空，照常起；
+// 在运行就返回这个进程该用的退出码。
 // 要在钥匙串、mpv 这些初始化之前问：第二次启动不该先等这些
 std::optional<int> forwardToRunningInstance()
 {
@@ -62,11 +63,12 @@ std::optional<int> forwardToRunningInstance()
         service, QStringLiteral("/io/github/nephelesound/Yunting"),
         QStringLiteral("org.kde.KDBusService"), QStringLiteral("CommandLine"));
     call << QCoreApplication::arguments() << QDir::currentPath() << platformData;
-    // 那边卡住时不能陪着等（D-Bus 默认 25 秒）：3 秒没回话就当它不在，自己照常起
-    const QDBusMessage reply = bus.call(call, QDBus::Block, 3000);
+    // 那边登记着却不回话（界面卡住、在等钥匙串）：不陪着等满 D-Bus 默认的 25 秒，也不再起一个——
+    // 名字被占着，再起的那个只会是第二个实例（第二个托盘、MPRIS 冲突）。说一句，退出
+    const QDBusMessage reply = bus.call(call, QDBus::Block, 10000);
     if (reply.type() != QDBusMessage::ReplyMessage) {
-        std::fprintf(stderr, "已在运行的云听没有回应：%s\n", qPrintable(reply.errorMessage()));
-        return std::nullopt;
+        std::fprintf(stderr, "云听已在运行，但没有回应：%s\n", qPrintable(reply.errorMessage()));
+        return 1;
     }
     return reply.arguments().value(0).toInt();
 }
@@ -79,7 +81,7 @@ int main(int argc, char *argv[])
         QCoreApplication app(argc, argv);
         if (const auto rc = forwardToRunningInstance())
             return *rc;
-        std::fprintf(stderr, "没有图形环境，链接没能交给正在运行的云听，没法打开\n");
+        std::fprintf(stderr, "没有图形环境，云听也没有在运行，链接没法打开\n");
         return 1;
     }
     // 在 QApplication 之前判断：它会把 -platform、-style 这些 Qt 自己的选项从 argv 里拿掉

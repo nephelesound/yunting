@@ -24,7 +24,7 @@
 | 热门评论 | `comments:<songId>` | `userId` `id` `user` `avatar` `avatarPendant` `identityIcon` `vipLevel` `content` `likes` `liked` `time` |
 | 评论分页 | `comments:<songId>:<offset>` → `data.commentPage` | 同上 + `parentId` |
 | 评论点赞 | `setCommentLiked(kind, ownerId, commentId, liked)` | `kind` 为 `song` / `playlist`（`ownerId` 是歌曲或歌单 id）；乐观更新该线程热评与分页槽的 `liked` / `likes`，失败回滚 |
-| 只读信箱 | `inbox` / `inbox:<offset>` | 会话：`userId` `name` `avatar` `vipType` `lastText` `kind` `lastTime` `lastMsgId` `unread` `messageCount` |
+| 只读信箱 | `inbox` / `inbox:<offset>` | 会话：`userId` `name` `avatar` `avatarPendant` `identityIcon` `vipType` `lastText` `kind` `lastTime` `lastMsgId` `unread` `messageCount` |
 | 私信历史 | `inboxThread:<uid>[:<before>]` | 消息：`id` `fromUserId` `fromName` `fromAvatar` `toUserId` `toName` `mine` `time` `message{ text,kind,song,album,playlist,mv }` |
 | NCBL 上报 | `AudioEngine.scrobbleMode` | `legacy` / `ncbl` |
 
@@ -72,7 +72,7 @@
 | `data.listenRealtime` | `listen:week` / `listen:month` | `{ type,startTime,endTime,userNickName,listenTimeDistribution,weekFriends,weekToday }` |
 | `data.listenRank` | `listenRank:month` / `listenRank:week` | `{ type,startTime,endTime,songCount,items:[{id,name,artist,album,cover,playCount,artists[]}] }` |
 | `data.notifications` | `notifications` | `{ msg,comment,event,follow,notice,forward,newProgramCount,total }` |
-| `data.userFollows` | `userFollows:<uid>[:<offset>]` | `{ userId,offset,more,items:[{id,name,avatar,signature,gender,followed,mutual,vipType,vipLevel}] }` |
+| `data.userFollows` | `userFollows:<uid>[:<offset>]` | `{ userId,offset,more,items:[{id,name,avatar,avatarPendant,identityIcon,signature,gender,followed,mutual,vipType,vipLevel}] }` |
 | `data.userFolloweds` | `userFolloweds:<uid>[:<offset>]` | 同 `userFollows` |
 | `data.userLevel` | `userLevel` | `{ level,nowPlayCount,nextPlayCount,nowLoginCount,nextLoginCount,progress,info }` |
 | `data.userSubcount` | `userSubcount` | `{ artistCount,createdPlaylistCount,subPlaylistCount,mvCount,djRadioCount }` |
