@@ -12,7 +12,7 @@ QtObject {
     property var queue: []
     property int index: -1
     property int mode: 0            // 0 列表循环 · 1 单曲循环 · 2 随机
-    property string origin          // 队列从哪来："fm" = 私人漫游（快放完时续取），其余为空
+    property string origin          // 队列从哪来："fm" = 私人漫游、"heart" = 心动模式（都是流，快放完时续取），其余为空
 
     readonly property var current: playback.index >= 0 && playback.index < playback.queue.length ? playback.queue[playback.index] : null
 

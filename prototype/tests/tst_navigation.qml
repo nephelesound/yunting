@@ -88,5 +88,19 @@ Item {
             tryCompare(window.pageStack.currentItem, "artistId", 6452);
             window.close();
         }
+
+        // 心动模式与私人漫游一样是流：点入口就从头播放并去正在播放页，不打开列表页、不压历史里的列表
+        function test_heartEntryStartsTheStream() {
+            const component = Qt.createComponent("../main.qml");
+            const window = component.createObject(root, { backend: null, fixture: "worst" });
+            verify(window.loggedIn, "the worst fixture has an account");
+            window.history = [];
+            window.page = "home";
+            window.openEntry("heart");
+            compare(window.page, "nowplaying");
+            compare(window.currentTrack.id, Source.heartTracks[0].id);
+            window.close();
+            Source.snapshot.fixture = "";
+        }
     }
 }

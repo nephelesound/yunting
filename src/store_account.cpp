@@ -307,26 +307,54 @@ void Store::fetchHeart(const QVariantMap &seed, double likedId)
 {
     m_similarSeed = seed;
     maybeFetchSimilar();
-    fetch("api/playmode/intelligence/list",
-          query({{"songId", seed.value("id").toString()},
-                 {"type", "fromPlayAll"},
-                 {"playlistId", num(likedId)},
-                 {"startMusicId", seed.value("id").toString()},
-                 {"count", "1"}}), true,
-          [this, seed](const QJsonDocument &doc, bool /*ok*/) {
+    fetchHeartBatch(seed.value("id").toDouble(), likedId, [this, seed](const QVariantList &tracks) {
         if (seed.value("id").toDouble() != m_heartSeedId)
             return;   // 回包前红心首位又换了：等新种子那一次
-        const QJsonObject resp = body(doc);
-        const QJsonArray entries = arr(resp, "data");
-        QJsonArray songs;
-        for (const QJsonValue &x : entries)
-            songs.append(x.toObject().value("songInfo").toObject());
-        const auto parsed = sdk::parseTracks(songs, arr(resp, "privileges"));
-        if (!parsed)
-            return;
-        QVariantList tracks = sdk::tracksToVariantList(*parsed.value);
         put("heart", QVariantMap{{"seed", seed}, {"tracks", tracks.mid(0, 30)}}, true);
         // radar / tail 由 fetchAccount 独立发起，不挂在这条链尾
+    });
+}
+
+// 心动模式是一个流：快放完时从正在放的这首接着推荐，追加到 personal.heart.tracks（按 id 去重），种子不变
+void Store::requestMoreHeart(double songId)
+{
+    const double likedId = m_personal.value("liked").toMap().value("id").toDouble();
+    if (songId <= 0 || likedId <= 0)
+        return;
+    fetchHeartBatch(songId, likedId, [this](const QVariantList &batch) {
+        QVariantMap heart = m_personal.value("heart").toMap();
+        if (heart.isEmpty())
+            return;   // 期间退出登录或红心清空：没有可以接上的流
+        QVariantList tracks = heart.value("tracks").toList();
+        QSet<double> seen;
+        for (const QVariant &t : std::as_const(tracks))
+            seen.insert(t.toMap().value("id").toDouble());
+        for (const QVariant &t : batch) {
+            if (!seen.contains(t.toMap().value("id").toDouble()))
+                tracks.append(t);
+        }
+        heart.insert("tracks", tracks);
+        put("heart", heart, true);
+    });
+}
+
+// 网易云的心动模式接口：从 songId 出发、混合红心歌单（likedId）与相似推荐的一批歌
+void Store::fetchHeartBatch(double songId, double likedId, std::function<void(const QVariantList &)> done)
+{
+    fetch("api/playmode/intelligence/list",
+          query({{"songId", num(songId)},
+                 {"type", "fromPlayAll"},
+                 {"playlistId", num(likedId)},
+                 {"startMusicId", num(songId)},
+                 {"count", "1"}}), true,
+          [done = std::move(done)](const QJsonDocument &doc, bool /*ok*/) {
+        const QJsonObject resp = body(doc);
+        QJsonArray songs;
+        for (const QJsonValue &x : arr(resp, "data"))
+            songs.append(x.toObject().value("songInfo").toObject());
+        const auto parsed = sdk::parseTracks(songs, arr(resp, "privileges"));
+        if (parsed)
+            done(sdk::tracksToVariantList(*parsed.value));
     });
 }
 

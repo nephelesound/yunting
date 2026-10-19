@@ -256,8 +256,8 @@ QtObject {
     function maybeExtend() {
         if (!smart.enabled || !smart.player.current)
             return;
-        // 私人漫游已有自己的续取流，别再插一批口味歌把它打断
-        if (smart.player.origin === "fm")
+        // 私人漫游、心动模式有自己的续取流，别再插一批口味歌把它打断
+        if (smart.player.origin === "fm" || smart.player.origin === "heart")
             return;
         const remaining = smart.player.queue.length - smart.player.index - 1;
         if (remaining > 2)

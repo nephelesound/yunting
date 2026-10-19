@@ -213,6 +213,8 @@ void Store::request(const QString &key)
              s.requestRadio(parts.value(1).toDouble(), parts.value(2).toInt()); }},
         {QStringLiteral("fm:next"), [](Store &s, const QString &k) {
              if (k == QLatin1String("fm:next")) s.requestMoreFm(); }},
+        {QStringLiteral("heart:next:"), [](Store &s, const QString &k) {
+             s.requestMoreHeart(k.section(u':', 2).toDouble()); }},
     };
 
     for (const auto &route : routes) {

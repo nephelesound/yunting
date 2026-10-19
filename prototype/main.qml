@@ -23,7 +23,7 @@ Kirigami.ApplicationWindow {
     minimumHeight: 680
 
     // 截图 harness 可从命令行覆盖（先给 listKey 再给 page）：
-    //   page = home | charts | list | nowplaying | mine | search；listKey = daily | heart | radar | similar | liked | hot
+    //   page = home | charts | list | nowplaying | mine | search；listKey = daily | radar | similar | liked | hot
     property string page: "home"
     property string listKey: "daily"
     property real mvId: 0
@@ -118,12 +118,17 @@ Kirigami.ApplicationWindow {
             root.fail(reason);
         }
     }
-    // 私人漫游是一个流：放到倒数第二首时续取一批，取回来的接在队尾，不会放完一轮又从头循环
+    // 私人漫游、心动模式是流：放到倒数第二首时续取一批，取回来的接在队尾，不会放完一轮又从头循环。
+    // 心动模式从正在放的这首续取：在里面点的红心会把后面的推荐带过去
     Connections {
         target: playback
         function onIndexChanged() {
-            if (playback.origin === "fm" && playback.index >= playback.queue.length - 2)
+            if (playback.index < playback.queue.length - 2)
+                return;
+            if (playback.origin === "fm")
                 Source.moreFm();
+            else if (playback.origin === "heart" && playback.current)
+                Source.moreHeart(playback.current.id);
         }
     }
     Connections {
@@ -131,6 +136,10 @@ Kirigami.ApplicationWindow {
         function onFmTracksChanged() {
             if (playback.origin === "fm")
                 playback.append(Source.fmTracks);
+        }
+        function onHeartTracksChanged() {
+            if (playback.origin === "heart")
+                playback.append(Source.heartTracks);
         }
     }
     // 智能续播：只在应用里持久化口味；原型/截图不写配置
@@ -869,15 +878,21 @@ Kirigami.ApplicationWindow {
     function openEntry(key) {
         if (key === "charts")
             root.open("charts");
-        else if (key === "fm") {
-            if (Source.fmTracks.length === 0)
-                return;
-            playback.play(Source.fmTracks, 0, "fm");
-            root.open("nowplaying");
-        } else if (!root.loggedIn && key !== "similar")
+        else if (key === "fm")
+            root.startStream("fm", Source.fmTracks);
+        else if (!root.loggedIn && key !== "similar")
             root.requestLogin();
+        else if (key === "heart")
+            root.startStream("heart", Source.heartTracks);
         else
             root.open("list", key);
+    }
+    // 私人漫游、心动模式是流：点了就从头放，去正在播放页
+    function startStream(origin, tracks) {
+        if (tracks.length === 0)
+            return;
+        playback.play(tracks, 0, origin);
+        root.open("nowplaying");
     }
 
     // 键盘与鼠标侧键：每个常用动作都不必离开键盘

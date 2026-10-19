@@ -591,6 +591,18 @@ private slots:
 
         m_store->setLiked(77, false);
         QVERIFY(waitUntil([&] { return heartIs(7); }));
+
+        // 流的续取：从正在放的这首（70）接着推荐，接在后面、不重复，种子不变
+        m_store->request(QStringLiteral("heart:next:70"));
+        QVERIFY(waitUntil([&] {
+            return m_store->personal().value("heart").toMap().value("tracks").toList().size() == 2;
+        }));
+        const QVariantMap heart = m_store->personal().value("heart").toMap();
+        QCOMPARE(heart.value("seed").toMap().value("id").toDouble(), 7.0);
+        QCOMPARE(heart.value("tracks").toList().at(1).toMap().value("id").toDouble(), 700.0);
+        m_store->request(QStringLiteral("heart:next:70"));
+        QTest::qWait(100);
+        QCOMPARE(m_store->personal().value("heart").toMap().value("tracks").toList().size(), 2);
     }
 
     // 从排行榜收藏：卡片不在 personal/搜索结果里，也要用排行榜已有的名字与封面

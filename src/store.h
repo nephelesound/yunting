@@ -142,6 +142,7 @@ private:
     void fetchLiked(const QJsonObject &likedList);
     void putLiked(const QVariantMap &liked);
     void fetchHeart(const QVariantMap &seed, double likedId);
+    void fetchHeartBatch(double songId, double likedId, std::function<void(const QVariantList &)> done);
     void fetchRadar();
     void fetchTail();
     // 云盘分页的共享状态：递归回调只持有 state，不形成 shared_ptr 自环
@@ -219,6 +220,7 @@ private:
     void requestRecommendedPrograms();
     void requestRadio(double radioId, int offset);
     void requestMoreFm();
+    void requestMoreHeart(double songId);
     void requestMv(const QString &key, double mvId);
     void requestUser(const QString &key, double uid);
     // -- 只读信箱：data.inbox / data.inboxThread；不落盘，退出/换号清空
