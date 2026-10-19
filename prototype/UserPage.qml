@@ -102,27 +102,21 @@ ScreenFrame {
             Layout.maximumWidth: Tokens.trackColumn
             spacing: 0
 
-            // 有挂件时头像缩到这一格的三分之二，挂件（头像的 1.5 倍）正好铺满这一格，不伸出左栏。
-            // 挂件图真的取到了才缩（坏链接时头像照常铺满）；挂件按这一格画，尺寸不随头像变，不会来回重取
+            // 头像挂件只有自己的取得到（主页接口不带，Store 另取 data.avatarPendant）。戴着时像网易一样把头像缩小：
+            // 挂件图只有 352 见方，头像 160、挂件 240，在 2 倍屏上放大约 1.4 倍，仍然清楚；铺满 280 会糊。
+            // 是否戴挂件按有没有链接定，不按图取没取到：头像大小一变挂件就重取，按状态定会来回跳
             Item {
+                readonly property bool framed: Source.account !== null && page.user.id === Source.account.id
+                    && Source.ownPendant.length > 0
                 Layout.preferredWidth: Tokens.trackColumn
-                Layout.preferredHeight: Tokens.trackColumn
+                Layout.preferredHeight: framed ? 1.5 * Tokens.tileLg : Tokens.trackColumn
                 PersonAvatar {
                     anchors.centerIn: parent
-                    width: profilePendant.status === Image.Ready ? parent.width / 1.5 : parent.width
+                    width: parent.framed ? Tokens.tileLg : parent.width
                     height: width
                     name: page.user.name
                     source: page.user.avatar
-                }
-                Image {
-                    id: profilePendant
-                    anchors.fill: parent
-                    visible: status === Image.Ready
-                    source: page.user.avatarPendant || ""
-                    sourceSize.width: 2 * Tokens.trackColumn
-                    sourceSize.height: 2 * Tokens.trackColumn
-                    fillMode: Image.PreserveAspectFit
-                    asynchronous: true
+                    pendant: parent.framed ? Source.ownPendant : ""
                 }
             }
 

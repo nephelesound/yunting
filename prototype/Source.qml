@@ -256,6 +256,8 @@ QtObject {
 
     // 账号
     readonly property var account: source.p.account   // null = 没有登录快照
+    // 自己正戴着的头像挂件（profile 不带，Store 另外取 data.avatarPendant）；没戴、没登录是空串
+    readonly property string ownPendant: source.d.avatarPendant ? source.d.avatarPendant.imageUrl || "" : ""
     readonly property double accountId: source.account ? source.account.id : 0
     // 换号（含匿名 → 登录 / 退出）时，评论分页与歌手分页里还留着上一个账号的 liked/followed 状态。
     // 只认 userId 变化；同一账号资料刷新不打断正在看的列表。

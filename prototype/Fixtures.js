@@ -137,6 +137,7 @@ var worst = {
         artist: { "1": worstArtist },
         album: { "1": worstAlbum },
         wiki: { "903": worstWiki },
+        avatarPendant: { id: 1, name: "挂件", imageUrl: PENDANT },   // 自己正戴着的（页头右上角）
         similarSongs: { songId: 903, tracks: worstTracks.slice(0, 8) },
         similarPlaylists: { songId: 903, items: [
             { id: 11, name: "【温柔女声】在深夜被治愈：适合一个人听的 100 首华语民谣与独立音乐", cover: C2, count: 100 },
@@ -209,7 +210,7 @@ var worst = {
               resource: { kind: "video", id: 0, vid: "A1B2", name: "x", cover: "", artist: "" } }] },
     },
     personal: {
-        account: { id: 1001, name: "一只想要变成猫但是没有成功的柴犬Official", vip: true, vipLevel: "svip", avatar: C2, avatarPendant: PENDANT },
+        account: { id: 1001, name: "一只想要变成猫但是没有成功的柴犬Official", vip: true, vipLevel: "svip", avatar: C2 },
         savedArtists: { more: true, next: 3, count: 1284, items: [
             { id: 2, name: "一只想要变成猫但是没有成功的柴犬Official", cover: BROKEN, alias: "Shiba Inu Who Wanted To Be A Cat", albums: 128, mvs: 99 },
             { id: 3, name: "x", cover: "", alias: "", albums: 0, mvs: 0 }, { id: 1, name: "A", cover: C2, alias: "", albums: 1, mvs: 1 }] },
