@@ -834,8 +834,11 @@ QtObject {
             const facts = [{ label: "官方榜" }, source.songs(pl.count)];
             if (pl.plays > 0)
                 facts.push({ value: pl.plays >= 1e8 ? (pl.plays / 1e8).toFixed(1) + " 亿" : pl.plays >= 1e4 ? Math.round(pl.plays / 1e4) + " 万" : String(pl.plays), label: "次播放" });
+            // 热歌榜本身就是一个歌单：带上 id，分享、收藏、评论与别的歌单一样
+            const followed = source.myPlaylists.some(m => m.id === pl.id && !m.owned);
             return { heading: pl.name, cover: source.sized(pl.cover, 560), tracks: source.d.tracks, ranked: true,
-                     facts: facts, description: pl.description, emptyText: "榜单暂时为空" };
+                     facts: facts, description: pl.description, emptyText: "榜单暂时为空",
+                     listId: pl.id || 0, owned: false, subscribed: followed, playlistId: 0 };
         }
         }
     }

@@ -160,10 +160,10 @@ AppDialog {
             }
         }
 
-        // 右：链接、发送到、手机扫码
+        // 右：链接、发送到、手机扫码。与左栏一样高：扫码区吃掉剩下的高度，两栏底边对齐
         ColumnLayout {
             Layout.fillWidth: true
-            Layout.alignment: Qt.AlignTop
+            Layout.fillHeight: true
             spacing: Tokens.space4
 
             ColumnLayout {
@@ -256,26 +256,37 @@ AppDialog {
             Binding { target: targets.item; property: "title"; value: share.shareTitle; when: targets.status === Loader.Ready }
             Binding { target: targets.item; property: "text"; value: share.shareText; when: targets.status === Loader.Ready }
 
-            // 扫码：白底（二维码要高对比，深色主题下也是白底）
-            RowLayout {
-                spacing: Tokens.space3
-                Rectangle {
-                    implicitWidth: 3 * Tokens.height8   // 96
-                    implicitHeight: implicitWidth
-                    radius: Tokens.radius
-                    color: "white"
-                    Prison.Barcode {
-                        anchors.fill: parent
-                        anchors.margins: Tokens.space1
-                        barcodeType: Prison.Barcode.QRCode
-                        content: share.visible ? share.shareUrl : ""
+            // 扫码：码随右栏剩下的高度变大（至少 96，不比左边的分享图宽，免得喧宾夺主），贴着底边，
+            // 与左边的按钮齐平；白底（二维码要高对比，深色主题下也是白底）
+            Item {
+                id: scanArea
+                readonly property real side: Math.max(3 * Tokens.height8,
+                                                      Math.min(scanArea.height, scanArea.width / 2, card.width / 2))
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.minimumHeight: 3 * Tokens.height8
+                RowLayout {
+                    anchors.left: parent.left
+                    anchors.bottom: parent.bottom
+                    spacing: Tokens.space3
+                    Rectangle {
+                        implicitWidth: scanArea.side
+                        implicitHeight: scanArea.side
+                        radius: Tokens.radius
+                        color: "white"
+                        Prison.Barcode {
+                            anchors.fill: parent
+                            anchors.margins: Tokens.space1
+                            barcodeType: Prison.Barcode.QRCode
+                            content: share.visible ? share.shareUrl : ""
+                        }
                     }
-                }
-                Label {
-                    Layout.alignment: Qt.AlignVCenter
-                    text: "用手机扫码打开"
-                    font.pixelSize: Tokens.textSm
-                    color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                    Label {
+                        Layout.alignment: Qt.AlignVCenter
+                        text: "用手机扫码打开"
+                        font.pixelSize: Tokens.textSm
+                        color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                    }
                 }
             }
         }
