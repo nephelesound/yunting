@@ -21,6 +21,7 @@ class Store;
 class QTimer;
 
 namespace ncm::sdk {
+struct Error;
 struct ListenTogetherCommand;
 struct ListenTogetherPlaylist;
 struct ListenTogetherRoom;
@@ -41,6 +42,10 @@ class ListenTogether : public QObject {
     Q_PROPERTY(QVariantList trackIds READ trackIds NOTIFY tracksChanged)
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)
     Q_PROPERTY(QString shareUrl READ shareUrl NOTIFY stateChanged)
+    // 和房间里另一位成员一起听过的累计：{ listenCount, totalSeconds }；房间里只有自己、或没取到时为空
+    Q_PROPERTY(QVariantMap statistics READ statistics NOTIFY statisticsChanged)
+    // 房间歌单里另一位成员放不了的歌（版权、会员）：歌曲 id 列表
+    Q_PROPERTY(QVariantList unplayableIds READ unplayableIds NOTIFY unplayableChanged)
 public:
     explicit ListenTogether(NcmClient *client, Store *store, AudioEngine *audio,
                             QObject *parent = nullptr);
@@ -57,6 +62,8 @@ public:
     QVariantList trackIds() const { return m_trackIds; }
     QString error() const { return m_error; }
     QString shareUrl() const { return m_shareUrl; }
+    QVariantMap statistics() const { return m_statistics; }
+    QVariantList unplayableIds() const { return m_unplayableIds; }
 
     Q_INVOKABLE void createRoom();
     // roomRef 可以是分享链接（roomId/inviterId 查询参数）或裸房间号。
@@ -77,6 +84,8 @@ signals:
     void errorChanged();
     void leftRoom();
     void userInvited(double userId);
+    void statisticsChanged();
+    void unplayableChanged();
     // 服务器下发的播放指令；type 保留服务器原样（QML 自己转小写）。
     void commandReceived(QString type, double songId, double progressMs, bool playing);
 
@@ -103,6 +112,11 @@ private:
     void applyPlaylist(const ncm::sdk::ListenTogetherPlaylist &playlist);
     void applyCommand(const ncm::sdk::ListenTogetherCommand &command);
     void emitCommand(const ncm::sdk::ListenTogetherCommand &command);
+    // 488：房间已失效（被解散、过期）。立刻离开，提示一次，不再重试
+    bool expireIfGone(const ncm::sdk::Error &error);
+    qint64 otherUid() const;
+    void refreshStatistics();
+    void refreshPrivileges();
 
     void updateQueue(const QList<qint64> &ids);
     void fetchSongDetails(const QList<qint64> &ids,
@@ -143,6 +157,10 @@ private:
     QVariantList m_trackIds;
     QString m_error;
     QString m_shareUrl;
+    QVariantMap m_statistics;
+    qint64 m_statisticsUid = 0;   // statistics 是和谁的；同一位成员一个房间只取一次
+    QVariantList m_unplayableIds;
+    QString m_privilegeKey;       // 上次查权限的「成员 + 歌单」，没变就不再查
 
     qint64 m_myUid = 0;
     // 房间代次：换房/退房/登出后，旧回包一律丢弃。

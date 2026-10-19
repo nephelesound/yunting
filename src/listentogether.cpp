@@ -13,9 +13,12 @@
 #include <QJsonObject>
 #include <QLoggingCategory>
 #include <QSet>
+#include <QStringList>
 #include <QTimer>
 #include <QUrl>
 #include <QUrlQuery>
+#include <algorithm>
+#include <cstdlib>
 #include <utility>
 
 namespace {
@@ -269,6 +272,16 @@ void ListenTogether::adoptRoom(const sdk::ListenTogetherRoom &room, qint64 invit
         m_playlistVersion = 0;
         m_versions.clear();
         m_playMode.clear();
+        m_statisticsUid = 0;
+        m_privilegeKey.clear();
+        if (!m_statistics.isEmpty()) {
+            m_statistics.clear();
+            emit statisticsChanged();
+        }
+        if (!m_unplayableIds.isEmpty()) {
+            m_unplayableIds.clear();
+            emit unplayableChanged();
+        }
         m_remoteTimer->stop();
         if (m_remoteApplying) {
             m_remoteApplying = false;
@@ -317,6 +330,9 @@ void ListenTogether::adoptRoom(const sdk::ListenTogetherRoom &room, qint64 invit
         startTimers();
         fetchSyncPlaylist();
     }
+    // 另一位成员进来了：和他的累计、歌单里他放不了的歌
+    refreshStatistics();
+    refreshPrivileges();
 }
 
 void ListenTogether::clearRoom(bool emitLeft)
@@ -359,9 +375,19 @@ void ListenTogether::clearRoom(bool emitLeft)
     m_playlistVersion = 0;
     m_versions.clear();
     m_playMode.clear();
+    m_statisticsUid = 0;
+    m_privilegeKey.clear();
+    const bool hadStatistics = !m_statistics.isEmpty();
+    const bool hadUnplayable = !m_unplayableIds.isEmpty();
+    m_statistics.clear();
+    m_unplayableIds.clear();
     clearError();
 
     emit stateChanged();
+    if (hadStatistics)
+        emit statisticsChanged();
+    if (hadUnplayable)
+        emit unplayableChanged();
     if (hadUsers)
         emit usersChanged();
     if (hadTracks)
@@ -599,6 +625,8 @@ void ListenTogether::fetchSyncPlaylist()
             return;
         m_syncInFlight = false;
         if (!result) {
+            if (expireIfGone(result.error))
+                return;
             // 解析失败时不要把旧队列当最新状态；下一次轮询再试。
             qCDebug(lcListen) << "sync playlist failed:" << result.error.message;
             return;
@@ -622,10 +650,12 @@ void ListenTogether::sendHeartbeat()
     m_heartbeatInFlight = true;
     sdk::reportHeartbeat(*m_client, roomId, songId, playStatus, progress,
                          playlistVersions(), this,
-                         [this, generation, roomId](sdk::Result<sdk::ListenTogetherResult>) {
+                         [this, generation, roomId](sdk::Result<sdk::ListenTogetherResult> result) {
         if (generation != m_generation || roomId != m_roomId)
             return;
         m_heartbeatInFlight = false;
+        if (!result)
+            expireIfGone(result.error);
     });
 }
 
@@ -693,6 +723,7 @@ void ListenTogether::updateQueue(const QList<qint64> &ids)
     if (idValues != m_trackIds) {
         m_trackIds = idValues;
         emit tracksChanged();
+        refreshPrivileges();
     }
 
     if (ids.isEmpty()) {
@@ -838,8 +869,89 @@ void ListenTogether::emitCommand(const sdk::ListenTogetherCommand &command)
     const bool playing =
         command.playStatus.compare(QStringLiteral("PLAY"), Qt::CaseInsensitive) == 0
         || command.playStatus.compare(QStringLiteral("PLAYING"), Qt::CaseInsensitive) == 0;
+    // 对方发指令时在 progress 处；正在放的话，到我们这里已经往前走了一段。serverSeq 是服务器收到
+    // 指令的毫秒时间戳：在十分钟以内才认（不像时间戳、或时钟差得离谱时不补，按原位置）
+    qint64 progress = command.progress;
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (playing && command.serverSeq > 1000000000000LL && std::abs(now - command.serverSeq) < 600000)
+        progress += std::max<qint64>(0, now - command.serverSeq);
     emit commandReceived(command.commandType, static_cast<double>(command.targetSongId),
-                         static_cast<double>(command.progress), playing);
+                         static_cast<double>(progress), playing);
+}
+
+bool ListenTogether::expireIfGone(const sdk::Error &error)
+{
+    if (error.code != 488 || !m_inRoom)
+        return false;
+    clearRoom(true);
+    setError(QStringLiteral("一起听已失效，可以邀请好友进入新的房间"));
+    return true;
+}
+
+qint64 ListenTogether::otherUid() const
+{
+    for (const QVariant &value : m_users) {
+        const qint64 uid = variantId(value.toMap().value(QStringLiteral("userId")));
+        if (uid > 0 && uid != m_myUid)
+            return uid;
+    }
+    return 0;
+}
+
+void ListenTogether::refreshStatistics()
+{
+    const qint64 other = otherUid();
+    if (!m_inRoom || m_myUid <= 0 || other <= 0 || other == m_statisticsUid)
+        return;
+    m_statisticsUid = other;
+    const quint64 generation = m_generation;
+    sdk::fetchRelationStatistics(*m_client, m_roomId, {m_creatorId > 0 ? m_creatorId : m_myUid, other}, this,
+                                 [this, generation, other](sdk::Result<sdk::ListenTogetherStatistics> result) {
+        if (generation != m_generation || other != m_statisticsUid || !result)
+            return;   // 取不到就不显示：这是锦上添花的一行，不提示错误
+        m_statistics = {{"listenCount", static_cast<double>(result.value->listenCount)},
+                        {"totalSeconds", static_cast<double>(result.value->totalConnectionTime)}};
+        emit statisticsChanged();
+    });
+}
+
+void ListenTogether::refreshPrivileges()
+{
+    const qint64 other = otherUid();
+    QList<qint64> ids;
+    for (const QVariant &value : std::as_const(m_trackIds)) {
+        const qint64 id = variantId(value);
+        if (id > 0)
+            ids.append(id);
+    }
+    if (!m_inRoom || other <= 0 || ids.isEmpty())
+        return;
+    QStringList parts{QString::number(other)};
+    for (qint64 id : std::as_const(ids))
+        parts.append(QString::number(id));
+    const QString key = parts.join(u',');
+    if (key == m_privilegeKey)
+        return;
+    m_privilegeKey = key;
+    const quint64 generation = m_generation;
+    sdk::fetchPrivileges(*m_client, other, ids, this,
+                         [this, generation, key](sdk::Result<QList<sdk::ListenTogetherPrivilege>> result) {
+        if (generation != m_generation || key != m_privilegeKey)
+            return;
+        if (!result) {
+            m_privilegeKey.clear();   // 下次歌单或成员变化时再查
+            return;
+        }
+        QVariantList unplayable;
+        for (const sdk::ListenTogetherPrivilege &privilege : std::as_const(*result.value)) {
+            if (!privilege.playable && privilege.songId > 0)
+                unplayable.append(static_cast<double>(privilege.songId));
+        }
+        if (unplayable != m_unplayableIds) {
+            m_unplayableIds = unplayable;
+            emit unplayableChanged();
+        }
+    });
 }
 
 void ListenTogether::onAudioTrackChanged()
@@ -883,8 +995,12 @@ void ListenTogether::reportLocalCommand(const QString &type, qint64 formerSongId
     info.insert(QStringLiteral("clientSeq"), static_cast<double>(++m_clientSeq));
 
     // 上报失败不打断播放，也不覆盖界面上的上一条错误。
+    const quint64 generation = m_generation;
     sdk::reportPlayCommand(*m_client, m_roomId, info, this,
-                           [](sdk::Result<sdk::ListenTogetherResult>) {});
+                           [this, generation](sdk::Result<sdk::ListenTogetherResult> result) {
+        if (generation == m_generation && !result)
+            expireIfGone(result.error);
+    });
 }
 
 bool ListenTogether::canReport() const

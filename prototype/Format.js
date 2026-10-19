@@ -14,6 +14,18 @@ function duration(seconds) {
     return h > 0 ? h + ":" + (m < 10 ? "0" : "") + m + ":" + ss : m + ":" + ss;
 }
 
+// 累计时长的口语说法：「3 小时 25 分钟」「25 分钟」「不到 1 分钟」；没有（0 或缺失）返回空串
+function spoken(seconds) {
+    const total = Math.floor(seconds || 0);
+    if (total <= 0)
+        return "";
+    const h = Math.floor(total / 3600);
+    const m = Math.floor(total % 3600 / 60);
+    if (h > 0)
+        return h + " 小时" + (m > 0 ? " " + m + " 分钟" : "");
+    return m > 0 ? m + " 分钟" : "不到 1 分钟";
+}
+
 // 播放进度：已播时间允许为 0（显示 0:00），所以不走 duration() 的「缺失为空」
 function elapsed(seconds) {
     return duration(seconds) || "0:00";

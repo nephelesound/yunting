@@ -103,6 +103,11 @@ Kirigami.OverlayDrawer {
     function locked(track) {
         return Format.blockedBy(track, panel.vip) !== "";
     }
+    // 一起听时房间里另一位放不了的歌（版权、会员）：标出来，放到它时对方那边会卡住
+    function roomNote(track) {
+        const ids = panel.room && panel.room.inRoom ? panel.room.unplayableIds || [] : [];
+        return track && ids.indexOf(track.id) >= 0 ? "对方不能播放" : "";
+    }
 
     component SectionLabel: Label {
         Layout.leftMargin: Tokens.pageMargin
@@ -233,6 +238,18 @@ Kirigami.OverlayDrawer {
                             panel.listenEndRequested();
                     }
                 }
+            }
+            // 你们俩一起听过多少：好友来了、取到了才有这一行
+            Label {
+                readonly property var stats: panel.room ? panel.room.statistics || ({}) : ({})
+                visible: !listenSection.waiting && text.length > 0
+                Layout.fillWidth: true
+                text: stats.listenCount > 0
+                    ? "一起听过 " + stats.listenCount + " 次" + (stats.totalSeconds > 0 ? "，共 " + Format.spoken(stats.totalSeconds) : "")
+                    : ""
+                font.pixelSize: Tokens.textSm
+                font.features: { "tnum": 1 }
+                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             }
 
             // 邀请：网易云音乐 App 扫码即可加入；也可以把链接发给好友
@@ -381,6 +398,7 @@ Kirigami.OverlayDrawer {
             modelData: panel.current || { name: "", artist: "", album: "", dur: 0, fee: 0, cover: "" }
             current: true
             showReason: !!modelData.smartReason
+            note: panel.roomNote(panel.current)
             // 点正在播放的这一首：不重头放，去正在播放页（与点播放条封面同一个去处）
             onActivated: panel.nowPlayingRequested()
         }
@@ -457,6 +475,7 @@ Kirigami.OverlayDrawer {
                     removable: true
                     hangingMarker: false
                     locked: panel.locked(row.track)
+                    note: panel.roomNote(row.track)
                     // 列表里的序号是相对「接下来」的，换算回队列里的位置
                     onActivated: i => panel.activated(panel.currentIndex + 1 + i)
                     onRemoveRequested: i => panel.removeRequested(panel.currentIndex + 1 + i)

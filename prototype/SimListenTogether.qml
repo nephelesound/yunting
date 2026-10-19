@@ -18,6 +18,9 @@ QtObject {
         ? [{ userId: 1003, name: "Jo", avatar: "", identity: "" }, { userId: 2, name: "一只想要变成猫但是没有成功的柴犬Official", avatar: "", identity: "" }]
         : room.inRoom ? [{ userId: 1003, name: "Jo", avatar: "", identity: "" }] : []
     property var tracks: []
+    // 与 C++ 同形：好友来了才有；放不了的歌取压力数据里接下来要放的两首
+    readonly property var statistics: room.state === "together" ? { listenCount: 12, totalSeconds: 12300 } : ({})
+    readonly property var unplayableIds: room.state === "together" ? [903, 905] : []
 
     signal commandReceived(string type, real songId, real progressMs, bool playing)
     signal userInvited(real userId)

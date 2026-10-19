@@ -18,6 +18,7 @@ AbstractButton {
     property bool current
     property bool ranked
     property bool locked // 匿名会话下的 VIP 曲：可见，点击时提示登录
+    property string note // 这一行在当下场景里的说明（例如一起听时「对方不能播放」）：弱化的标签，跟在音质后面
 
     property bool removable  // 播放队列：悬停时显示「移出」
     property bool reordering // 歌单编辑顺序：行尾固定显示上移 / 下移
@@ -166,12 +167,22 @@ AbstractButton {
                     }
                 }
             }
-            LinkText {
-                objectName: "artistLinks"
+            // 场景说明放在第二行开头：标题那一行已经有购买限制与音质，再挤一个标签会把标题压成一个字
+            RowLayout {
                 Layout.fillWidth: true
-                parts: Format.artistLinks(tile.modelData)
-                font.pixelSize: Tokens.textSm
-                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                spacing: Tokens.space2
+                Tag {
+                    id: noteTag
+                    text: tile.note
+                    muted: true
+                }
+                LinkText {
+                    objectName: "artistLinks"
+                    Layout.fillWidth: true
+                    parts: Format.artistLinks(tile.modelData)
+                    font.pixelSize: Tokens.textSm
+                    color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                }
             }
         }
 
