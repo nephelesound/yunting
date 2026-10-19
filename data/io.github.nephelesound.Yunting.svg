@@ -1,4 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <!-- fluent-emoji-flat:musical-note（Microsoft Fluent Emoji，MIT，经 icones.js.org 选取），原样使用，见 data/ICON-LICENSE -->
-  <path fill="#402a32" d="M29.41 2.869c0-.53-.46-.93-.98-.86l-16.97 2.2c-.43.06-.76.43-.76.87v13.61c-.59-.2-1.23-.32-1.89-.32c-3.21 0-5.81 2.61-5.81 5.82s2.6 5.81 5.81 5.81s5.81-2.6 5.81-5.81c0-.12-.01-.25-.01-.37v-13.9c0-.39.29-.71.67-.76l9.35-1.21c.46-.06.87.3.87.76v6.53a5.808 5.808 0 0 0-7.71 5.49c0 3.21 2.6 5.81 5.81 5.81s5.81-2.6 5.81-5.81z"/>
+  <!-- fluent-emoji-flat:musical-note（Microsoft Fluent Emoji，MIT，经 icones.js.org 选取），形状原样，见 data/ICON-LICENSE。
+       颜色跟随主题：KDE 的图标加载按 ColorScheme-Text 把它换成当前配色的文字色（浅色主题深、深色主题浅），
+       标题栏、任务栏、启动器里都看得清；不认这张样式表的地方（GitHub、Flathub、GNOME）用下面的中间调梅色，
+       在浅底与深底上都读得出 -->
+  <style id="current-color-scheme" type="text/css">.ColorScheme-Text { color: #8a5a6b; }</style>
+  <path class="ColorScheme-Text" fill="currentColor" d="M29.41 2.869c0-.53-.46-.93-.98-.86l-16.97 2.2c-.43.06-.76.43-.76.87v13.61c-.59-.2-1.23-.32-1.89-.32c-3.21 0-5.81 2.61-5.81 5.82s2.6 5.81 5.81 5.81s5.81-2.6 5.81-5.81c0-.12-.01-.25-.01-.37v-13.9c0-.39.29-.71.67-.76l9.35-1.21c.46-.06.87.3.87.76v6.53a5.808 5.808 0 0 0-7.71 5.49c0 3.21 2.6 5.81 5.81 5.81s5.81-2.6 5.81-5.81z"/>
 </svg>
