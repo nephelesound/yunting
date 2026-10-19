@@ -93,12 +93,23 @@ struct CommentLikeState {
 };
 
 using CommentLikeCallback = std::function<void(Result<CommentLikeState>)>;
+// Successful hug/report endpoints answer with a business code only.
+using CommentActionCallback = std::function<void(Result<bool>)>;
 
 // Like/unlike one comment. This is a write: no retry, requires the stored
 // MUSIC_U cookie. ownerId/commentId <= 0 fail locally without a request.
 void setCommentLiked(NcmClient &client, CommentThreadKind kind, qint64 ownerId,
                      qint64 commentId, bool liked, QObject *context,
                      CommentLikeCallback callback);
+
+// Hug a comment. `targetUserId` is the comment author, not the caller.
+void hugComment(NcmClient &client, const QString &threadId, qint64 commentId,
+                qint64 targetUserId, QObject *context, CommentActionCallback callback);
+
+// Report a comment. `reason` is the report panel's integer code; negative
+// values are rejected locally.
+void reportComment(NcmClient &client, const QString &threadId, qint64 commentId,
+                   int reason, QObject *context, CommentActionCallback callback);
 
 Result<CommentPage> parseHotComments(const QJsonObject &root);
 Result<CommentPage> parseCommentPage(const QJsonObject &root);

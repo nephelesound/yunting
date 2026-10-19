@@ -1,12 +1,16 @@
 #pragma once
-// Social SDK — typed read model for a user's activity feed.
+// Social SDK — typed read model for a user's activity feed, plus follow and
+// event write actions.
 //
-// Raw endpoint:
-//   POST /api/event/get/<uid>  form: getcounts,time,limit,total,fromRN
+// Raw endpoints:
+//   POST /api/event/get/<uid>      form: getcounts,time,limit,total,fromRN
+//   POST /api/user/follow/<uid>    form: t=1|2
+//   POST /api/event/forward        form: forwards,id,eventUserId
+//   POST /api/event/delete         weapi: id
+//   POST /api/event/privacy/op     form: eventId,privacy
 //
 // The upstream event object is very wide and UI-specific. This SDK keeps the
-// stable, renderable subset and ignores unknown fields. It does not expose event
-// write/follow operations yet; those need a login and a separate contract.
+// stable, renderable subset and ignores unknown fields.
 #include "sdk/sdk_result.h"
 
 #include <QList>
@@ -62,6 +66,7 @@ struct EventPage {
 
 using UserEventsCallback = std::function<void(Result<EventPage>)>;
 using UserFollowCallback = std::function<void(Result<UserFollowState>)>;
+using SocialActionCallback = std::function<void(Result<bool>)>;
 
 // `personal` attaches the stored MUSIC_U cookie; pass true for the current
 // account's own feed, false for a public profile.
@@ -73,6 +78,17 @@ void fetchUserEvents(NcmClient &client, qint64 uid, qint64 lasttime, int limit,
 // MUSIC_U cookie. The returned state is the intent accepted by the server.
 void setUserFollowed(NcmClient &client, qint64 userId, bool followed, QObject *context,
                      UserFollowCallback callback);
+
+// Event write actions. They answer with `code=200` only, so the SDK reports
+// success as a boolean. `eventUserId` is the event author, not the caller.
+void forwardEvent(NcmClient &client, qint64 eventId, qint64 eventUserId,
+                  const QString &comment, QObject *context,
+                  SocialActionCallback callback);
+void deleteEvent(NcmClient &client, qint64 eventId, QObject *context,
+                 SocialActionCallback callback);
+// privacy: 0 everyone, 1 following, 2 only me, 6 mutual follows.
+void setEventPrivacy(NcmClient &client, qint64 eventId, int privacy,
+                     QObject *context, SocialActionCallback callback);
 
 Result<EventPage> parseUserEvents(const QJsonObject &root);
 

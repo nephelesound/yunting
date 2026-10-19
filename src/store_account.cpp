@@ -474,6 +474,11 @@ struct Store::CloudState {
     int offset = 0;
 };
 
+void Store::refreshCloud()
+{
+    fetchCloudPage(std::make_shared<CloudState>());
+}
+
 void Store::fetchCloudPage(const std::shared_ptr<CloudState> &state)
 {
     fetch("api/v1/cloud/get",

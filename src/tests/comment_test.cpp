@@ -1,6 +1,8 @@
 // Typed Comment SDK contract: hot comments, cursor pages and floor replies.
 #include "sdk/comment.h"
 
+#include "ncmclient.h"
+
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonValue>
@@ -381,6 +383,31 @@ private slots:
     {
         QCOMPARE(commentThreadId(CommentThreadKind::Song, 77), QStringLiteral("R_SO_4_77"));
         QCOMPARE(commentThreadId(CommentThreadKind::Playlist, 42), QStringLiteral("A_PL_0_42"));
+    }
+
+    void invalidHugOrReportFailsWithoutRequest()
+    {
+        NcmClient client(nullptr, false);
+        bool hugged = false;
+        ErrorKind hugKind = ErrorKind::Api;
+        hugComment(client, QString(), 0, 0, nullptr, [&](Result<bool> result) {
+            hugged = true;
+            if (!result)
+                hugKind = result.error.kind;
+        });
+        QVERIFY(hugged);
+        QCOMPARE(hugKind, ErrorKind::InvalidRequest);
+
+        bool reported = false;
+        ErrorKind reportKind = ErrorKind::Api;
+        reportComment(client, QStringLiteral("R_SO_4_1"), 2, -1, nullptr,
+                      [&](Result<bool> result) {
+            reported = true;
+            if (!result)
+                reportKind = result.error.kind;
+        });
+        QVERIFY(reported);
+        QCOMPARE(reportKind, ErrorKind::InvalidRequest);
     }
 };
 

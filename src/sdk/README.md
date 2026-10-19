@@ -39,14 +39,14 @@ NcmClient                 传输（cookie、weapi/明文、超时）
 - `song_wiki_service.h/.cpp`：三个请求的组合与回调。
 - `discovery.h/.cpp`：推荐新歌、新碟、精品歌单、精品标签、首页 banner 的 typed 模型与请求。
 - `radio.h/.cpp`：推荐节目、电台详情、节目详情、电台节目分页的 typed 模型与请求。
-- `social.h/.cpp`：用户动态流的 typed 模型、只读请求，以及用户关注/取关写请求（需要登录 cookie，不重试）。
+- `social.h/.cpp`：用户动态流的 typed 模型、只读请求，用户关注/取关，以及动态转发/删除/可见性写请求（需要登录 cookie，不重试）。
 - `feed.h/.cpp`：个性化 MV、独家内容、首页 block 的 typed 模型与请求。
 - `video.h/.cpp`：视频时间线、详情、签名播放地址。
 - `notification.h/.cpp`：系统通知、评论通知、@我/转发通知（登录 weapi）。
 - `library.h/.cpp`：歌手/专辑/MV 收藏列表分页（登录 weapi）。
 - `dynamic_cover.h/.cpp`：动态封面 URL/尺寸/needTransition；匿名 301，登录后可用；live 已验 `videoPlayUrl`。
 - `search_suggest.h/.cpp`：搜索联想（歌手/歌曲/专辑/歌单）；匿名明文接口。
-- `comment.h/.cpp`：热评、游标分页、楼中楼 typed 模型与纯解析，以及歌曲/歌单评论点赞写请求；头像 URL 保持原始值，Store 边界统一缩成 96。
+- `comment.h/.cpp`：热评、游标分页、楼中楼 typed 模型与纯解析，以及歌曲/歌单评论点赞、抱一抱、举报写请求；头像 URL 保持原始值，Store 边界统一缩成 96。
 - `lyrics.h/.cpp`：普通/逐字歌词原始文本（lrc/tlyric/yrc/ytlrc、pureMusic/nolyric）；LRC/YRC 行解析仍由 Store 边界复用旧解析器。
 - `notify.h/.cpp`：`/api/pl/count` 通知计数纯解析；`total` 由 Store 按固定六项求和。
 - `user_social.h/.cpp`：关注/粉丝列表、账号等级、收藏计数纯解析；不包含关注写操作。

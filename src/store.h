@@ -5,12 +5,14 @@
 #include "ncmclient.h"
 #include "querycache.h"
 #include <QHash>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QList>
 #include <QMap>
 #include <QObject>
 #include <QSet>
 #include <QString>
+#include <QStringList>
 #include <QTimer>
 #include <QVariant>
 #include <memory>
@@ -19,6 +21,7 @@
 #include <functional>
 
 class NcmClient;
+class CloudUploader;
 class QNetworkInformation;
 class QTimer;
 
@@ -79,6 +82,11 @@ public:
     Q_INVOKABLE void removeSongFromPlaylist(double playlistId, double songId);
     Q_INVOKABLE void renamePlaylist(double id, const QString &name);
     Q_INVOKABLE void setPlaylistDescription(double id, const QString &description);
+    Q_INVOKABLE void setPlaylistPrivacy(double id, bool privatePlaylist);
+    Q_INVOKABLE void setPlaylistTags(double id, const QStringList &tags);
+    // 歌单导入：文本或链接；成功后发 playlistImportStarted(taskId)
+    Q_INVOKABLE void importPlaylistFromText(const QString &text, const QString &name = {});
+    Q_INVOKABLE void importPlaylistFromLinks(const QVariantList &links, const QString &name = {});
     Q_INVOKABLE void deletePlaylist(double id);
     Q_INVOKABLE void reorderPlaylists(const QVariantList &ids);
     // 歌单内曲目排序：pid + 完整的新顺序 trackIds
@@ -93,6 +101,9 @@ public:
     // 发送文本 / 当前歌曲私信；成功后重取当前对话与会话列表，结果经 inboxMessageSent/Failed 发出
     Q_INVOKABLE void sendInboxText(double userId, const QString &text);
     Q_INVOKABLE void sendInboxSong(double userId, double songId, const QString &text = {});
+    // 云盘上传：Web 路径，单文件 100 MB；结果经 cloudUpload* 信号发出
+    Q_INVOKABLE void uploadCloudSong(const QString &filePath);
+    Q_INVOKABLE void cancelCloudUpload();
 
 public slots:
     // AudioEngine 打卡成功后调用：本地「最近播放」立刻反映刚听的歌，不必等下次 refresh
@@ -114,6 +125,10 @@ signals:
     void playlistCreated(double id, const QString &name);
     void playlistChanged(double id);
     void playlistActionFailed(const QString &action, const QString &message);
+    void playlistImportStarted(double taskId);
+    void cloudUploadProgress(qint64 sent, qint64 total);
+    void cloudUploadFinished(double songId);
+    void cloudUploadFailed(const QString &message);
     void artistChanged(double id, bool subscribed);
     void albumChanged(double id, bool subscribed);
     void userFollowChanged(double id, bool followed);
@@ -158,6 +173,7 @@ private:
     // 云盘分页的共享状态：递归回调只持有 state，不形成 shared_ptr 自环
     struct CloudState;
     void fetchCloudPage(const std::shared_ptr<CloudState> &state);
+    void refreshCloud();
     // 歌单 / 红心的完整曲目：playlist.tracks 最多约 1000 条，其余用 trackIds + SDK 歌曲详情补齐
     using TracksCallback = std::function<void(const QVariantList &, const QJsonObject &, bool)>;
     void fetchPlaylistTracks(double id, bool personal, TracksCallback callback);
@@ -196,6 +212,7 @@ private:
     // SDK 已经分好类：网络/业务码走同一套文案；解析错误用它自己的 fallback，绝不显示 parser 文本
     QString requestFailure(const ncm::sdk::Error &error, const QString &fallback);
     // 歌单写请求的共同部分：登录检查、epoch 防串号、错误消息
+    void startPlaylistImport(const QString &playlistName, const QJsonArray &songs);
     void playlistWrite(const QString &path, const QJsonObject &payload, const QString &action,
                        std::function<void(const QJsonObject &)> onSuccess);
     void followWrite(const QString &path, const QJsonObject &payload, const QString &action,
@@ -298,6 +315,7 @@ private:
     void setSessionExpired(bool expired);
 
     NcmClient *m_client;
+    CloudUploader *m_cloudUploader = nullptr;
     QVariantMap m_data;
     QVariantMap m_personal;
     QVariantMap m_emptyPersonal;     // 个人骨架（换账号时清回它）

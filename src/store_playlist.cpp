@@ -4,12 +4,24 @@
 
 #include "json_util.h"
 
+#include <QDateTime>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QUrl>
 
 #include <algorithm>
 
 using namespace ncm;
+
+namespace {
+// JS encodeURI keeps reserved URL characters; QUrl::toPercentEncoding would
+// encode "rpc://" and "https://" into an unusable string.
+QString encodeUri(const QString &value)
+{
+    return QString::fromUtf8(QUrl::toPercentEncoding(
+        value, QByteArray(";/?:@&=+$,#-_.!~*'()")));
+}
+} // namespace
 
 void Store::playlistWrite(const QString &path, const QJsonObject &payload, const QString &action,
                           std::function<void(const QJsonObject &)> onSuccess)
@@ -310,6 +322,133 @@ void Store::setPlaylistDescription(double id, const QString &description)
         m_cache.forget(QStringLiteral("playlist:") + num(id));
         emit playlistChanged(id);
     });
+}
+
+void Store::setPlaylistPrivacy(double id, bool privatePlaylist)
+{
+    const QString privacy = privatePlaylist ? QStringLiteral("10") : QStringLiteral("0");
+    playlistWrite(QStringLiteral("playlist/update/privacy"),
+                  QJsonObject{{"id", num(id)}, {"privacy", privacy}},
+                  QStringLiteral("修改歌单隐私"), [this, id, privacy](const QJsonObject &) {
+        const auto updateIn = [this, id, privacy](const char *key) {
+            QVariantList cards = m_personal.value(QLatin1String(key)).toList();
+            bool changed = false;
+            for (QVariant &v : cards) {
+                QVariantMap card = v.toMap();
+                if (card.value("id").toDouble() == id) {
+                    card.insert("privacy", privacy);
+                    v = card;
+                    changed = true;
+                }
+            }
+            if (changed)
+                put(key, cards, true);
+        };
+        updateIn("playlists");
+        updateIn("mine");
+        updateIn("subscribed");
+        QVariantMap details = m_personal.value("playlistDetails").toMap();
+        if (details.contains(num(id))) {
+            QVariantMap detail = details.value(num(id)).toMap();
+            detail.insert("privacy", privacy);
+            details.insert(num(id), detail);
+            put("playlistDetails", details, true);
+        }
+        m_cache.forget(QStringLiteral("playlist:") + num(id));
+        emit playlistChanged(id);
+    });
+}
+
+void Store::setPlaylistTags(double id, const QStringList &tags)
+{
+    QStringList cleaned;
+    for (const QString &tag : tags) {
+        const QString value = tag.trimmed();
+        if (!value.isEmpty())
+            cleaned.append(value);
+    }
+    const QString joined = cleaned.join(QLatin1Char(','));
+    playlistWrite(QStringLiteral("playlist/tags/update"),
+                  QJsonObject{{"id", num(id)}, {"tags", joined}},
+                  QStringLiteral("更新歌单标签"), [this, id, cleaned](const QJsonObject &) {
+        QVariantList values;
+        for (const QString &tag : cleaned)
+            values.append(tag);
+        QVariantMap details = m_personal.value("playlistDetails").toMap();
+        if (details.contains(num(id))) {
+            QVariantMap detail = details.value(num(id)).toMap();
+            detail.insert("tags", values);
+            details.insert(num(id), detail);
+            put("playlistDetails", details, true);
+        }
+        m_cache.forget(QStringLiteral("playlist:") + num(id));
+        emit playlistChanged(id);
+    });
+}
+
+void Store::startPlaylistImport(const QString &playlistName, const QJsonArray &songs)
+{
+    const QString serialized = QString::fromUtf8(
+        QJsonDocument(songs).toJson(QJsonDocument::Compact));
+    playlistWrite(QStringLiteral("playlist/import/name/task/create"),
+                  QJsonObject{{QStringLiteral("songs"), serialized},
+                              {QStringLiteral("playlistName"), playlistName}},
+                  QStringLiteral("导入歌单"), [this](const QJsonObject &resp) {
+        const double taskId = resp.value(QStringLiteral("data")).toObject()
+                                  .value(QStringLiteral("taskId")).toDouble();
+        if (taskId <= 0) {
+            emit playlistActionFailed(QStringLiteral("导入歌单"),
+                                      QStringLiteral("接口没有返回任务 id"));
+            return;
+        }
+        emit playlistImportStarted(taskId);
+    });
+}
+
+void Store::importPlaylistFromText(const QString &text, const QString &name)
+{
+    if (text.trimmed().isEmpty()) {
+        emit playlistActionFailed(QStringLiteral("导入歌单"), QStringLiteral("导入内容为空"));
+        return;
+    }
+    const QString playlistName = name.trimmed().isEmpty()
+        ? QStringLiteral("导入音乐 %1").arg(QDateTime::currentDateTime().toString(
+              QStringLiteral("yyyy-MM-dd HH:mm")))
+        : name.trimmed();
+    const QString encoded = encodeUri(QStringLiteral("rpc://playlist/import?text=") + text);
+    QJsonArray songs;
+    songs.append(QJsonObject{{QStringLiteral("name"), playlistName},
+                             {QStringLiteral("type"), QString()},
+                             {QStringLiteral("url"), encoded}});
+    startPlaylistImport(playlistName, songs);
+}
+
+void Store::importPlaylistFromLinks(const QVariantList &links, const QString &name)
+{
+    QStringList urls;
+    for (const QVariant &value : links) {
+        const QString url = value.toString().trimmed();
+        if (!url.isEmpty())
+            urls.append(url);
+    }
+    if (urls.isEmpty()) {
+        emit playlistActionFailed(QStringLiteral("导入歌单"), QStringLiteral("没有可导入的链接"));
+        return;
+    }
+
+    const QString playlistName = name.trimmed().isEmpty()
+        ? QStringLiteral("导入音乐 %1").arg(QDateTime::currentDateTime().toString(
+              QStringLiteral("yyyy-MM-dd HH:mm")))
+        : name.trimmed();
+    QJsonArray songs;
+    for (const QString &url : std::as_const(urls)) {
+        songs.append(QJsonObject{
+            {QStringLiteral("name"), playlistName},
+            {QStringLiteral("type"), QString()},
+            {QStringLiteral("url"), encodeUri(url)},
+        });
+    }
+    startPlaylistImport(playlistName, songs);
 }
 
 void Store::deletePlaylist(double id)

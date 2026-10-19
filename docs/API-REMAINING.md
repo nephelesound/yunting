@@ -366,7 +366,7 @@ type=pic, picinfo=<JSON 字符串>, userIds=<JSON 数组字符串>
 
 - `reason` 是举报面板给的整数原因码，网页端代码只透传，没有内置枚举；先做「其他」一个原因，拿到真实原因列表后再展开。
 - 歌单评论点赞就是把 `threadId` 换成 `A_PL_0_<playlistId>`；读取侧已经有 `A_PL_0_` 的解析。
-- 评论写入（发评论/回复）仍是 `xeapi` + 易盾，维持「不做」。
+- 评论写入（发评论/回复）依赖客户端专有写链路，维持「不做」。
 
 ---
 
@@ -382,7 +382,7 @@ type=pic, picinfo=<JSON 字符串>, userIds=<JSON 数组字符串>
 | 导入状态 | `/api/playlist/import/task/status/v2` | weapi | `taskIds=<JSON 数组字符串>`；`data` 为任务状态，字段未验证 |
 | 收藏 | `/api/playlist/subscribe` / `unsubscribe` | weapi | `id` |
 
-收藏的 `405` 是限流，不是端点错误：写请求单发、失败不重试、连续操作只保留最后一次。参考库为了绕风控用了 `eapi` + `checkToken`，那条路不在当前鉴权边界内。
+收藏的 `405` 是限流，不是端点错误：写请求单发、失败不重试、连续操作只保留最后一次。参考库用了另一条客户端专有链路，那条路不在当前鉴权边界内。
 
 导入的 `songs` 结构：
 
@@ -391,6 +391,8 @@ type=pic, picinfo=<JSON 字符串>, userIds=<JSON 数组字符串>
 ```
 
 本地元数据导入则传 `local=JSON.stringify([{name,artist,album}])`。
+
+隐私、排序、标签、文本与链接导入已接 C++（`Store::setPlaylistPrivacy` / `reorderPlaylists` / `setPlaylistTags` / `importPlaylistFrom*`）；封面仍需图片上传链路。
 
 ### 5.2 图片上传（歌单封面 / 头像 / 私信图片共用）
 
@@ -424,6 +426,8 @@ type=pic, picinfo=<JSON 字符串>, userIds=<JSON 数组字符串>
 | 下载 | `/api/cloud/dowonload` | eapi | `songId`；当前边界内优先走已有 `song/enhance/player/url/v1` |
 
 网页端的云盘上限是 `maxPrivateCloudUploadSize=104857600`（100 MB）。上传本身不走 `music.163.com`，不要给 NOS 请求带 `MUSIC_U`。
+
+已接 C++：`CloudUploader` 走完 check → NOS token → LBS → 原始上传 → info → pub；云盘导入、删除、下载仍未接。
 
 ### 5.4 账户
 
@@ -470,6 +474,8 @@ GET https://music.163.com/song?id=<songId>
 
 只列对用户有感知、且不越过 Web cookie 边界的；广告、抽奖、云贝、音乐人后台、粉丝中心不列。状态：
 
+本轮已接 C++：评论抱一抱/举报、动态转发/删除/可见性、歌单隐私/标签/文本与链接导入、云盘上传；歌单评论点赞复用 `setCommentLiked`。
+
 - `已实现`：C++ 已有请求/解析。
 - `已写入`：在 OpenAPI 或本文前面有请求规格，但 C++ 还没接。
 - `未写入`：只知道路由/用途，参数或回包还没确认。
@@ -484,10 +490,10 @@ GET https://music.163.com/song?id=<songId>
 | 删除通知 | `/api/msg/notice/delete` | 清理通知 | 已写入；参数未确认 |
 | 未读清零 | `/api/msg/count/clear` | 消息角标清零 | 已写入；参数未确认 |
 | 最近联系人 | `/api/msg/recentcontact` | 发私信时快速选人 | 已写入；回包未确认 |
-| 评论抱一抱 | `/api/v2/resource/comments/hug/listener`、`/hug/list` | 评论互动 | 已写入；C++ 未接 |
-| 评论举报/删除 | `/api/report/reportcomment`、`/api/resource/comments/delete` | 评论治理 | 已写入；C++ 未接；删除需实测 weapi |
-| 歌单评论点赞 | `/api/v1/comment/like`（`A_PL_0_`） | 歌单评论互动 | 已写入；C++ 未接 |
-| 动态转发/删除/可见性 | `/api/event/forward`、`/delete`、`/privacy/op` | 用户动态管理 | 已写入；C++ 未接 |
+| 评论抱一抱 | `/api/v2/resource/comments/hug/listener`、`/hug/list` | 评论互动 | 动作已接 C++；列表未接 |
+| 评论举报/删除 | `/api/report/reportcomment`、`/api/resource/comments/delete` | 评论治理 | 举报已接 C++；删除未接，需实测 weapi |
+| 歌单评论点赞 | `/api/v1/comment/like`（`A_PL_0_`） | 歌单评论互动 | C++ `setCommentLiked` 已支持；Store/UI 未接 |
+| 动态转发/删除/可见性 | `/api/event/forward`、`/delete`、`/privacy/op` | 用户动态管理 | 已接 C++ SDK |
 | 分享到好友/动态 | `/api/share/friends/resource` | 资源分享 | 已写入；参考实现用 xeapi，需实测 |
 | 话题 | `/api/act/hot`、`/act/detail`、`/act/event/hot`、`/topic/sub|unsub|sublist` | 社区内容 | 已写入；C++ 未接 |
 | 举报用户/资源/动态 | `/api/report/reportuser`、`/reportresource`、`/reportevent` | 安全与治理 | 未写入 |
@@ -518,7 +524,7 @@ GET https://music.163.com/song?id=<songId>
 | 歌曲特征/红心数 | `/api/song/feature/detail`、`/song/red/count` | 曲目信息 | 未写入 |
 | 歌曲版权推荐 | `/api/song/copyright/rcmd` | 无版权时替代推荐 | 未写入 |
 | 歌单相关推荐 | `/api/playlist/detail/rcmd/get` | 歌单页「相关歌单」 | 未写入 |
-| 歌单标签/排序 | `/api/playlist/tags/update`、`/playlist/order/update` | 歌单管理 | 未写入 |
+| 歌单标签/排序 | `/api/playlist/tags/update`、`/playlist/order/update` | 歌单管理 | 已接 C++ |
 | 歌单订阅者 | `/api/playlist/subscribers` | 歌单社交证明 | 未写入 |
 | 歌单内视频 | `/api/playlist/video/recent` | 视频歌单 | 未写入 |
 | 首页日推变体 | `/api/homepage/category/daily/song/list`、`/homepage/more/rcmd/song`、`/pc/daily/rcmd/block` | 首页更多推荐 | 未写入 |
@@ -548,11 +554,11 @@ GET https://music.163.com/song?id=<songId>
 
 | 功能 | 原因 |
 |---|---|
-| 评论写入（发评论/回复） | `xeapi` + 易盾 token + 公钥轮换；维持 `PROGRESS.md` 的「不做」 |
+| 评论写入（发评论/回复） | 客户端专有写链路与密钥轮换；维持 `PROGRESS.md` 的「不做」 |
 | 动态发布（纯文本/资源） | 网页端的 `/api/share/friends/resource` 参考实现走 `xeapi` v3；先做转发，发布需单独验证 weapi |
 | 听歌识曲 | 需要客户端生成 AFP 指纹：需要专用音频指纹库生成 AFP；桌面端没有等价实现，只有匹配端点 `/api/music/audio/match` 不够 |
 | `/eapi` 专有接口 | 违反 `BACKEND.md` 的鉴权边界 |
-| 歌单收藏的 `checkToken` 绕行 | 参考库用 `eapi` + 易盾 token；当前边界内只能限速与退避 |
+| 歌单收藏的 `checkToken` 绕行 | 参考库用 `eapi` + 风控 token；当前边界内只能限速与退避 |
 
 听歌识曲端点仅作记录：`GET https://interface.music.163.com/api/music/audio/match?sessionId=<16hex>&algorithmCode=shazam_v2&duration=<秒>&rawdata=<AFP>&times=1&decrypt=1`。
 
@@ -563,6 +569,6 @@ GET https://music.163.com/song?id=<songId>
 1. **一起听补口**：`invite/message/send`（邀请好友落私信）、`privilege/get`（成员无版权时跳过）、`relation/statistics/get/v2`（房间时长）、`vip/gift/report`。
 2. **私信补口**：删除会话/单条、通知删除、未读清零；先 live 确认参数名。资源分享先走 `msg/private/send`，不要为 `/api/share/friends/resource` 引入 `xeapi`。
 3. **社交动作**：动态转发/删除/可见性、话题收藏、评论抱一抱/举报/歌单评论点赞。
-4. **次要**：歌单隐私/封面/导入、云盘写入、账户资料/头像、热搜详情、歌词摘录。
+4. **次要**：歌单封面、云盘导入/删除、账户资料/头像、热搜详情、歌词摘录。
 5. **不做**：评论写入、动态发布、听歌识曲、eapi/xeapi。
 

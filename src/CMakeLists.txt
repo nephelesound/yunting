@@ -55,10 +55,11 @@ qt_add_executable(yunting
     link_parser.h link_parser.cpp links.h links.cpp
     listentogether.h listentogether.cpp
     downloadmanager.h downloadmanager.cpp
+    clouduploader.h clouduploader.cpp
     downloadpaths.h
     ncmclient.h ncmclient.cpp traffic.h traffic.cpp
     cookievault.h cookievault.cpp
-    store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_comment.cpp store_user.cpp store_inbox.cpp store_stats.cpp store_notify.cpp store_social.cpp store_user_events.cpp store_library.cpp store_resource.cpp store_comment_extra.cpp store_lyrics_new.cpp store_on_demand.cpp store_discovery.cpp store_wiki.cpp
+    store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_comment.cpp store_user.cpp store_inbox.cpp store_stats.cpp store_notify.cpp store_social.cpp store_user_events.cpp store_library.cpp store_resource.cpp store_comment_extra.cpp store_lyrics_new.cpp store_on_demand.cpp store_discovery.cpp store_wiki.cpp store_cloud.cpp
     ${YUNTING_SDK_SOURCES}
     session.h session.cpp
     querycache.h querycache.cpp

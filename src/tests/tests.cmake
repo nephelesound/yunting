@@ -81,7 +81,8 @@ add_test(NAME cookievault COMMAND cookievault_test)
 
 # Store 的缓存/写操作行为：本地假接口，不碰外网
 qt_add_executable(store_test tests/store_test.cpp
-    store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_comment.cpp store_user.cpp store_inbox.cpp store_stats.cpp store_notify.cpp store_social.cpp store_user_events.cpp store_library.cpp store_resource.cpp store_comment_extra.cpp store_lyrics_new.cpp store_on_demand.cpp store_discovery.cpp store_wiki.cpp
+    store.h store.cpp store_like.cpp store_playlist.cpp store_account.cpp store_follow.cpp store_comment.cpp store_user.cpp store_inbox.cpp store_stats.cpp store_notify.cpp store_social.cpp store_user_events.cpp store_library.cpp store_resource.cpp store_comment_extra.cpp store_lyrics_new.cpp store_on_demand.cpp store_discovery.cpp store_wiki.cpp store_cloud.cpp
+    clouduploader.h clouduploader.cpp
     sdk/sdk_json.h sdk/sdk_json.cpp sdk/service.h sdk/service.cpp
     sdk/library.h sdk/library.cpp sdk/notification.h sdk/notification.cpp
     sdk/social.h sdk/social.cpp sdk/dynamic_cover.h sdk/dynamic_cover.cpp
@@ -161,9 +162,10 @@ yunting_add_sdk_test(search_default sdk/search_default.h sdk/search_default.cpp)
 yunting_add_sdk_test(pendant sdk/pendant.h sdk/pendant.cpp)
 yunting_add_sdk_test(friend_listening sdk/friend_listening.h sdk/friend_listening.cpp
     sdk/user_vip.h sdk/user_vip.cpp)
+yunting_add_sdk_test(cloud_upload clouduploader.h clouduploader.cpp)
 
 # 任何测试都碰不到用户的真实凭据与缓存：会话总线不可达（钥匙串因此走后备文件），数据与缓存目录在构建目录里
-set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store link_parser sdk_song_wiki sdk_track sdk_track_service sdk_discovery sdk_radio sdk_social sdk_feed sdk_video sdk_library sdk_notification sdk_dynamic_cover sdk_search_suggest sdk_service notify lyrics sdk_listen_data user_social user_vip comment search_people mv_page account_feed listen_together download search_default pendant friend_listening PROPERTIES ENVIRONMENT
+set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store link_parser sdk_song_wiki sdk_track sdk_track_service sdk_discovery sdk_radio sdk_social sdk_feed sdk_video sdk_library sdk_notification sdk_dynamic_cover sdk_search_suggest sdk_service notify lyrics sdk_listen_data user_social user_vip comment search_people mv_page account_feed listen_together download search_default pendant friend_listening cloud_upload PROPERTIES ENVIRONMENT
     "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent;XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/data;XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/cache;YUNTING_KEYCHAIN_SERVICE=yunting-test")
 
 # 电源抑制：对着真的会话总线测（没有 Plasma 电源管理时自行跳过），所以不像其他测试那样断开总线

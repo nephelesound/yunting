@@ -1,11 +1,14 @@
 #include "sdk/comment.h"
 
+#include "ncmclient.h"
+
 #include "sdk/sdk_json.h"
 #include "sdk/service.h"
 #include "sdk/user_vip.h"
 
 #include <QJsonArray>
 #include <QJsonValue>
+#include <QUrlQuery>
 #include <algorithm>
 #include <utility>
 
@@ -16,6 +19,8 @@ constexpr auto CommentsPath = "api/v2/resource/comments";
 constexpr auto RepliesPath = "resource/comment/floor/get";
 constexpr auto LikePath = "v1/comment/like";
 constexpr auto UnlikePath = "v1/comment/unlike";
+constexpr auto HugPath = "api/v2/resource/comments/hug/listener";
+constexpr auto ReportPath = "api/report/reportcomment";
 constexpr qsizetype HotLimit = 10;
 
 QString indexedPath(const QString &arrayPath, qsizetype index)
@@ -245,6 +250,66 @@ void setCommentLiked(NcmClient &client, CommentThreadKind kind, qint64 ownerId,
         }
         callback(Result<CommentLikeState>::success(CommentLikeState{commentId, liked}));
     });
+}
+
+void hugComment(NcmClient &client, const QString &threadId, qint64 commentId,
+                qint64 targetUserId, QObject *context, CommentActionCallback callback)
+{
+    if (!callback)
+        return;
+    if (threadId.isEmpty() || commentId <= 0 || targetUserId <= 0) {
+        callback(Result<bool>::failure(endpointError(
+            ErrorKind::InvalidRequest, HugPath,
+            QStringLiteral("threadId, commentId and targetUserId are required"))));
+        return;
+    }
+
+    QUrlQuery form;
+    form.addQueryItem(QStringLiteral("threadId"), threadId);
+    form.addQueryItem(QStringLiteral("commentId"), QString::number(commentId));
+    form.addQueryItem(QStringLiteral("targetUserId"), QString::number(targetUserId));
+    const QString csrf = client.cookieJar().value(QStringLiteral("__csrf"));
+    if (!csrf.isEmpty())
+        form.addQueryItem(QStringLiteral("csrf_token"), csrf);
+
+    postFormJson(client, context, QString::fromLatin1(HugPath), std::move(form),
+                 [callback = std::move(callback)](Result<QJsonObject> root) {
+        if (!root) {
+            callback(Result<bool>::failure(root.error));
+            return;
+        }
+        callback(Result<bool>::success(true));
+    }, true);
+}
+
+void reportComment(NcmClient &client, const QString &threadId, qint64 commentId,
+                   int reason, QObject *context, CommentActionCallback callback)
+{
+    if (!callback)
+        return;
+    if (threadId.isEmpty() || commentId <= 0 || reason < 0) {
+        callback(Result<bool>::failure(endpointError(
+            ErrorKind::InvalidRequest, ReportPath,
+            QStringLiteral("threadId, commentId and a non-negative reason are required"))));
+        return;
+    }
+
+    QUrlQuery form;
+    form.addQueryItem(QStringLiteral("threadId"), threadId);
+    form.addQueryItem(QStringLiteral("commentId"), QString::number(commentId));
+    form.addQueryItem(QStringLiteral("reason"), QString::number(reason));
+    const QString csrf = client.cookieJar().value(QStringLiteral("__csrf"));
+    if (!csrf.isEmpty())
+        form.addQueryItem(QStringLiteral("csrf_token"), csrf);
+
+    postFormJson(client, context, QString::fromLatin1(ReportPath), std::move(form),
+                 [callback = std::move(callback)](Result<QJsonObject> root) {
+        if (!root) {
+            callback(Result<bool>::failure(root.error));
+            return;
+        }
+        callback(Result<bool>::success(true));
+    }, true);
 }
 
 } // namespace ncm::sdk

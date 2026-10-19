@@ -1,5 +1,7 @@
 #include "sdk/social.h"
 
+#include "ncmclient.h"
+
 #include "sdk/sdk_json.h"
 #include "sdk/service.h"
 
@@ -14,6 +16,9 @@ namespace ncm::sdk {
 namespace {
 
 constexpr auto EventsPath = "api/event/get/";
+constexpr auto ForwardPath = "api/event/forward";
+constexpr auto DeletePath = "event/delete";
+constexpr auto PrivacyPath = "api/event/privacy/op";
 
 QString eventJsonText(const QJsonObject &event, const char *key)
 {
@@ -200,6 +205,89 @@ void setUserFollowed(NcmClient &client, qint64 userId, bool followed, QObject *c
         }
         callback(Result<UserFollowState>::success(UserFollowState{userId, followed}));
     });
+}
+
+void forwardEvent(NcmClient &client, qint64 eventId, qint64 eventUserId,
+                  const QString &comment, QObject *context,
+                  SocialActionCallback callback)
+{
+    if (!callback)
+        return;
+    if (eventId <= 0 || eventUserId <= 0) {
+        callback(Result<bool>::failure(endpointError(
+            ErrorKind::InvalidRequest, ForwardPath,
+            QStringLiteral("eventId and eventUserId must be positive"))));
+        return;
+    }
+
+    QUrlQuery form;
+    form.addQueryItem(QStringLiteral("id"), QString::number(eventId));
+    form.addQueryItem(QStringLiteral("eventUserId"), QString::number(eventUserId));
+    form.addQueryItem(QStringLiteral("forwards"), comment);
+    const QString csrf = client.cookieJar().value(QStringLiteral("__csrf"));
+    if (!csrf.isEmpty())
+        form.addQueryItem(QStringLiteral("csrf_token"), csrf);
+
+    postFormJson(client, context, QString::fromLatin1(ForwardPath), std::move(form),
+                 [callback = std::move(callback)](Result<QJsonObject> root) {
+        if (!root) {
+            callback(Result<bool>::failure(root.error));
+            return;
+        }
+        callback(Result<bool>::success(true));
+    }, true);
+}
+
+void deleteEvent(NcmClient &client, qint64 eventId, QObject *context,
+                 SocialActionCallback callback)
+{
+    if (!callback)
+        return;
+    if (eventId <= 0) {
+        callback(Result<bool>::failure(endpointError(
+            ErrorKind::InvalidRequest, DeletePath,
+            QStringLiteral("eventId must be positive"))));
+        return;
+    }
+
+    postWeapiJson(client, context, QString::fromLatin1(DeletePath),
+                  QJsonObject{{QStringLiteral("id"), QString::number(eventId)}}, true,
+                  [callback = std::move(callback)](Result<QJsonObject> root) {
+        if (!root) {
+            callback(Result<bool>::failure(root.error));
+            return;
+        }
+        callback(Result<bool>::success(true));
+    });
+}
+
+void setEventPrivacy(NcmClient &client, qint64 eventId, int privacy,
+                     QObject *context, SocialActionCallback callback)
+{
+    if (!callback)
+        return;
+    if (eventId <= 0 || (privacy != 0 && privacy != 1 && privacy != 2 && privacy != 6)) {
+        callback(Result<bool>::failure(endpointError(
+            ErrorKind::InvalidRequest, PrivacyPath,
+            QStringLiteral("eventId must be positive and privacy must be 0, 1, 2 or 6"))));
+        return;
+    }
+
+    QUrlQuery form;
+    form.addQueryItem(QStringLiteral("eventId"), QString::number(eventId));
+    form.addQueryItem(QStringLiteral("privacy"), QString::number(privacy));
+    const QString csrf = client.cookieJar().value(QStringLiteral("__csrf"));
+    if (!csrf.isEmpty())
+        form.addQueryItem(QStringLiteral("csrf_token"), csrf);
+
+    postFormJson(client, context, QString::fromLatin1(PrivacyPath), std::move(form),
+                 [callback = std::move(callback)](Result<QJsonObject> root) {
+        if (!root) {
+            callback(Result<bool>::failure(root.error));
+            return;
+        }
+        callback(Result<bool>::success(true));
+    }, true);
 }
 
 } // namespace ncm::sdk

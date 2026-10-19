@@ -1,6 +1,8 @@
 // Typed Social SDK contract for a user's event feed.
 #include "sdk/social.h"
 
+#include "ncmclient.h"
+
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -71,6 +73,41 @@ private slots:
         QVERIFY(!result.ok());
         QCOMPARE(result.error.kind, ErrorKind::Parse);
         QVERIFY(result.error.message.contains(QStringLiteral("events")));
+    }
+
+    void invalidEventActionsFailWithoutRequest()
+    {
+        NcmClient client(nullptr, false);
+
+        bool forwarded = false;
+        ErrorKind forwardKind = ErrorKind::Api;
+        forwardEvent(client, 0, 0, QString(), nullptr, [&](Result<bool> result) {
+            forwarded = true;
+            if (!result)
+                forwardKind = result.error.kind;
+        });
+        QVERIFY(forwarded);
+        QCOMPARE(forwardKind, ErrorKind::InvalidRequest);
+
+        bool deleted = false;
+        ErrorKind deleteKind = ErrorKind::Api;
+        deleteEvent(client, 0, nullptr, [&](Result<bool> result) {
+            deleted = true;
+            if (!result)
+                deleteKind = result.error.kind;
+        });
+        QVERIFY(deleted);
+        QCOMPARE(deleteKind, ErrorKind::InvalidRequest);
+
+        bool privateSet = false;
+        ErrorKind privacyKind = ErrorKind::Api;
+        setEventPrivacy(client, 5, 3, nullptr, [&](Result<bool> result) {
+            privateSet = true;
+            if (!result)
+                privacyKind = result.error.kind;
+        });
+        QVERIFY(privateSet);
+        QCOMPARE(privacyKind, ErrorKind::InvalidRequest);
     }
 };
 
