@@ -566,6 +566,8 @@ Kirigami.ApplicationWindow {
         function onPlayRequested(tracks, index) { root.play(tracks, index); }
         function onPlayNowRequested(track) { root.playNow(track); }
         function onInboxRequested() { root.open("inbox"); }
+        function onLinkRequested(kind, id) { root.openLink(kind, id); }
+        function onListenJoinRequested(roomId, inviterId) { root.listenRoom.joinRoom(roomId, inviterId); }
         function onAboutRequested() {
             aboutLoader.active = true;
             const window = aboutLoader.item as AboutWindow;

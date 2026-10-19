@@ -256,7 +256,7 @@ ScreenFrame {
                             selectByMouse: true
                             // 分享时没写话，接口用分享物的名字顶上：那就不重复显示
                             readonly property var shared: message.messageData.message[message.messageData.message.kind] || null
-                            text: message.messageData.message.text !== (shared && shared.name ? shared.name : null)
+                            text: message.messageData.message.text !== (shared ? shared.name || shared.title || null : null)
                                 ? message.messageData.message.text : ""
                             font.pixelSize: Tokens.textBase
                             color: Kirigami.Theme.textColor
@@ -302,6 +302,29 @@ ScreenFrame {
                                     : "MV" + (item.artist ? "，" + item.artist : "")
                                 onClicked: kind === "album" ? Actions.openAlbum(item.id)
                                          : kind === "playlist" ? Actions.openPlaylist(item.id) : Actions.openMv(item.id)
+                            }
+                        }
+                        // 卡片：官方号的上新与活动、推广链接。能在云听里打开的（歌、歌单、专辑…）就地打开，
+                        // 其余去浏览器；什么链接都没有的只是展示。一起听邀请：点了加入那个房间
+                        Item {
+                            readonly property bool invite: message.messageData.message.kind === "listen"
+                            readonly property var card: message.messageData.message.card
+                                || message.messageData.message.listen || null
+                            Layout.fillWidth: true
+                            implicitHeight: cardTile.height
+                            visible: card !== null
+                            SharedItem {
+                                id: cardTile
+                                readonly property var card: parent.card
+                                readonly property bool invite: parent.invite
+                                width: Math.min(parent.width, Tokens.measureMax)
+                                enabled: card !== null && (invite || Boolean(card.openKind) || Boolean(card.web))
+                                cover: card ? card.cover : ""
+                                title: card ? card.title : ""
+                                caption: !card ? "" : invite ? "一起听，点击加入" : card.subtitle
+                                onClicked: invite ? Actions.joinListen(card.roomId, card.inviterId)
+                                    : card.openKind ? Actions.openLink(card.openKind, card.openId)
+                                    : Qt.openUrlExternally(card.web)
                             }
                         }
                     }

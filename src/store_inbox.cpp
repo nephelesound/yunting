@@ -2,12 +2,15 @@
 #include "store.h"
 
 #include "json_util.h"
+#include "link_parser.h"
 #include "ncmclient.h"
 #include "normalize.h"
 #include "sdk/track.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QUrl>
+#include <QUrlQuery>
 
 using namespace ncm;
 
@@ -24,11 +27,78 @@ QJsonObject otherUser(const QJsonObject &from, const QJsonObject &to, double me)
     return from;
 }
 
+// 卡片类消息里的应用内链接：orpheus://open?url1=<应用内链接>&url2=<网页兜底>，取 url1
+QUrl appTarget(const QString &nativeUrl)
+{
+    const QUrl url(nativeUrl);
+    if (url.scheme() == QLatin1String("orpheus") && url.host() == QLatin1String("open")) {
+        const QString inner = QUrlQuery(url).queryItemValue(QStringLiteral("url1"), QUrl::FullyDecoded);
+        if (!inner.isEmpty())
+            return QUrl(inner);
+    }
+    return url;
+}
+
+// 网页兜底：「请升级 App」页不算，点了只会叫人去装官方客户端
+QString webFallback(const QString &webUrl)
+{
+    const QUrl url(webUrl);
+    if (url.scheme() != QLatin1String("http") && url.scheme() != QLatin1String("https"))
+        return {};
+    if (url.path().startsWith(QLatin1String("/app-upgrade/")))
+        return {};
+    return webUrl;
+}
+
+// 卡片类消息：type 23（generalMsg：官方号的上新、活动、一起听邀请）与 type 12（promotionUrl：推广链接）。
+// 一起听邀请（应用内链接 orpheus://nm/play/listenTogether?roomId=…&inviterId=…）给 kind=listen；
+// 其余给 kind=card：能在云听里打开的（歌、歌单、专辑…）带 openKind/openId，否则带网页链接 web。不是卡片时返回空
+QVariantMap cardOf(const QJsonObject &payload)
+{
+    QString title, subtitle, cover, web;
+    QUrl target;
+    if (payload.value("generalMsg").isObject()) {
+        const QJsonObject g = payload.value("generalMsg").toObject();
+        title = g.value("title").toString();
+        subtitle = g.value("subTitle").toString();
+        cover = ncmSized(g.value("cover"), 120);
+        web = webFallback(g.value("webUrl").toString());
+        target = appTarget(g.value("nativeUrl").toString());
+        if (target.scheme() == QLatin1String("orpheus") && target.host() == QLatin1String("nm")
+            && target.path() == QLatin1String("/play/listenTogether")) {
+            const QUrlQuery query(target);
+            return {{"kind", QStringLiteral("listen")}, {"title", title}, {"subtitle", subtitle}, {"cover", cover},
+                    {"roomId", query.queryItemValue(QStringLiteral("roomId"), QUrl::FullyDecoded)},
+                    {"inviterId", query.queryItemValue(QStringLiteral("inviterId"), QUrl::FullyDecoded)}};
+        }
+    } else if (payload.value("promotionUrl").isObject()) {
+        const QJsonObject p = payload.value("promotionUrl").toObject();
+        title = p.value("title").toString();
+        subtitle = p.value("text").toString();
+        cover = ncmSized(p.value("coverUrl"), 120);
+        web = webFallback(p.value("url").toString());
+    } else {
+        return {};
+    }
+    QVariantMap card{{"kind", QStringLiteral("card")}, {"title", title}, {"subtitle", subtitle}, {"cover", cover},
+                     {"web", web}};
+    OpenLink open = parseOpenLink(target.toString());
+    if (!open.valid())
+        open = parseOpenLink(web);
+    if (open.valid()) {
+        card.insert("openKind", linkKindName(open.kind));
+        card.insert("openId", double(open.id));
+    }
+    return card;
+}
+
 QString payloadText(const QJsonObject &payload)
 {
     const QString text = payload.value("msg").toString();
     if (!text.isEmpty())
         return text;
+    if (const QVariantMap card = cardOf(payload); !card.isEmpty())
+        return card.value("title").toString();
     if (payload.contains("song")) return payload.value("song").toObject().value("name").toString();
     if (payload.contains("album")) return payload.value("album").toObject().value("name").toString();
     if (payload.contains("playlist")) return payload.value("playlist").toObject().value("name").toString();
@@ -38,6 +108,8 @@ QString payloadText(const QJsonObject &payload)
 
 QString payloadKind(const QJsonObject &payload)
 {
+    if (const QVariantMap card = cardOf(payload); !card.isEmpty())
+        return card.value("kind").toString();
     for (const char *key : {"song", "album", "playlist", "mv", "program", "event", "dj"})
         if (payload.contains(QLatin1String(key)))
             return QString::fromLatin1(key);
@@ -47,6 +119,8 @@ QString payloadKind(const QJsonObject &payload)
 QVariantMap normalizePayload(const QJsonObject &payload)
 {
     QVariantMap out{{"text", payloadText(payload)}, {"kind", payloadKind(payload)}};
+    if (const QVariantMap card = cardOf(payload); !card.isEmpty())
+        out.insert(card.value("kind").toString(), card);   // message.card / message.listen
     if (payload.value("song").isObject()) {
         const auto track = sdk::parseTrack(payload.value("song").toObject());
         if (track)

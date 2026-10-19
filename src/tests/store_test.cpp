@@ -1853,6 +1853,66 @@ private slots:
         QCOMPARE(m_store->data().value("inboxThread").toMap().value("items").toList().size(), 1);
     }
 
+    // 卡片类私信（真实回包的形状）：type 23 的 generalMsg 把应用内链接包在 orpheus://open?url1=…&url2=<升级页> 里，
+    // 一起听邀请就是其中一种；type 12 是推广链接
+    void inboxCardsAndListenInvites()
+    {
+        const auto wrapped = [](const QString &inner) {
+            return QStringLiteral("orpheus://open?url1=%1&url2=%2")
+                .arg(QString::fromLatin1(QUrl::toPercentEncoding(inner)),
+                     QString::fromLatin1(QUrl::toPercentEncoding(
+                         QStringLiteral("https://st.music.163.com/app-upgrade/index/index.html?type=1"))));
+        };
+        const auto row = [](int id, const QJsonObject &payload) {
+            return QJsonObject{{"id", id}, {"time", 100 + id},
+                               {"fromUser", QJsonObject{{"userId", 7}, {"nickname", "Peer"}}},
+                               {"toUser", QJsonObject{{"userId", 1}}},
+                               {"msg", QString::fromUtf8(QJsonDocument(payload).toJson(QJsonDocument::Compact))}};
+        };
+        const QJsonArray msgs{
+            row(61, QJsonObject{{"type", 23}, {"msg", ""}, {"generalMsg", QJsonObject{
+                {"title", "一起听邀请"}, {"cover", "http://p1/c.jpg"},
+                {"webUrl", "https://st.music.163.com/app-upgrade/index/index.html?type=1"},
+                {"nativeUrl", wrapped("orpheus://nm/play/listenTogether?roomId=r-42&inviterId=7&showWindow=1")}}}}),
+            row(62, QJsonObject{{"type", 23}, {"msg", "新专辑上线"}, {"generalMsg", QJsonObject{
+                {"title", "A"}, {"subTitle", "专辑"}, {"webUrl", "https://music.163.com/"},
+                {"nativeUrl", wrapped("orpheus://nm/album/detail?id=5")}}}}),
+            row(63, QJsonObject{{"type", 12}, {"msg", ""}, {"promotionUrl", QJsonObject{
+                {"title", "活动"}, {"text", "说明"},
+                {"url", "https://st.music.163.com/app-upgrade/index/index.html?type=2"}}}}),
+        };
+        m_api->handler = [msgs](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/weapi/msg/private/history") {
+                respond(200, json(QJsonObject{{"code", 200}, {"more", false}, {"msgs", msgs}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        m_store->request(QStringLiteral("inboxThread:7"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("inboxThread").toMap().value("items").toList().size() == 3;
+        }));
+        QHash<double, QVariantMap> byId;
+        for (const QVariant &item : m_store->data().value("inboxThread").toMap().value("items").toList())
+            byId.insert(item.toMap().value("id").toDouble(), item.toMap().value("message").toMap());
+
+        const QVariantMap invite = byId.value(61);
+        QCOMPARE(invite.value("kind").toString(), QStringLiteral("listen"));
+        QCOMPARE(invite.value("listen").toMap().value("roomId").toString(), QStringLiteral("r-42"));
+        QCOMPARE(invite.value("listen").toMap().value("inviterId").toString(), QStringLiteral("7"));
+        QCOMPARE(invite.value("text").toString(), QStringLiteral("一起听邀请"));   // 没写话时用卡片标题
+
+        const QVariantMap album = byId.value(62).value("card").toMap();
+        QCOMPARE(album.value("openKind").toString(), QStringLiteral("album"));
+        QCOMPARE(album.value("openId").toDouble(), 5.0);
+
+        // 只有「请升级 App」页的推广：不给网页链接，界面只展示
+        const QVariantMap promo = byId.value(63).value("card").toMap();
+        QCOMPARE(promo.value("title").toString(), QStringLiteral("活动"));
+        QVERIFY(promo.value("web").toString().isEmpty());
+        QVERIFY(!promo.contains("openKind"));
+    }
+
     // 统计 / 通知 / 等级 / 逐字歌词 / 楼中楼：归一化字段与请求 key 的回归
     void readOnlyExtrasNormalize()
     {

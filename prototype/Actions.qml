@@ -55,6 +55,14 @@ QtObject {
             openArtist(resource.id);
     }
 
+    // 网易云链接指向的东西（kind 同 link_parser 的 linkKindName：song / playlist / album / artist / user / mv），
+    // 与浏览器、剪贴板里的链接走同一处：私信里的卡片
+    signal linkRequested(string kind, real id)
+    function openLink(kind, id) { if (kind && id > 0) linkRequested(kind, id); }
+    // 私信里收到的一起听邀请：加入那个房间
+    signal listenJoinRequested(string roomId, string inviterId)
+    function joinListen(roomId, inviterId) { if (roomId) listenJoinRequested(roomId, inviterId || ""); }
+
     signal inboxRequested()
     function openInbox() { inboxRequested(); }
     signal aboutRequested()

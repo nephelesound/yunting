@@ -106,6 +106,7 @@ qt_add_executable(store_test tests/store_test.cpp
     querycache.h querycache.cpp
     ncmclient.h ncmclient.cpp traffic.h traffic.cpp cookievault.h cookievault.cpp
     sdk/track.h sdk/track.cpp sdk/track_service.h sdk/track_service.cpp
+    link_parser.h link_parser.cpp
     normalize.h normalize.cpp json_util.h crypto.h crypto.cpp perf.h perf.cpp)
 target_include_directories(store_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_options(store_test PRIVATE -Wall -Wextra)
