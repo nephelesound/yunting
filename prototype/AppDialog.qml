@@ -1,5 +1,6 @@
 // 云听的对话框：KDE 的 FormCardDialog。标题、内容与按钮同一种内边距（FormCard 的 12px），
-// 宽度不超出窗口，长文字换行而不是把对话框撑出屏幕。内容放 FormCard 的行；自绘的内容左右各留 Tokens.space3 对齐。
+// 宽高都不超出窗口：长文字换行；内容比窗口还高时内容区滚动，标题（右上角的关闭）与按钮始终看得见。
+// 内容放 FormCard 的行；自绘的内容左右各留 Tokens.space3 对齐。
 // 应用没有加载 Qt 的翻译，标准按钮会显示英文：按钮文字在这里统一写成中文。
 import QtQuick
 import QtQuick.Controls
@@ -19,15 +20,28 @@ FormCard.FormCardDialog {
 
     implicitWidth: Math.min(dialog.parent ? dialog.parent.width - 2 * Tokens.pageMargin : dialog.preferredWidth,
                             dialog.preferredWidth)
+    height: Math.min(dialog.implicitHeight,
+                     dialog.parent ? dialog.parent.height - 2 * Tokens.pageMargin : dialog.implicitHeight)
 
     standardButtons: dialog.acceptText.length > 0 ? Dialog.Ok | Dialog.Cancel : Dialog.Cancel
 
-    Label {
-        visible: dialog.message.length > 0
-        Layout.fillWidth: true
-        Layout.margins: Tokens.space3   // 与 FormCard 的行同一内边距
-        text: dialog.message
-        wrapMode: Text.Wrap
+    // FormCardDialog 的内容区不会滚动：换成一个 ScrollView，子项都放进 body
+    default property alias body: body.data
+    contentItem: ScrollView {
+        contentWidth: availableWidth
+        ColumnLayout {
+            id: body
+            width: parent.width
+            spacing: 0
+            // 写在这里而不是对话框下面：本文件里的子项不走 body 这个默认属性
+            Label {
+                visible: dialog.message.length > 0
+                Layout.fillWidth: true
+                Layout.margins: Tokens.space3   // 与 FormCard 的行同一内边距
+                text: dialog.message
+                wrapMode: Text.Wrap
+            }
+        }
     }
 
     Component.onCompleted: {

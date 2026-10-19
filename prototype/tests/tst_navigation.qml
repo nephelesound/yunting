@@ -123,6 +123,26 @@ Item {
             Source.snapshot.fixture = "";
         }
 
+        // 对话框不能比窗口高：内容再高也只在内容区滚动，标题和右上角的关闭一直在窗口里
+        function test_tallDialogStaysInsideTheWindow() {
+            const component = Qt.createComponent("../main.qml");
+            const window = component.createObject(root, { backend: null, fixture: "worst", height: 680 });
+            window.show();
+            const tall = Qt.createQmlObject("import QtQuick; Item { implicitWidth: 100; implicitHeight: 2000 }", window);
+            const dialog = Qt.createComponent("../AppDialog.qml").createObject(window, { title: "高", body: [tall] });
+            dialog.open();
+            tryVerify(() => dialog.opened);
+            verify(dialog.y >= 0, "dialog top " + dialog.y);
+            verify(dialog.y + dialog.height <= window.height, "dialog bottom " + (dialog.y + dialog.height));
+            const close = closeButton(dialog);
+            verify(close !== null && close.visible);
+            verify(dialog.contentItem.contentHeight > dialog.contentItem.height, "the body scrolls");
+            mouseClick(close);
+            tryVerify(() => !dialog.visible, 2000);
+            window.close();
+            Source.snapshot.fixture = "";
+        }
+
         // 心动模式与私人漫游一样是流：点入口就从头播放并去正在播放页，不打开列表页、不压历史里的列表
         function test_heartEntryStartsTheStream() {
             const component = Qt.createComponent("../main.qml");
