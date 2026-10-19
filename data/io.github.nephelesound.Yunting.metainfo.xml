@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.7" date="2026-10-19">
+      <description>
+        <p>The now-playing cover sits on the page with a thin contact shadow instead of floating above it.</p>
+        <p xml:lang="zh_CN">正在播放页的封面改为贴着页面的薄阴影，像放在桌上，不再浮起来。</p>
+      </description>
+    </release>
     <release version="0.6.6" date="2026-10-19">
       <description>
         <p>Comments on playlists can be liked; the now-playing cover gets a soft shadow and rounded corners; downloads keep the song's duration and a second click no longer downloads a song twice.</p>
@@ -98,12 +104,6 @@
       <description>
         <p>Heart mode plays right away and improves as you listen; pausing and switching songs fade in and out; seeking no longer makes noise.</p>
         <p xml:lang="zh_CN">心动模式改为点了就放、越听越准的播放方式；暂停与切歌淡入淡出；修复拖动进度条时的噪音。</p>
-      </description>
-    </release>
-    <release version="0.6.2" date="2026-10-19">
-      <description>
-        <p>Dialogs follow KDE's new style, and ending a listen-together session is confirmed in place in the queue; the delete-playlist dialog no longer overflows the window for long names.</p>
-        <p xml:lang="zh_CN">对话框统一成 KDE 新的样式，结束一起听改为在播放队列里原地确认；修复删除歌单的对话框在歌单名很长时超出窗口。</p>
       </description>
     </release>
   </releases>
