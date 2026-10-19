@@ -2,6 +2,7 @@
 
 #include "sdk/sdk_json.h"
 #include "sdk/service.h"
+#include "sdk/user_vip.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -122,7 +123,8 @@ Result<ListenTogetherRoom> roomFrom(const QJsonObject &object, const QString &pa
         if (!users.at(i).isObject())
             return itemTypeFailure<ListenTogetherRoom>(decodeEndpoint(endpoint), userPath);
 
-        JsonReader userReader(users.at(i).toObject(), userPath);
+        const QJsonObject object = users.at(i).toObject();
+        JsonReader userReader(object, userPath);
         ListenTogetherUser user;
         QString userBadPath;
         user.userId = userReader.integer("userId");
@@ -145,6 +147,7 @@ Result<ListenTogetherRoom> roomFrom(const QJsonObject &object, const QString &pa
         user.identity = userReader.string("identityName");
         if (!userReader.ok() && userBadPath.isEmpty())
             userBadPath = fieldPath(userPath, "identityName");
+        user.vipLevel = vipLevel(object);
         if (!userReader.ok())
             return parseFailure<ListenTogetherRoom>(decodeEndpoint(endpoint), userReader,
                                                    userBadPath);

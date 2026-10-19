@@ -19,9 +19,9 @@
 ## 已有
 | 能力 | Store key / 触发 | 主要字段 |
 |---|---|---|
-| 账户 | `account` | `name` `vip` `vipType` `level` `listenSongs` `avatar` `background` |
-| 用户主页 | `user:<id>` | `id` `name` `avatar` `signature` `followed` `follows` `followeds` `playlistCount` `vipType` `level` `listenSongs` `playlists[]` |
-| 热门评论 | `comments:<songId>` | `userId` `id` `user` `avatar` `content` `likes` `liked` `time` |
+| 账户 | `account` | `name` `vip` `vipType` `vipLevel` `level` `listenSongs` `avatar` `background` |
+| 用户主页 | `user:<id>` | `id` `name` `avatar` `signature` `followed` `follows` `followeds` `playlistCount` `vipType` `vipLevel` `level` `listenSongs` `playlists[]` |
+| 热门评论 | `comments:<songId>` | `userId` `id` `user` `avatar` `vipLevel` `content` `likes` `liked` `time` |
 | 评论分页 | `comments:<songId>:<offset>` → `data.commentPage` | 同上 + `parentId` |
 | 评论点赞 | `setCommentLiked(kind, ownerId, commentId, liked)` | `kind` 为 `song` / `playlist`（`ownerId` 是歌曲或歌单 id）；乐观更新该线程热评与分页槽的 `liked` / `likes`，失败回滚 |
 | 只读信箱 | `inbox` / `inbox:<offset>` | 会话：`userId` `name` `avatar` `vipType` `lastText` `kind` `lastTime` `lastMsgId` `unread` `messageCount` |
@@ -56,7 +56,7 @@
 
 ## 字段补全建议
 - 歌单卡片：补 `description`、`playCount`、`creator{id,name}`、`updateTime`、`subscribed`。
-- 用户：补 `vipRights`（细分黑胶/VIP）、`createTime`、`followed`、`mutual`。
+- 用户：已补 `vipLevel`：`svip` 为黑胶 SVIP，`vip` 为黑胶 VIP，空串为无会员；`createTime`、`followed`、`mutual` 也已接。
 - 评论：补 `replyCount`、`beReplied` / `parentCommentId`，前端才能画楼中楼。
 - 曲目：已有 `mv` / `albumId` / `artistId` / `artists` / `quality`；下载/授权状态需单独接。
 - 通知：`/pl/count` 的 `msg` 与 `comment/event/follow/notice/forward` 应拆开展示，不要只显示一个总数。
@@ -72,14 +72,14 @@
 | `data.listenRealtime` | `listen:week` / `listen:month` | `{ type,startTime,endTime,userNickName,listenTimeDistribution,weekFriends,weekToday }` |
 | `data.listenRank` | `listenRank:month` / `listenRank:week` | `{ type,startTime,endTime,songCount,items:[{id,name,artist,album,cover,playCount,artists[]}] }` |
 | `data.notifications` | `notifications` | `{ msg,comment,event,follow,notice,forward,newProgramCount,total }` |
-| `data.userFollows` | `userFollows:<uid>[:<offset>]` | `{ userId,offset,more,items:[{id,name,avatar,signature,gender,followed,mutual,vipType}] }` |
+| `data.userFollows` | `userFollows:<uid>[:<offset>]` | `{ userId,offset,more,items:[{id,name,avatar,signature,gender,followed,mutual,vipType,vipLevel}] }` |
 | `data.userFolloweds` | `userFolloweds:<uid>[:<offset>]` | 同 `userFollows` |
 | `data.userLevel` | `userLevel` | `{ level,nowPlayCount,nextPlayCount,nowLoginCount,nextLoginCount,progress,info }` |
 | `data.userSubcount` | `userSubcount` | `{ artistCount,createdPlaylistCount,subPlaylistCount,mvCount,djRadioCount }` |
 | `data.commentReplies` | `commentReplies:<songId>:<commentId>[:<before>]` | `{ songId,commentId,before,more,items:[评论字段] }` |
 | `data.artist` | `artist:<id>` | 按 id 存：`{ "<artistId>": { id,name,cover,alias,description,followed,musicSize,albumSize,tracks[],albums[] } }`，只留最近 8 个 id |
 | `data.album` | `album:<id>` | 按 id 存：`{ "<albumId>": { id,name,artist,artistId,cover,description,company,subscribed,publishTime,tracks[] } }`，只留最近 8 个 id |
-| `data.user` | `user:<id>` | 按 id 存：`{ "<uid>": { id,name,avatar,signature,followed,follows,followeds,playlistCount,vipType,level,listenSongs,playlists[] } }`，只留最近 8 个 id；隐私拒绝时该项带 `restricted` / `message` |
+| `data.user` | `user:<id>` | 按 id 存：`{ "<uid>": { id,name,avatar,signature,followed,follows,followeds,playlistCount,vipType,vipLevel,level,listenSongs,playlists[] } }`，只留最近 8 个 id；隐私拒绝时该项带 `restricted` / `message` |
 | `data.mv` | `mv:<id>` | 按 id 存：`{ "<mvId>": { id,name,cover,artist,artistId,duration,playCount,subCount,shareCount,commentCount,publishTime,description,subscribed,url,br,size,expires,urlPending } }`，只留最近 8 个 id；每次打开都重新取签名地址 |
 | `data.wiki` | `wiki:<songId>` | 按 id 存：`{ "<songId>": { songId,loaded,songName,description,memory,chorus,basic[],creators[],mvs[],reviews[],sheets[],entertainments[],awards[] } }`，只留最近 8 个 id |
 | `data.song` | `song:<id>` | 按 id 存：`{ "<songId>": Track }`，只留最近 8 个 id；只知道 id 时（打开链接、下载）用它取曲目 |

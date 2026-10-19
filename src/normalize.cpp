@@ -2,6 +2,7 @@
 #include "json_util.h"
 #include "sdk/comment.h"
 #include "sdk/track.h"
+#include "sdk/user_vip.h"
 
 #include <QDate>
 #include <QDateTime>
@@ -73,7 +74,7 @@ QVariantMap ncmProfile(const QJsonObject &p, int avatarPx, int backgroundPx)
         {"followeds", p.value("followeds").toDouble()},
         {"playlistCount", p.value("playlistCount").toDouble()},
         {"vipType", p.value("vipType").toDouble()},
-        {"vipRights", p.value("vipRights").toObject().toVariantMap()},
+        {"vipLevel", sdk::vipLevel(p)},
         {"level", p.value("level").toDouble()},
         {"listenSongs", p.value("listenSongs").toDouble()},
         {"createTime", p.value("createTime").toDouble()},
@@ -99,6 +100,7 @@ QVariantMap commentToVariantMap(const sdk::Comment &c)
         {"avatar", ncmSized(QJsonValue(c.avatar), 96)},
         {"avatarPendant", c.pendant},
         {"identityIcon", c.identityIcon},
+        {"vipLevel", c.vipLevel},
         {"content", c.content},
         {"likes", static_cast<double>(c.likes)},
         {"time", static_cast<double>(c.time)},

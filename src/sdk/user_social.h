@@ -37,6 +37,7 @@ struct SocialUser {
     bool followed = false;  // followed
     bool mutual = false;    // mutual
     int vipType = 0;        // vipType
+    QString vipLevel;       // vipRights / vipType, see user_vip.h
 };
 
 struct FollowPage {

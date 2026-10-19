@@ -23,6 +23,8 @@ class UserSocialTest : public QObject {
                            {"followed", true},
                            {"mutual", true},
                            {"vipType", 11},
+                           {"vipRights", QJsonObject{{"associator", QJsonObject{{"rights", true}}},
+                                                     {"redplus", QJsonObject{{"rights", true}}}}},
                            {"unknownField", "ignored"}};
     }
 
@@ -52,6 +54,7 @@ private slots:
         QCOMPARE(user.followed, true);
         QCOMPARE(user.mutual, true);
         QCOMPARE(user.vipType, 11);
+        QCOMPARE(user.vipLevel, QStringLiteral("svip"));
         QCOMPARE(parsed.value->items.at(1).id, qint64(7));
     }
 

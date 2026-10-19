@@ -42,6 +42,7 @@ struct ListenTogetherUser {
     QString pendant;   // pendantData.imageUrl (raw)
     QString identityIcon; // identityIcon / avatarDetail.identityIconUrl (raw)
     QString identity;  // identityName
+    QString vipLevel;  // vipRights / vipType, see user_vip.h
 };
 
 struct ListenTogetherRoom {

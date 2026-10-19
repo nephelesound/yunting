@@ -51,7 +51,8 @@ target_link_libraries(link_parser_test PRIVATE Qt6::Core Qt6::Test)
 add_test(NAME link_parser COMMAND link_parser_test)
 
 qt_add_executable(normalize_test tests/normalize_test.cpp normalize.h normalize.cpp json_util.h
-    sdk/track.h sdk/track.cpp sdk/sdk_json.h sdk/sdk_json.cpp sdk/sdk_result.h)
+    sdk/track.h sdk/track.cpp sdk/sdk_json.h sdk/sdk_json.cpp sdk/sdk_result.h
+    sdk/user_vip.h sdk/user_vip.cpp)
 target_include_directories(normalize_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(normalize_test PRIVATE Qt6::Core Qt6::Test)
 add_test(NAME normalize COMMAND normalize_test)
@@ -60,7 +61,8 @@ add_test(NAME normalize COMMAND normalize_test)
 qt_add_executable(audioengine_test tests/audioengine_test.cpp audioengine.h audioengine.cpp
     ncmclient.h ncmclient.cpp traffic.h traffic.cpp cookievault.h cookievault.cpp json_util.h crypto.h crypto.cpp
     normalize.h normalize.cpp perf.h perf.cpp
-    sdk/track.h sdk/track.cpp sdk/sdk_json.h sdk/sdk_json.cpp sdk/sdk_result.h)
+    sdk/track.h sdk/track.cpp sdk/sdk_json.h sdk/sdk_json.cpp sdk/sdk_result.h
+    sdk/user_vip.h sdk/user_vip.cpp)
 target_include_directories(audioengine_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_options(audioengine_test PRIVATE -Wall -Wextra)
 target_link_libraries(audioengine_test PRIVATE Qt6::Core Qt6::Test Qt6::Network MpvQt::MpvQt Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
@@ -92,6 +94,7 @@ qt_add_executable(store_test tests/store_test.cpp
     sdk/search_default.h sdk/search_default.cpp
     sdk/lyrics.h sdk/lyrics.cpp
     sdk/user_social.h sdk/user_social.cpp
+    sdk/user_vip.h sdk/user_vip.cpp
     sdk/comment.h sdk/comment.cpp
     sdk/search_people.h sdk/search_people.cpp
     sdk/mv_page.h sdk/mv_page.cpp
@@ -111,7 +114,8 @@ add_test(NAME store COMMAND store_test)
 qt_add_executable(audioengine_seek_test tests/audioengine_seek_test.cpp
     audioengine.h audioengine.cpp ncmclient.h ncmclient.cpp traffic.h traffic.cpp
     cookievault.h cookievault.cpp json_util.h crypto.h crypto.cpp normalize.h normalize.cpp perf.h perf.cpp
-    sdk/track.h sdk/track.cpp sdk/sdk_json.h sdk/sdk_json.cpp sdk/sdk_result.h)
+    sdk/track.h sdk/track.cpp sdk/sdk_json.h sdk/sdk_json.cpp sdk/sdk_result.h
+    sdk/user_vip.h sdk/user_vip.cpp)
 target_include_directories(audioengine_seek_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_options(audioengine_seek_test PRIVATE -Wall -Wextra)
 target_link_libraries(audioengine_seek_test PRIVATE Qt6::Core Qt6::Test Qt6::Network MpvQt::MpvQt Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
@@ -137,19 +141,23 @@ yunting_add_sdk_test(sdk_service)
 yunting_add_sdk_test(notify sdk/notify.h sdk/notify.cpp)
 yunting_add_sdk_test(lyrics sdk/lyrics.h sdk/lyrics.cpp)
 yunting_add_sdk_test(sdk_listen_data sdk/listen_data.h sdk/listen_data.cpp)
-yunting_add_sdk_test(user_social sdk/user_social.h sdk/user_social.cpp)
-yunting_add_sdk_test(comment sdk/comment.h sdk/comment.cpp)
+yunting_add_sdk_test(user_social sdk/user_social.h sdk/user_social.cpp
+    sdk/user_vip.h sdk/user_vip.cpp)
+yunting_add_sdk_test(user_vip sdk/user_vip.h sdk/user_vip.cpp)
+yunting_add_sdk_test(comment sdk/comment.h sdk/comment.cpp
+    sdk/user_vip.h sdk/user_vip.cpp)
 yunting_add_sdk_test(search_people sdk/search_people.h sdk/search_people.cpp)
 yunting_add_sdk_test(mv_page sdk/mv_page.h sdk/mv_page.cpp)
 yunting_add_sdk_test(account_feed sdk/account_feed.h sdk/account_feed.cpp)
-yunting_add_sdk_test(listen_together sdk/listen_together.h sdk/listen_together.cpp)
+yunting_add_sdk_test(listen_together sdk/listen_together.h sdk/listen_together.cpp
+    sdk/user_vip.h sdk/user_vip.cpp)
 yunting_add_sdk_test(download sdk/download.h sdk/download.cpp
     sdk/track.h sdk/track.cpp sdk/track_service.h sdk/track_service.cpp
     downloadmanager.h downloadmanager.cpp downloadpaths.h)
 yunting_add_sdk_test(search_default sdk/search_default.h sdk/search_default.cpp)
 
 # 任何测试都碰不到用户的真实凭据与缓存：会话总线不可达（钥匙串因此走后备文件），数据与缓存目录在构建目录里
-set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store link_parser sdk_song_wiki sdk_track sdk_track_service sdk_discovery sdk_radio sdk_social sdk_feed sdk_video sdk_library sdk_notification sdk_dynamic_cover sdk_search_suggest sdk_service notify lyrics sdk_listen_data user_social comment search_people mv_page account_feed listen_together download search_default PROPERTIES ENVIRONMENT
+set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store link_parser sdk_song_wiki sdk_track sdk_track_service sdk_discovery sdk_radio sdk_social sdk_feed sdk_video sdk_library sdk_notification sdk_dynamic_cover sdk_search_suggest sdk_service notify lyrics sdk_listen_data user_social user_vip comment search_people mv_page account_feed listen_together download search_default PROPERTIES ENVIRONMENT
     "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent;XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/data;XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/cache;YUNTING_KEYCHAIN_SERVICE=yunting-test")
 
 # 电源抑制：对着真的会话总线测（没有 Plasma 电源管理时自行跳过），所以不像其他测试那样断开总线

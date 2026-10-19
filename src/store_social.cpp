@@ -28,6 +28,7 @@ QVariantMap socialUser(const sdk::SocialUser &u)
         {"followed", u.followed},
         {"mutual", u.mutual},
         {"vipType", static_cast<double>(u.vipType)},
+        {"vipLevel", u.vipLevel},
     };
 }
 

@@ -55,6 +55,7 @@ private slots:
         comment.liked = true;
         comment.parentId = 1;
         comment.replyCount = 14;
+        comment.vipLevel = QStringLiteral("svip");
         comment.beReplied.append(
             ncm::sdk::RepliedComment{9, QStringLiteral("old"), 8, QStringLiteral("v")});
 
@@ -66,7 +67,7 @@ private slots:
                               QStringLiteral("liked"), QStringLiteral("likes"),
                               QStringLiteral("parentId"), QStringLiteral("replyCount"),
                               QStringLiteral("time"), QStringLiteral("user"),
-                              QStringLiteral("userId")}));
+                              QStringLiteral("userId"), QStringLiteral("vipLevel")}));
         QCOMPARE(commentMap.value("user").toString(), QStringLiteral("u"));
         QCOMPARE(commentMap.value("userId").toDouble(), 7.0);
         QCOMPARE(commentMap.value("avatar").toString(),
@@ -78,6 +79,7 @@ private slots:
         QCOMPARE(commentMap.value("liked").toBool(), true);
         QCOMPARE(commentMap.value("parentId").toDouble(), 1.0);
         QCOMPARE(commentMap.value("replyCount").toDouble(), 14.0);
+        QCOMPARE(commentMap.value("vipLevel").toString(), QStringLiteral("svip"));
 
         const QVariantList replied = commentMap.value("beReplied").toList();
         QCOMPARE(replied.size(), 1);
@@ -93,6 +95,23 @@ private slots:
         QCOMPARE(empty.value("avatar").toString(), QString());
         QCOMPARE(empty.value("replyCount").toDouble(), 0.0);
         QVERIFY(empty.value("beReplied").toList().isEmpty());
+    }
+
+    // profile 统一给 vipLevel；vipType 仍给还在读它的旧页面，vipRights 不再进 map
+    void profileMapExposesVipLevel()
+    {
+        const QJsonObject profile{
+            {"userId", 7},
+            {"nickname", "u"},
+            {"vipType", 11},
+            {"vipRights", QJsonObject{
+                 {"associator", QJsonObject{{"rights", true}}},
+                 {"redplus", QJsonObject{{"rights", true}}}}},
+        };
+        const QVariantMap map = ncmProfile(profile, 96, 1200);
+        QCOMPARE(map.value("vipLevel").toString(), QStringLiteral("svip"));
+        QCOMPARE(map.value("vipType").toDouble(), 11.0);
+        QVERIFY(!map.contains("vipRights"));
     }
 
     void lrcTranslationMatchesTimestamp()

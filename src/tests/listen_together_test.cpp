@@ -29,6 +29,9 @@ QJsonObject userJson(qint64 id, const QString &nickname)
         {QStringLiteral("nickname"), nickname},
         {QStringLiteral("avatarUrl"), QStringLiteral("https://cdn.example/%1.jpg").arg(id)},
         {QStringLiteral("identityName"), QStringLiteral("member")},
+        {QStringLiteral("vipType"), 0},
+        {QStringLiteral("vipRights"),
+         QJsonObject{{QStringLiteral("associator"), QJsonObject{{QStringLiteral("rights"), true}}}}},
     };
 }
 
@@ -63,6 +66,7 @@ private slots:
         QCOMPARE(result.value->users.at(0).avatar,
                  QStringLiteral("https://cdn.example/7.jpg"));
         QCOMPARE(result.value->users.at(0).identity, QStringLiteral("member"));
+        QCOMPARE(result.value->users.at(0).vipLevel, QStringLiteral("vip"));
         QCOMPARE(result.value->users.at(1).userId, qint64(42));
     }
 

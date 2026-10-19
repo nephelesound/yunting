@@ -1589,7 +1589,10 @@ private slots:
                     {"listenSongs", 1031},
                     {"profile", QJsonObject{{"userId", 42}, {"nickname", "Listener"},
                                             {"signature", "hi"}, {"follows", 3}, {"followeds", 4},
-                                            {"playlistCount", 1}, {"avatarUrl", ""}}}}));
+                                            {"playlistCount", 1}, {"avatarUrl", ""},
+                                            {"vipType", 11},
+                                            {"vipRights", QJsonObject{
+                                                 {"redplus", QJsonObject{{"rights", true}}}}}}}}));
                 return;
             }
             if (req.path == "/weapi/user/playlist") {
@@ -1613,6 +1616,8 @@ private slots:
         QCOMPARE(u.value("follows").toDouble(), 3.0);
         QCOMPARE(u.value("level").toDouble(), 9.0);
         QCOMPARE(u.value("listenSongs").toDouble(), 1031.0);
+        QCOMPARE(u.value("vipLevel").toString(), QStringLiteral("svip"));
+        QVERIFY(!u.contains("vipRights"));
         QCOMPARE(u.value("playlists").toList().first().toMap().value("name").toString(), QStringLiteral("Public"));
     }
 
@@ -1629,8 +1634,12 @@ private slots:
                 const bool second = req.query.contains("offset=30");
                 respond(200, json(QJsonObject{
                     {"code", 200}, {"more", !second},
-                    {"follow", QJsonArray{QJsonObject{{"userId", second ? 2 : 1}, {"nickname", second ? "B" : "A"},
-                                                      {"mutual", !second}}}}}));
+                    {"follow", QJsonArray{QJsonObject{
+                         {"userId", second ? 2 : 1}, {"nickname", second ? "B" : "A"},
+                         {"mutual", !second},
+                         {"vipType", second ? 0 : 11},
+                         {"vipRights", QJsonObject{
+                              {"redplus", QJsonObject{{"rights", second}}}}}}}}}));
                 return;
             }
             respond(200, "{\"code\":200}");
@@ -1643,7 +1652,9 @@ private slots:
         QVERIFY(waitUntil([&] { return m_store->data().value("userFollows").toMap().value("items").toList().size() == 2; }));
         const QVariantList items = m_store->data().value("userFollows").toMap().value("items").toList();
         QCOMPARE(items.at(0).toMap().value("mutual").toBool(), true);
+        QCOMPARE(items.at(0).toMap().value("vipLevel").toString(), QStringLiteral("vip"));
         QCOMPARE(items.at(1).toMap().value("name").toString(), QStringLiteral("B"));
+        QCOMPARE(items.at(1).toMap().value("vipLevel").toString(), QStringLiteral("svip"));
         QVERIFY(m_api->requests.last().query.contains("order=true"));   // 关注按新到旧
 
         // 同一页回来第二次（滚到底触发了两次、点了重试）：不会出现重复的人

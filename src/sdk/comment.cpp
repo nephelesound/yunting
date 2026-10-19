@@ -2,6 +2,7 @@
 
 #include "sdk/sdk_json.h"
 #include "sdk/service.h"
+#include "sdk/user_vip.h"
 
 #include <QJsonArray>
 #include <QJsonValue>
@@ -83,6 +84,7 @@ Result<Comment> commentFrom(const QJsonValue &value, const QString &path,
     comment.pendant = pendant.value(QStringLiteral("imageUrl")).toString();
     const QJsonObject avatarDetail = userReader.object("avatarDetail");
     comment.identityIcon = avatarDetail.value(QStringLiteral("identityIconUrl")).toString();
+    comment.vipLevel = vipLevel(user);
     comment.content = reader.string("content");
     comment.likes = reader.integer("likedCount");
     comment.time = reader.integer("time");

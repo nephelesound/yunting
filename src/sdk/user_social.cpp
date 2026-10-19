@@ -2,6 +2,7 @@
 
 #include "sdk/sdk_json.h"
 #include "sdk/service.h"
+#include "sdk/user_vip.h"
 
 #include <QJsonArray>
 #include <QJsonValue>
@@ -66,6 +67,7 @@ Result<SocialUser> userFrom(const QJsonObject &object, const QString &path,
     user.followed = reader.boolean("followed");
     user.mutual = reader.boolean("mutual");
     user.vipType = static_cast<int>(reader.integer("vipType"));
+    user.vipLevel = vipLevel(object);
     if (!reader.ok())
         return parseFailure<SocialUser>(QString::fromLatin1(endpoint), reader, path);
     return Result<SocialUser>::success(user);

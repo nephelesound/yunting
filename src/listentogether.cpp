@@ -92,6 +92,7 @@ QVariantList roomUsers(const QList<sdk::ListenTogetherUser> &users)
             {"avatarPendant", user.pendant},
             {"identityIcon", user.identityIcon},
             {"identity", user.identity},
+            {"vipLevel", user.vipLevel},
         });
     }
     return values;

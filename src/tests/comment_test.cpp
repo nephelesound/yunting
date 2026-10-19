@@ -17,7 +17,11 @@ class SdkCommentTest : public QObject {
             {"user", QJsonObject{{"userId", 7}, {"nickname", "u"},
                                  {"avatarUrl", "http://cover/u.jpg"},
                                  {"avatarDetail", QJsonObject{{"identityIconUrl",
-                                                              "http://cover/id.png"}}}}},
+                                                              "http://cover/id.png"}}},
+                                 {"vipType", 11},
+                                 {"vipRights", QJsonObject{
+                                      {"associator", QJsonObject{{"rights", true}}},
+                                      {"redplus", QJsonValue::Null}}}}},
             {"pendantData", QJsonObject{{"imageUrl", "http://cover/p.png"}}},
             {"content", "hello"},
             {"likedCount", 3},
@@ -53,6 +57,7 @@ private slots:
         QCOMPARE(comment.avatar, QStringLiteral("http://cover/u.jpg"));
         QCOMPARE(comment.pendant, QStringLiteral("http://cover/p.png"));
         QCOMPARE(comment.identityIcon, QStringLiteral("http://cover/id.png"));
+        QCOMPARE(comment.vipLevel, QStringLiteral("vip"));
         QCOMPARE(comment.content, QStringLiteral("hello"));
         QCOMPARE(comment.likes, qint64(3));
         QCOMPARE(comment.time, qint64(1700000000000));

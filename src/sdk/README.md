@@ -50,6 +50,7 @@ NcmClient                 传输（cookie、weapi/明文、超时）
 - `lyrics.h/.cpp`：普通/逐字歌词原始文本（lrc/tlyric/yrc/ytlrc、pureMusic/nolyric）；LRC/YRC 行解析仍由 Store 边界复用旧解析器。
 - `notify.h/.cpp`：`/api/pl/count` 通知计数纯解析；`total` 由 Store 按固定六项求和。
 - `user_social.h/.cpp`：关注/粉丝列表、账号等级、收藏计数纯解析；不包含关注写操作。
+- `user_vip.h/.cpp`：用户会员等级的唯一判定（`vipRights.redplus` / `associator` / `vipType` → `svip` / `vip` / 空串）；评论、资料、关注/粉丝与一起听成员共用。
 - `search_people.h/.cpp`：Cloudsearch 用户/电台结果行纯解析（type=1002/1009）。
 - `mv_page.h/.cpp`：MV 详情 typed 模型；签名播放地址仍由 Store 的 `mvUrl:<id>` 状态机刷新。
 - `account_feed.h/.cpp`：首页榜单卡、热搜词、红心 id 纯解析；榜单/热搜上限与顺序由 SDK 固定。
