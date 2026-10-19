@@ -66,25 +66,18 @@ void Store::maybeFetchSimilar()
     });
 }
 
-// 私人漫游续取：接口每次给一小批新歌，追加到 personal.fm.tracks（按 id 去重）。
+// 私人漫游续取：接口每次给一小批新歌（见 beginRefill / endRefill）。
 // 每次都要新的一批，所以不经 QueryCache；失败时什么都不改，界面下次快放完时再要
 void Store::requestMoreFm()
 {
-    fetch("api/v1/radio/get", {}, true, [this](const QJsonDocument &doc, bool ok) {
-        if (!ok)
-            return;
-        const auto parsed = sdk::parseTracks(arr(body(doc), "data"));
-        if (!parsed)
-            return;
-        QVariantList tracks = m_personal.value("fm").toMap().value("tracks").toList();
-        QSet<double> seen;
-        for (const QVariant &t : std::as_const(tracks))
-            seen.insert(t.toMap().value("id").toDouble());
-        for (const sdk::Track &track : *parsed.value) {
-            if (!seen.contains(static_cast<double>(track.id)))
-                tracks.append(sdk::trackToVariantMap(track));
-        }
-        put("fm", QVariantMap{{"tracks", tracks}}, true);
+    if (!beginRefill("fm"))
+        return;
+    const quint64 generation = m_requests.token(QStringLiteral("fm"));
+    fetch("api/v1/radio/get", {}, true, [this, generation](const QJsonDocument &doc, bool ok) {
+        QVariantList batch;
+        if (const auto parsed = sdk::parseTracks(arr(body(doc), "data")); ok && parsed)
+            batch = sdk::tracksToVariantList(*parsed.value);
+        endRefill("fm", generation, batch);
     });
 }
 
@@ -796,8 +789,10 @@ void Store::requestMv(const QString &key, double mvId)
 
 
 // 用户搜索：Cloudsearch 的 userprofiles；与主搜索分开按需取，避免每次搜索多发请求
+// 搜索的「用户」「电台」两栏是单槽：只收最后一次搜的词，晚到的旧词结果作废（同 requestSearch 的 generation）
 void Store::requestSearchUsers(const QString &key, const QString &raw)
 {
+    const quint64 token = m_requests.begin(QStringLiteral("searchUsers"));
     m_cache.query(key,
         [this, raw](QueryCache::Done done) {
             m_client->get("api/cloudsearch/pc",
@@ -830,12 +825,16 @@ void Store::requestSearchUsers(const QString &key, const QString &raw)
                 done(QVariantMap{{"query", parsed.value->query}, {"items", items}}, true);
             });
         },
-        [this](const QVariant &result) { put("searchUsers", result, false); });
+        [this, token](const QVariant &result) {
+            if (m_requests.current(QStringLiteral("searchUsers"), token))
+                put("searchUsers", result, false);
+        });
 }
 
 // 电台搜索：Cloudsearch 的 djRadios
 void Store::requestSearchRadios(const QString &key, const QString &raw)
 {
+    const quint64 token = m_requests.begin(QStringLiteral("searchRadios"));
     m_cache.query(key,
         [this, raw](QueryCache::Done done) {
             m_client->get("api/cloudsearch/pc",
@@ -868,7 +867,10 @@ void Store::requestSearchRadios(const QString &key, const QString &raw)
                 done(QVariantMap{{"query", parsed.value->query}, {"items", items}}, true);
             });
         },
-        [this](const QVariant &result) { put("searchRadios", result, false); });
+        [this, token](const QVariant &result) {
+            if (m_requests.current(QStringLiteral("searchRadios"), token))
+                put("searchRadios", result, false);
+        });
 }
 
 void Store::requestDynamicCover(double songId)

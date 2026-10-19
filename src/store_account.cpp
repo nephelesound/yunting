@@ -172,6 +172,7 @@ void Store::fetchPublicPersonal()
         const auto parsed = sdk::parseTracks(arr(body(doc), "data"));
         if (!parsed)
             return;
+        m_requests.begin(QStringLiteral("fm"));   // 整批换：在途的续取不再属于这条流
         put("fm", QVariantMap{{"tracks", sdk::tracksToVariantList(*parsed.value)}}, true);
     });
 }
@@ -297,49 +298,75 @@ void Store::putLiked(const QVariantMap &liked)
     if (seedId == m_heartSeedId)
         return;
     m_heartSeedId = seedId;
-    if (seed.isEmpty())
+    if (seed.isEmpty()) {
+        m_requests.begin(QStringLiteral("heart"));
         put("heart", QVariant::fromValue(nullptr), true);
-    else
+    } else {
         fetchHeart(seed, liked.value("id").toDouble());
+    }
 }
 
 void Store::fetchHeart(const QVariantMap &seed, double likedId)
 {
     m_similarSeed = seed;
     maybeFetchSimilar();
-    fetchHeartBatch(seed.value("id").toDouble(), likedId, [this, seed](const QVariantList &tracks) {
-        if (seed.value("id").toDouble() != m_heartSeedId)
+    fetchHeartBatch(seed.value("id").toDouble(), likedId, [this, seed](const QVariantList &tracks, bool ok) {
+        if (!ok || seed.value("id").toDouble() != m_heartSeedId)
             return;   // 回包前红心首位又换了：等新种子那一次
+        m_requests.begin(QStringLiteral("heart"));   // 整批换：在途的续取不再属于这条流
         put("heart", QVariantMap{{"seed", seed}, {"tracks", tracks.mid(0, 30)}}, true);
         // radar / tail 由 fetchAccount 独立发起，不挂在这条链尾
     });
 }
 
-// 心动模式是一个流：快放完时从正在放的这首接着推荐，追加到 personal.heart.tracks（按 id 去重），种子不变
+// 心动模式续取：从正在放的这首接着推荐，种子不变
 void Store::requestMoreHeart(double songId)
 {
     const double likedId = m_personal.value("liked").toMap().value("id").toDouble();
-    if (songId <= 0 || likedId <= 0)
+    if (songId <= 0 || likedId <= 0 || !beginRefill("heart"))
         return;
-    fetchHeartBatch(songId, likedId, [this](const QVariantList &batch) {
-        QVariantMap heart = m_personal.value("heart").toMap();
-        if (heart.isEmpty())
-            return;   // 期间退出登录或红心清空：没有可以接上的流
-        QVariantList tracks = heart.value("tracks").toList();
-        QSet<double> seen;
-        for (const QVariant &t : std::as_const(tracks))
-            seen.insert(t.toMap().value("id").toDouble());
-        for (const QVariant &t : batch) {
-            if (!seen.contains(t.toMap().value("id").toDouble()))
-                tracks.append(t);
-        }
-        heart.insert("tracks", tracks);
-        put("heart", heart, true);
+    const quint64 generation = m_requests.token(QStringLiteral("heart"));
+    fetchHeartBatch(songId, likedId, [this, generation](const QVariantList &batch, bool /*ok*/) {
+        endRefill("heart", generation, batch);
     });
 }
 
-// 网易云的心动模式接口：从 songId 出发、混合红心歌单（likedId）与相似推荐的一批歌
-void Store::fetchHeartBatch(double songId, double likedId, std::function<void(const QVariantList &)> done)
+// 私人漫游与心动模式是流：personal.<stream>.tracks 有两种写法——整批换（刷新、换种子，
+// 换时 m_requests.begin(stream) 开新一代）与续取追加。续取只接在发出时的那一代后面，
+// 同一条流同时只续取一次；回包（成功或失败）一定结束这次续取。
+bool Store::beginRefill(const char *stream)
+{
+    if (m_refilling.contains(QLatin1String(stream)))
+        return false;
+    m_refilling.insert(QLatin1String(stream));
+    return true;
+}
+
+void Store::endRefill(const char *stream, quint64 generation, const QVariantList &batch)
+{
+    m_refilling.remove(QLatin1String(stream));
+    if (!m_requests.current(QLatin1String(stream), generation))
+        return;
+    QVariantMap current = m_personal.value(QLatin1String(stream)).toMap();
+    if (current.isEmpty())
+        return;   // 期间退出登录或红心清空：没有可以接上的流
+    QVariantList tracks = current.value("tracks").toList();
+    QSet<double> seen;
+    for (const QVariant &t : std::as_const(tracks))
+        seen.insert(t.toMap().value("id").toDouble());
+    for (const QVariant &t : batch) {
+        if (!seen.contains(t.toMap().value("id").toDouble()))
+            tracks.append(t);
+    }
+    if (tracks.size() == current.value("tracks").toList().size())
+        return;
+    current.insert("tracks", tracks);
+    put(stream, current, true);
+}
+
+// 网易云的心动模式接口：从 songId 出发、混合红心歌单（likedId）与相似推荐的一批歌。失败时 ok = false
+void Store::fetchHeartBatch(double songId, double likedId,
+                            std::function<void(const QVariantList &, bool)> done)
 {
     fetch("api/playmode/intelligence/list",
           query({{"songId", num(songId)},
@@ -353,8 +380,7 @@ void Store::fetchHeartBatch(double songId, double likedId, std::function<void(co
         for (const QJsonValue &x : arr(resp, "data"))
             songs.append(x.toObject().value("songInfo").toObject());
         const auto parsed = sdk::parseTracks(songs, arr(resp, "privileges"));
-        if (parsed)
-            done(sdk::tracksToVariantList(*parsed.value));
+        done(parsed ? sdk::tracksToVariantList(*parsed.value) : QVariantList{}, bool(parsed));
     });
 }
 

@@ -142,7 +142,9 @@ private:
     void fetchLiked(const QJsonObject &likedList);
     void putLiked(const QVariantMap &liked);
     void fetchHeart(const QVariantMap &seed, double likedId);
-    void fetchHeartBatch(double songId, double likedId, std::function<void(const QVariantList &)> done);
+    void fetchHeartBatch(double songId, double likedId, std::function<void(const QVariantList &, bool)> done);
+    bool beginRefill(const char *stream);
+    void endRefill(const char *stream, quint64 generation, const QVariantList &batch);
     void fetchRadar();
     void fetchTail();
     // 云盘分页的共享状态：递归回调只持有 state，不形成 shared_ptr 自环
@@ -157,6 +159,8 @@ private:
     void resetPersonal();
     // 红心成功后同步 personal.liked.tracks（列表已加载时）：先找本地曲目，找不到再取详情
     void addLikedTrack(double songId);
+    // 关注 / 收藏成功后同步收藏列表：取消就移掉，新收藏就清空等下次重取
+    void updateSaved(const char *slot, double id, bool subscribed);
     void removeLikedTrack(double songId);
     QVariantMap trackById(double songId) const;
     // 红心的本地写入与服务器请求：同一首歌在途时记住最后一次意图，回包落地后追发
@@ -272,6 +276,7 @@ private:
     QVariantMap m_personal;
     QVariantMap m_emptyPersonal;     // 个人骨架（换账号时清回它）
     QStringList m_lyricsOrder;       // data.lyrics 里各首歌的先后：超出上限时先丢最早的
+    QSet<QString> m_refilling;       // 正在续取的流（fm / heart），见 beginRefill
     QVariantMap m_similarSeed;
     bool m_similarFired = false;
     double m_heartSeedId = 0;        // 心动模式当前（或在途）的种子：红心第一首

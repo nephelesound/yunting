@@ -32,6 +32,8 @@ Item {
         }
     }
 
+    Component { id: commentsComponent; CommentsPane { width: 400; height: 400 } }
+
     TestCase {
         name: "Requests"
         when: windowShown
@@ -66,6 +68,21 @@ Item {
             compare(count("user:4343"), users);
             verify(artists <= 2 && users <= 2);
             verify(reader.artist.failed, "页面看得到失败，可以显示「重试」");
+        }
+
+        // 换账号时最新评论被清空（含上一个账号的点赞）：开着的评论区要自己重新取，不能整段消失
+        function test_openCommentsRestartAfterAccountSwitch() {
+            const songId = Source.d.comments.songId;
+            const pane = createTemporaryObject(commentsComponent, root, { thread: Source.commentThread("song", songId) });
+            tryVerify(() => pane.latest !== null);
+            wait(100);
+            const pages = count("comments:" + songId + ":0");
+            verify(pages >= 1);
+            Source.latestComments = ({ song: { owner: 0, items: [], total: 0, more: false, next: 0, loading: false },
+                                       playlist: { owner: 0, items: [], total: 0, more: false, next: 0, loading: false } });
+            tryVerify(() => pane.latest !== null, 1000, "评论区重新开始取");
+            wait(200);
+            verify(count("comments:" + songId + ":0") <= pages + 1, "只重取一次，不循环");
         }
 
         function test_retryAsksOnceMore() {

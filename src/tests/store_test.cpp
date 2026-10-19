@@ -569,14 +569,16 @@ private slots:
         QVERIFY(m_store->personal().value("liked").toMap().value("tracks").toList().isEmpty());
     }
 
-    // 心动模式以红心第一首为种子：新点的红心排到第一，心动模式跟着换；取消后换回原来的第一首
-    void heartFollowsTheFirstLikedSong()
+private:
+    // 心动模式用的假服务器：红心歌单 [7]，点红心的详情是 77；推荐的第一首 = 种子 × 10，看得出是哪一次请求的结果。
+    // hold(songId, respond) 返回 true 时由测试自己决定何时回包
+    void serveHeart(std::function<bool(double, const FakeApi::Responder &)> hold = {})
     {
         const auto song = [](double id) {
             return QJsonObject{{"id", id}, {"name", "song"},
                                {"ar", QJsonArray{}}, {"al", QJsonObject{}}, {"dt", 1000}};
         };
-        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+        m_api->handler = [song, hold](const FakeApi::Request &req, const FakeApi::Responder &respond) {
             if (req.path == "/api/nuser/account/get") {
                 respond(200, json(QJsonObject{
                     {"code", 200},
@@ -598,23 +600,40 @@ private slots:
             } else if (req.path == "/api/v3/song/detail") {
                 respond(200, json(QJsonObject{{"code", 200}, {"songs", QJsonArray{song(77)}}}));
             } else if (req.path == "/api/playmode/intelligence/list") {
-                // 推荐的第一首 = 种子 × 10，看得出是哪一次请求的结果
                 const QUrlQuery query(QString::fromLatin1(req.query));
                 const double seed = query.queryItemValue(QStringLiteral("songId")).toDouble();
-                respond(200, json(QJsonObject{
-                    {"code", 200},
-                    {"data", QJsonArray{QJsonObject{{"songInfo", song(seed * 10)}}}}}));
+                const FakeApi::Responder answer = [respond, song, seed](int status, const QByteArray &) {
+                    respond(status, json(QJsonObject{
+                        {"code", 200},
+                        {"data", QJsonArray{QJsonObject{{"songInfo", song(seed * 10)}}}}}));
+                };
+                if (!hold || !hold(seed, answer))
+                    answer(200, {});
             } else {
                 respond(200, "{\"code\":200}");
             }
         };
-        const auto heartIs = [&](double seed) {
-            const QVariantMap heart = m_store->personal().value("heart").toMap();
-            const QVariantList tracks = heart.value("tracks").toList();
-            return heart.value("seed").toMap().value("id").toDouble() == seed
-                && !tracks.isEmpty() && tracks.first().toMap().value("id").toDouble() == seed * 10;
-        };
+    }
+    bool heartIs(double seed) const
+    {
+        const QVariantMap heart = m_store->personal().value("heart").toMap();
+        const QVariantList tracks = heart.value("tracks").toList();
+        return heart.value("seed").toMap().value("id").toDouble() == seed
+            && !tracks.isEmpty() && tracks.first().toMap().value("id").toDouble() == seed * 10;
+    }
+    QList<double> heartTrackIds() const
+    {
+        QList<double> ids;
+        for (const QVariant &t : m_store->personal().value("heart").toMap().value("tracks").toList())
+            ids.append(t.toMap().value("id").toDouble());
+        return ids;
+    }
 
+private slots:
+    // 心动模式以红心第一首为种子：新点的红心排到第一，心动模式跟着换；取消后换回原来的第一首
+    void heartFollowsTheFirstLikedSong()
+    {
+        serveHeart();
         m_store->refresh();
         QVERIFY(waitUntil([&] { return heartIs(7); }));
 
@@ -635,6 +654,65 @@ private slots:
         m_store->request(QStringLiteral("heart:next:70"));
         QTest::qWait(100);
         QCOMPARE(m_store->personal().value("heart").toMap().value("tracks").toList().size(), 2);
+    }
+
+    // 续取：同一条流同时只续一次；续取在途时换了种子（点了红心），回来的那批属于旧的流，丢掉。
+    // 曾经两种写法互不知道，旧种子的推荐会接到新的流后面
+    void heartRefillIsSerialAndDropsStaleBatches()
+    {
+        QList<FakeApi::Responder> held;
+        int refills = 0;
+        serveHeart([&](double seed, const FakeApi::Responder &answer) {
+            if (seed != 70 && seed != 71)
+                return false;
+            ++refills;
+            held.append(answer);
+            return true;
+        });
+        m_store->refresh();
+        QVERIFY(waitUntil([&] { return heartIs(7); }));
+
+        m_store->request(QStringLiteral("heart:next:70"));
+        QVERIFY(waitUntil([&] { return refills == 1; }));
+        m_store->request(QStringLiteral("heart:next:71"));   // 上一次还没回：不再发
+        QTest::qWait(100);
+        QCOMPARE(refills, 1);
+
+        m_store->setLiked(77, true);
+        QVERIFY(waitUntil([&] { return heartIs(77); }));
+        held.takeFirst()(200, {});
+        QTest::qWait(100);
+        QCOMPARE(heartTrackIds(), QList<double>{770});   // 旧流的 700 没接上来
+
+        m_store->request(QStringLiteral("heart:next:71"));   // 上一次已结束，可以再续
+        QVERIFY(waitUntil([&] { return refills == 2; }));
+        held.takeFirst()(200, {});
+        QVERIFY(waitUntil([&] { return heartTrackIds() == QList<double>({770, 710}); }));
+    }
+
+    // 搜索的「用户」栏是单槽：晚到的旧词结果不能盖掉新词的
+    void lateSearchUsersResultIsDropped()
+    {
+        FakeApi::Responder heldA;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            const QString s = QUrlQuery(QString::fromLatin1(req.query)).queryItemValue(QStringLiteral("s"));
+            const QByteArray reply = "{\"code\":200,\"result\":{\"userprofileCount\":1,\"userprofiles\":"
+                                     "[{\"userId\":1,\"nickname\":\"" + s.toUtf8() + "\"}]}}";
+            if (s == QLatin1String("a")) {
+                heldA = [respond, reply](int status, const QByteArray &) { respond(status, reply); };
+                return;
+            }
+            respond(200, reply);
+        };
+        m_store->request(QStringLiteral("searchUsers:a"));
+        QVERIFY(waitUntil([&] { return bool(heldA); }));
+        m_store->request(QStringLiteral("searchUsers:ab"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("searchUsers").toMap().value("query").toString() == QLatin1String("ab");
+        }));
+        heldA(200, {});
+        QTest::qWait(100);
+        QCOMPARE(m_store->data().value("searchUsers").toMap().value("query").toString(), QStringLiteral("ab"));
     }
 
     // 从排行榜收藏：卡片不在 personal/搜索结果里，也要用排行榜已有的名字与封面
@@ -2539,6 +2617,12 @@ private slots:
         QVERIFY(waitUntil([&] {
             return m_store->personal().value("savedArtists").toMap().value("items").toList().isEmpty();
         }));
+
+        // 新收藏：列表清空，下次打开向服务器取（新的一项只有服务器知道排在哪）。
+        // 曾经只有取关会改列表，新关注的歌手要等重启才出现
+        m_store->setAlbumSubscribed(900201, true);
+        QVERIFY(waitUntil([&] { return albumChanged.count() == 2; }));
+        QVERIFY(m_store->personal().value("savedAlbums").isNull());
 
         m_store->logout();
         QVERIFY(m_store->personal().value("savedArtists").isNull());

@@ -29,6 +29,28 @@ void Store::followWrite(const QString &path, const QJsonObject &payload, const Q
     });
 }
 
+// 收藏列表（savedArtists / savedAlbums）只由取它的请求和这里写。在途的回包一律作废：它是改动前的状态。
+// 取消：把这一项立刻移掉；新收藏：清掉整张列表，下次打开向服务器取（新的一项排在哪由服务器决定）
+void Store::updateSaved(const char *slot, double id, bool subscribed)
+{
+    m_requests.begin(QLatin1String(slot));
+    if (subscribed) {
+        put(slot, QVariant::fromValue(nullptr), true);
+        return;
+    }
+    QVariantMap saved = m_personal.value(QLatin1String(slot)).toMap();
+    QVariantList kept;
+    for (const QVariant &v : saved.value("items").toList()) {
+        if (v.toMap().value("id").toDouble() != id)
+            kept.append(v);
+    }
+    if (kept.size() == saved.value("items").toList().size())
+        return;
+    saved.insert("items", kept);
+    saved.insert("count", std::max(0.0, saved.value("count").toDouble() - 1));
+    put(slot, saved, true);
+}
+
 void Store::setArtistSubscribed(double id, bool subscribed)
 {
     // 快速防抖：连续点关注/取消只发最后一次意图，避免连点触发风控。
@@ -44,25 +66,7 @@ void Store::setArtistSubscribed(double id, bool subscribed)
             put("artist", artist, false);
         }
         m_cache.forget(QStringLiteral("artist:") + num(id));
-        if (!subscribed) {
-            // 收藏列表可能正在取：作废在途回包，并把已显示的这位立刻移掉。
-            m_requests.begin(QStringLiteral("savedArtists"));
-            QVariantMap saved = m_personal.value("savedArtists").toMap();
-            QVariantList kept;
-            bool removed = false;
-            for (const QVariant &v : saved.value("items").toList()) {
-                if (v.toMap().value("id").toDouble() == id) {
-                    removed = true;
-                    continue;
-                }
-                kept.append(v);
-            }
-            if (removed) {
-                saved.insert("items", kept);
-                saved.insert("count", std::max(0.0, saved.value("count").toDouble() - 1));
-                put("savedArtists", saved, true);
-            }
-        }
+        updateSaved("savedArtists", id, subscribed);
         emit artistChanged(id, subscribed);
     });
     });
@@ -80,24 +84,7 @@ void Store::setAlbumSubscribed(double id, bool subscribed)
             put("album", album, false);
         }
         m_cache.forget(QStringLiteral("album:") + num(id));
-        if (!subscribed) {
-            m_requests.begin(QStringLiteral("savedAlbums"));
-            QVariantMap saved = m_personal.value("savedAlbums").toMap();
-            QVariantList kept;
-            bool removed = false;
-            for (const QVariant &v : saved.value("items").toList()) {
-                if (v.toMap().value("id").toDouble() == id) {
-                    removed = true;
-                    continue;
-                }
-                kept.append(v);
-            }
-            if (removed) {
-                saved.insert("items", kept);
-                saved.insert("count", std::max(0.0, saved.value("count").toDouble() - 1));
-                put("savedAlbums", saved, true);
-            }
-        }
+        updateSaved("savedAlbums", id, subscribed);
         emit albumChanged(id, subscribed);
     });
     });

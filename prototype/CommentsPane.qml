@@ -46,6 +46,10 @@ ListView {
     }
     readonly property bool hotLoaded: Boolean(pane.hot) && pane.hot.loaded
     onHotLoadedChanged: pane.start()
+    // 换账号时 Source 把最新评论清空（里面有上一个账号的点赞状态）：开着的评论区要重新取，
+    // 不然「最新评论」整段消失。放到下一轮再取：在 latest 的变化通知里改 latest 的来源是绑定环，
+    // latest 会停在旧值。start() 放进一个在取的条目后 latest 不再为空，不会反复触发
+    onLatestChanged: if (pane.latest === null) Qt.callLater(pane.start)
     Component.onCompleted: pane.start()
 
     // 展开着回复的那条评论（0 = 都没展开）。展开时要第一页回复，再点收起
@@ -92,7 +96,8 @@ ListView {
 
         // 分组标题：每组第一条之前，与队列的「正在播放 / 接下来播放」同一种小节标题
         Label {
-            visible: entry.index === 0 || pane.rows[entry.index - 1].group !== entry.modelData.group
+            // 列表变短时旧的委托还在、前一行可能已经没了
+            visible: entry.index === 0 || pane.rows[entry.index - 1]?.group !== entry.modelData.group
             Layout.topMargin: entry.index === 0 ? 0 : Tokens.space6
             text: entry.modelData.group === "hot" ? "精彩评论"
                 : "最新评论" + (pane.latest && pane.latest.total > 0 ? " " + Format.count(pane.latest.total) : "")
