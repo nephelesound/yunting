@@ -242,9 +242,11 @@ void Store::putPage(const char *key, QVariantMap page, bool append, bool persona
         QVariantList items = (personalSide ? m_personal : m_data).value(QLatin1String(key)).toMap()
                                  .value(itemsName).toList();
         QSet<QString> seen;
+        // 行自带 key 时按它认（会话、私信），否则按 id（视频另有 vid）
         const auto identity = [](const QVariant &item) {
             const QVariantMap map = item.toMap();
-            return map.value("id").toString() + u'|' + map.value("vid").toString();
+            return map.contains("key") ? map.value("key").toString()
+                                       : map.value("id").toString() + u'|' + map.value("vid").toString();
         };
         for (const QVariant &item : std::as_const(items))
             seen.insert(identity(item));

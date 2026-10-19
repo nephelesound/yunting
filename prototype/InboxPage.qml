@@ -114,7 +114,7 @@ ScreenFrame {
             boundsBehavior: Flickable.StopAtBounds
             model: GrowingModel {
                 values: page.conversations.items
-                keyOf: c => c.userId
+                keyOf: c => c.key   // Store 给每一行的 key（与它续页去重用的同一个）
             }
             ScrollBar.vertical: ScrollBar {}
             WheelScroll { flickable: list }
@@ -189,7 +189,7 @@ ScreenFrame {
                 verticalLayoutDirection: ListView.BottomToTop
                 model: GrowingModel {
                     values: page.thread.items
-                    keyOf: m => m.id > 0 ? String(m.id) : m.fromUserId + ":" + m.time + ":" + m.batchId
+                    keyOf: m => m.key   // Store 给每条消息的 key（没有 id 的消息用发送人、时间与批次）
                 }
                 ScrollBar.vertical: ScrollBar {}
                 WheelScroll { flickable: messages }

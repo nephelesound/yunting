@@ -40,93 +40,60 @@ QString pageKey(const QString &kind, double uid, int offset)
 
 void Store::requestUserFollows(double uid, int offset)
 {
-    if (uid <= 0)
-        return;
-    const quint64 epoch = m_epoch;
-    const quint64 token = offset > 0 ? m_requests.token(QStringLiteral("userFollows"))
-                                     : m_requests.begin(QStringLiteral("userFollows"));
-    m_client->get(QStringLiteral("api/user/getfollows/%1").arg(qlonglong(uid)),
-                  query({{"offset", QString::number(offset)}, {"limit", "30"}, {"order", "true"}}), true,
-                  [this, uid, offset, epoch, token](const QJsonDocument &doc, bool ok) {
-        if (epoch != m_epoch || !m_requests.current(QStringLiteral("userFollows"), token))
-            return;
-        const QJsonObject r = body(doc);
-        const QString restricted = Store::privacyMessage(r);
-        if (!restricted.isEmpty()) {
-            const QString key = pageKey(QStringLiteral("userFollows"), uid, offset);
-            put("userFollows", QVariantMap{{"userId", uid}, {"offset", offset},
-                                           {"more", false}, {"items", QVariantList{}},
-                                           {"restricted", true}, {"message", restricted}}, false);
-            emit requestRestricted(key, restricted);
-            return;
-        }
-        const QString failure = requestFailure(doc, ok);
-        if (!failure.isEmpty()) {
-            emit requestFailed(pageKey(QStringLiteral("userFollows"), uid, offset), failure);
-            return;
-        }
-        const auto parsed = sdk::parseUserFollows(r);
-        if (!parsed) {
-            emit requestFailed(pageKey(QStringLiteral("userFollows"), uid, offset),
-                               QStringLiteral("暂时取不到关注列表"));
-            return;
-        }
-        QVariantList items;
-        if (offset > 0) {
-            const QVariant old = m_data.value("userFollows");
-            if (old.toMap().value("userId").toDouble() == uid)
-                items = old.toMap().value("items").toList();
-        }
-        for (const sdk::SocialUser &user : parsed.value->items)
-            items.append(socialUser(user));
-        put("userFollows", QVariantMap{{"userId", uid}, {"offset", offset},
-                                       {"more", parsed.value->more}, {"items", items}}, false);
-    });
+    requestPeople("userFollows", QStringLiteral("api/user/getfollows/%1"), sdk::parseUserFollows,
+                  QStringLiteral("暂时取不到关注列表"), uid, offset, /*newestFirst=*/true);
 }
 
 void Store::requestUserFolloweds(double uid, int offset)
 {
+    requestPeople("userFolloweds", QStringLiteral("api/user/getfolloweds/%1"), sdk::parseUserFolloweds,
+                  QStringLiteral("暂时取不到粉丝列表"), uid, offset, /*newestFirst=*/false);
+}
+
+// 关注 / 粉丝：同一种分页（每页 30）。第一页开新一代（换了人，旧的回包作废）；续页经 putPage
+// 按 id 去重接在后面：同一页回来两次（滚到底触发了两次、点了重试）也不会出现重复的人
+void Store::requestPeople(const char *slot, const QString &path,
+                          sdk::Result<sdk::FollowPage> (*parse)(const QJsonObject &),
+                          const QString &failText, double uid, int offset, bool newestFirst)
+{
     if (uid <= 0)
         return;
+    const QString kind = QLatin1String(slot);
     const quint64 epoch = m_epoch;
-    const quint64 token = offset > 0 ? m_requests.token(QStringLiteral("userFolloweds"))
-                                     : m_requests.begin(QStringLiteral("userFolloweds"));
-    m_client->get(QStringLiteral("api/user/getfolloweds/%1").arg(qlonglong(uid)),
-                  query({{"offset", QString::number(offset)}, {"limit", "30"}}), true,
-                  [this, uid, offset, epoch, token](const QJsonDocument &doc, bool ok) {
-        if (epoch != m_epoch || !m_requests.current(QStringLiteral("userFolloweds"), token))
+    const quint64 token = offset > 0 ? m_requests.token(kind) : m_requests.begin(kind);
+    QUrlQuery params = query({{"offset", QString::number(offset)}, {"limit", "30"}});
+    if (newestFirst)
+        params.addQueryItem(QStringLiteral("order"), QStringLiteral("true"));
+    m_client->get(path.arg(qlonglong(uid)), params, true,
+                  [this, slot, kind, parse, failText, uid, offset, epoch, token](const QJsonDocument &doc, bool ok) {
+        if (epoch != m_epoch || !m_requests.current(kind, token))
             return;
         const QJsonObject r = body(doc);
         const QString restricted = Store::privacyMessage(r);
         if (!restricted.isEmpty()) {
-            const QString key = pageKey(QStringLiteral("userFolloweds"), uid, offset);
-            put("userFolloweds", QVariantMap{{"userId", uid}, {"offset", offset},
-                                             {"more", false}, {"items", QVariantList{}},
-                                             {"restricted", true}, {"message", restricted}}, false);
-            emit requestRestricted(key, restricted);
+            put(slot, QVariantMap{{"userId", uid}, {"offset", offset},
+                                  {"more", false}, {"items", QVariantList{}},
+                                  {"restricted", true}, {"message", restricted}}, false);
+            emit requestRestricted(pageKey(kind, uid, offset), restricted);
             return;
         }
         const QString failure = requestFailure(doc, ok);
         if (!failure.isEmpty()) {
-            emit requestFailed(pageKey(QStringLiteral("userFolloweds"), uid, offset), failure);
+            emit requestFailed(pageKey(kind, uid, offset), failure);
             return;
         }
-        const auto parsed = sdk::parseUserFolloweds(r);
+        const auto parsed = parse(r);
         if (!parsed) {
-            emit requestFailed(pageKey(QStringLiteral("userFolloweds"), uid, offset),
-                               QStringLiteral("暂时取不到粉丝列表"));
+            emit requestFailed(pageKey(kind, uid, offset), failText);
             return;
         }
         QVariantList items;
-        if (offset > 0) {
-            const QVariant old = m_data.value("userFolloweds");
-            if (old.toMap().value("userId").toDouble() == uid)
-                items = old.toMap().value("items").toList();
-        }
         for (const sdk::SocialUser &user : parsed.value->items)
             items.append(socialUser(user));
-        put("userFolloweds", QVariantMap{{"userId", uid}, {"offset", offset},
-                                         {"more", parsed.value->more}, {"items", items}}, false);
+        const bool samePerson = m_data.value(kind).toMap().value("userId").toDouble() == uid;
+        putPage(slot, QVariantMap{{"userId", uid}, {"offset", offset},
+                                  {"more", parsed.value->more}, {"items", items}},
+                offset > 0 && samePerson, false);
     });
 }
 

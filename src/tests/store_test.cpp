@@ -1232,6 +1232,12 @@ private slots:
         const QVariantList items = m_store->data().value("userFollows").toMap().value("items").toList();
         QCOMPARE(items.at(0).toMap().value("mutual").toBool(), true);
         QCOMPARE(items.at(1).toMap().value("name").toString(), QStringLiteral("B"));
+        QVERIFY(m_api->requests.last().query.contains("order=true"));   // 关注按新到旧
+
+        // 同一页回来第二次（滚到底触发了两次、点了重试）：不会出现重复的人
+        m_store->request(QStringLiteral("userFollows:42:30"));
+        QTest::qWait(150);
+        QCOMPARE(m_store->data().value("userFollows").toMap().value("items").toList().size(), 2);
 
         failSecond = true;
         m_store->request(QStringLiteral("userFollows:42:30"));
@@ -1289,6 +1295,17 @@ private slots:
         QCOMPARE(m.value("fromUserId").toDouble(), 7.0);
         QCOMPARE(m.value("mine").toBool(), false);
         QCOMPARE(m.value("message").toMap().value("text").toString(), QStringLiteral("hello"));
+
+        // 每一行带 key（界面的列表模型与续页去重认的是同一个）；续页回来已有的行不会重复
+        QCOMPARE(c.value("key").toString(), QStringLiteral("7"));
+        QVERIFY(!m.value("key").toString().isEmpty());
+        const int before = m_api->requests.size();
+        m_store->request(QStringLiteral("inbox:1"));
+        m_store->request(QStringLiteral("inboxThread:7:%1").arg(qlonglong(m.value("time").toDouble())));
+        QVERIFY(waitUntil([&] { return m_api->requests.size() >= before + 2; }));
+        QTest::qWait(150);
+        QCOMPARE(m_store->data().value("inbox").toMap().value("items").toList().size(), 1);
+        QCOMPARE(m_store->data().value("inboxThread").toMap().value("items").toList().size(), 1);
     }
 
     // 统计 / 通知 / 等级 / 逐字歌词 / 楼中楼：归一化字段与请求 key 的回归

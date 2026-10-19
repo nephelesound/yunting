@@ -582,14 +582,14 @@ Item {
         // 从一段长对话切到另一段：列表重建前旧的委托会用新列表读一次、下标越界。
         // 曾经回退成 {}，每个字段都是 undefined，日志里一串「Unable to assign [undefined]」和 TypeError
         function test_switchingConversationLogsNothing() {
-            const message = (id, text) => ({ id: id, fromUserId: 5, fromName: "Jo", fromAvatar: "", mine: false,
+            const message = (id, text) => ({ key: String(id), id: id, fromUserId: 5, fromName: "Jo", fromAvatar: "", mine: false,
                                              time: 1700000000000 + id, batchId: "", message: { kind: "text", text: text } });
             const saved = Source.snapshot;
             Source.snapshot = {
                 data: Object.assign({}, saved.data, {
                     inbox: { unread: 0, more: false, items: [
-                        { userId: 5, name: "Jo", avatar: "", lastText: "三", lastTime: 1, unread: 0 },
-                        { userId: 6, name: "Al", avatar: "", lastText: "", lastTime: 1, unread: 0 }] },
+                        { key: "5", userId: 5, name: "Jo", avatar: "", lastText: "三", lastTime: 1, unread: 0 },
+                        { key: "6", userId: 6, name: "Al", avatar: "", lastText: "", lastTime: 1, unread: 0 }] },
                     inboxThread: { userId: 5, before: 0, more: false,
                                    items: [message(1, "一"), message(2, "二"), message(3, "三")] },
                 }),

@@ -24,6 +24,8 @@ class QTimer;
 
 namespace ncm::sdk {
 struct Error;
+struct FollowPage;
+template <typename T> struct Result;
 }
 
 // 一个数据槽的请求代号。页面切换会开始新代号；旧请求晚到时凭代号丢弃，
@@ -239,6 +241,9 @@ private:
     // -- 社交：关注/粉丝/等级/收藏计数；列表只读，不做关注写
     void requestUserFollows(double uid, int offset);
     void requestUserFolloweds(double uid, int offset);
+    void requestPeople(const char *slot, const QString &path,
+                       ncm::sdk::Result<ncm::sdk::FollowPage> (*parse)(const QJsonObject &),
+                       const QString &failText, double uid, int offset, bool newestFirst);
     void requestUserLevel();
     void requestUserSubcount();
     // -- 用户动态：需要登录；别人的主页也能看。cursor 为第一页时传 SDK 的初始值 -1

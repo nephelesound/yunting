@@ -91,6 +91,7 @@ QVariantMap normalizeConversation(const QJsonObject &c, double me)
     if (payload.isEmpty())
         payload = parsePayload(user.value("lastMsg").toString());
     return {
+        {"key", QString::number(qlonglong(other.value("userId").toDouble()))},   // 列表里认同一行（见 Store::putPage）
         {"userId", other.value("userId").toDouble()},
         {"name", other.value("nickname").toString()},
         {"avatar", ncmSized(other.value("avatarUrl"), 96)},
@@ -123,6 +124,12 @@ QVariantMap normalizeMessage(const QJsonObject &m, double me)
         {"batchId", m.value("batchId").toDouble()},
     };
     out.insert("message", normalizePayload(payload));
+    // 列表里认同一条（见 Store::putPage）：有些消息没有 id，用发送人、时间与批次
+    const qint64 id = qint64(out.value("id").toDouble());
+    out.insert("key", id > 0 ? QString::number(id)
+                             : QStringLiteral("%1:%2:%3").arg(qlonglong(out.value("fromUserId").toDouble()))
+                                   .arg(qlonglong(out.value("time").toDouble()))
+                                   .arg(qlonglong(out.value("batchId").toDouble())));
     return out;
 }
 } // namespace
@@ -149,19 +156,16 @@ void Store::requestInbox(int offset)
         }
         const QJsonObject resp = response.doc.object();
         QVariantList items;
-        if (offset > 0) {
-            const QVariant raw = m_data.value("inbox");
-            if (raw.isValid() && !raw.isNull())
-                items = raw.toMap().value("items").toList();
-        }
         for (const QJsonValue &v : arr(resp, "msgs"))
             items.append(normalizeConversation(v.toObject(), m_accountUid));
-        put("inbox", QVariantMap{
+        // 续页按 key 去重接在后面：同一页回来两次也不会重复
+        const QVariant old = m_data.value("inbox");
+        putPage("inbox", QVariantMap{
             {"offset", offset},
             {"unread", resp.value("newMsgCount").toDouble()},
             {"more", resp.value("more").toBool()},
             {"items", items},
-        }, false);
+        }, offset > 0 && old.isValid() && !old.isNull(), false);
     });
 }
 
@@ -191,22 +195,18 @@ void Store::requestInboxThread(double userId, qint64 before)
         }
         const QJsonObject resp = response.doc.object();
         QVariantList items;
-        if (before > 0) {
-            const QVariant raw = m_data.value("inboxThread");
-            if (raw.isValid() && !raw.isNull()
-                && raw.toMap().value("userId").toDouble() == userId)
-                items = raw.toMap().value("items").toList();
-        }
         for (const QJsonValue &v : arr(resp, "msgs"))
             items.append(normalizeMessage(v.toObject(), m_accountUid));
         const QJsonArray msgs = arr(resp, "msgs");
         const qint64 next = msgs.isEmpty() ? before
                                           : qint64(msgs.last().toObject().value("time").toDouble());
-        put("inboxThread", QVariantMap{
+        // 更早的一页按 key 去重接在后面（只接同一个人的）：同一页回来两次也不会重复
+        const bool samePerson = m_data.value("inboxThread").toMap().value("userId").toDouble() == userId;
+        putPage("inboxThread", QVariantMap{
             {"userId", userId},
             {"before", next},
             {"more", resp.value("more").toBool()},
             {"items", items},
-        }, false);
+        }, before > 0 && samePerson, false);
     });
 }
