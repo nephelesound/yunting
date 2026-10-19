@@ -9,6 +9,7 @@
 #include "sdk/lyrics.h"
 #include "sdk/comment.h"
 #include "sdk/mv_page.h"
+#include "sdk/pendant.h"
 #include "sdk/search_default.h"
 #include "sdk/search_people.h"
 #include "sdk/track.h"
@@ -125,6 +126,8 @@ void Store::request(const QString &key)
              s.requestSimilarPlaylists(k, k.section(u':', 1).toDouble()); }},
         {QStringLiteral("defaultSearch"), [](Store &s, const QString &) {
              s.requestDefaultSearch(); }},
+        {QStringLiteral("avatarPendant"), [](Store &s, const QString &) {
+             s.requestAvatarPendant(); }},
         {QStringLiteral("artistSongs:"), [](Store &s, const QString &k) {
              const QStringList parts = k.split(u':');
              s.requestArtistSongs(k, parts.value(1).toDouble(), parts.value(2).toInt()); }},
@@ -405,6 +408,37 @@ void Store::requestSearch(const QString &key, const QString &raw)
             if (generation == m_searchGeneration)
                 put("search", result, false);
         });
+}
+
+// 当前账号正在佩戴的头像挂件。profile/account 接口都不带这个字段；没有挂件时
+// 服务端会返回 data.pendantData=null，这里落成 null 而不是失败。
+void Store::requestAvatarPendant()
+{
+    if (!m_client->hasMusicU())
+        return;
+    const quint64 token = m_requests.begin(QStringLiteral("avatarPendant"));
+    const quint64 epoch = m_epoch;
+    sdk::fetchAvatarPendant(*m_client, this,
+        [this, token, epoch](sdk::Result<sdk::AvatarPendant> result) {
+        if (epoch != m_epoch || !m_requests.current(QStringLiteral("avatarPendant"), token))
+            return;
+        if (!result) {
+            put("avatarPendant", QVariant::fromValue(nullptr), false);
+            return;
+        }
+        const sdk::AvatarPendant &p = *result.value;
+        put("avatarPendant", QVariantMap{
+            {"id", static_cast<double>(p.id)},
+            {"name", p.name},
+            {"imageUrl", p.imageUrl},
+            {"imageAndroidUrl", p.androidUrl},
+            {"imageIosUrl", p.iosUrl},
+            {"imagePCUrl", p.pcUrl},
+            {"previewImageUrl", p.previewUrl},
+            {"type", p.type},
+            {"status", p.status},
+        }, false);
+    });
 }
 
 // 搜索框为空时的默认关键词/活动词。

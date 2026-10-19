@@ -113,6 +113,7 @@ Store::Store(NcmClient *client, QObject *parent)
         {"similarSongs", nullVariant()},
         {"similarPlaylists", nullVariant()},
         {"defaultSearch", nullVariant()},
+        {"avatarPendant", nullVariant()},
         {"lyricsNew", nullVariant()},
         // 匿名发现：形状见 docs/API-FRONTEND.md「已实现的新增数据槽」。没取之前是 null，[] 是取到了但为空
         {"searchSuggest", nullVariant()},
@@ -340,7 +341,7 @@ void Store::resetPersonal()
     put("userFollows", nullVariant(), false);
     put("userFolloweds", nullVariant(), false);
     // 动态、通知、收藏列表与动态封面都带着当前账号的私有状态
-    for (const char *key : {"userEvents", "notices", "commentNotices", "forwards", "dynamicCover"})
+    for (const char *key : {"userEvents", "notices", "commentNotices", "forwards", "dynamicCover", "avatarPendant"})
         put(key, nullVariant(), false);
     // 按需详情里的 followed / subscribed / liked 都带账号状态：换账号后不能继续显示上一号的结果
     put("comments", nullVariant(), false);

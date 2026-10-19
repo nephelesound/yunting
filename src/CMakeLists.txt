@@ -35,6 +35,7 @@ set(YUNTING_SDK_SOURCES
     sdk/search_suggest.h sdk/search_suggest.cpp
     sdk/notify.h sdk/notify.cpp
     sdk/search_default.h sdk/search_default.cpp
+    sdk/pendant.h sdk/pendant.cpp
     sdk/lyrics.h sdk/lyrics.cpp
     sdk/user_social.h sdk/user_social.cpp
     sdk/user_vip.h sdk/user_vip.cpp

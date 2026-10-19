@@ -216,6 +216,8 @@ private:
     void requestSimilarSongs(const QString &key, double songId);
     void requestSimilarPlaylists(const QString &key, double songId);
     void requestDefaultSearch();
+    // 当前登录用户正在佩戴的头像挂件；profile 接口不返回它。
+    void requestAvatarPendant();
     void requestArtist(const QString &key, double artistId);
     void requestArtistSongs(const QString &key, double artistId, int offset);
     void requestAlbum(const QString &key, double albumId);
