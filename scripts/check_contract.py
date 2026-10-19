@@ -32,9 +32,9 @@ EMPTY_OK = {
     "personal.cloud.tracks",
 }
 
-# 按 id 存的映射：键是歌曲 id，参照与 dump 取的不是同一首，只比每一项的形状（各取一项）。
-# 空映射同 EMPTY_OK：按需数据，dump 时没取到不算形状错误
-KEYED_BY_ID = {"data.lyrics"}
+# 按 id 存的映射（歌曲 / 歌手 / 专辑 / 用户 / MV）：参照与 dump 取的不是同一个 id，
+# 只比每一项的形状（各取一项）。空映射同 EMPTY_OK：按需数据，dump 时没取到不算形状错误
+KEYED_BY_ID = {"data.lyrics", "data.artist", "data.album", "data.user", "data.mv", "data.wiki"}
 
 # 首屏必有的列表；全空说明 dump 时没有网络（或请求全部失败），不是形状问题
 FIRST_SCREEN = ("toplists", "tracks", "hotSearches")

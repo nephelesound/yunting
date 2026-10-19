@@ -77,6 +77,11 @@
 | `data.userLevel` | `userLevel` | `{ level,nowPlayCount,nextPlayCount,nowLoginCount,nextLoginCount,progress,info }` |
 | `data.userSubcount` | `userSubcount` | `{ artistCount,createdPlaylistCount,subPlaylistCount,mvCount,djRadioCount }` |
 | `data.commentReplies` | `commentReplies:<songId>:<commentId>[:<before>]` | `{ songId,commentId,before,more,items:[评论字段] }` |
+| `data.artist` | `artist:<id>` | 按 id 存：`{ "<artistId>": { id,name,cover,alias,description,followed,musicSize,albumSize,tracks[],albums[] } }`，只留最近 8 个 id |
+| `data.album` | `album:<id>` | 按 id 存：`{ "<albumId>": { id,name,artist,artistId,cover,description,company,subscribed,publishTime,tracks[] } }`，只留最近 8 个 id |
+| `data.user` | `user:<id>` | 按 id 存：`{ "<uid>": { id,name,avatar,signature,followed,follows,followeds,playlistCount,vipType,level,listenSongs,playlists[] } }`，只留最近 8 个 id；隐私拒绝时该项带 `restricted` / `message` |
+| `data.mv` | `mv:<id>` | 按 id 存：`{ "<mvId>": { id,name,cover,artist,artistId,duration,playCount,subCount,shareCount,commentCount,publishTime,description,subscribed,url,br,size,expires,urlPending } }`，只留最近 8 个 id；每次打开都重新取签名地址 |
+| `data.wiki` | `wiki:<songId>` | 按 id 存：`{ "<songId>": { songId,loaded,songName,description,memory,chorus,basic[],creators[],mvs[],reviews[],sheets[],entertainments[],awards[] } }`，只留最近 8 个 id |
 | `data.lyrics` | `lyrics:<songId>` | 按歌存：`{ "<songId>": { lines:[{t,text,tr}], pureMusic } }`，只留最近 8 首；`pureMusic` 为 true 表示纯音乐（空歌词是正确结果，界面说「纯音乐，请欣赏」）。几处同时要不同歌的歌词各取各的 |
 | `data.lyricsNew` | `lyricsNew:<songId>` | `{ songId,lrc,tlyric,yrc,klyric,romalrc,lines:[{t,text,tr}] }` |
 | `data.searchSuggest` | `searchSuggest:<query>` | `{ query,order[],songs:[{id,name,artist,album}],artists:[{id,name,cover}],albums:[{id,name,artist,artistId}],playlists:[{id,name,cover,count}] }`；最新请求的查询优先，不落盘 |

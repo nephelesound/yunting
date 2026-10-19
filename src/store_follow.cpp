@@ -60,10 +60,11 @@ void Store::setArtistSubscribed(double id, bool subscribed)
                 QJsonObject{{"artistId", num(id)},
                             {"artistIds", QStringLiteral("[%1]").arg(num(id))}},
                 action, [this, id, subscribed] {
-        QVariantMap artist = m_data.value("artist").toMap();
-        if (artist.value("id").toDouble() == id) {
+        const QString key = num(id);
+        QVariantMap artist = m_data.value("artist").toMap().value(key).toMap();
+        if (!artist.isEmpty()) {
             artist.insert("followed", subscribed);
-            put("artist", artist, false);
+            putKeyed("artist", key, artist);
         }
         m_cache.forget(QStringLiteral("artist:") + num(id));
         updateSaved("savedArtists", id, subscribed);
@@ -78,10 +79,11 @@ void Store::setAlbumSubscribed(double id, bool subscribed)
     debounceWrite(QStringLiteral("follow:album:") + num(id), [this, id, subscribed, action] {
         followWrite(subscribed ? QStringLiteral("album/sub") : QStringLiteral("album/unsub"),
                 QJsonObject{{"id", num(id)}}, action, [this, id, subscribed] {
-        QVariantMap album = m_data.value("album").toMap();
-        if (album.value("id").toDouble() == id) {
+        const QString key = num(id);
+        QVariantMap album = m_data.value("album").toMap().value(key).toMap();
+        if (!album.isEmpty()) {
             album.insert("subscribed", subscribed);
-            put("album", album, false);
+            putKeyed("album", key, album);
         }
         m_cache.forget(QStringLiteral("album:") + num(id));
         updateSaved("savedAlbums", id, subscribed);
@@ -115,15 +117,16 @@ void Store::setUserFollowed(double userId, bool followed)
         // 与关注歌手一样：缓存里的主页还是旧的关注状态，下次打开要重新取
         m_cache.forget(QStringLiteral("user:") + num(userId));
 
-        QVariantMap user = m_data.value("user").toMap();
-        if (user.value("id").toDouble() == userId) {
+        const QString key = num(userId);
+        QVariantMap user = m_data.value("user").toMap().value(key).toMap();
+        if (!user.isEmpty()) {
             const bool was = user.value("followed").toBool();
             user.insert("followed", state);
             if (was != state) {
                 const double followers = user.value("followeds").toDouble();
                 user.insert("followeds", std::max(0.0, followers + (state ? 1.0 : -1.0)));
             }
-            put("user", user, false);
+            putKeyed("user", key, user);
         }
 
         // 关注/粉丝列表里的同一个人同步成新状态，不必等重新翻页。

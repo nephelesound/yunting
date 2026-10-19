@@ -247,6 +247,208 @@ private slots:
         QVERIFY(!lyricsOf(22).isEmpty());
     }
 
+    // 两个歌手页同时开着：各自的详情按 id 存，互不覆盖；已经取到的 id 再要不会再发请求
+    void artistSlotsCoexistByArtistId()
+    {
+        QHash<QString, int> requests;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            const QString path = QString::fromLatin1(req.path);
+            if (path.startsWith(QStringLiteral("/api/v1/artist/"))) {
+                ++requests[path];
+                const int id = path.section(u'/', -1).toInt();
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"artist", QJsonObject{{"id", id}, {"name", QStringLiteral("A%1").arg(id)},
+                                           {"alias", QJsonArray{}}, {"picUrl", ""},
+                                           {"briefDesc", ""}, {"followed", false},
+                                           {"musicSize", 0}, {"albumSize", 0}}},
+                    {"hotSongs", QJsonArray{}}}));
+                return;
+            }
+            if (path.startsWith(QStringLiteral("/api/artist/albums/"))) {
+                ++requests[path];
+                respond(200, json(QJsonObject{{"code", 200}, {"hotAlbums", QJsonArray{}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        const auto entry = [this](const QString &id) {
+            return m_store->data().value("artist").toMap().value(id).toMap();
+        };
+        m_store->request(QStringLiteral("artist:1"));
+        m_store->request(QStringLiteral("artist:2"));
+        QVERIFY(waitUntil([&] {
+            return entry(QStringLiteral("1")).value("name").toString() == QLatin1String("A1")
+                && entry(QStringLiteral("2")).value("name").toString() == QLatin1String("A2");
+        }));
+
+        const int before = requests.value(QStringLiteral("/api/v1/artist/1"));
+        QCOMPARE(before, 1);
+        m_store->request(QStringLiteral("artist:1"));
+        QTest::qWait(150);
+        QCOMPARE(requests.value(QStringLiteral("/api/v1/artist/1")), before);
+        QCOMPARE(entry(QStringLiteral("2")).value("name").toString(), QStringLiteral("A2"));
+    }
+
+    // 两个专辑页同时开着：各自的详情按 id 存；已经取到的 id 再要不会再发请求
+    void albumSlotsCoexistByAlbumId()
+    {
+        QHash<QString, int> requests;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            const QString path = QString::fromLatin1(req.path);
+            if (path.startsWith(QStringLiteral("/api/v1/album/"))) {
+                ++requests[path];
+                const int id = path.section(u'/', -1).toInt();
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"album", QJsonObject{{"id", id}, {"name", QStringLiteral("B%1").arg(id)},
+                                          {"artists", QJsonArray{}}, {"publishTime", 0}}},
+                    {"songs", QJsonArray{}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        const auto entry = [this](const QString &id) {
+            return m_store->data().value("album").toMap().value(id).toMap();
+        };
+        m_store->request(QStringLiteral("album:1"));
+        m_store->request(QStringLiteral("album:2"));
+        QVERIFY(waitUntil([&] {
+            return entry(QStringLiteral("1")).value("name").toString() == QLatin1String("B1")
+                && entry(QStringLiteral("2")).value("name").toString() == QLatin1String("B2");
+        }));
+
+        const int before = requests.value(QStringLiteral("/api/v1/album/1"));
+        QCOMPARE(before, 1);
+        m_store->request(QStringLiteral("album:1"));
+        QTest::qWait(150);
+        QCOMPARE(requests.value(QStringLiteral("/api/v1/album/1")), before);
+        QCOMPARE(entry(QStringLiteral("2")).value("name").toString(), QStringLiteral("B2"));
+    }
+
+    // 两个用户主页同时开着：资料按 id 存；已经取到的 id 再要不会再发请求
+    void userSlotsCoexistByUserId()
+    {
+        QHash<QString, int> requests;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            const QString path = QString::fromLatin1(req.path);
+            if (path.startsWith(QStringLiteral("/weapi/v1/user/detail/"))) {
+                ++requests[path];
+                const int id = path.section(u'/', -1).toInt();
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"profile", QJsonObject{{"userId", id},
+                                            {"nickname", QStringLiteral("U%1").arg(id)},
+                                            {"avatarUrl", ""}}}}));
+                return;
+            }
+            if (path == QLatin1String("/weapi/user/playlist")) {
+                respond(200, json(QJsonObject{{"code", 200}, {"playlist", QJsonArray{}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        const auto entry = [this](const QString &id) {
+            return m_store->data().value("user").toMap().value(id).toMap();
+        };
+        m_store->request(QStringLiteral("user:1"));
+        m_store->request(QStringLiteral("user:2"));
+        QVERIFY(waitUntil([&] {
+            return entry(QStringLiteral("1")).value("name").toString() == QLatin1String("U1")
+                && entry(QStringLiteral("2")).value("name").toString() == QLatin1String("U2");
+        }));
+
+        const int before = requests.value(QStringLiteral("/weapi/v1/user/detail/1"));
+        QCOMPARE(before, 1);
+        m_store->request(QStringLiteral("user:1"));
+        QTest::qWait(150);
+        QCOMPARE(requests.value(QStringLiteral("/weapi/v1/user/detail/1")), before);
+        QCOMPARE(entry(QStringLiteral("2")).value("name").toString(), QStringLiteral("U2"));
+    }
+
+    // 两个 MV 页同时开着：详情按 id 存；已取到的详情不再重取（签名地址仍按设计每次打开重取）
+    void mvSlotsCoexistByMvId()
+    {
+        int detailRequests = 0;
+        int urlRequests = 0;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/weapi/v1/mv/detail") {
+                const double id = ++detailRequests == 1 ? 7.0 : 8.0;
+                respond(200, json(QJsonObject{
+                    {"code", 200}, {"subed", false},
+                    {"data", QJsonObject{
+                        {"id", id}, {"name", QStringLiteral("MV%1").arg(qlonglong(id))},
+                        {"cover", "http://cover"}, {"artistName", "A"}, {"artistId", 9},
+                        {"duration", 120000}, {"playCount", 1}, {"subCount", 2},
+                        {"shareCount", 3}, {"commentCount", 4},
+                        {"publishTime", "2020-01-01"}, {"desc", "d"}}}}));
+                return;
+            }
+            if (req.path == "/weapi/song/enhance/play/mv/url") {
+                ++urlRequests;
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"data", QJsonObject{{"code", 200},
+                                         {"url", QStringLiteral("http://media/%1").arg(urlRequests)},
+                                         {"r", 1080}, {"size", 100}, {"expi", 1}}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        const auto entry = [this](const QString &id) {
+            return m_store->data().value("mv").toMap().value(id).toMap();
+        };
+        m_store->request(QStringLiteral("mv:7"));
+        QVERIFY(waitUntil([&] { return !entry(QStringLiteral("7")).value("url").toString().isEmpty(); }));
+        m_store->request(QStringLiteral("mv:8"));
+        QVERIFY(waitUntil([&] { return !entry(QStringLiteral("8")).value("url").toString().isEmpty(); }));
+        QCOMPARE(detailRequests, 2);
+        QCOMPARE(entry(QStringLiteral("7")).value("name").toString(), QStringLiteral("MV7"));
+        QCOMPARE(entry(QStringLiteral("8")).value("name").toString(), QStringLiteral("MV8"));
+
+        m_store->request(QStringLiteral("mv:7"));
+        QVERIFY(waitUntil([&] { return urlRequests == 3; }));
+        QCOMPARE(detailRequests, 2);   // 详情仍是缓存里的那份
+        QCOMPARE(entry(QStringLiteral("8")).value("name").toString(), QStringLiteral("MV8"));
+    }
+
+    // 两首歌的百科同时开着：各按 songId 存；已取到的 id 再要不会再发请求
+    void wikiSlotsCoexistBySongId()
+    {
+        int wikiRequests = 0;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/link/page/parent/relation/construct/info") {
+                ++wikiRequests;
+                respond(200, json(QJsonObject{{"code", 200},
+                                              {"data", QJsonObject{{"blocks", QJsonArray{}}}}}));
+                return;
+            }
+            if (req.path == "/api/song/creators" || req.path == "/api/song/chorus") {
+                respond(200, "{\"code\":200}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        const auto entry = [this](const QString &id) {
+            return m_store->data().value("wiki").toMap().value(id).toMap();
+        };
+        m_store->request(QStringLiteral("wiki:1"));
+        QVERIFY(waitUntil([&] { return entry(QStringLiteral("1")).value("loaded").toBool(); }));
+        m_store->request(QStringLiteral("wiki:2"));
+        QVERIFY(waitUntil([&] { return entry(QStringLiteral("2")).value("loaded").toBool(); }));
+        QCOMPARE(wikiRequests, 2);
+
+        m_store->request(QStringLiteral("wiki:1"));
+        QTest::qWait(150);
+        QCOMPARE(wikiRequests, 2);
+        QCOMPARE(entry(QStringLiteral("2")).value("songId").toDouble(), 2.0);
+    }
+
     // 没有 pureMusic/nolyric 标记的空歌词可能是瞬时空包：不能永久缓存成「暂无歌词」
     void unexplainedEmptyLyricsIsNotCached()
     {
@@ -357,7 +559,7 @@ private slots:
         QVERIFY(waitUntil([&] { return restricted.count() == 1; }));
         QCOMPARE(failed.count(), 0);
         QCOMPARE(restricted.first().at(0).toString(), QStringLiteral("user:9"));
-        const QVariantMap user = m_store->data().value("user").toMap();
+        const QVariantMap user = m_store->data().value("user").toMap().value("9").toMap();
         QCOMPARE(user.value("id").toDouble(), 9.0);
         QCOMPARE(user.value("restricted").toBool(), true);
         QCOMPARE(user.value("message").toString(), QStringLiteral("用户隐私无权限查看"));
@@ -388,40 +590,6 @@ private slots:
         QVERIFY(pollHasType);
         QCOMPARE(m_client->cookieJar().value("MUSIC_U"), QStringLiteral("session-cookie"));
         QCOMPARE(m_client->cookieJar().value("__csrf"), QStringLiteral("session-csrf"));
-    }
-
-    // 旧页面的回包晚于新页面时必须丢弃：单槽数据由最新请求代号拥有。
-    void staleAlbumResponseCannotOverwriteNewSlot()
-    {
-        FakeApi::Responder first;
-        FakeApi::Responder second;
-        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
-            if (req.path == "/api/v1/album/1") {
-                first = respond;
-                return;
-            }
-            if (req.path == "/api/v1/album/2") {
-                second = respond;
-                return;
-            }
-            respond(200, "{\"code\":200}");
-        };
-
-        m_store->request(QStringLiteral("album:1"));
-        QVERIFY(waitUntil([&] { return static_cast<bool>(first); }));
-        m_store->request(QStringLiteral("album:2"));
-        QVERIFY(waitUntil([&] { return static_cast<bool>(second); }));
-
-        second(200, json(QJsonObject{
-            {"code", 200}, {"album", QJsonObject{{"id", 2}, {"name", "B"},
-                {"artists", QJsonArray{}}, {"publishTime", 0}}}, {"songs", QJsonArray{}}}));
-        QVERIFY(waitUntil([&] { return m_store->data().value("album").toMap().value("id").toDouble() == 2; }));
-
-        first(200, json(QJsonObject{
-            {"code", 200}, {"album", QJsonObject{{"id", 1}, {"name", "A"},
-                {"artists", QJsonArray{}}, {"publishTime", 0}}}, {"songs", QJsonArray{}}}));
-        QTest::qWait(150);
-        QCOMPARE(m_store->data().value("album").toMap().value("id").toDouble(), 2.0);
     }
 
     // 页面退栈时 id 会短暂归零：这些 key 不能发网络请求，也不能报失败。
@@ -1350,11 +1518,11 @@ private slots:
         };
         m_store->request(QStringLiteral("user:42"));
         QVERIFY(waitUntil([&] {
-            const QVariantMap u = m_store->data().value("user").toMap();
+            const QVariantMap u = m_store->data().value("user").toMap().value("42").toMap();
             return u.value("name").toString() == "Listener"
                 && u.value("playlists").toList().size() == 1;
         }));
-        const QVariantMap u = m_store->data().value("user").toMap();
+        const QVariantMap u = m_store->data().value("user").toMap().value("42").toMap();
         QCOMPARE(u.value("id").toDouble(), 42.0);
         QCOMPARE(u.value("follows").toDouble(), 3.0);
         QCOMPARE(u.value("level").toDouble(), 9.0);
@@ -1718,11 +1886,11 @@ private slots:
         };
 
         const auto url = [this] {
-            return m_store->data().value("mv").toMap().value("url").toString();
+            return m_store->data().value("mv").toMap().value("7").toMap().value("url").toString();
         };
 
         const auto urlPending = [this] {
-            return m_store->data().value("mv").toMap().value("urlPending").toBool();
+            return m_store->data().value("mv").toMap().value("7").toMap().value("urlPending").toBool();
         };
 
         m_store->request(QStringLiteral("mv:7"));
@@ -2027,9 +2195,9 @@ private slots:
             return m_store->personal().value("playlistDetails").toMap()
                        .value(QStringLiteral("601")).toMap().value("name").toString()
                        == QLatin1String("P")
-                && m_store->data().value("album").toMap().value("name").toString()
+                && m_store->data().value("album").toMap().value("123").toMap().value("name").toString()
                        == QLatin1String("A")
-                && m_store->data().value("artist").toMap().value("name").toString()
+                && m_store->data().value("artist").toMap().value("321").toMap().value("name").toString()
                        == QLatin1String("Ar");
         };
 
@@ -2198,10 +2366,10 @@ private slots:
 
         m_store->request(QStringLiteral("wiki:9"));
         QVERIFY(waitUntil([&] {
-            const QVariantMap wiki = m_store->data().value("wiki").toMap();
+            const QVariantMap wiki = m_store->data().value("wiki").toMap().value("9").toMap();
             return wiki.value("songId").toDouble() == 9 && wiki.value("loaded").toBool();
         }));
-        const QVariantMap wiki = m_store->data().value("wiki").toMap();
+        const QVariantMap wiki = m_store->data().value("wiki").toMap().value("9").toMap();
         QCOMPARE(wiki.value("songName").toString(), QStringLiteral("ALIVE"));
         QCOMPARE(wiki.value("description").toString(), QStringLiteral("一首动画片头曲。"));
         QCOMPARE(wiki.value("basic").toList().size(), 2);
@@ -2780,7 +2948,7 @@ private slots:
         m_store->request(QStringLiteral("userFollows:900042"));
         m_store->request(QStringLiteral("userFolloweds:900042"));
         QVERIFY(waitUntil([&] {
-            return m_store->data().value("user").toMap().value("id").toDouble() == 900042
+            return m_store->data().value("user").toMap().value("900042").toMap().value("id").toDouble() == 900042
                 && m_store->data().value("userFollows").toMap().value("items").toList().size() == 2
                 && m_store->data().value("userFolloweds").toMap().value("items").toList().size() == 1;
         }));
@@ -2792,8 +2960,8 @@ private slots:
         QVERIFY(waitUntil([&] { return changed.count() == 1; }));
         QCOMPARE(changed.first().at(0).toDouble(), 900007.0);
         QCOMPARE(changed.first().at(1).toBool(), true);
-        QCOMPARE(m_store->data().value("user").toMap().value("followed").toBool(), false);
-        QCOMPARE(m_store->data().value("user").toMap().value("followeds").toDouble(), 5.0);
+        QCOMPARE(m_store->data().value("user").toMap().value("900042").toMap().value("followed").toBool(), false);
+        QCOMPARE(m_store->data().value("user").toMap().value("900042").toMap().value("followeds").toDouble(), 5.0);
         QCOMPARE(m_store->data().value("userFollows").toMap().value("items").toList()
                      .at(0).toMap().value("followed").toBool(), true);
         QCOMPARE(m_store->data().value("userFollows").toMap().value("items").toList()
@@ -2804,8 +2972,8 @@ private slots:
         // 关注当前被查看的用户：资料槽与粉丝数一起更新
         m_store->setUserFollowed(900042, true);
         QVERIFY(waitUntil([&] { return changed.count() == 2; }));
-        QCOMPARE(m_store->data().value("user").toMap().value("followed").toBool(), true);
-        QCOMPARE(m_store->data().value("user").toMap().value("followeds").toDouble(), 6.0);
+        QCOMPARE(m_store->data().value("user").toMap().value("900042").toMap().value("followed").toBool(), true);
+        QCOMPARE(m_store->data().value("user").toMap().value("900042").toMap().value("followeds").toDouble(), 6.0);
 
         m_store->setUserFollowed(900008, true);
         QVERIFY(waitUntil([&] { return failed.count() == 1; }));

@@ -8158,15 +8158,17 @@ var hotSearches = [
  }
 ]
 
-var artist = null
+var artist = {}
 
 var artistSongs = null
 
-var album = null
+var album = {}
 
-var mv = null
+var mv = {}
 
-var user = null
+var user = {}
+
+var wiki = {}
 
 var inbox = null
 

@@ -82,12 +82,13 @@ Store::Store(NcmClient *client, QObject *parent)
         {"commentPage", nullVariant()},
         {"searchUsers", nullVariant()},
         {"searchRadios", nullVariant()},
-        // 按需加载：歌手页 / 歌手全部歌曲 / 专辑页；初始为 null，结构与 snapshot.py 保持一致
-        {"artist", nullVariant()},
+        // 按需详情按 id 存：data.<kind>[<id>]，只留最近 8 个 id；结构与 snapshot.py 保持一致
+        {"artist", QVariantMap{}},
         {"artistSongs", nullVariant()},
-        {"album", nullVariant()},
-        {"mv", nullVariant()},
-        {"user", nullVariant()},
+        {"album", QVariantMap{}},
+        {"mv", QVariantMap{}},
+        {"user", QVariantMap{}},
+        {"wiki", QVariantMap{}},
         // 只读信箱：私密数据只进内存，不写首屏快照
         {"inbox", nullVariant()},
         {"inboxThread", nullVariant()},
@@ -235,6 +236,22 @@ void Store::put(const char *key, const QVariant &value, bool personalSide)
     }
 }
 
+// 多个页面可能同时读同一类详情的不同 id：各存各的，不能互相覆盖（单槽时两边会互相换掉、
+// 再各自重取，形成请求循环）。每个槽只留最近 8 个 id，写入一个就淘汰最久没写的。
+void Store::putKeyed(const char *slot, const QString &id, const QVariant &value)
+{
+    constexpr qsizetype kept = 8;
+    const QString name = QLatin1String(slot);
+    QVariantMap all = m_data.value(name).toMap();
+    QStringList &order = m_keyedOrder[name];
+    order.removeAll(id);
+    order.append(id);
+    while (order.size() > kept)
+        all.remove(order.takeFirst());
+    all.insert(id, value);
+    put(slot, all, false);
+}
+
 void Store::putPage(const char *key, QVariantMap page, bool append, bool personalSide, const char *itemsKey)
 {
     if (append) {
@@ -320,9 +337,13 @@ void Store::resetPersonal()
     for (const char *key : {"userEvents", "notices", "commentNotices", "forwards", "dynamicCover"})
         put(key, nullVariant(), false);
     // 按需详情里的 followed / subscribed / liked 都带账号状态：换账号后不能继续显示上一号的结果
-    for (const char *key : {"comments", "commentPage", "commentReplies",
-                            "artist", "album", "user", "wiki"})
-        put(key, nullVariant(), false);
+    put("comments", nullVariant(), false);
+    put("commentPage", nullVariant(), false);
+    put("commentReplies", nullVariant(), false);
+    for (const char *key : {"artist", "album", "user", "wiki"}) {
+        m_keyedOrder.remove(QLatin1String(key));
+        put(key, QVariantMap{}, false);
+    }
     m_similarFired = false;
     m_similarSeed.clear();
     m_heartSeedId = 0;

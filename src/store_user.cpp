@@ -17,7 +17,8 @@ void Store::requestUser(const QString &key, double uid)
 {
     if (!(uid > 0))
         return;   // 退栈时 userId 会短暂归零；不能请求 /user/detail/0
-    const quint64 token = m_requests.begin(QStringLiteral("user"));
+    const QString slot = QStringLiteral("user:") + num(uid);
+    const quint64 token = m_requests.begin(slot);
     m_cache.query(key,
         [this, uid](QueryCache::Done done) {
             struct State {
@@ -95,10 +96,10 @@ void Store::requestUser(const QString &key, double uid)
                 finish();
             });
         },
-        [this, token, uid](const QVariant &user) {
-            if (!m_requests.current(QStringLiteral("user"), token))
+        [this, slot, token, uid](const QVariant &user) {
+            if (!m_requests.current(slot, token))
                 return;
-            put("user", user, false);
+            putKeyed("user", num(uid), user);
             const QVariantMap map = user.toMap();
             if (map.value("restricted").toBool())
                 emit requestRestricted(QStringLiteral("user:") + num(uid),

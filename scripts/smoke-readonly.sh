@@ -62,11 +62,11 @@ PY
 echo "ok   api list"
 
 check "api artist" 'd["hotSongs"]' "${APP_CMD[@]}" --api get api/v1/artist/6452
-check "artist detail" 'd["artist"]["tracks"] and d["artist"]["albums"]' "${APP_CMD[@]}" --detail artist:6452
-check "album detail" 'd["album"]["tracks"]' "${APP_CMD[@]}" --detail album:32311
+check "artist detail" 'd["artist"]["6452"]["tracks"] and d["artist"]["6452"]["albums"]' "${APP_CMD[@]}" --detail artist:6452
+check "album detail" 'd["album"]["32311"]["tracks"]' "${APP_CMD[@]}" --detail album:32311
 check "artist songs" 'len(d["artistSongs"]["tracks"]) == 50' "${APP_CMD[@]}" --artist-songs 6452:100
 check "comments page" 'len(d["commentPage"]["items"]) == 20' "${APP_CMD[@]}" --comments 108485:20
-check "mv" 'd["mv"]["url"] and d["mv"]["br"] > 0' "${APP_CMD[@]}" --mv 522365
+check "mv" 'd["mv"]["522365"]["url"] and d["mv"]["522365"]["br"] > 0' "${APP_CMD[@]}" --mv 522365
 check "search users" 'd["searchUsers"]["items"]' "${APP_CMD[@]}" --search-users 林俊杰
 check "search radios" 'd["searchRadios"]["items"]' "${APP_CMD[@]}" --search-radios 林俊杰
 

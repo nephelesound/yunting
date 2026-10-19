@@ -11,7 +11,8 @@ void Store::requestWiki(const QString &key, double songId)
     if (!(songId > 0))
         return;
 
-    const quint64 token = m_requests.begin(QStringLiteral("wiki"));
+    const QString slot = QStringLiteral("wiki:") + num(songId);
+    const quint64 token = m_requests.begin(slot);
     m_cache.query(
         key,
         [this, songId](QueryCache::Done done) {
@@ -24,8 +25,8 @@ void Store::requestWiki(const QString &key, double songId)
                 done(result.value->toVariantMap(), true);
             });
         },
-        [this, token](const QVariant &value) {
-            if (m_requests.current(QStringLiteral("wiki"), token))
-                put("wiki", value, false);
+        [this, slot, token, songId](const QVariant &value) {
+            if (m_requests.current(slot, token))
+                putKeyed("wiki", num(songId), value);
         });
 }

@@ -33,6 +33,45 @@ Item {
             property var user: Source.user(4343)
         }
     }
+    Component {
+        id: keyedReaderComponent
+        Item {
+            property double artistId: 0
+            property var artist: Source.artist(artistId)
+        }
+    }
+    // 请求都成功，并把每个 artist id 单独放进 data.artist[<id>]：与真 Store 的按 id 存储一致
+    Component {
+        id: keyedStoreComponent
+        QtObject {
+            property var data: ({ artist: {} })
+            property var personal: ({})
+            property bool online: true
+            property bool sessionExpired: false
+            property var requested: []
+            property bool scheduled: false
+            function request(key) {
+                requested = requested.concat([key]);
+                if (scheduled)
+                    return;
+                scheduled = true;
+                Qt.callLater(deliver);
+            }
+            function deliver() {
+                scheduled = false;
+                const artist = Object.assign({}, data.artist);
+                for (const key of requested) {
+                    const id = Number(key.slice(7));
+                    if (id > 0)
+                        artist[String(id)] = { id: id, name: "A" + id, cover: "", alias: "",
+                                               description: "", musicSize: 0, albumSize: 0,
+                                               tracks: [], albums: [] };
+                }
+                data = Object.assign({}, data, { artist: artist });
+            }
+            function refresh() {}
+        }
+    }
 
     Component { id: commentsComponent; CommentsPane { width: 400; height: 400 } }
 
@@ -45,7 +84,7 @@ Item {
         function init() {
             const snap = createTemporaryObject(snapshotComponent, root);
             store = createTemporaryObject(storeComponent, root, {
-                data: Object.assign({}, snap.data, { artist: null, user: null }),
+                data: Object.assign({}, snap.data, { artist: {}, user: {} }),
                 personal: snap.personal,
             });
             Source.live = store;
@@ -57,6 +96,24 @@ Item {
         }
 
         function count(key) { return store.requested.filter(k => k === key).length; }
+        function countIn(s, key) { return s.requested.filter(k => k === key).length; }
+
+        // 两个不同歌手的页面同时开着：各自的详情按 id 存，一个页面的数据到达不会让另一个页面再要一次
+        function test_twoArtistReadersDoNotReplaceEachOther() {
+            const fake = createTemporaryObject(keyedStoreComponent, root);
+            fake.data = Object.assign({}, store.data, { artist: {} });
+            fake.personal = store.personal;
+            Source.live = fake;
+            const first = createTemporaryObject(keyedReaderComponent, root, { artistId: 101 });
+            const second = createTemporaryObject(keyedReaderComponent, root, { artistId: 202 });
+            tryVerify(() => first.artist.name === "A101" && second.artist.name === "A202");
+            wait(300);
+            compare(countIn(fake, "artist:101"), 1);
+            compare(countIn(fake, "artist:202"), 1);
+            compare(first.artist.id, 101);
+            compare(second.artist.id, 202);
+            Source.live = store;   // 恢复 init 的替身，cleanup 照常收尾
+        }
 
         // 首次渲染可能在失败落地前要过不止一次（真 Store 会把在途的同一个 key 合并）；
         // 要紧的是失败记下之后不再增长

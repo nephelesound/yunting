@@ -422,8 +422,8 @@ int runMv(const CommandLine &cli, Backend &backend)
         return 1;
     }
     return waitForStoreData(backend.store, QStringLiteral("mv:%1").arg(qlonglong(mvId)),
-                            QStringLiteral("mv"), [&](const QVariantMap &mv) {
-        return mv.value("id").toDouble() == mvId;
+                            QStringLiteral("mv"), [&](const QVariantMap &byId) {
+        return byId.contains(QString::number(qlonglong(mvId)));
     });
 }
 
@@ -470,8 +470,8 @@ int runDetail(const CommandLine &cli, Backend &backend)
         std::fprintf(stderr, "expected artist:<id> or album:<id>\n");
         return 1;
     }
-    return waitForStoreData(backend.store, key, kind, [&](const QVariantMap &value) {
-        return value.value("id").toDouble() == id;
+    return waitForStoreData(backend.store, key, kind, [&](const QVariantMap &byId) {
+        return byId.contains(QString::number(qlonglong(id)));
     });
 }
 

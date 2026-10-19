@@ -271,6 +271,8 @@ private:
 
     // 归一化结果写回 m_data / m_personal 并 NOTIFY
     void put(const char *key, const QVariant &value, bool personalSide);
+    // 按 id 存的详情槽：m_data[slot][id] = value，只留最近 8 个 id（最久未写的先丢）
+    void putKeyed(const char *slot, const QString &id, const QVariant &value);
     // 分页槽：第一页（append 为 false）整槽换成这一页；之后的页把 itemsKey 下的条目接在已有的后面
     //（按 id/vid 去重：缓存命中后再刷新会把同一页送来两次），其余字段（more、next、计数）取这一页的
     void putPage(const char *key, QVariantMap page, bool append, bool personalSide, const char *itemsKey = "items");
@@ -281,7 +283,7 @@ private:
     QVariantMap m_data;
     QVariantMap m_personal;
     QVariantMap m_emptyPersonal;     // 个人骨架（换账号时清回它）
-    QStringList m_lyricsOrder;       // data.lyrics 里各首歌的先后：超出上限时先丢最早的
+    QHash<QString, QStringList> m_keyedOrder;   // 各按 id 存的槽里 id 的先后：超出上限时先丢最早的
     QSet<QString> m_refilling;       // 正在续取的流（fm / heart），见 beginRefill
     QVariantMap m_similarSeed;
     bool m_similarFired = false;

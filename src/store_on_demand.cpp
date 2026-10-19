@@ -228,6 +228,8 @@ void Store::requestLyrics(const QString &key, double songId)
 {
     if (!(songId > 0))
         return;
+    const QString slot = QStringLiteral("lyrics:") + num(songId);
+    const quint64 token = m_requests.begin(slot);
     m_cache.query(key,
         [this, songId](QueryCache::Done done) {
             // lv / tv 是客户端手里已有的歌词版本，服务器只回更新的：-1 = 要最新的。
@@ -257,16 +259,9 @@ void Store::requestLyrics(const QString &key, double songId)
                      businessOk(resp));
             });
         },
-        [this, songId](const QVariant &lyrics) {
-            constexpr qsizetype kept = 8;
-            const QString id = num(songId);
-            QVariantMap all = m_data.value("lyrics").toMap();
-            m_lyricsOrder.removeAll(id);
-            m_lyricsOrder.append(id);
-            while (m_lyricsOrder.size() > kept)
-                all.remove(m_lyricsOrder.takeFirst());
-            all.insert(id, lyrics.toMap());
-            put("lyrics", all, false);
+        [this, slot, token, songId](const QVariant &lyrics) {
+            if (m_requests.current(slot, token))
+                putKeyed("lyrics", num(songId), lyrics);
         });
 }
 
@@ -534,7 +529,8 @@ void Store::requestArtist(const QString &key, double artistId)
 {
     if (!(artistId > 0))
         return;
-    const quint64 token = m_requests.begin(QStringLiteral("artist"));
+    const QString slot = QStringLiteral("artist:") + num(artistId);
+    const quint64 token = m_requests.begin(slot);
     m_cache.query(key,
         [this, artistId](QueryCache::Done done) {
             struct State {
@@ -598,9 +594,9 @@ void Store::requestArtist(const QString &key, double artistId)
                     finish();
             });
         },
-        [this, token](const QVariant &artist) {
-            if (m_requests.current(QStringLiteral("artist"), token))
-                put("artist", artist, false);
+        [this, slot, token, artistId](const QVariant &artist) {
+            if (m_requests.current(slot, token))
+                putKeyed("artist", num(artistId), artist);
         });
 }
 
@@ -609,7 +605,8 @@ void Store::requestAlbum(const QString &key, double albumId)
 {
     if (!(albumId > 0))
         return;
-    const quint64 token = m_requests.begin(QStringLiteral("album"));
+    const QString slot = QStringLiteral("album:") + num(albumId);
+    const quint64 token = m_requests.begin(slot);
     m_cache.query(key,
         [this, albumId](QueryCache::Done done) {
             m_client->get(QStringLiteral("api/v1/album/%1").arg(qlonglong(albumId)), {}, false,
@@ -643,9 +640,9 @@ void Store::requestAlbum(const QString &key, double albumId)
                      true);
             });
         },
-        [this, token](const QVariant &album) {
-            if (m_requests.current(QStringLiteral("album"), token))
-                put("album", album, false);
+        [this, slot, token, albumId](const QVariant &album) {
+            if (m_requests.current(slot, token))
+                putKeyed("album", num(albumId), album);
         });
 }
 
@@ -693,17 +690,19 @@ void Store::requestMv(const QString &key, double mvId)
 {
     if (!(mvId > 0))
         return;
-    const quint64 token = m_requests.begin(QStringLiteral("mv"));
+    const QString id = num(mvId);
+    const QString slot = QStringLiteral("mv:") + id;
+    const quint64 token = m_requests.begin(slot);
     // 同一个 MV 再打开：先清掉上一次的地址，新地址回来前界面不能拿着死链
-    const QVariantMap shown = m_data.value(QStringLiteral("mv")).toMap();
-    if (shown.value("id").toDouble() == mvId && !shown.value("url").toString().isEmpty()) {
+    const QVariantMap shown = m_data.value(QStringLiteral("mv")).toMap().value(id).toMap();
+    if (!shown.value("url").toString().isEmpty()) {
         QVariantMap cleared = shown;
         cleared.insert("url", QString{});
         cleared.insert("br", 0.0);
         cleared.insert("size", 0.0);
         cleared.insert("expires", 0.0);
         cleared.insert("urlPending", true);   // 界面据此区分「地址在取」与「没有可播放的地址」
-        put("mv", cleared, false);
+        putKeyed("mv", id, cleared);
     }
 
     struct State {
@@ -713,8 +712,8 @@ void Store::requestMv(const QString &key, double mvId)
         bool urlSettled = false;
     };
     auto state = std::make_shared<State>();
-    const auto deliver = [this, state, token] {
-        if (!m_requests.current(QStringLiteral("mv"), token) || !state->detailOk || !state->urlSettled)
+    const auto deliver = [this, state, slot, token, id] {
+        if (!m_requests.current(slot, token) || !state->detailOk || !state->urlSettled)
             return;
         QVariantMap mv = state->mv;
         mv.insert("url", state->url.value("url", QString{}));
@@ -722,7 +721,7 @@ void Store::requestMv(const QString &key, double mvId)
         mv.insert("size", state->url.value("size", 0.0));
         mv.insert("expires", state->url.value("expires", 0.0));
         mv.insert("urlPending", false);
-        put("mv", mv, false);
+        putKeyed("mv", id, mv);
     };
 
     m_cache.query(key,

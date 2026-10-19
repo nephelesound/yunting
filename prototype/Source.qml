@@ -154,11 +154,11 @@ QtObject {
     }
     function commentTotal(t) { return source.hotComments(t).total; }
 
-    // 歌曲百科：data 里只放最近取回的一首，songId 对上才用（取失败时槽里还留着上一首的）。
+    // 歌曲百科：data 里按 songId 存（最近 8 首），各读各的；取失败时不会拿别的歌顶上。
     // pending：还在取；empty：取到了但这首没有百科
     function wiki(songId) {
-        const w = source.d.wiki;
-        if (w && w.songId === songId)
+        const w = (source.d.wiki || {})[String(songId)];
+        if (w)
             return Object.assign({ pending: false, failed: false }, w);
         if (songId > 0)
             source.need("wiki:" + songId);
@@ -310,7 +310,7 @@ QtObject {
         return bytes < 1073741824 ? Math.round(bytes / 1048576) + " MB" : Number((bytes / 1073741824).toFixed(1)) + " GB";
     }
 
-    // 歌手 / 专辑：data 里只放最近取回的一个，id 对上才用；没对上就向 live 要，先给同形的空值
+    // 歌手 / 专辑 / 用户 / MV / 百科：data 里按 id 存（最近 8 个），各读各的；没取到就向 live 要，先给同形的空值
     // 简介常带全角空格的段首缩进：去掉，每行都从窗格左缘开始（对齐页边线）
     function unindent(text) {
         return (text || "").replace(/^[\s　]+/gm, "");
@@ -322,8 +322,8 @@ QtObject {
     function artist(id) {
         if (!(id > 0))
             return emptyArtist(0, false);
-        const a = source.d.artist;
-        if (a && (a.id === id || !source.live))
+        const a = (source.d.artist || {})[String(id)];
+        if (a)
             return Object.assign({}, a, { description: source.unindent(a.description) });
         source.need("artist:" + id);
         return emptyArtist(id, Boolean(source.failure("artist:" + id)));
@@ -335,8 +335,8 @@ QtObject {
     function album(id) {
         if (!(id > 0))
             return emptyAlbum(0, false);
-        const a = source.d.album;
-        if (a && (a.id === id || !source.live))
+        const a = (source.d.album || {})[String(id)];
+        if (a)
             return a;
         source.need("album:" + id);
         return emptyAlbum(id, Boolean(source.failure("album:" + id)));
@@ -354,8 +354,8 @@ QtObject {
         // 页面退栈时 userId 会短暂变成 0：这里绝不能发 user:0 请求
         if (!(id > 0))
             return emptyUser(0, false);
-        const u = source.d.user;
-        if (u && (u.id === id || !source.live))
+        const u = (source.d.user || {})[String(id)];
+        if (u)
             return u;
         source.need("user:" + id);
         return emptyUser(id, Boolean(source.failure("user:" + id)));
@@ -591,8 +591,8 @@ QtObject {
     function mv(id) {
         if (!(id > 0))
             return emptyMv(0, false);
-        const m = source.d.mv;
-        if (m && (m.id === id || !source.live))
+        const m = (source.d.mv || {})[String(id)];
+        if (m)
             return m;
         source.need("mv:" + id);
         return emptyMv(id, Boolean(source.failure("mv:" + id)));
