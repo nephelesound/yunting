@@ -2,15 +2,57 @@
 // QML 编进可执行文件的 Qt 资源（qrc:/qt/qml/org/nephelesound/yunting/），资源清单见 CMakeLists.txt。
 #include "cli.h"
 #include "colortone.h"
+#include "link_parser.h"
 
 #include <KAboutData>
 #include <QApplication>
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDir>
 #include <QIcon>
 #include <QQuickWindow>
 #include <QSGRendererInterface>
 
+#include <cstdio>
+
+namespace {
+
+// 浏览器点「在客户端打开」时，链接经 xdg-desktop-portal 拉起云听；门户若比桌面先启动，
+// 它的环境里没有 WAYLAND_DISPLAY / DISPLAY，建 QApplication 就会崩。这个进程只是来送链接的：
+// 不建窗口，把参数交给已在运行的云听（KDBusService 的 CommandLine，与第二次启动走同一条路）。
+bool deliversLinkWithoutDisplay(int argc, char *argv[])
+{
+    if (!qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY") || !qEnvironmentVariableIsEmpty("DISPLAY")
+        || !qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM"))
+        return false;
+    for (int i = 1; i < argc; ++i) {
+        if (findLink(QString::fromLocal8Bit(argv[i])).found())
+            return true;
+    }
+    return false;
+}
+
+int forwardToRunningInstance(int argc, char *argv[])
+{
+    QCoreApplication app(argc, argv);
+    QDBusMessage call = QDBusMessage::createMethodCall(
+        QStringLiteral("io.github.nephelesound.Yunting"), QStringLiteral("/io/github/nephelesound/Yunting"),
+        QStringLiteral("org.kde.KDBusService"), QStringLiteral("CommandLine"));
+    call << QCoreApplication::arguments() << QDir::currentPath() << QVariantMap();
+    const QDBusMessage reply = QDBusConnection::sessionBus().call(call);
+    if (reply.type() == QDBusMessage::ReplyMessage)
+        return reply.arguments().value(0).toInt();
+    std::fprintf(stderr, "没有图形环境，云听也没有在运行，链接没法打开：%s\n", qPrintable(reply.errorMessage()));
+    return 1;
+}
+
+} // namespace
+
 int main(int argc, char *argv[])
 {
+    if (deliversLinkWithoutDisplay(argc, argv))
+        return forwardToRunningInstance(argc, argv);
+
     // 桌面歌词与迷你窗是透明的顶层窗口；没有 alpha buffer 时合成器会把透明区域画成黑色。
     // 必须在创建任何 QQuickWindow 之前设置。
     QQuickWindow::setDefaultAlphaBuffer(true);
