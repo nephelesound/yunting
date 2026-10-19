@@ -102,12 +102,12 @@ ScreenFrame {
             Layout.maximumWidth: Tokens.trackColumn
             spacing: 0
 
-            // 头像挂件只有自己的取得到（主页接口不带，Store 另取 data.avatarPendant）。戴着时像网易一样把头像缩小：
-            // 挂件图只有 352 见方，头像 160、挂件 240，在 2 倍屏上放大约 1.4 倍，仍然清楚；铺满 280 会糊。
+            // 戴着头像挂件时像网易一样把头像缩小：挂件图只有 352 见方，头像 160、挂件 240，在 2 倍屏上
+            // 放大约 1.4 倍，仍然清楚；铺满 280 会糊。
             // 是否戴挂件按有没有链接定，不按图取没取到：头像大小一变挂件就重取，按状态定会来回跳
             Item {
-                readonly property bool framed: Source.account !== null && page.user.id === Source.account.id
-                    && Source.ownPendant.length > 0
+                readonly property string pendant: page.user.avatarPendant || ""
+                readonly property bool framed: pendant.length > 0
                 Layout.preferredWidth: Tokens.trackColumn
                 Layout.preferredHeight: framed ? 1.5 * Tokens.tileLg : Tokens.trackColumn
                 PersonAvatar {
@@ -116,7 +116,7 @@ ScreenFrame {
                     height: width
                     name: page.user.name
                     source: page.user.avatar
-                    pendant: parent.framed ? Source.ownPendant : ""
+                    pendant: parent.pendant
                 }
             }
 
