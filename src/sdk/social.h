@@ -22,6 +22,8 @@ struct EventUser {
     qint64 id = 0;         // user.userId
     QString name;          // user.nickname
     QString avatar;        // user.avatarUrl
+    QString pendant;       // pendantData.imageUrl
+    QString identityIcon;  // avatarDetail.identityIconUrl
 };
 
 struct EventResource {

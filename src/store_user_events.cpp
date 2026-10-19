@@ -17,6 +17,8 @@ QVariantMap eventUser(const sdk::EventUser &u)
         {"id", static_cast<double>(u.id)},
         {"name", u.name},
         {"avatar", u.avatar},
+        {"avatarPendant", u.pendant},
+        {"identityIcon", u.identityIcon},
     };
 }
 

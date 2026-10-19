@@ -57,6 +57,10 @@ Result<UserEvent> eventFrom(const QJsonObject &object, const QString &path)
     event.user.id = userReader.integer("userId");
     event.user.name = userReader.string("nickname");
     event.user.avatar = userReader.string("avatarUrl");
+    event.user.pendant =
+        userReader.object("pendantData").value(QStringLiteral("imageUrl")).toString();
+    event.user.identityIcon =
+        userReader.object("avatarDetail").value(QStringLiteral("identityIconUrl")).toString();
 
     const QJsonObject info = reader.object("info");
     JsonReader infoReader(info, path + QStringLiteral(".info"));

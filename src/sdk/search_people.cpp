@@ -26,6 +26,8 @@ Result<SearchUser> userFrom(const QJsonObject &object, const QString &path)
     user.id = reader.integer("userId");
     user.name = reader.string("nickname");
     user.cover = reader.string("avatarUrl");
+    user.pendant = reader.object("pendantData").value(QStringLiteral("imageUrl")).toString();
+    user.identityIcon = reader.object("avatarDetail").value(QStringLiteral("identityIconUrl")).toString();
     user.followed = reader.boolean("followed");
     user.fans = reader.integer("followeds");
     user.follows = reader.integer("follows");

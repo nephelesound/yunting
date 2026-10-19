@@ -21,6 +21,8 @@ QVariantMap notificationUser(const sdk::NotificationUser &user, qint64 fallbackI
         {"id", static_cast<double>(id)},
         {"name", user.name},
         {"avatar", user.avatar},
+        {"avatarPendant", user.pendant},
+        {"identityIcon", user.identityIcon},
     };
 }
 

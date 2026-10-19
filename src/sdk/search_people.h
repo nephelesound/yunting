@@ -21,6 +21,8 @@ struct SearchUser {
     qint64 id = 0;         // userId
     QString name;          // nickname
     QString cover;         // avatarUrl (raw URL, may be empty)
+    QString pendant;       // pendantData.imageUrl (raw)
+    QString identityIcon;  // avatarDetail.identityIconUrl (raw)
     bool followed = false; // followed
     qint64 fans = 0;       // followeds
     qint64 follows = 0;    // follows

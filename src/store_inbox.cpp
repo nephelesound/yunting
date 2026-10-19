@@ -79,6 +79,16 @@ QVariantMap normalizePayload(const QJsonObject &payload)
     return out;
 }
 
+QString pendantUrl(const QJsonObject &user)
+{
+    return user.value("pendantData").toObject().value("imageUrl").toString();
+}
+
+QString identityIconUrl(const QJsonObject &user)
+{
+    return user.value("avatarDetail").toObject().value("identityIconUrl").toString();
+}
+
 QVariantMap normalizeConversation(const QJsonObject &c, double me)
 {
     const QJsonObject from = c.value("fromUser").toObject();
@@ -95,6 +105,8 @@ QVariantMap normalizeConversation(const QJsonObject &c, double me)
         {"userId", other.value("userId").toDouble()},
         {"name", other.value("nickname").toString()},
         {"avatar", ncmSized(other.value("avatarUrl"), 96)},
+        {"avatarPendant", pendantUrl(other)},
+        {"identityIcon", identityIconUrl(other)},
         {"vipType", other.value("vipType").toDouble()},
         {"lastText", payloadText(payload)},
         {"kind", payloadKind(payload)},
@@ -117,6 +129,8 @@ QVariantMap normalizeMessage(const QJsonObject &m, double me)
         {"fromUserId", from.value("userId").toDouble()},
         {"fromName", from.value("nickname").toString()},
         {"fromAvatar", ncmSized(from.value("avatarUrl"), 96)},
+        {"fromAvatarPendant", pendantUrl(from)},
+        {"fromIdentityIcon", identityIconUrl(from)},
         {"toUserId", to.value("userId").toDouble()},
         {"toName", to.value("nickname").toString()},
         {"mine", from.value("userId").toDouble() == me},

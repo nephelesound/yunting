@@ -69,6 +69,9 @@ NotificationUser userFrom(const QJsonObject &object, const QString &path)
     user.id = numericId(object, "userId");
     user.name = reader.string("nickname");
     user.avatar = reader.string("avatarUrl");
+    user.pendant = reader.object("pendantData").value(QStringLiteral("imageUrl")).toString();
+    user.identityIcon =
+        reader.object("avatarDetail").value(QStringLiteral("identityIconUrl")).toString();
     return user;
 }
 

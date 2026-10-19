@@ -76,6 +76,8 @@ struct NotificationUser {
     qint64 id = 0;      // userId (number or numeric string)
     QString name;       // nickname
     QString avatar;     // avatarUrl
+    QString pendant;    // pendantData.imageUrl
+    QString identityIcon; // avatarDetail.identityIconUrl
 };
 
 // notices[].notice after JSON-decoding. Which members are meaningful depends on

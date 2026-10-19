@@ -952,6 +952,8 @@ void Store::requestSearchUsers(const QString &key, const QString &raw)
                         {"id", static_cast<double>(user.id)},
                         {"name", user.name},
                         {"cover", ncmSized(QJsonValue(user.cover), 300)},
+                        {"avatarPendant", user.pendant},
+                        {"identityIcon", user.identityIcon},
                         {"followed", user.followed},
                         {"fans", static_cast<double>(user.fans)},
                         {"follows", static_cast<double>(user.follows)},

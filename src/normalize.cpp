@@ -65,6 +65,7 @@ QVariantMap ncmProfile(const QJsonObject &p, int avatarPx, int backgroundPx)
         {"name", p.value("nickname").toString()},
         {"avatar", ncmSized(p.value("avatarUrl"), avatarPx)},
         {"background", ncmSized(p.value("backgroundUrl"), backgroundPx)},
+        {"avatarPendant", p.value("pendantData").toObject().value("imageUrl").toString()},
         {"identityIcon", p.value("avatarDetail").toObject().value("identityIconUrl").toString()},
         {"signature", p.value("signature").toString()},
         {"followed", p.value("followed").toBool()},
