@@ -2,6 +2,16 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.3] - 2026-10-19
+
+### 变化
+- 心动模式和网易云一样是一种播放方式，不再是一张歌单：点首页的入口就从红心第一首开始放，快放完时从正在放的这首接着推荐，在里面点的红心会带着后面的推荐走。
+- 暂停、继续与切歌有淡入淡出：暂停时声音先淡出再停，继续时淡入；正在放时切歌，上一首淡出、下一首淡入。自然播完接下一首不淡，前奏不会被削掉。
+
+### 修复
+- 拖动进度条时有噪音：拖动中每移动一点就跳转一次。现在拖动时只有进度线和时间跟着走，松手才跳转（MV 的进度条也一样）。
+- 在心动模式里点红心，正在看的列表会整个刷新。
+
 ## [0.6.2] - 2026-10-19
 
 ### 变化
@@ -157,6 +167,7 @@
 - 分享：链接、二维码、Telegram 与邮件，以及带封面与歌词的分享图。
 - 「关于」窗口与「复制诊断信息」，方便反馈问题。
 
+[0.6.3]: https://github.com/nephelesound/yunting/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/nephelesound/yunting/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/nephelesound/yunting/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/nephelesound/yunting/compare/v0.5.5...v0.6.0
