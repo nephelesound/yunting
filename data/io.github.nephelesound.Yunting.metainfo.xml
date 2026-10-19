@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.16" date="2026-10-20">
+      <description>
+        <p>Upload songs to your cloud and import playlists from a song list or other platforms' links. Make your own playlists private and give them up to three tags. Hug and copy comments, and forward events; your own events can change visibility or be deleted. Listen together no longer skips two songs when one change arrives twice.</p>
+        <p xml:lang="zh_CN">可以把本机的歌上传到云盘，用歌曲清单或其他平台的链接导入歌单；自己的歌单可设为私密、加最多 3 个标签。评论可以抱一抱、复制，动态可以转发，自己的动态可以改可见范围或删除。一起听不再因为同一次切歌收到两条命令而连跳两首。</p>
+      </description>
+    </release>
     <release version="0.6.15" date="2026-10-20">
       <description>
         <p>Listen together keeps both sides in sync again, invites a friend with one click, shows how often you have listened together and marks songs your friend cannot play. Private messages can be sent, and cards and listen-together invites in them can be opened. Chinese and Japanese use one font, also in the Flatpak, and multi-line Chinese text gets more line spacing.</p>
