@@ -586,8 +586,14 @@ QtObject {
         const rank = f => f.inRoom ? 2 : f.online ? 1 : 0;
         return items.slice().sort((a, b) => rank(b) - rank(a) || (b.lastTime || 0) - (a.lastTime || 0));
     }
-    // 打开一起听的面板时重取一次（用户的动作，不是绑定求值）
-    function refreshFriendsListening() { if (source.live) source.live.request("friendsListening"); }
+    // 打开一起听的面板时重取，30 秒内反复开关只取一次（这个读接口是 POST，流量计不拦重复的 POST）
+    property real friendsRefreshedAt: 0
+    function refreshFriendsListening() {
+        if (Date.now() - source.friendsRefreshedAt < 30000)
+            return;
+        source.friendsRefreshedAt = Date.now();
+        source.need("friendsListening");
+    }
     // 一首歌的相似歌曲与相似歌单（正在播放页的「相似」栏）：两个槽各放一首歌的结果、带 songId，
     // 只有这一栏读，所以不按 id 分开存
     function similarTo(songId) {

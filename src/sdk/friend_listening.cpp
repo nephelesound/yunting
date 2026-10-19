@@ -39,7 +39,10 @@ Result<FriendListening> friendFrom(const QJsonObject &object, const QString &pat
     JsonReader userReader(userInfo, path + QStringLiteral(".userInfo"));
     FriendListeningUser user;
     user.userId = userReader.integer("userId");
-    user.name = firstString(userInfo, {"customNickname", "snsNickname", "nickname"});
+    // 备注名（customNickname）在行上，不在 userInfo 里；没有备注时用昵称
+    user.name = firstString(object, {"customNickname"});
+    if (user.name.isEmpty())
+        user.name = firstString(userInfo, {"nickname"});
     user.avatar = userReader.string("avatarUrl");
     user.signature = userReader.string("signature");
     user.mutual = userReader.boolean("mutual");

@@ -48,6 +48,20 @@ private slots:
         QCOMPARE(parsed.value->matchButtonText, QStringLiteral("匹配"));
     }
 
+    // 真实回包里备注名在行上，没设备注时是 null
+    void remarkOnTheRowWinsOverNickname()
+    {
+        const auto row = [](const QJsonValue &remark) {
+            return QJsonObject{{"userInfo", QJsonObject{{"userId", 1}, {"nickname", "Alice"}}},
+                               {"customNickname", remark}};
+        };
+        const auto parsed = parseFriendListening(QJsonObject{{"data", QJsonObject{
+            {"mutualFollowLists", QJsonArray{row("小艾"), row(QJsonValue::Null)}}}}});
+        QVERIFY2(parsed.ok(), qPrintable(parsed.error.message));
+        QCOMPARE(parsed.value->items.at(0).user.name, QStringLiteral("小艾"));
+        QCOMPARE(parsed.value->items.at(1).user.name, QStringLiteral("Alice"));
+    }
+
     void emptyListIsSuccess()
     {
         const auto parsed = parseFriendListening(

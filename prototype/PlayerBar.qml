@@ -62,8 +62,8 @@ Item {
 
     function openEqualizer() { eqPanel.showAt(bar); }
     // 宽窗口挂在播放条的一起听按钮上，窄窗口（按钮收进「更多」）挂在「更多」上
-    function openListenPopup(anchor) {
-        listenPopup.anchorItem = anchor || listenButton;
+    function openListenPopup() {
+        listenPopup.anchorItem = hud.compact ? moreButton : listenButton;
         listenPopup.open();
     }
     function openQualityMenu() { qualityMenu.popup(qualityButton, 0, -qualityMenu.implicitHeight - Tokens.space2); }
@@ -79,6 +79,9 @@ Item {
             return left;
         }
         y: -height - Tokens.space2      // 浮在播放条顶边（进度线）之上
+        // 退出登录、或窗口宽窄切换把挂靠的按钮藏起来时，面板跟着关掉
+        readonly property bool usable: bar.canListen && anchorItem.visible
+        onUsableChanged: if (!usable) close()
         active: bar.active
         busy: bar.listenBusy
         onStartRequested: bar.listenStartRequested()
@@ -385,7 +388,7 @@ Item {
                         height: visible ? implicitHeight : 0
                         icon.name: "group-symbolic"
                         text: bar.together ? bar.togetherText : "和好友一起听…"
-                        onTriggered: bar.together ? bar.queueRequested() : bar.openListenPopup(moreButton)
+                        onTriggered: bar.together ? bar.queueRequested() : bar.openListenPopup()
                     }
                     MenuItem {
                         icon.name: "view-fullscreen"

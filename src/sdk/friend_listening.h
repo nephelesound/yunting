@@ -23,7 +23,7 @@ namespace ncm::sdk {
 
 struct FriendListeningUser {
     qint64 userId = 0;       // userInfo.userId
-    QString name;            // customNickname / snsNickname / userInfo.nickname
+    QString name;            // row customNickname (your remark) / userInfo.nickname
     QString avatar;          // userInfo.avatarUrl (raw)
     QString avatarPendant;   // pendant.image / imageAndroid / imageIos (raw)
     QString identityIcon;    // userInfo.avatarDetail.identityIconUrl (raw)
