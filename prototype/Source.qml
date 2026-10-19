@@ -25,19 +25,33 @@ QtObject {
     readonly property var d: source.raw().data
     readonly property var p: source.raw().personal
 
-    // 按需加载：只有 live 来源需要（快照与压力数据是一次给全的）。key 见 DESIGN.md，Store 自己去重。
+    // 按需加载：只有 live 来源需要（快照与压力数据是一次给全的）。key 见 DESIGN.md。
     // 读数据的函数在绑定里调用它，所以失败过的 key 在冷却期内不自动再要：失败会写 requestFailures，
     // 读它的绑定随之重算、又走到这里，不冷却就是一个请求失败、重要、再失败的死循环。
-    // 冷却过后，下次自然重算才再试一次；用户点「重试」（retryKey）立刻再要。
+    // 冷却过后，下次自然重算才再试一次。用户自己的动作（点「重试」、滚到底要下一页、展开回复）
+    // 走 retryKey，立刻再要。同一轮里重复要的 key 合成一个请求。
     readonly property int retryCooldownMs: 30000
-    property var failedAt: ({})   // key → 失败时刻（毫秒）。就地修改：它不是绑定的依赖
+    // failedAt 与 queued 只就地修改：读它们的绑定不会因此重算。
+    // 整体换掉 failedAt（重新联网、换账号）则会让读过它的绑定重算、把失败过的再要一遍——正是想要的
+    property var failedAt: ({})   // key → 失败时刻（毫秒）
+    property var queued: ({})     // 这一轮已排上的 key
     function need(key) {
         if (!source.live)
             return;
         const at = source.failedAt[key];
         if (at !== undefined && Date.now() - at < source.retryCooldownMs)
             return;
-        Qt.callLater(() => source.live.request(key));
+        if (source.queued[key])
+            return;
+        source.queued[key] = true;
+        Qt.callLater(source.sendQueued);   // 同一个函数在一轮里只排一次
+    }
+    function sendQueued() {
+        const keys = Object.keys(source.queued);
+        for (const key of keys)
+            delete source.queued[key];
+        if (source.live)
+            keys.forEach(key => source.live.request(key));
     }
     // 按需请求失败：Store 发来 requestFailed 后由 main 标记；页面可显示「重试」而不是一直转圈
     property var requestFailures: ({})
@@ -221,7 +235,7 @@ QtObject {
         if (acc === null)
             return;
         source.setLatest(t.kind, acc);
-        source.need(source.commentKinds[t.kind].hot + ":" + t.id + ":" + acc.next);
+        source.retryKey(source.commentKinds[t.kind].hot + ":" + t.id + ":" + acc.next);   // 用户的动作，不等冷却
     }
 
     // 歌手的全部歌曲：先是 artist:<id> 带的热门 50 首，滚到底再按热度从第 50 首往后取（artistSongs:<id>:<offset>）
@@ -237,7 +251,7 @@ QtObject {
         if (acc === null)
             return;
         source.artistSongs = acc;
-        source.need("artistSongs:" + artistId + ":" + acc.next);
+        source.retryKey("artistSongs:" + artistId + ":" + acc.next);   // 滚到底、点重试：用户的动作，不等冷却
     }
 
     // 账号

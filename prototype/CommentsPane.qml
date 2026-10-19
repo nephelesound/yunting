@@ -62,7 +62,7 @@ ListView {
         pane.openThread = commentId;
         const replies = Source.replies(pane.thread, commentId);
         if (replies.pending)
-            Source.need(replies.key);
+            Source.retryKey(replies.key);   // 点开回复是用户的动作：上次失败过也立刻再要
     }
 
     clip: true

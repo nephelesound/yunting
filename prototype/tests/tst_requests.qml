@@ -78,11 +78,13 @@ Item {
             wait(100);
             const pages = count("comments:" + songId + ":0");
             verify(pages >= 1);
+            // 与 Source.onAccountIdChanged 一样：清空最新评论，也清掉上一个账号的失败冷却
+            Source.failedAt = ({});
             Source.latestComments = ({ song: { owner: 0, items: [], total: 0, more: false, next: 0, loading: false },
                                        playlist: { owner: 0, items: [], total: 0, more: false, next: 0, loading: false } });
-            tryVerify(() => pane.latest !== null, 1000, "评论区重新开始取");
+            tryVerify(() => count("comments:" + songId + ":0") === pages + 1, 1000, "评论区重新开始取");
             wait(200);
-            verify(count("comments:" + songId + ":0") <= pages + 1, "只重取一次，不循环");
+            compare(count("comments:" + songId + ":0"), pages + 1, "只重取一次，不循环");
         }
 
         function test_retryAsksOnceMore() {
@@ -92,9 +94,16 @@ Item {
             const before = count("artist:4242");
             Source.retryKey("artist:4242");
             tryVerify(() => count("artist:4242") > before);
-            const after = count("artist:4242");
             wait(300);
-            compare(count("artist:4242"), after, "重试只是再要一次，失败后同样不循环");
+            // 清掉失败标记会让读它的绑定重算、也去要：与 retryKey 自己要的合成一个请求
+            compare(count("artist:4242"), before + 1, "重试只再要一次，失败后同样不循环");
+        }
+
+        // 滚到底要下一页、点「重试」是用户的动作：这一页上次失败、还在冷却，也要立刻再要
+        function test_loadingMoreIgnoresTheCooldown() {
+            Source.failedAt["artistSongs:9:2"] = Date.now();
+            Source.moreArtistSongs(9, [{ id: 1 }, { id: 2 }]);
+            tryVerify(() => count("artistSongs:9:2") === 1, 1000, "冷却期内用户要下一页也发出去");
         }
     }
 }

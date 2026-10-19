@@ -355,8 +355,9 @@ ScreenFrame {
         // 没有歌词时说清楚是哪种：没取到（可点重试）/ 还在取 / 纯音乐 / 这首真的没有
         LinkText {
             objectName: "lyricsEmpty"
-            readonly property bool failed: page.track !== null && Boolean(Source.failure("lyrics:" + page.track.id))
             readonly property var entry: page.track ? Source.lyricsEntry(page.track.id) : null
+            // 取到了就以取到的为准：冷却后自动重取成功时，旧的失败标记还在
+            readonly property bool failed: page.track !== null && entry === null && Boolean(Source.failure("lyrics:" + page.track.id))
             readonly property bool loading: page.track !== null && Source.live !== null && entry === null
             readonly property bool pureMusic: entry !== null && entry.pureMusic === true
             y: page.focusRow * page.pitch
@@ -443,7 +444,7 @@ ScreenFrame {
                 onTapped: {
                     commentsEmpty.timedOut = false;
                     commentsTimeout.restart();
-                    Source.need("comments:" + page.track.id);
+                    Source.retryKey("comments:" + page.track.id);
                     // 等热评落地后由 commentsReady 触发最新页，不能在这里抢先排序。
                 }
             }

@@ -614,6 +614,8 @@ Item {
                 data: Object.assign({}, saved.data, { lyrics: { "8080": { lines: [], pureMusic: true } } }),
                 personal: saved.personal,
             };
+            // 之前失败过、冷却后自动重取成功：旧的失败标记还在，也要以取到的为准
+            Source.markRequestFailed("lyrics:8080", "旧的失败");
             try {
                 const page = createTemporaryObject(nowPlayingComponent, root, {
                     track: { id: 8080, name: "纯音乐", artist: "A", cover: "", dur: 100 }, elapsed: 0 });
@@ -622,6 +624,8 @@ Item {
                 compare(empty.parts[0].text, "纯音乐，请欣赏");
             } finally {
                 Source.snapshot = saved;
+                Source.clearRequestFailure("lyrics:8080");
+                delete Source.failedAt["lyrics:8080"];
             }
         }
     }
