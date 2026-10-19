@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.15" date="2026-10-20">
+      <description>
+        <p>Listen together keeps both sides in sync again, invites a friend with one click, shows how often you have listened together and marks songs your friend cannot play. Private messages can be sent, and cards and listen-together invites in them can be opened. Chinese and Japanese use one font, also in the Flatpak, and multi-line Chinese text gets more line spacing.</p>
+        <p xml:lang="zh_CN">一起听双方重新保持同步，点好友即可邀请，显示你们一起听过多少，并标出对方放不了的歌。私信可以发送，里面的卡片和一起听邀请可以点开。中日文使用同一款字体（Flatpak 版也一样），中文多行正文的行距加大。</p>
+      </description>
+    </release>
     <release version="0.6.14" date="2026-10-19">
       <description>
         <p>After switching songs, changing audio quality or seeking, the progress bar and lyrics no longer jump back for a moment. The Flatpak uses system portals to keep the computer awake and to store your login; if you signed in to an earlier Flatpak build, sign in once more.</p>
