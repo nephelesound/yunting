@@ -8,6 +8,7 @@
 #include <QDBusReply>
 #include <QGuiApplication>
 #include <QTest>
+#include <QUuid>
 
 class PowerInhibitorTest : public QObject {
     Q_OBJECT
@@ -16,7 +17,8 @@ class PowerInhibitorTest : public QObject {
     // PowerDevil 收到 freedesktop 的抑制后约 5 秒才生效（短暂的抑制不算），等足这么久
     static constexpr int kApplied = 10000;
 
-    // PolicyAgent 的 RequestedInhibitions（a(ssssu)：类型、应用、原因、……）里我们这条原因出现几次
+    // PolicyAgent 的 RequestedInhibitions（a(ssssu)：类型、应用、原因、……）里我们这条原因出现几次。
+    // 应用名由桌面门户按真实应用 id 填写，测试进程没有安装自己的 .desktop，所以只认原因。
     static int ours(const QString &reason)
     {
         QDBusMessage get = QDBusMessage::createMethodCall(
@@ -35,7 +37,7 @@ class PowerInhibitorTest : public QObject {
             list.beginStructure();
             list >> type >> app >> why >> mode >> flags;
             list.endStructure();
-            n += app == QLatin1String(kApp) && why == reason;
+            n += why == reason;
         }
         list.endArray();
         return n;
@@ -52,34 +54,37 @@ private slots:
 
     void sleepIsInhibitedOnlyWhilePlaying()
     {
-        PowerInhibitor power;
+        const QString reason = QStringLiteral("云听测试睡眠 %1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+        PowerInhibitor power(nullptr, reason, reason);
         power.setPreventSleep(true);
-        QTRY_COMPARE_WITH_TIMEOUT(ours(QStringLiteral("正在播放音乐")), 1, kApplied);
+        QTRY_COMPARE_WITH_TIMEOUT(ours(reason), 1, kApplied);
         power.setPreventSleep(false);
-        QTRY_COMPARE_WITH_TIMEOUT(ours(QStringLiteral("正在播放音乐")), 0, kApplied);
+        QTRY_COMPARE_WITH_TIMEOUT(ours(reason), 0, kApplied);
     }
 
     // 暂停又继续发生在请求在途时：最后只持有一个抑制，不漏撤也不多加
     void quickToggleEndsWithExactlyOne()
     {
-        PowerInhibitor power;
+        const QString reason = QStringLiteral("云听测试连按 %1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+        PowerInhibitor power(nullptr, reason, reason);
         power.setPreventSleep(true);
         power.setPreventSleep(false);
         power.setPreventSleep(true);
-        QTRY_COMPARE_WITH_TIMEOUT(ours(QStringLiteral("正在播放音乐")), 1, kApplied);
+        QTRY_COMPARE_WITH_TIMEOUT(ours(reason), 1, kApplied);
         QTest::qWait(300);
-        QCOMPARE(ours(QStringLiteral("正在播放音乐")), 1);
+        QCOMPARE(ours(reason), 1);
         power.setPreventSleep(false);
-        QTRY_COMPARE_WITH_TIMEOUT(ours(QStringLiteral("正在播放音乐")), 0, kApplied);
+        QTRY_COMPARE_WITH_TIMEOUT(ours(reason), 0, kApplied);
     }
 
     void screenStaysOnForVideo()
     {
-        PowerInhibitor power;
+        const QString reason = QStringLiteral("云听测试 MV %1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+        PowerInhibitor power(nullptr, reason, reason);
         power.setKeepScreenOn(true);
-        QTRY_COMPARE_WITH_TIMEOUT(ours(QStringLiteral("正在播放 MV")), 1, kApplied);
+        QTRY_COMPARE_WITH_TIMEOUT(ours(reason), 1, kApplied);
         power.setKeepScreenOn(false);
-        QTRY_COMPARE_WITH_TIMEOUT(ours(QStringLiteral("正在播放 MV")), 0, kApplied);
+        QTRY_COMPARE_WITH_TIMEOUT(ours(reason), 0, kApplied);
     }
 };
 

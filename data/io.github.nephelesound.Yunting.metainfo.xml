@@ -56,22 +56,22 @@
     <screenshot type="default">
       <caption>Now playing with line-by-line lyrics</caption>
       <caption xml:lang="zh_CN">正在播放与逐行歌词</caption>
-      <image>https://raw.githubusercontent.com/nephelesound/yunting/v0.6.6/data/screenshots/1-now-playing.png</image>
+      <image>https://raw.githubusercontent.com/nephelesound/yunting/master/data/screenshots/1-now-playing.png</image>
     </screenshot>
     <screenshot>
-      <caption>Discover: charts, new songs, new albums and curated playlists</caption>
-      <caption xml:lang="zh_CN">发现：排行榜、新歌、新碟与精品歌单</caption>
-      <image>https://raw.githubusercontent.com/nephelesound/yunting/v0.6.6/data/screenshots/2-discover.png</image>
+      <caption>Recommendations: daily picks, heart mode, personal radio and playlists</caption>
+      <caption xml:lang="zh_CN">推荐：每日推荐、心动模式、私人漫游与推荐歌单</caption>
+      <image>https://raw.githubusercontent.com/nephelesound/yunting/master/data/screenshots/2-discover.png</image>
     </screenshot>
     <screenshot>
       <caption>A chart with audio quality badges</caption>
       <caption xml:lang="zh_CN">榜单与音质标记</caption>
-      <image>https://raw.githubusercontent.com/nephelesound/yunting/v0.6.6/data/screenshots/3-chart.png</image>
+      <image>https://raw.githubusercontent.com/nephelesound/yunting/master/data/screenshots/3-chart.png</image>
     </screenshot>
     <screenshot>
       <caption>Dark colors that follow the system</caption>
       <caption xml:lang="zh_CN">跟随系统的深色配色</caption>
-      <image>https://raw.githubusercontent.com/nephelesound/yunting/v0.6.6/data/screenshots/4-dark.png</image>
+      <image>https://raw.githubusercontent.com/nephelesound/yunting/master/data/screenshots/4-dark.png</image>
     </screenshot>
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->

@@ -36,6 +36,11 @@ CookieVault::CookieVault(QObject *parent)
       m_service(serviceOverride().isEmpty() ? QCoreApplication::applicationName() : serviceOverride()),
       m_key(QStringLiteral("cookies"))
 {
+    // QtKeychain 在 Plasma 上默认优先 KWallet；沙箱里那个服务已经不再授权，
+    // 明确选 libsecret，才能稳定落到 org.freedesktop.portal.Secret 的应用钥匙环。
+    if (QFile::exists(QStringLiteral("/.flatpak-info"))
+        && qEnvironmentVariableIsEmpty("QTKEYCHAIN_BACKEND"))
+        qputenv("QTKEYCHAIN_BACKEND", "libsecret");
 }
 
 void CookieVault::enqueue(const Op &op)

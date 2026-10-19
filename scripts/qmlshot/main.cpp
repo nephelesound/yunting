@@ -97,6 +97,7 @@ int main(int argc, char *argv[])
         }
     }
     window->show();
+    window->requestActivate();   // 带窗框截图时 Spectacle 抓的是活动窗口
 
     // 给异步图片和布局一点时间
     const int delay = qEnvironmentVariableIntValue("QMLSHOT_DELAY_MS");

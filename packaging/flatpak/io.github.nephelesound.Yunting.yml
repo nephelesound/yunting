@@ -1,5 +1,6 @@
 # 云听的 Flatpak：所有发行版通用。KDE 运行时已带 Kirigami、Kirigami Addons、Prison、KStatusNotifierItem、
-# OpenSSL 与 ffmpeg；这里只补运行时没有的 qtkeychain、layer-shell-qt 与 mpv 一套（照 Flathub 上 Haruna 的写法）。
+# OpenSSL 与 ffmpeg；这里只补运行时没有的 qtkeychain、libsecret 一套、layer-shell-qt 与 mpv 一套
+#（照 Flathub 上 Haruna 的写法）。
 # 本地构建：flatpak-builder --user --install --force-clean build/flatpak packaging/flatpak/io.github.nephelesound.Yunting.yml
 app-id: io.github.nephelesound.Yunting
 runtime: org.kde.Platform
@@ -15,16 +16,12 @@ finish-args:
   - --device=dri
   # MPRIS：服务名是 org.mpris.MediaPlayer2.<applicationName>
   - --own-name=org.mpris.MediaPlayer2.yunting
-  # 登录凭据存钥匙串（qtkeychain：Secret Service 或 KWallet）
-  - --talk-name=org.freedesktop.secrets
-  - --talk-name=org.kde.kwalletd6
+  # 登录凭据由 libsecret 经 org.freedesktop.portal.Secret 存在应用自己的钥匙环里，
+  # 不再直连 org.freedesktop.secrets 或 kwalletd6。
   # 托盘与托盘通知
   - --talk-name=org.kde.StatusNotifierWatcher
   - --talk-name=org.freedesktop.Notifications
-  # 放歌时不自动睡眠、看 MV 时屏幕常亮（powerinhibitor.cpp）
-  - --talk-name=org.freedesktop.ScreenSaver
-  - --talk-name=org.freedesktop.PowerManagement
-  - --talk-name=org.kde.Solid.PowerManagement
+  # 放歌时不自动睡眠、看 MV 时屏幕常亮：走 org.freedesktop.portal.Inhibit，不需要电源服务的直连权限
 cleanup:
   - '*.a'
   - '*.la'
@@ -35,11 +32,46 @@ cleanup:
   - /share/doc
 
 modules:
+  # QtKeychain 的 libsecret 后端：沙箱里 libsecret 的简单 API 自动改走
+  # org.freedesktop.portal.Secret + 应用自己的钥匙环，不再需要直连宿主 Secret Service。
+  # libsecret 的本地钥匙环文件要加密，所以带上 libgcrypt。
+  - name: libgpg-error
+    buildsystem: autotools
+    config-opts:
+      - --disable-doc
+    sources:
+      - type: archive
+        url: https://gnupg.org/ftp/gcrypt/libgpg-error/libgpg-error-1.55.tar.bz2
+        sha256: 95b178148863f07d45df0cea67e880a79b9ef71f5d230baddc0071128516ef78
+
+  - name: libgcrypt
+    buildsystem: autotools
+    config-opts:
+      - --disable-doc
+    sources:
+      - type: archive
+        url: https://gnupg.org/ftp/gcrypt/libgcrypt/libgcrypt-1.11.1.tar.bz2
+        sha256: 24e91c9123a46c54e8371f3a3a2502f1198f2893fbfbf59af95bc1c21499b00e
+
+  - name: libsecret
+    buildsystem: meson
+    config-opts:
+      - -Dcrypto=libgcrypt
+      - -Dmanpage=false
+      - -Dgtk_doc=false
+      - -Dvapi=false
+      - -Dintrospection=false
+      - -Dbash_completion=disabled
+    sources:
+      - type: archive
+        url: https://download.gnome.org/sources/libsecret/0.21/libsecret-0.21.7.tar.xz
+        sha256: 6b452e4750590a2b5617adc40026f28d2f4903de15f1250e1d1c40bfd68ed55e
+
   - name: qtkeychain
     buildsystem: cmake-ninja
     config-opts:
       - -DBUILD_TRANSLATIONS=NO
-      - -DBUILD_WITH_QT6=ON
+      - -DLIBSECRET_SUPPORT=ON
     sources:
       - type: archive
         url: https://github.com/frankosterfeld/qtkeychain/archive/0.17.0.tar.gz
