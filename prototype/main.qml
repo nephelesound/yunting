@@ -619,6 +619,11 @@ Kirigami.ApplicationWindow {
     Connections {
         target: root.backend ? root.backend.links : null
         function onOpened(kind, id) { root.openLink(kind, id); }
+        function onFailed(message) { root.fail(message); }
+        // 别的程序里复制了网易云链接（例如 Telegram）：回到云听时问一句，点了才打开
+        function onClipboardOffered(text) {
+            root.notify("剪贴板里有网易云音乐的链接", "long", "打开", () => root.backend.links.open(text));
+        }
     }
 
     // 歌单磁贴的菜单（「我的」「全部歌单」「搜索」）：自己建的可改名/删除（「我喜欢的音乐」除外），

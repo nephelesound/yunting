@@ -139,6 +139,42 @@ private slots:
         QCOMPARE(linkKindName(LinkKind::Mv), QStringLiteral("mv"));
         QVERIFY(linkKindName(LinkKind::None).isEmpty());
     }
+
+    // 剪贴板与命令行拿到的是一句话：找出第一个网易云链接，短链单独交出来
+    void findsLinksInsideShareText_data()
+    {
+        QTest::addColumn<QString>("text");
+        QTest::addColumn<QString>("kind");
+        QTest::addColumn<qint64>("id");
+        QTest::addColumn<QString>("shortUrl");
+        QTest::newRow("phone share")
+            << QStringLiteral("分享王菲的单曲《红豆》: http://163cn.tv/xLb2c3 (来自@网易云音乐)")
+            << QString() << qint64(0) << QStringLiteral("http://163cn.tv/xLb2c3");
+        QTest::newRow("web link in a sentence")
+            << QStringLiteral("听听这首：https://music.163.com/song?id=186001&userid=1。")
+            << QStringLiteral("song") << qint64(186001) << QString();
+        QTest::newRow("trailing ascii period")
+            << QStringLiteral("see https://y.music.163.com/m/playlist?id=24381616.")
+            << QStringLiteral("playlist") << qint64(24381616) << QString();
+        QTest::newRow("other site first")
+            << QStringLiteral("https://example.com/song?id=1 https://music.163.com/#/album?id=32311")
+            << QStringLiteral("album") << qint64(32311) << QString();
+        QTest::newRow("no netease link")
+            << QStringLiteral("周末一起去听音乐会吧 https://example.com/x")
+            << QString() << qint64(0) << QString();
+    }
+    void findsLinksInsideShareText()
+    {
+        QFETCH(QString, text);
+        QFETCH(QString, kind);
+        QFETCH(qint64, id);
+        QFETCH(QString, shortUrl);
+        const FoundLink found = findLink(text);
+        QCOMPARE(linkKindName(found.link.kind), kind);
+        QCOMPARE(found.link.id, id);
+        QCOMPARE(found.shortUrl.toString(), shortUrl);
+        QCOMPARE(found.found(), !kind.isEmpty() || !shortUrl.isEmpty());
+    }
 };
 
 QTEST_GUILESS_MAIN(LinkParserTest)

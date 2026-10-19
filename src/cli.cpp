@@ -894,7 +894,7 @@ int runGui(const CommandLine &cli, QApplication &app, Backend &backend)
     // Flatpak 与 D-Bus 认的应用 id 是 io.github.nephelesound.Yunting。只在构造时临时换成 id
     // 的末段，构造完立即还原（KDBusService 只在构造时读 applicationName）。
     // 没有会话总线时（例如离屏截图）不让单实例失败拖垮界面。
-    Links links;
+    Links links(&client);
     const QString applicationName = QCoreApplication::applicationName();
     QCoreApplication::setApplicationName(QStringLiteral("Yunting"));
     KDBusService dbusService(KDBusService::Unique | KDBusService::NoExitOnFailure);

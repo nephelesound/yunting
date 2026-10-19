@@ -49,6 +49,7 @@ class RetryTest : public QObject {
                                     + " x\r\nContent-Type: application/json\r\nContent-Length: "
                                     + QByteArray::number(body.size()) + "\r\nConnection: close\r\n"
                                     + (setCookie.isEmpty() ? QByteArray() : "Set-Cookie: " + setCookie + "\r\n")
+                                    + (location.isEmpty() ? QByteArray() : "Location: " + location + "\r\n")
                                     + "\r\n" + body);
                         sock->flush();
                     });
@@ -58,6 +59,7 @@ class RetryTest : public QObject {
         }
         QQueue<int> script;
         QByteArray setCookie;   // 非空时每个响应都带这个 Set-Cookie
+        QByteArray location;    // 非空时每个响应都带这个 Location（短链跳转）
         bool hold = false;      // 下一个请求挂起，由 release() 回包
         QPointer<QTcpSocket> held;
 
@@ -223,6 +225,28 @@ private slots:
         QCOMPARE(out.networkFailure, false);
         QCOMPARE(api.script.size(), 0);        // 404 只消耗了脚本第一条，没有重试
         QVERIFY2(clock.elapsed() < 1000, "4xx 不该等重试间隔");
+    }
+
+    // 短链：只问跳转、不跟过去，交出 Location；没有跳转就交空地址
+    void shortLinkResolvesToItsTargetWithoutFollowing()
+    {
+        FakeApi api;
+        QVERIFY(api.listen(QHostAddress::LocalHost));
+        api.script = QQueue<int>({302, 500});
+        api.location = "https://music.163.com/song?id=186001";
+        NcmClient client;
+        QUrl target;
+        bool done = false;
+        client.resolveRedirect(QUrl(baseUrl(&api) + "xLb2c3"), [&](const QUrl &t) { target = t; done = true; });
+        QTRY_VERIFY(done);
+        QCOMPARE(target, QUrl("https://music.163.com/song?id=186001"));
+
+        api.location.clear();
+        done = false;
+        client.resolveRedirect(QUrl(baseUrl(&api) + "gone"), [&](const QUrl &t) { target = t; done = true; });
+        QTRY_VERIFY(done);
+        QVERIFY(target.isEmpty());
+        QCOMPARE(api.script.size(), 0);   // 两次请求，两条脚本各用掉一条
     }
 
     // 连接被拒（无 HTTP 状态）也按同一节奏重试，耗尽后按「网络原因」分类：Store 据此报离线

@@ -76,6 +76,10 @@ explicit NcmClient(QObject *parent = nullptr, bool loadCookies = true);
     // 依赖 jar 的个人请求必须在 ready() 之后。
     void get(const QString &path, const QUrlQuery &query, bool personal, GetCallback callback);
 
+    // 网易的短链（163cn.tv）：GET 一次、不跟随跳转，回调它指向的地址；失败回调空 QUrl。
+    // 不带 cookie，不重试；照样经过流量计。
+    void resolveRedirect(const QUrl &url, std::function<void(const QUrl &target)> callback);
+
     // POST https://music.163.com/weapi/<path>，payload 经 weapi 加密（AES-CBC 两次 + RSA）。
     // 写操作不重试：重复提交红心/建歌单并不幂等。失败时 doc 为空、ok=false。
     void postWeapi(const QString &path, const QJsonObject &payload, bool personal, GetCallback callback,

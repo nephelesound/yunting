@@ -487,6 +487,33 @@ void NcmClient::get(const QString &path, const QUrlQuery &query, bool personal, 
     startGet(path, query, personal, 0, false, std::move(callback));
 }
 
+void NcmClient::resolveRedirect(const QUrl &url, std::function<void(const QUrl &target)> callback)
+{
+    if (!m_traffic.admit(QStringLiteral("GET"), url.host() + url.path(), url.query(), m_clock.elapsed())) {
+        QTimer::singleShot(0, this, [this, callback] {
+            if (callbackContextAlive())
+                callback({});
+        });
+        return;
+    }
+    QNetworkRequest req(url);
+    req.setRawHeader("User-Agent", ncm::client::userAgent().toUtf8());
+    req.setTransferTimeout(15 * 1000);
+    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+    req.setAttribute(QNetworkRequest::CookieLoadControlAttribute, QNetworkRequest::Manual);
+    req.setAttribute(QNetworkRequest::CookieSaveControlAttribute, QNetworkRequest::Manual);
+    qCDebug(lcNet).noquote() << "GET" << url.host() + url.path() << "(redirect)";
+    QNetworkReply *reply = m_nam->get(req);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, callback] {
+        reply->deleteLater();
+        const QVariant location = reply->attribute(QNetworkRequest::RedirectionTargetAttribute);
+        if (!location.isValid())
+            qWarning() << "short link did not redirect:" << reply->error();
+        if (callbackContextAlive())
+            callback(location.isValid() ? reply->url().resolved(location.toUrl()) : QUrl());
+    });
+}
+
 void NcmClient::startGet(const QString &path, const QUrlQuery &query, bool personal,
                          int attempt, bool retrying, GetCallback callback)
 {

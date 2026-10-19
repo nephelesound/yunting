@@ -5,6 +5,7 @@
 #include <QJsonObject>
 #include <QJsonParseError>
 #include <QJsonValue>
+#include <QRegularExpression>
 #include <QStringList>
 #include <QUrl>
 #include <QUrlQuery>
@@ -172,6 +173,32 @@ OpenLink parseOpenLink(const QString &text)
         return parseOrpheusPayload(text);
     }
     return parseShareUrl(text);
+}
+
+FoundLink findLink(const QString &text)
+{
+    // 链接在空白、引号、中文标点或括号处结束；末尾的英文句读不算链接
+    static const QRegularExpression candidate(
+        QStringLiteral("(?:orpheus|https?)://[^\\s<>\"'，。；、！？（）()「」『』【】]+"),
+        QRegularExpression::CaseInsensitiveOption);
+    auto matches = candidate.globalMatch(text);
+    while (matches.hasNext()) {
+        QString token = matches.next().captured();
+        while (!token.isEmpty() && QStringLiteral(".,;:!?").contains(token.back()))
+            token.chop(1);
+        FoundLink found;
+        found.link = parseOpenLink(token);
+        if (found.link.valid())
+            return found;
+        const QUrl url(token);
+        const QString scheme = url.scheme().toLower();
+        if ((scheme == QLatin1String("http") || scheme == QLatin1String("https"))
+            && url.host().toLower() == QLatin1String("163cn.tv") && url.path().size() > 1) {
+            found.shortUrl = url;
+            return found;
+        }
+    }
+    return {};
 }
 
 QString linkKindName(LinkKind kind)
