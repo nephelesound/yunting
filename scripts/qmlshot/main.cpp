@@ -1,6 +1,7 @@
 // 离屏截图：加载一个 QML 窗口，等几帧后用同步的 grabWindow() 存成 PNG。
 // 用法: qmlshot <main.qml> <out.png> [宽 高] [-- 根对象属性 key=value ...]
 #include "colortone.h"
+#include "uifont.h"
 
 #include <KLocalizedQmlContext>
 #include <QFileInfo>
@@ -37,6 +38,7 @@ int main(int argc, char *argv[])
     // 不离屏时（README 用带窗框的截图）窗管按这个 id 找图标：标题栏里是云听的图标，不是通用图标
     app.setDesktopFileName(QStringLiteral("io.github.nephelesound.Yunting"));
     ColorTone::apply();
+    UiFont::unifyCjk();
     if (qEnvironmentVariableIsEmpty("QT_QUICK_CONTROLS_STYLE"))
         QQuickStyle::setStyle(QStringLiteral("org.kde.desktop"));
 

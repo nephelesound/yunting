@@ -13,7 +13,7 @@ license=('GPL-3.0-or-later' 'MIT')   # MIT：应用图标（Microsoft Fluent Emo
 depends=(
   qt6-base qt6-declarative mpvqt mpv
   kirigami kirigami-addons kcoreaddons kdbusaddons kwindowsystem ki18n kcolorscheme kconfig kstatusnotifieritem prison
-  qtkeychain-qt6 openssl
+  qtkeychain-qt6 openssl fontconfig
   layer-shell-qt   # Wayland 下桌面歌词置顶
   zstd
 )

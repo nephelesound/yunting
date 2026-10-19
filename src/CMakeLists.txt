@@ -16,6 +16,7 @@ find_package(KF6ColorScheme REQUIRED)  # 中性配色下的应用色调（colort
 find_package(KF6Config REQUIRED)
 find_package(KF6I18n REQUIRED)         # kirigami-addons 的页面（「关于」）在 QML 里用 i18nd()
 find_package(OpenSSL REQUIRED COMPONENTS Crypto)
+find_package(Fontconfig REQUIRED)        # 中日文回退落在同一款字（uifont.cpp）
 find_package(LayerShellQt QUIET)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(ZSTD QUIET libzstd)
@@ -72,6 +73,7 @@ qt_add_executable(yunting
     clipboardhelper.h
     diagnostics.h diagnostics.cpp
     colortone.h colortone.cpp
+    uifont.h uifont.cpp
     powerinhibitor.h powerinhibitor.cpp
     crypto.h crypto.cpp
     perf.h perf.cpp
@@ -116,6 +118,7 @@ target_link_libraries(yunting PRIVATE
     KF6::DBusAddons
     KF6::WindowSystem
     OpenSSL::Crypto
+    Fontconfig::Fontconfig
 )
 if (LayerShellQt_FOUND)
     target_compile_definitions(yunting PRIVATE YUNTING_LAYERSHELL=1)

@@ -3,6 +3,7 @@
 #include "cli.h"
 #include "colortone.h"
 #include "link_parser.h"
+#include "uifont.h"
 
 #include <KAboutData>
 #include <QApplication>
@@ -115,6 +116,8 @@ int main(int argc, char *argv[])
     KAboutData::setApplicationData(about);
     // 系统配色是中性灰时给本应用染上强调色的色调（要在任何窗口之前，缓存目录要用到上面的应用名）
     ColorTone::apply();
+    // 中日文落在同一款字上，Flatpak 里也与系统一致
+    UiFont::unifyCjk();
     // 任务栏/窗口图标：装好后走主题；从源码运行时用内嵌 SVG，避免显示通用占位图标
     QIcon appIcon = QIcon::fromTheme(QStringLiteral("io.github.nephelesound.Yunting"));
     if (appIcon.isNull())

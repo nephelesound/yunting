@@ -144,7 +144,7 @@ makepkg -si
 
 ### 从源码构建
 
-依赖：Qt 6（Base、Declarative）、MpvQt、libmpv、Kirigami、Kirigami Addons、KCoreAddons、KDBusAddons、KWindowSystem、KI18n、KColorScheme、KConfig、KStatusNotifierItem、Prison、QtKeychain、OpenSSL。可选依赖：LayerShellQt（在 Wayland 下置顶桌面歌词）、zstd。
+依赖：Qt 6（Base、Declarative）、MpvQt、libmpv、Kirigami、Kirigami Addons、KCoreAddons、KDBusAddons、KWindowSystem、KI18n、KColorScheme、KConfig、KStatusNotifierItem、Prison、QtKeychain、OpenSSL、Fontconfig。可选依赖：LayerShellQt（在 Wayland 下置顶桌面歌词）、zstd。
 
 ```bash
 git clone https://github.com/nephelesound/yunting.git
