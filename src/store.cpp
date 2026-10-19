@@ -110,6 +110,8 @@ Store::Store(NcmClient *client, QObject *parent)
         {"dynamicCover", nullVariant()},
         {"commentReplies", nullVariant()},
         {"playlistCommentReplies", nullVariant()},
+        {"similarSongs", nullVariant()},
+        {"similarPlaylists", nullVariant()},
         {"lyricsNew", nullVariant()},
         // 匿名发现：形状见 docs/API-FRONTEND.md「已实现的新增数据槽」。没取之前是 null，[] 是取到了但为空
         {"searchSuggest", nullVariant()},

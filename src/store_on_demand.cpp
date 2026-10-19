@@ -118,6 +118,10 @@ void Store::request(const QString &key)
              s.requestPlaylistCommentReplies(parts.value(1).toDouble(),
                                              parts.value(2).toDouble(),
                                              parts.value(3).toLongLong()); }},
+        {QStringLiteral("similarSongs:"), [](Store &s, const QString &k) {
+             s.requestSimilarSongs(k, k.section(u':', 1).toDouble()); }},
+        {QStringLiteral("similarPlaylists:"), [](Store &s, const QString &k) {
+             s.requestSimilarPlaylists(k, k.section(u':', 1).toDouble()); }},
         {QStringLiteral("artistSongs:"), [](Store &s, const QString &k) {
              const QStringList parts = k.split(u':');
              s.requestArtistSongs(k, parts.value(1).toDouble(), parts.value(2).toInt()); }},
@@ -397,6 +401,72 @@ void Store::requestSearch(const QString &key, const QString &raw)
             // 用户已经输入了更新的搜索词：旧请求晚到也不能覆盖当前结果
             if (generation == m_searchGeneration)
                 put("search", result, false);
+        });
+}
+
+// 当前歌曲的相似歌曲：与首页的 personal.similar 分开，按任意 songId 取。
+void Store::requestSimilarSongs(const QString &key, double songId)
+{
+    if (!(songId > 0))
+        return;
+    const quint64 token = m_requests.begin(QStringLiteral("similarSongs"));
+    m_cache.query(key,
+        [this, songId](QueryCache::Done done) {
+            m_client->get(QStringLiteral("api/v1/discovery/simiSong"),
+                          query({{"songid", num(songId)}, {"limit", "20"}}), false,
+                          [done, songId](const QJsonDocument &doc, bool ok) {
+                const QJsonObject resp = body(doc);
+                if (!ok || resp.value("code").toInt() != 200) {
+                    done({}, false);
+                    return;
+                }
+                const auto parsed = sdk::parseTracks(arr(resp, "songs"));
+                if (!parsed) {
+                    done({}, false);
+                    return;
+                }
+                done(QVariantMap{{"songId", songId},
+                                 {"tracks", sdk::tracksToVariantList(*parsed.value)}},
+                     true);
+            });
+        },
+        [this, token](const QVariant &result) {
+            if (m_requests.current(QStringLiteral("similarSongs"), token))
+                put("similarSongs", result, false);
+        });
+}
+
+// 当前歌曲的相似歌单：接口按 songid 推荐，不是「包含这首歌」的精确反查。
+void Store::requestSimilarPlaylists(const QString &key, double songId)
+{
+    if (!(songId > 0))
+        return;
+    const quint64 token = m_requests.begin(QStringLiteral("similarPlaylists"));
+    m_cache.query(key,
+        [this, songId](QueryCache::Done done) {
+            m_client->get(QStringLiteral("api/discovery/simiPlaylist"),
+                          query({{"songid", num(songId)}, {"limit", "20"}, {"offset", "0"}}), false,
+                          [done, songId](const QJsonDocument &doc, bool ok) {
+                const QJsonObject resp = body(doc);
+                if (!ok || resp.value("code").toInt() != 200) {
+                    done({}, false);
+                    return;
+                }
+                const auto parsed = sdk::parsePlaylistCards(arr(resp, "playlists"), "coverImgUrl");
+                if (!parsed) {
+                    done({}, false);
+                    return;
+                }
+                QVariantList items;
+                items.reserve(parsed.value->size());
+                for (const sdk::PlaylistCard &card : *parsed.value)
+                    items.append(sdk::playlistCardToVariantMap(card));
+                done(QVariantMap{{"songId", songId}, {"items", items}}, true);
+            });
+        },
+        [this, token](const QVariant &result) {
+            if (m_requests.current(QStringLiteral("similarPlaylists"), token))
+                put("similarPlaylists", result, false);
         });
 }
 

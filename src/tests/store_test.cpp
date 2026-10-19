@@ -1352,6 +1352,49 @@ private slots:
         QCOMPARE(page.value("items").toList().first().toMap().value("replyCount").toDouble(), 5.0);
     }
 
+    // 任意歌曲的相似歌曲/相似歌单按 songId 取，和首页的全局 similar 分槽
+    void songSimilarRequestsUseSongId()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            const QUrlQuery q(QString::fromLatin1(req.query));
+            if (req.path == "/api/v1/discovery/simiSong") {
+                QCOMPARE(q.queryItemValue(QStringLiteral("songid")), QStringLiteral("108485"));
+                const QJsonObject song{{"id", 42}, {"name", "相似歌"},
+                                       {"duration", 1000}, {"fee", 0},
+                                       {"artists", QJsonArray{QJsonObject{{"id", 7}, {"name", "歌手"}}}},
+                                       {"album", QJsonObject{{"id", 8}, {"name", "专辑"}}}};
+                respond(200, QJsonDocument(QJsonObject{{"code", 200},
+                                                       {"songs", QJsonArray{song}}})
+                                 .toJson(QJsonDocument::Compact));
+                return;
+            }
+            if (req.path == "/api/discovery/simiPlaylist") {
+                QCOMPARE(q.queryItemValue(QStringLiteral("songid")), QStringLiteral("108485"));
+                const QJsonObject playlist{{"id", 99}, {"name", "相似歌单"},
+                                           {"coverImgUrl", "http://cover/p.jpg"},
+                                           {"trackCount", 3}};
+                respond(200, QJsonDocument(QJsonObject{{"code", 200},
+                                                       {"playlists", QJsonArray{playlist}}})
+                                 .toJson(QJsonDocument::Compact));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("similarSongs:108485"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("similarSongs").toMap().value("tracks").toList().size() == 1;
+        }));
+        QCOMPARE(m_store->data().value("similarSongs").toMap().value("songId").toDouble(), 108485.0);
+        QCOMPARE(m_store->data().value("similarSongs").toMap().value("tracks").toList().first().toMap().value("id").toDouble(), 42.0);
+
+        m_store->request(QStringLiteral("similarPlaylists:108485"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("similarPlaylists").toMap().value("items").toList().size() == 1;
+        }));
+        QCOMPARE(m_store->data().value("similarPlaylists").toMap().value("items").toList().first().toMap().value("id").toDouble(), 99.0);
+    }
+
     // 歌单评论用 A_PL_0_ 线程，槽位与歌曲评论分离；分页也走同一套 cursor 逻辑
     void playlistCommentsUsePlaylistThread()
     {

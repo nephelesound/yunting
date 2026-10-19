@@ -212,6 +212,9 @@ private:
     void requestPlaylistComments(const QString &key, double playlistId);
     void requestPlaylistCommentPage(const QString &key, double playlistId, int offset);
     void requestPlaylistCommentReplies(double playlistId, double commentId, qint64 before);
+    // 当前歌曲的相似歌曲 / 相似歌单（按 songid 取，不是首页的全局种子）
+    void requestSimilarSongs(const QString &key, double songId);
+    void requestSimilarPlaylists(const QString &key, double songId);
     void requestArtist(const QString &key, double artistId);
     void requestArtistSongs(const QString &key, double artistId, int offset);
     void requestAlbum(const QString &key, double albumId);
