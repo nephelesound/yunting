@@ -175,6 +175,10 @@ private:
     bool m_heartbeatInFlight = false;
 
     qint64 m_lastServerSeq = 0;
+    // 同一次切歌可能同时下发 NEXT 和 GOTO；同一目标在短窗口内只应用一次。
+    qint64 m_lastRemoteTargetId = 0;
+    qint64 m_lastRemoteTargetMs = 0;
+    bool m_lastRemoteWasRelative = false;
     qint64 m_playlistVersion = 0;      // 本机最近一次发出的歌单版本（迟到的回包不覆盖新的）
     // 各成员的歌单版本（userId → version，同步回包里的）与播放模式：改歌单时原样带回，自己的 +1。
     // 只带自己的版本时服务器不认这次改动，对方的列表就不变

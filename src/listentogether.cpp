@@ -268,6 +268,9 @@ void ListenTogether::adoptRoom(const sdk::ListenTogetherRoom &room, qint64 invit
         ++m_queueGeneration;
         stopTimers();
         m_lastServerSeq = 0;
+        m_lastRemoteTargetId = 0;
+        m_lastRemoteTargetMs = 0;
+        m_lastRemoteWasRelative = false;
         m_clientSeq = 0;
         m_playlistVersion = 0;
         m_versions.clear();
@@ -371,6 +374,9 @@ void ListenTogether::clearRoom(bool emitLeft)
     m_trackIds.clear();
     m_shareUrl.clear();
     m_lastServerSeq = 0;
+    m_lastRemoteTargetId = 0;
+    m_lastRemoteTargetMs = 0;
+    m_lastRemoteWasRelative = false;
     m_clientSeq = 0;
     m_playlistVersion = 0;
     m_versions.clear();
@@ -865,6 +871,26 @@ void ListenTogether::applyCommand(const sdk::ListenTogetherCommand &command)
 
 void ListenTogether::emitCommand(const sdk::ListenTogetherCommand &command)
 {
+    const QString &type = command.commandType;
+    const bool relative = isCommandType(type, "NEXT") || isCommandType(type, "PREV");
+    const bool songChange = relative || isCommandType(type, "GOTO");
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    // 一次“下一首”可能同时产生 NEXT 和 GOTO 两条命令。目标相同时只应用第一条，
+    // 否则会连跳两首；PLAY/PAUSE/seek 不参与去重。
+    if (songChange && command.targetSongId > 0
+        && command.targetSongId == m_lastRemoteTargetId
+        && (relative || m_lastRemoteWasRelative)
+        && now - m_lastRemoteTargetMs < 1500) {
+        qCDebug(lcListen) << "ignore duplicate remote target" << command.targetSongId
+                          << command.commandType << command.serverSeq;
+        return;
+    }
+    if (songChange && command.targetSongId > 0) {
+        m_lastRemoteTargetId = command.targetSongId;
+        m_lastRemoteTargetMs = now;
+        m_lastRemoteWasRelative = relative;
+    }
+
     // 兼容 PLAY / PLAYING 两种写法；PAUSE 等其余值一律按未播放处理。
     const bool playing =
         command.playStatus.compare(QStringLiteral("PLAY"), Qt::CaseInsensitive) == 0
@@ -872,7 +898,6 @@ void ListenTogether::emitCommand(const sdk::ListenTogetherCommand &command)
     // 对方发指令时在 progress 处；正在放的话，到我们这里已经往前走了一段。serverSeq 是服务器收到
     // 指令的毫秒时间戳：在十分钟以内才认（不像时间戳、或时钟差得离谱时不补，按原位置）
     qint64 progress = command.progress;
-    const qint64 now = QDateTime::currentMSecsSinceEpoch();
     if (playing && command.serverSeq > 1000000000000LL && std::abs(now - command.serverSeq) < 600000)
         progress += std::max<qint64>(0, now - command.serverSeq);
     emit commandReceived(command.commandType, static_cast<double>(command.targetSongId),
