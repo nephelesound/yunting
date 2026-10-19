@@ -26,6 +26,7 @@ RowLayout {
         visible: row.person
         name: row.user.name || ""
         source: row.user.avatar || ""
+        pendant: row.user.avatarPendant || ""
         HoverHandler { enabled: (row.user.id || 0) > 0; cursorShape: Qt.PointingHandCursor }
         TapHandler { enabled: (row.user.id || 0) > 0; onTapped: Actions.openUser(row.user.id) }
     }

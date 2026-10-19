@@ -346,7 +346,7 @@ QtObject {
     function emptyUser(id, failed) {
         return { id: id, name: "", avatar: "", background: "", signature: "",
                  followed: false, follows: 0, followeds: 0, playlistCount: 0,
-                 vipType: 0, vipRights: {}, level: 0, listenSongs: 0,
+                 vipLevel: "", avatarPendant: "", level: 0, listenSongs: 0,
                  createTime: 0, mutual: false, playlists: [], restricted: false,
                  failed: failed };
     }

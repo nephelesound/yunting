@@ -362,6 +362,7 @@ ScreenFrame {
                         caption: page.caption(modelData)
                         cover: modelData.cover
                         round: page.collection === "artists" || page.collection === "users"
+                        pendant: page.collection === "users" ? modelData.avatarPendant || "" : ""
                         onClicked: page.collection === "artists" ? Actions.openArtist(modelData.id)
                                  : page.collection === "users" ? Actions.openUser(modelData.id)
                                  : page.collection === "albums" ? Actions.openAlbum(modelData.id)

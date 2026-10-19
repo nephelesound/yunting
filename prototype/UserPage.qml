@@ -102,11 +102,19 @@ ScreenFrame {
             Layout.maximumWidth: Tokens.trackColumn
             spacing: 0
 
-            PersonAvatar {
+            // 有挂件时头像缩到这一格的三分之二，挂件（头像的 1.5 倍）正好铺满这一格，不伸出左栏
+            Item {
                 Layout.preferredWidth: Tokens.trackColumn
                 Layout.preferredHeight: Tokens.trackColumn
-                name: page.user.name
-                source: page.user.avatar
+                PersonAvatar {
+                    readonly property bool framed: (page.user.avatarPendant || "").length > 0
+                    anchors.centerIn: parent
+                    width: framed ? parent.width / 1.5 : parent.width
+                    height: width
+                    name: page.user.name
+                    source: page.user.avatar
+                    pendant: page.user.avatarPendant || ""
+                }
             }
 
             RowLayout {

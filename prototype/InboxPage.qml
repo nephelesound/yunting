@@ -136,6 +136,7 @@ ScreenFrame {
                     || ({ userId: 0, name: "", avatar: "", lastText: "", lastTime: 0, unread: 0 })
                 width: ListView.view.width - ListView.view.rightMargin
                 avatar: conversation.avatar
+                pendant: conversation.avatarPendant || ""
                 name: conversation.name
                 // 后端给的最后一句：对方说的话，没说话时是分享物的名字（再包一层「分享了…」会重复书名号）
                 detail: conversation.lastText
@@ -221,6 +222,7 @@ ScreenFrame {
                         implicitHeight: Tokens.height8
                         name: message.messageData.fromName
                         source: message.messageData.fromAvatar
+                        pendant: message.messageData.fromAvatarPendant || ""
                     }
                     // 贴左上：只有分享物（固定宽）时列比行窄，不能被居中
                     ColumnLayout {

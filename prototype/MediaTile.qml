@@ -15,6 +15,9 @@ AbstractButton {
     property string symbol      // 无封面时显示的图标
     property bool locked        // 需要登录：图标换成锁，点击触发登录
     property bool round         // 人物（歌手）用圆形，这是通行约定；其余都是方形
+    // 用户的头像挂件：头像缩到方块的三分之二居中，挂件（头像的 1.5 倍）正好铺满方块，不伸到旁边的磁贴上
+    property string pendant
+    readonly property real inset: tile.pendant.length > 0 ? tile.size / 6 : 0
 
     readonly property real corner: tile.round ? tile.size / 2 : Tokens.radius
 
@@ -50,6 +53,7 @@ AbstractButton {
 
             Cover {
                 anchors.fill: parent
+                anchors.margins: tile.inset
                 visible: !parent.emblem
                 source: tile.cover
                 pixelSize: 400
@@ -72,10 +76,20 @@ AbstractButton {
             // 悬停：封面上叠一层强调色淡色调（与曲目行悬停同一令牌）；按下再深一档
             Rectangle {
                 anchors.fill: parent
+                anchors.margins: tile.inset
                 visible: !parent.emblem
                 radius: tile.corner
                 color: Qt.alpha(Kirigami.Theme.highlightColor, tile.down ? Tokens.tintPressed : tile.hovered ? Tokens.tintHover : 0)
                 Behavior on color { ColorAnimation { duration: Tokens.motionFast } }
+            }
+            Image {
+                anchors.fill: parent
+                visible: tile.pendant.length > 0 && status === Image.Ready
+                source: tile.pendant
+                sourceSize.width: 2 * tile.size
+                sourceSize.height: 2 * tile.size
+                fillMode: Image.PreserveAspectFit
+                asynchronous: true
             }
             // 键盘焦点：强调色描边，只在 Tab 导航时出现
             Rectangle {
