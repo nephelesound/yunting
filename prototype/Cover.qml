@@ -1,4 +1,5 @@
-// 封面：真实图片 + 默认圆角，无描边无投影。全应用只有这一种封面画法（含占位）。
+// 封面：真实图片 + 默认圆角，无描边，默认无投影。全应用只有这一种封面画法（含占位）。
+// 投影只给正在播放页的大封面（shadowSize > 0）：那一页它是主角，像一张放在桌上的封套
 import QtQuick
 import org.kde.kirigami as Kirigami
 
@@ -8,6 +9,8 @@ Item {
     property alias source: image.source
     property int pixelSize: 300
     property int radius: Tokens.radius
+    property real shadowSize: 0
+    property real shadowYOffset: 0
 
     // 占位：加载中、没有封面、链接失效时都一样，是淡底 + 专辑图标，不留一个看起来像渲染出错的空方块
     Rectangle {
@@ -43,6 +46,9 @@ Item {
         source: image.status === Image.Ready ? image : null
         radius: cover.radius
         color: "transparent"
+        shadow.size: cover.shadowSize
+        shadow.yOffset: cover.shadowYOffset
+        shadow.color: Qt.alpha("black", Tokens.track)
         opacity: image.status === Image.Ready ? 1 : 0
         Behavior on opacity {
             NumberAnimation { duration: Tokens.motionBase; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut }

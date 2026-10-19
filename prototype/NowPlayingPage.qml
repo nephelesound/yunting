@@ -76,6 +76,16 @@ ScreenFrame {
             pixelSize: 800
             // 共享封面转场飞行时隐藏，落地后再显示：屏上永远只有一张封面
             opacity: page.coverHidden ? 0 : 1
+            // 微圆角、微投影；放歌时封面微微浮起（投影拉长），暂停时落下一点、投影收紧
+            radius: Tokens.radiusLg
+            shadowSize: page.playing ? Tokens.space4 : Tokens.space2
+            shadowYOffset: page.playing ? Tokens.space2 : Tokens.space1
+            transform: Translate {
+                y: page.playing ? 0 : Tokens.space1
+                Behavior on y { NumberAnimation { duration: Tokens.motionBase; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut } }
+            }
+            Behavior on shadowSize { NumberAnimation { duration: Tokens.motionBase; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut } }
+            Behavior on shadowYOffset { NumberAnimation { duration: Tokens.motionBase; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut } }
 
             // 动态封面（登录后，少数歌有的循环小视频）：盖在封面上，不出声。只在这一页、正在放歌时才转，
             // 暂停、换歌或离开就把播放器拆掉（不在后台解码）；没有动态封面时就是普通封面。
@@ -112,6 +122,21 @@ ScreenFrame {
                     property: "source"
                     value: dynamicCover.loaded
                 }
+            }
+            // 视频画面是方的：先画进一张纹理，再按封面的圆角贴上去，四角不露出来
+            ShaderEffectSource {
+                id: dynamicTexture
+                sourceItem: dynamicCover.item as Item
+                hideSource: true
+                visible: false
+            }
+            Kirigami.ShadowedTexture {
+                anchors.fill: parent
+                visible: dynamicCover.item !== null
+                source: dynamicCover.item !== null ? dynamicTexture : null
+                radius: pageCover.radius
+                color: "transparent"
+                opacity: dynamicCover.opacity
             }
         }
         Facts {
