@@ -88,8 +88,8 @@ public:
     Q_INVOKABLE void setAlbumSubscribed(double id, bool subscribed);
     // 关注 / 取关用户：成功发 userFollowChanged 并同步已有用户行，失败发 followFailed
     Q_INVOKABLE void setUserFollowed(double userId, bool followed);
-    // 评论点赞：乐观更新 comments / commentPage，失败回滚并发 commentLikeFailed
-    Q_INVOKABLE void setCommentLiked(double songId, double commentId, bool liked);
+    // 评论点赞：kind 为 "song" / "playlist"；乐观更新该线程的热评与分页槽，失败回滚并发 commentLikeFailed
+    Q_INVOKABLE void setCommentLiked(const QString &kind, double ownerId, double commentId, bool liked);
 
 public slots:
     // AudioEngine 打卡成功后调用：本地「最近播放」立刻反映刚听的歌，不必等下次 refresh
@@ -115,8 +115,8 @@ signals:
     void albumChanged(double id, bool subscribed);
     void userFollowChanged(double id, bool followed);
     void followFailed(const QString &action, const QString &message);
-    void commentLikeFailed(double songId, double commentId, const QString &message);
-    void commentLikeSucceeded(double songId, double commentId, bool liked);
+    void commentLikeFailed(const QString &kind, double ownerId, double commentId, const QString &message);
+    void commentLikeSucceeded(const QString &kind, double ownerId, double commentId, bool liked);
     // 按需请求失败（含信箱与私信对话）：请求时的 key 与给用户看的一句话；成功走 dataChanged
     void requestFailed(const QString &key, const QString &message);
     // 预期内的不可见状态（例如对方设置了隐私）：在对应页面内说明，不弹全局错误
@@ -173,9 +173,10 @@ private:
     void flushDebouncedWrites();
     void flushLike(double songId);
     void flushCommentLike(const QString &key);
-    void sendCommentLike(const QString &key, double songId, double commentId, bool liked);
-    void applyCommentLike(double songId, double commentId, bool liked, int delta);
-    std::optional<bool> commentLiked(double songId, double commentId) const;
+    void sendCommentLike(const QString &key, const QString &kind, double ownerId,
+                         double commentId, bool liked);
+    void applyCommentLike(const QString &kind, double ownerId, double commentId, bool liked, int delta);
+    std::optional<bool> commentLiked(const QString &kind, double ownerId, double commentId) const;
     bool isLiked(double songId) const;
     // 首屏快照落盘：只存首屏字段，搜索/评论/详情等按需数据不写进 screen:data
     void persistScreenData();
@@ -207,7 +208,7 @@ private:
     void requestCommentRepliesFor(const QString &threadId, double ownerId,
                                   const QString &ownerKey, const QString &slot,
                                   const QString &failureKey, double commentId, qint64 before);
-    // 歌单评论：A_PL_0_<id>，键为 playlistComments:<id>[:<offset>]；只读
+    // 歌单评论：A_PL_0_<id>，键为 playlistComments:<id>[:<offset>]
     void requestPlaylistComments(const QString &key, double playlistId);
     void requestPlaylistCommentPage(const QString &key, double playlistId, int offset);
     void requestPlaylistCommentReplies(double playlistId, double commentId, qint64 before);
@@ -308,7 +309,7 @@ private:
         bool desired = false;
         bool inFlight = false;
     };
-    QHash<QString, CommentLikeState> m_commentLikes; // songId:commentId 的防抖/在途意图
+    QHash<QString, CommentLikeState> m_commentLikes; // kind:ownerId:commentId 的防抖/在途意图
     QTimer m_writeDebounce;
     QHash<QString, std::function<void()>> m_debouncedWrites;
 };

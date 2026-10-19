@@ -985,14 +985,14 @@ private slots:
         QVERIFY(waitUntil([&] {
             return m_store->data().value("comments").toMap().value("items").toList().size() == 2;
         }));
-        m_store->setCommentLiked(1, 500, true);
+        m_store->setCommentLiked(QStringLiteral("song"), 1, 500, true);
         QVERIFY(waitUntil([&] {
             const QVariantMap c = m_store->data().value("comments").toMap().value("items").toList().first().toMap();
             return c.value("liked").toBool() && c.value("likes").toDouble() == 11;
         }));
 
         QSignalSpy failed(m_store, &Store::commentLikeFailed);
-        m_store->setCommentLiked(1, 501, false);
+        m_store->setCommentLiked(QStringLiteral("song"), 1, 501, false);
         QVERIFY(waitUntil([&] { return failed.count() == 1; }));
         const QVariantMap second = m_store->data().value("comments").toMap().value("items").toList().at(1).toMap();
         QVERIFY(second.value("liked").toBool());
@@ -1009,9 +1009,9 @@ private slots:
             respond(400, "{\"code\":250,\"message\":\"系统检测到您的设备存在安全风险\"}");
         };
         QSignalSpy failed(m_store, &Store::commentLikeFailed);
-        m_store->setCommentLiked(1, 888, true);
+        m_store->setCommentLiked(QStringLiteral("song"), 1, 888, true);
         QVERIFY(waitUntil([&] { return failed.count() == 1; }));
-        QCOMPARE(failed.first().at(2).toString(),
+        QCOMPARE(failed.first().at(3).toString(),
                  QStringLiteral("系统检测到您的设备存在安全风险"));
     }
 
@@ -1033,8 +1033,8 @@ private slots:
         m_api->handler = [](const FakeApi::Request &, const FakeApi::Responder &respond) {
             respond(200, "{\"code\":200}");
         };
-        m_store->setCommentLiked(1, 999, true);
-        m_store->setCommentLiked(1, 999, false);
+        m_store->setCommentLiked(QStringLiteral("song"), 1, 999, true);
+        m_store->setCommentLiked(QStringLiteral("song"), 1, 999, false);
         QTest::qWait(500);
         int writes = 0;
         for (const FakeApi::Request &req : std::as_const(m_api->requests))
@@ -1051,7 +1051,7 @@ private slots:
             respond(200, "{\"code\":200}");
         };
         m_api->requests.clear();
-        m_store->setCommentLiked(1, 777, true);
+        m_store->setCommentLiked(QStringLiteral("song"), 1, 777, true);
         QVERIFY(waitUntil([&] {
             for (const FakeApi::Request &req : std::as_const(m_api->requests))
                 if (req.path == "/weapi/v1/comment/like")
@@ -1180,6 +1180,103 @@ private slots:
         QCOMPARE(page.value("total").toDouble(), 1.0);
         QVERIFY(threads.size() >= 2);
         QCOMPARE(threads.last(), QByteArray("A_PL_0_42"));
+    }
+
+    // 歌单评论点赞与歌曲走同一套乐观更新：热评与分页两个槽一起改，取消时一起改回
+    void playlistCommentLikeAndUnlikeUpdateBothSlots()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/v2/resource/comments") {
+                const QJsonObject comment{
+                    {"commentId", 501}, {"content", "playlist comment"}, {"likedCount", 2},
+                    {"time", 10}, {"liked", false},
+                    {"user", QJsonObject{{"userId", 7}, {"nickname", "u"}}},
+                };
+                respond(200, json(QJsonObject{{"code", 200}, {"data", QJsonObject{
+                    {"comments", QJsonArray{comment}}, {"cursor", "10"},
+                    {"hasMore", false}, {"totalCount", 1}}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("playlistComments:42"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("playlistComments").toMap().value("items").toList().size() == 1;
+        }));
+        m_store->request(QStringLiteral("playlistComments:42:0"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("playlistCommentPage").toMap().value("items").toList().size() == 1;
+        }));
+
+        QSignalSpy succeeded(m_store, &Store::commentLikeSucceeded);
+        m_store->setCommentLiked(QStringLiteral("playlist"), 42, 501, true);
+        QVERIFY(waitUntil([&] { return succeeded.count() == 1; }));
+        QCOMPARE(succeeded.first().at(0).toString(), QStringLiteral("playlist"));
+        QCOMPARE(succeeded.first().at(1).toDouble(), 42.0);
+        QCOMPARE(succeeded.first().at(2).toDouble(), 501.0);
+        QCOMPARE(succeeded.first().at(3).toBool(), true);
+        for (const char *slot : {"playlistComments", "playlistCommentPage"}) {
+            const QVariantMap row = m_store->data().value(QString::fromLatin1(slot)).toMap()
+                                        .value("items").toList().first().toMap();
+            QCOMPARE(row.value("liked").toBool(), true);
+            QCOMPARE(row.value("likes").toDouble(), 3.0);
+        }
+
+        m_store->setCommentLiked(QStringLiteral("playlist"), 42, 501, false);
+        QVERIFY(waitUntil([&] { return succeeded.count() == 2; }));
+        QCOMPARE(succeeded.at(1).at(3).toBool(), false);
+        for (const char *slot : {"playlistComments", "playlistCommentPage"}) {
+            const QVariantMap row = m_store->data().value(QString::fromLatin1(slot)).toMap()
+                                        .value("items").toList().first().toMap();
+            QCOMPARE(row.value("liked").toBool(), false);
+            QCOMPARE(row.value("likes").toDouble(), 2.0);
+        }
+    }
+
+    // 歌单评论点赞失败：两个槽都回滚，信号带上 playlist 身份
+    void playlistCommentLikeFailureRollsBackBothSlots()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/v2/resource/comments") {
+                const QJsonObject comment{
+                    {"commentId", 501}, {"content", "playlist comment"}, {"likedCount", 2},
+                    {"time", 10}, {"liked", false},
+                    {"user", QJsonObject{{"userId", 7}, {"nickname", "u"}}},
+                };
+                respond(200, json(QJsonObject{{"code", 200}, {"data", QJsonObject{
+                    {"comments", QJsonArray{comment}}, {"cursor", "10"},
+                    {"hasMore", false}, {"totalCount", 1}}}}));
+                return;
+            }
+            if (req.path == "/weapi/v1/comment/like") {
+                respond(200, "{\"code\":500,\"message\":\"no\"}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("playlistComments:42"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("playlistComments").toMap().value("items").toList().size() == 1;
+        }));
+        m_store->request(QStringLiteral("playlistComments:42:0"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("playlistCommentPage").toMap().value("items").toList().size() == 1;
+        }));
+
+        QSignalSpy failed(m_store, &Store::commentLikeFailed);
+        m_store->setCommentLiked(QStringLiteral("playlist"), 42, 501, true);
+        QVERIFY(waitUntil([&] { return failed.count() == 1; }));
+        QCOMPARE(failed.first().at(0).toString(), QStringLiteral("playlist"));
+        QCOMPARE(failed.first().at(1).toDouble(), 42.0);
+        QCOMPARE(failed.first().at(2).toDouble(), 501.0);
+        for (const char *slot : {"playlistComments", "playlistCommentPage"}) {
+            const QVariantMap row = m_store->data().value(QString::fromLatin1(slot)).toMap()
+                                        .value("items").toList().first().toMap();
+            QCOMPARE(row.value("liked").toBool(), false);
+            QCOMPARE(row.value("likes").toDouble(), 2.0);
+        }
     }
 
     // 冷启动直接要第 N 页（CLI / 缓存清空）时没有上一页的 cursor：从头顺序补，不能把第一页当成第 N 页

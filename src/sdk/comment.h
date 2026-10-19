@@ -1,11 +1,14 @@
 #pragma once
-// Comment SDK — typed models for the song comment surfaces.
+// Comment SDK — typed models for the song and playlist comment surfaces.
 //
 // Raw endpoints:
 //   GET  api/v2/resource/comments          hot (sortType=2) and cursor pages (sortType=3)
 //        data.comments[], data.totalCount, data.cursor, data.hasMore
 //   POST /weapi/resource/comment/floor/get replies of one comment
 //        data.comments[] (fallback root comments[]), root more
+//   POST /weapi/v1/comment/like           like one comment (personal write)
+//   POST /weapi/v1/comment/unlike         unlike it
+//        threadId is the resource prefix plus the owner id
 //
 // `comments` is optional in both payloads: an absent or null array means the
 // thread/floor has no comments yet and parses as an empty list. Every present
@@ -25,8 +28,16 @@
 #include <QJsonObject>
 #include <QList>
 #include <QString>
+#include <functional>
+
+class NcmClient;
+class QObject;
 
 namespace ncm::sdk {
+
+// Comment threads are addressed by a resource prefix: songs R_SO_4_,
+// playlists A_PL_0_ (docs/reference/ncm-api-enhanced/module/comment_like.js).
+enum class CommentThreadKind { Song, Playlist };
 
 // One entry of a comment's beReplied[] array ("回复 @某人").
 struct RepliedComment {
@@ -67,6 +78,24 @@ struct CommentReplyPage {
     QList<Comment> comments; // data.comments[], fallback comments[]
     bool more = false;       // root more
 };
+
+// threadId of a song (R_SO_4_<id>) or playlist (A_PL_0_<id>) comment thread.
+QString commentThreadId(CommentThreadKind kind, qint64 ownerId);
+
+// The comment and state the server accepted. Echoes the intent: the like
+// endpoints answer only with a business code.
+struct CommentLikeState {
+    qint64 commentId = 0; // commentId sent
+    bool liked = false;   // intended state accepted by the server
+};
+
+using CommentLikeCallback = std::function<void(Result<CommentLikeState>)>;
+
+// Like/unlike one comment. This is a write: no retry, requires the stored
+// MUSIC_U cookie. ownerId/commentId <= 0 fail locally without a request.
+void setCommentLiked(NcmClient &client, CommentThreadKind kind, qint64 ownerId,
+                     qint64 commentId, bool liked, QObject *context,
+                     CommentLikeCallback callback);
 
 Result<CommentPage> parseHotComments(const QJsonObject &root);
 Result<CommentPage> parseCommentPage(const QJsonObject &root);

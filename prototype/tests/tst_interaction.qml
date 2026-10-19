@@ -433,21 +433,18 @@ Item {
             spy.destroy();
         }
 
-        // 评论点赞从页面转发到后端时，参数不能丢（songId, commentId, 目标状态）。
+        // 评论点赞从页面转发到后端时，参数不能丢（线程种类与 id、commentId、目标状态）：歌单评论也能赞。
         function test_commentLikeForwardsToLive() {
             const calls = [];
             const saved = Source.live;
             Source.live = {
-                setCommentLiked: function(songId, commentId, liked) {
-                    calls.push([songId, commentId, liked]);
+                setCommentLiked: function(kind, ownerId, commentId, liked) {
+                    calls.push([kind, ownerId, commentId, liked]);
                 }
             };
-            Source.setCommentLiked(1456890009, 9667509659, true);
+            Source.setCommentLiked(Source.commentThread("playlist", 24381616), 9667509659, true);
             Source.live = saved;
-            compare(calls.length, 1);
-            compare(calls[0][0], 1456890009);
-            compare(calls[0][1], 9667509659);
-            compare(calls[0][2], true);
+            compare(calls, [["playlist", 24381616, 9667509659, true]]);
         }
 
         // 评论行：「N 条回复」展开楼中楼；楼中楼里回复的正是父评论时不再引一遍；长评论折起后可展开

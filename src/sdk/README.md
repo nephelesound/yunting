@@ -45,7 +45,7 @@ NcmClient                 传输（cookie、weapi/明文、超时）
 - `library.h/.cpp`：歌手/专辑/MV 收藏列表分页（登录 weapi）。
 - `dynamic_cover.h/.cpp`：动态封面 URL/尺寸/needTransition；匿名 301，登录后可用；live 已验 `videoPlayUrl`。
 - `search_suggest.h/.cpp`：搜索联想（歌手/歌曲/专辑/歌单）；匿名明文接口。
-- `comment.h/.cpp`：热评、游标分页、楼中楼 typed 模型与纯解析；头像 URL 保持原始值，Store 边界统一缩成 96。
+- `comment.h/.cpp`：热评、游标分页、楼中楼 typed 模型与纯解析，以及歌曲/歌单评论点赞写请求；头像 URL 保持原始值，Store 边界统一缩成 96。
 - `lyrics.h/.cpp`：普通/逐字歌词原始文本（lrc/tlyric/yrc/ytlrc、pureMusic/nolyric）；LRC/YRC 行解析仍由 Store 边界复用旧解析器。
 - `notify.h/.cpp`：`/api/pl/count` 通知计数纯解析；`total` 由 Store 按固定六项求和。
 - `user_social.h/.cpp`：关注/粉丝列表、账号等级、收藏计数纯解析；不包含关注写操作。

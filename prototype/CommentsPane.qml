@@ -16,7 +16,6 @@ ListView {
     property var thread: null        // Source.commentThread(kind, id)；null 时什么也不取
     property bool active: true       // 这一栏显示着才取
     property bool loggedIn
-    readonly property bool likeable: pane.thread !== null && pane.thread.kind === "song"   // 歌单评论接口只读
 
     signal loginRequested()
 
@@ -111,14 +110,13 @@ ListView {
         CommentRow {
             Layout.fillWidth: true
             comment: entry.modelData
-            likeable: pane.likeable
             threadOpen: pane.openThread === entry.modelData.id
             onLikeRequested: liked => {
                 if (!pane.loggedIn) {
                     pane.loginRequested();
                     return;
                 }
-                Source.setCommentLiked(pane.thread.id, entry.modelData.id, liked);
+                Source.setCommentLiked(pane.thread, entry.modelData.id, liked);
             }
             onThreadToggled: pane.toggleThread(entry.modelData.id)
         }

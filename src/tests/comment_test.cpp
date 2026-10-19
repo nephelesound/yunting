@@ -365,6 +365,13 @@ private slots:
         QCOMPARE(more.error.path, QStringLiteral("more"));
         QVERIFY(more.error.message.contains(QStringLiteral("expected boolean")));
     }
+
+    // 资源类型前缀：歌曲 R_SO_4_，歌单 A_PL_0_（comment_like 模块的 resourceTypeMap）
+    void commentThreadIdUsesResourcePrefix()
+    {
+        QCOMPARE(commentThreadId(CommentThreadKind::Song, 77), QStringLiteral("R_SO_4_77"));
+        QCOMPARE(commentThreadId(CommentThreadKind::Playlist, 42), QStringLiteral("A_PL_0_42"));
+    }
 };
 
 QTEST_GUILESS_MAIN(SdkCommentTest)

@@ -13,6 +13,8 @@ namespace {
 
 constexpr auto CommentsPath = "api/v2/resource/comments";
 constexpr auto RepliesPath = "resource/comment/floor/get";
+constexpr auto LikePath = "v1/comment/like";
+constexpr auto UnlikePath = "v1/comment/unlike";
 constexpr qsizetype HotLimit = 10;
 
 QString indexedPath(const QString &arrayPath, qsizetype index)
@@ -203,6 +205,40 @@ Result<CommentReplyPage> parseCommentReplies(const QJsonObject &root)
     page.comments = *comments.value;
     page.more = more;
     return Result<CommentReplyPage>::success(std::move(page));
+}
+
+QString commentThreadId(CommentThreadKind kind, qint64 ownerId)
+{
+    const auto prefix = kind == CommentThreadKind::Playlist ? "A_PL_0_" : "R_SO_4_";
+    return QString::fromLatin1(prefix) + QString::number(ownerId);
+}
+
+void setCommentLiked(NcmClient &client, CommentThreadKind kind, qint64 ownerId,
+                     qint64 commentId, bool liked, QObject *context,
+                     CommentLikeCallback callback)
+{
+    if (!callback)
+        return;
+    const QString endpoint = QString::fromLatin1(liked ? LikePath : UnlikePath);
+    if (ownerId <= 0 || commentId <= 0) {
+        callback(Result<CommentLikeState>::failure(endpointError(
+            ErrorKind::InvalidRequest, endpoint,
+            QStringLiteral("ownerId and commentId must be positive"))));
+        return;
+    }
+    const QJsonObject payload{
+        {"threadId", commentThreadId(kind, ownerId)},
+        {"commentId", QString::number(commentId)},
+    };
+    postWeapiJson(client, context, endpoint, payload, true,
+                  [callback = std::move(callback), commentId, liked]
+                  (Result<QJsonObject> root) {
+        if (!root) {
+            callback(Result<CommentLikeState>::failure(root.error));
+            return;
+        }
+        callback(Result<CommentLikeState>::success(CommentLikeState{commentId, liked}));
+    });
 }
 
 } // namespace ncm::sdk

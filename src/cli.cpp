@@ -373,8 +373,8 @@ int runCommentLike(const CommandLine &cli, Backend &backend)
     QEventLoop loop;
     int rc = 2;
     QObject::connect(&store, &Store::commentLikeSucceeded, &loop,
-                     [&](double s, double c, bool state) {
-        if (s == songId && c == commentId) {
+                     [&](const QString &kind, double s, double c, bool state) {
+        if (kind == QLatin1String("song") && s == songId && c == commentId) {
             std::printf("%s %lld:%lld\n", state ? "liked" : "unliked",
                         qlonglong(songId), qlonglong(commentId));
             rc = 0;
@@ -382,15 +382,15 @@ int runCommentLike(const CommandLine &cli, Backend &backend)
         }
     });
     QObject::connect(&store, &Store::commentLikeFailed, &loop,
-                     [&](double s, double c, const QString &message) {
-        if (s == songId && c == commentId) {
+                     [&](const QString &kind, double s, double c, const QString &message) {
+        if (kind == QLatin1String("song") && s == songId && c == commentId) {
             std::fprintf(stderr, "comment like failed: %s\n", qPrintable(message));
             rc = 1;
             loop.quit();
         }
     });
     QTimer::singleShot(8 * 1000, &loop, &QEventLoop::quit);
-    store.setCommentLiked(songId, commentId, liked);
+    store.setCommentLiked(QStringLiteral("song"), songId, commentId, liked);
     loop.exec();
     if (rc == 2) {
         std::fprintf(stderr, "comment-like: no response within 8s (unknown; not a success)\n");

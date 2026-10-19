@@ -23,7 +23,7 @@
 | 用户主页 | `user:<id>` | `id` `name` `avatar` `signature` `followed` `follows` `followeds` `playlistCount` `vipType` `level` `listenSongs` `playlists[]` |
 | 热门评论 | `comments:<songId>` | `userId` `id` `user` `avatar` `content` `likes` `liked` `time` |
 | 评论分页 | `comments:<songId>:<offset>` → `data.commentPage` | 同上 + `parentId` |
-| 评论点赞 | `setCommentLiked(songId, commentId, liked)` | 乐观更新 `liked` / `likes` |
+| 评论点赞 | `setCommentLiked(kind, ownerId, commentId, liked)` | `kind` 为 `song` / `playlist`（`ownerId` 是歌曲或歌单 id）；乐观更新该线程热评与分页槽的 `liked` / `likes`，失败回滚 |
 | 只读信箱 | `inbox` / `inbox:<offset>` | 会话：`userId` `name` `avatar` `vipType` `lastText` `kind` `lastTime` `lastMsgId` `unread` `messageCount` |
 | 私信历史 | `inboxThread:<uid>[:<before>]` | 消息：`id` `fromUserId` `fromName` `fromAvatar` `toUserId` `toName` `mine` `time` `message{ text,kind,song,album,playlist,mv }` |
 | NCBL 上报 | `AudioEngine.scrobbleMode` | `legacy` / `ncbl` |

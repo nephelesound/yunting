@@ -298,29 +298,6 @@ void Store::flushDebouncedWrites()
         action();
 }
 
-std::optional<bool> Store::commentLiked(double songId, double commentId) const
-{
-    const auto find = [commentId](const QVariantList &items) -> std::optional<bool> {
-        for (const QVariant &v : items) {
-            const QVariantMap c = v.toMap();
-            if (c.value("id").toDouble() == commentId)
-                return c.value("liked").toBool();
-        }
-        return std::nullopt;
-    };
-    const QVariantMap hot = m_data.value("comments").toMap();
-    if (hot.value("songId").toDouble() == songId) {
-        if (const auto found = find(hot.value("items").toList()))
-            return *found;
-    }
-    const QVariantMap page = m_data.value("commentPage").toMap();
-    if (page.value("songId").toDouble() == songId) {
-        if (const auto found = find(page.value("items").toList()))
-            return *found;
-    }
-    return std::nullopt;
-}
-
 void Store::resetPersonal()
 {
     m_debouncedWrites.clear();

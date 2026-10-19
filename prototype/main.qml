@@ -466,7 +466,7 @@ Kirigami.ApplicationWindow {
         function onFollowFailed(action, message) {
             root.fail(action + "失败：" + message);
         }
-        function onCommentLikeFailed(songId, commentId, message) {
+        function onCommentLikeFailed(kind, ownerId, commentId, message) {
             root.fail("评论点赞失败：" + message);
         }
         function onRequestRestricted(key, message) {

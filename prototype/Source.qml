@@ -616,7 +616,7 @@ QtObject {
     function setAlbumSubscribed(id, subscribed) { if (source.live) source.live.setAlbumSubscribed(id, subscribed); }
     function setUserFollowed(id, followed) { if (source.live) source.live.setUserFollowed(id, followed); }
     // 评论点赞：live 走 Store 乐观更新；原型不写网络
-    function setCommentLiked(songId, commentId, liked) { if (source.live) source.live.setCommentLiked(songId, commentId, liked); }
+    function setCommentLiked(t, commentId, liked) { if (source.live) source.live.setCommentLiked(t.kind, t.id, commentId, liked); }
     function logout() { if (source.live) source.live.logout(); }
 
     // 当前句：最后一个开始时间不晚于 elapsed 的句子（正在播放页与桌面歌词共用这一条规则）。
