@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.14" date="2026-10-19">
+      <description>
+        <p>After switching songs, changing audio quality or seeking, the progress bar and lyrics no longer jump back for a moment. The Flatpak uses system portals to keep the computer awake and to store your login; if you signed in to an earlier Flatpak build, sign in once more.</p>
+        <p xml:lang="zh_CN">切歌、换音质或拖动进度后，进度条和歌词不再短暂跳回。Flatpak 版改用系统门户来防止睡眠和保存登录信息；以前用 Flatpak 版登录过的，需要重新登录一次。</p>
+      </description>
+    </release>
     <release version="0.6.13" date="2026-10-19">
       <description>
         <p>The listen-together button on the player bar now opens a panel that lists your mutual follows: friends who are listening together or online come first, the rest show when you last listened together. The app icon follows the colour scheme, so it is light on a dark theme. Rows in the Similar pane are spaced like every other list.</p>
