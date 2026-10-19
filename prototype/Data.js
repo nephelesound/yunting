@@ -8195,3 +8195,41 @@ var userSubcount = null
 var commentReplies = null
 
 var lyricsNew = null
+
+var playlistComments = {"playlistId": 0, "items": []}
+
+var playlistCommentPage = null
+
+var playlistCommentReplies = null
+
+var commentNotices = null
+
+var notices = null
+
+var forwards = null
+
+var userEvents = null
+
+var dynamicCover = null
+
+var radio = null
+
+var newSongs = null
+
+var newAlbums = null
+
+var highquality = null
+
+var highqualityTags = null
+
+var recommendedMvs = null
+
+var recommendedPrograms = null
+
+var searchSuggest = null
+
+var defaultSearch = null
+
+var similarSongs = null
+
+var similarPlaylists = null

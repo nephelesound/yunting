@@ -133,6 +133,16 @@ def sized(url, px):
     return f"{url}?param={px}y{px}" if url else ""
 
 
+def vip_level(user):
+    """会员档：与 src/sdk/user_vip.cpp 同一条规则（快照要和 Store 的形状一致）。"""
+    rights = user.get("vipRights") or {}
+    if (rights.get("redplus") or {}).get("rights") is True:
+        return "svip"
+    if (rights.get("associator") or {}).get("rights") is True or (user.get("vipType") or 0) > 0:
+        return "vip"
+    return ""
+
+
 def parse_lrc(lrc, tlyric=""):
     """LRC → [{t, text, tr}]；译文按取整到两位小数的时间戳对上，没有为 ""。"""
     def stamps(text):
@@ -329,7 +339,14 @@ def anonymous():
            js("artist", {}), js("artistSongs", None), js("album", {}), js("mv", {}), js("user", {}), js("wiki", {}), js("song", {}), js("inbox", None), js("inboxThread", None),
            js("listenTotal", None), js("listenRealtime", None), js("listenRank", None),
            js("notifications", None), js("userFollows", None), js("userFolloweds", None),
-           js("userLevel", None), js("userSubcount", None), js("commentReplies", None), js("lyricsNew", None)])
+           js("userLevel", None), js("userSubcount", None), js("commentReplies", None), js("lyricsNew", None),
+           # 其余按需槽：Store 起始就有（见 store.cpp 的 m_data），快照里给同样的初值
+           js("playlistComments", {"playlistId": 0, "items": []}), js("playlistCommentPage", None),
+           js("playlistCommentReplies", None), js("commentNotices", None), js("notices", None),
+           js("forwards", None), js("userEvents", None), js("dynamicCover", None), js("radio", None),
+           js("newSongs", None), js("newAlbums", None), js("highquality", None), js("highqualityTags", None),
+           js("recommendedMvs", None), js("recommendedPrograms", None), js("searchSuggest", None),
+           js("defaultSearch", None), js("similarSongs", None), js("similarPlaylists", None)])
     return tracks
 
 
@@ -346,7 +363,9 @@ def personal(hot_tracks):
         data["account"] = {"id": uid, "name": profile["nickname"],
                            "vip": (profile.get("vipType") or 0) > 0,
                            "vipType": profile.get("vipType") or 0,
-                           "vipRights": profile.get("vipRights") or {},
+                           "vipLevel": vip_level(profile),
+                           "avatarPendant": (profile.get("pendantData") or {}).get("imageUrl") or "",
+                           "identityIcon": (profile.get("avatarDetail") or {}).get("identityIconUrl") or "",
                            "level": profile.get("level") or 0,
                            "listenSongs": profile.get("listenSongs") or 0,
                            "signature": profile.get("signature") or "",
