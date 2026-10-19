@@ -90,7 +90,10 @@ ListView {
     delegate: ColumnLayout {
         id: entry
         required property int index
-        readonly property var modelData: pane.rows[entry.index] || ({})
+        // 列表变短时旧的委托还会读一次，下标可能已越界：给一条完整的空评论，不给 {}（字段是 undefined 会报错）
+        readonly property var modelData: pane.rows[entry.index]
+            || ({ id: 0, group: "", user: "", userId: 0, avatar: "", content: "", time: 0,
+                  likes: 0, liked: false, replyCount: 0, beReplied: null })
         width: ListView.view.width - Tokens.space4
         spacing: Tokens.space3
 

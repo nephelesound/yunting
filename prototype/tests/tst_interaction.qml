@@ -18,6 +18,7 @@ Item {
     Component { id: linkComponent; LinkText { font.pixelSize: Tokens.textSm } }
     Component { id: tileComponent; TrackTile { width: 900 } }
     Component { id: nowPlayingComponent; NowPlayingPage { width: root.width; height: root.height } }
+    Component { id: inboxComponent; InboxPage { width: root.width; height: root.height } }
     Component { id: spyComponent; SignalSpy {} }
     Component { id: queueComponent; QueuePanel {} }
     Component { id: roomComponent; SimListenTogether {} }
@@ -578,6 +579,35 @@ Item {
         }
 
         // 纯音乐：歌词为空不是「没取到」，页面上说「纯音乐，请欣赏」
+        // 从一段长对话切到另一段：列表重建前旧的委托会用新列表读一次、下标越界。
+        // 曾经回退成 {}，每个字段都是 undefined，日志里一串「Unable to assign [undefined]」和 TypeError
+        function test_switchingConversationLogsNothing() {
+            const message = (id, text) => ({ id: id, fromUserId: 5, fromName: "Jo", fromAvatar: "", mine: false,
+                                             time: 1700000000000 + id, batchId: "", message: { kind: "text", text: text } });
+            const saved = Source.snapshot;
+            Source.snapshot = {
+                data: Object.assign({}, saved.data, {
+                    inbox: { unread: 0, more: false, items: [
+                        { userId: 5, name: "Jo", avatar: "", lastText: "三", lastTime: 1, unread: 0 },
+                        { userId: 6, name: "Al", avatar: "", lastText: "", lastTime: 1, unread: 0 }] },
+                    inboxThread: { userId: 5, before: 0, more: false,
+                                   items: [message(1, "一"), message(2, "二"), message(3, "三")] },
+                }),
+                personal: saved.personal,
+            };
+            try {
+                failOnWarning(/Unable to assign|TypeError/);
+                const page = createTemporaryObject(inboxComponent, root, { peer: 5 });
+                tryVerify(() => page.thread.items.length === 3);
+                wait(100);
+                page.peer = 6;
+                wait(100);
+                compare(page.thread.items.length, 0);
+            } finally {
+                Source.snapshot = saved;
+            }
+        }
+
         function test_pureMusicSaysSoInsteadOfNoLyrics() {
             const saved = Source.snapshot;
             Source.snapshot = {

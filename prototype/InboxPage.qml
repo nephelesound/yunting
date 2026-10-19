@@ -131,7 +131,9 @@ ScreenFrame {
 
             delegate: PersonRow {
                 required property int index
-                readonly property var conversation: page.conversations.items[index] || ({})
+                // 越界时（列表重建前的一瞬）给完整的空会话，不给 {}
+                readonly property var conversation: page.conversations.items[index]
+                    || ({ userId: 0, name: "", avatar: "", lastText: "", lastTime: 0, unread: 0 })
                 width: ListView.view.width - ListView.view.rightMargin
                 avatar: conversation.avatar
                 name: conversation.name
@@ -206,7 +208,10 @@ ScreenFrame {
                 delegate: RowLayout {
                     id: message
                     required property int index
-                    readonly property var messageData: page.thread.items[index] || ({})
+                    // 换会话时，列表重建前旧的委托还会用新列表读一次，下标可能已经越界：
+                    // 给一条完整的空消息，不给 {}（各处读 fromName、message.kind 会报错）
+                    readonly property var messageData: page.thread.items[index]
+                        || ({ fromName: "", fromAvatar: "", mine: false, time: 0, message: { kind: "", text: "" } })
                     width: ListView.view.width - ListView.view.rightMargin
                     spacing: Tokens.space3
 
