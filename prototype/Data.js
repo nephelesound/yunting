@@ -8170,6 +8170,8 @@ var user = {}
 
 var wiki = {}
 
+var song = {}
+
 var inbox = null
 
 var inboxThread = null

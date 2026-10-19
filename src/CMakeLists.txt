@@ -10,6 +10,7 @@ find_package(MpvQt REQUIRED)
 find_package(Qt6Keychain REQUIRED)
 find_package(KF6StatusNotifierItem REQUIRED)
 find_package(KF6CoreAddons REQUIRED)   # KAboutData（「关于」页）、KSignalHandler
+find_package(KF6DBusAddons REQUIRED)   # 单实例：KDBusService（cli.cpp 的 runGui）
 find_package(KF6ColorScheme REQUIRED)  # 中性配色下的应用色调（colortone.cpp）
 find_package(KF6Config REQUIRED)
 find_package(KF6I18n REQUIRED)         # kirigami-addons 的页面（「关于」）在 QML 里用 i18nd()
@@ -45,6 +46,7 @@ set(YUNTING_SDK_SOURCES
 
 qt_add_executable(yunting
     main.cpp cli.h cli.cpp
+    link_parser.h link_parser.cpp links.h links.cpp
     listentogether.h listentogether.cpp
     downloadmanager.h downloadmanager.cpp
     downloadpaths.h
@@ -106,6 +108,7 @@ target_link_libraries(yunting PRIVATE
     MpvQt::MpvQt
     Qt6Keychain::Qt6Keychain
     KF6::StatusNotifierItem
+    KF6::DBusAddons
     OpenSSL::Crypto
 )
 if (LayerShellQt_FOUND)

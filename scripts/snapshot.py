@@ -326,7 +326,7 @@ def anonymous():
            js("comments", hot_comments(tracks[CURRENT]["id"])),
            js("commentPage", None), js("searchUsers", None), js("searchRadios", None),
            js("search", search), js("hotSearches", hot_searches),
-           js("artist", {}), js("artistSongs", None), js("album", {}), js("mv", {}), js("user", {}), js("wiki", {}), js("inbox", None), js("inboxThread", None),
+           js("artist", {}), js("artistSongs", None), js("album", {}), js("mv", {}), js("user", {}), js("wiki", {}), js("song", {}), js("inbox", None), js("inboxThread", None),
            js("listenTotal", None), js("listenRealtime", None), js("listenRank", None),
            js("notifications", None), js("userFollows", None), js("userFolloweds", None),
            js("userLevel", None), js("userSubcount", None), js("commentReplies", None), js("lyricsNew", None)])

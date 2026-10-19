@@ -43,6 +43,13 @@ qt_add_executable(traffic_test tests/traffic_test.cpp traffic.h traffic.cpp)
 target_link_libraries(traffic_test PRIVATE Qt6::Core Qt6::Test)
 add_test(NAME traffic COMMAND traffic_test)
 
+# 纯解析：不联网、不需要 GUI，与 Store/传输层无关
+qt_add_executable(link_parser_test tests/link_parser_test.cpp link_parser.h link_parser.cpp)
+target_include_directories(link_parser_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_options(link_parser_test PRIVATE -Wall -Wextra)
+target_link_libraries(link_parser_test PRIVATE Qt6::Core Qt6::Test)
+add_test(NAME link_parser COMMAND link_parser_test)
+
 qt_add_executable(normalize_test tests/normalize_test.cpp normalize.h normalize.cpp json_util.h
     sdk/track.h sdk/track.cpp sdk/sdk_json.h sdk/sdk_json.cpp sdk/sdk_result.h)
 target_include_directories(normalize_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -140,7 +147,7 @@ yunting_add_sdk_test(download sdk/download.h sdk/download.cpp
     downloadmanager.h downloadmanager.cpp downloadpaths.h)
 
 # 任何测试都碰不到用户的真实凭据与缓存：会话总线不可达（钥匙串因此走后备文件），数据与缓存目录在构建目录里
-set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store sdk_song_wiki sdk_track sdk_track_service sdk_discovery sdk_radio sdk_social sdk_feed sdk_video sdk_library sdk_notification sdk_dynamic_cover sdk_search_suggest sdk_service notify lyrics sdk_listen_data user_social comment search_people mv_page account_feed listen_together download PROPERTIES ENVIRONMENT
+set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store link_parser sdk_song_wiki sdk_track sdk_track_service sdk_discovery sdk_radio sdk_social sdk_feed sdk_video sdk_library sdk_notification sdk_dynamic_cover sdk_search_suggest sdk_service notify lyrics sdk_listen_data user_social comment search_people mv_page account_feed listen_together download PROPERTIES ENVIRONMENT
     "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent;XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/data;XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/cache;YUNTING_KEYCHAIN_SERVICE=yunting-test")
 
 # 电源抑制：对着真的会话总线测（没有 Plasma 电源管理时自行跳过），所以不像其他测试那样断开总线

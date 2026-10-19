@@ -573,6 +573,15 @@ QtObject {
         return { id: id, name: "", cover: "", artist: "", artistId: 0, duration: 0, url: "",
                  playCount: 0, subscribed: false, description: "", failed: failed };
     }
+    // 只知道 id 的一首歌（外部链接打开的）：取到前是 null
+    function song(id) {
+        const s = (source.d.song || {})[String(id)];
+        if (s)
+            return s;
+        if (id > 0)
+            source.need("song:" + id);
+        return null;
+    }
     function mv(id) {
         if (!(id > 0))
             return emptyMv(0, false);

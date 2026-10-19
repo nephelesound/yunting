@@ -91,6 +91,7 @@ Store::Store(NcmClient *client, QObject *parent)
         {"mv", QVariantMap{}},
         {"user", QVariantMap{}},
         {"wiki", QVariantMap{}},
+        {"song", QVariantMap{}},   // <songId> → Track，最近 8 首
         // 只读信箱：私密数据只进内存，不写首屏快照
         {"inbox", nullVariant()},
         {"inboxThread", nullVariant()},

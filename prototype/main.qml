@@ -194,6 +194,7 @@ Kirigami.ApplicationWindow {
     }
 
     readonly property var currentTrack: playback.current
+    readonly property var queue: playback.queue
     // 逐字歌词：每换一首歌要一次（后端永久缓存；不在绑定里要，绑定会反复求值）
     readonly property real currentTrackId: root.currentTrack ? root.currentTrack.id : 0
     onCurrentTrackIdChanged: if (root.currentTrackId > 0) Source.need("lyricsNew:" + root.currentTrackId)
@@ -590,6 +591,34 @@ Kirigami.ApplicationWindow {
             }
             Source.setLiked(track.id, !Source.isLiked(track.id));
         }
+    }
+
+    // 外部链接（网页「在客户端打开」、orpheus://、分享链接，见 links.h）：页面走上面同一套导航；
+    // 歌曲插到「下一首」并立刻放，原来的队列不动。只知道 id 的歌要先取详情，取到再放
+    property real linkedSongId: 0
+    readonly property var linkedSong: root.linkedSongId > 0 ? Source.song(root.linkedSongId) : null
+    onLinkedSongChanged: if (root.linkedSong) Qt.callLater(root.playLinkedSong)
+    function playLinkedSong() {
+        const track = root.linkedSong;
+        if (!track)
+            return;
+        root.linkedSongId = 0;
+        playback.playNext(track);
+        playback.play(playback.queue, playback.queue.findIndex(t => t.id === track.id));
+    }
+    function openLink(kind, id) {
+        switch (kind) {
+        case "song": root.linkedSongId = id; break;
+        case "playlist": Actions.playlistRequested(id); break;
+        case "album": Actions.albumRequested(id); break;
+        case "artist": Actions.artistRequested(id); break;
+        case "user": Actions.userRequested(id); break;
+        case "mv": Actions.mvRequested(id); break;
+        }
+    }
+    Connections {
+        target: root.backend ? root.backend.links : null
+        function onOpened(kind, id) { root.openLink(kind, id); }
     }
 
     // 歌单磁贴的菜单（「我的」「全部歌单」「搜索」）：自己建的可改名/删除（「我喜欢的音乐」除外），

@@ -217,6 +217,8 @@ private:
     void requestAlbum(const QString &key, double albumId);
     // 歌曲百科：完整 block 页 + 创作者 + 副歌时间；只读、不落盘
     void requestWiki(const QString &key, double songId);
+    // 只知道 id 的歌曲：取详情，按 id 存进 data.song（链接打开、下载等共用）
+    void requestSong(const QString &key, double songId);
     // -- 匿名发现：搜索联想、新歌/新碟/精品歌单/推荐 MV/节目、电台；只读、可落盘（联想除外）
     void requestSearchSuggest(const QString &key, const QString &query);
     void requestNewSongs();

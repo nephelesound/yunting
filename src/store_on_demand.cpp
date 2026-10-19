@@ -11,6 +11,7 @@
 #include "sdk/mv_page.h"
 #include "sdk/search_people.h"
 #include "sdk/track.h"
+#include "sdk/track_service.h"
 
 #include <QDateTime>
 #include <QSet>
@@ -155,6 +156,8 @@ void Store::request(const QString &key)
              s.requestMv(k, k.section(u':', 1).toDouble()); }},
         {QStringLiteral("wiki:"), [](Store &s, const QString &k) {
              s.requestWiki(k, k.section(u':', 1).toDouble()); }},
+        {QStringLiteral("song:"), [](Store &s, const QString &k) {
+             s.requestSong(k, k.section(u':', 1).toDouble()); }},
         {QStringLiteral("album:"), [](Store &s, const QString &k) {
              s.requestAlbum(k, k.section(u':', 1).toDouble()); }},
         {QStringLiteral("inboxThread:"), [](Store &s, const QString &k) {
@@ -262,6 +265,32 @@ void Store::requestLyrics(const QString &key, double songId)
         [this, slot, token, songId](const QVariant &lyrics) {
             if (m_requests.current(slot, token))
                 putKeyed("lyrics", num(songId), lyrics);
+        });
+}
+
+// 只知道 id 的歌曲（从链接打开）：详情按 id 存进 data.song，最近 8 首；
+// 同一 id 命中缓存就不再发请求，切页面重复要也不会抖动。
+void Store::requestSong(const QString &key, double songId)
+{
+    if (!(songId > 0))
+        return;
+    const QString slot = QStringLiteral("song:") + num(songId);
+    const quint64 token = m_requests.begin(slot);
+    m_cache.query(key,
+        [this, songId](QueryCache::Done done) {
+            sdk::fetchSongDetails(*m_client, {static_cast<qint64>(songId)}, m_client->hasMusicU(), this,
+                                  [done, songId](sdk::Result<QList<sdk::Track>> result) {
+                if (!result || result.value->isEmpty()
+                    || result.value->first().id != static_cast<qint64>(songId)) {
+                    done({}, false);
+                    return;
+                }
+                done(sdk::trackToVariantMap(result.value->first()), true);
+            });
+        },
+        [this, slot, token, songId](const QVariant &song) {
+            if (m_requests.current(slot, token))
+                putKeyed("song", num(songId), song);
         });
 }
 

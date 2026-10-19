@@ -175,6 +175,29 @@ Item {
             window.close();
         }
 
+        // 外部链接：专辑链接打开专辑页；歌曲链接先按 id 要详情，取到后插到下一首并开始放，原来的队列还在
+        function test_linksOpenPagesAndPlaySongs() {
+            store.failRequests = false;
+            const window = Qt.createComponent("../main.qml").createObject(root, { backend: null, fixture: "worst" });
+            Source.live = store;
+            window.history = [];
+            window.openLink("album", 5);
+            compare(window.page, "list");
+            compare(window.listKey, "album:5");
+
+            const queued = Source.hotChart.tracks.slice(0, 3);
+            window.play(queued, 0);
+            const linked = Object.assign({}, queued[1], { id: 99, name: "链接里的歌" });
+            window.openLink("song", 99);
+            tryVerify(() => count("song:99") === 1);
+            store.data = Object.assign({}, store.data, { song: { "99": linked } });
+            tryVerify(() => window.currentTrack !== null && window.currentTrack.id === 99);
+            // 智能队列会在队尾续歌，只看原来的几首和插进来的这首
+            const ids = window.queue.slice(0, 4).map(t => t.id);
+            compare(ids, [queued[0].id, 99, queued[1].id, queued[2].id]);
+            window.close();
+        }
+
         // 下一页按 Store 给的 next 翻，不按已有条数：去重后条数可能比服务器的偏移少
         function test_morePagesFollowTheCursor() {
             Source.morePeople("userFollows", { more: true, pending: false, userId: 5, next: 7, items: [{ id: 1 }, { id: 2 }] });

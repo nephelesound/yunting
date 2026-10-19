@@ -9,6 +9,7 @@
 #include "downloadmanager.h"
 #include "imagecache.h"
 #include "layershellhelper.h"
+#include "links.h"
 #include "listentogether.h"
 #include "mpris.h"
 #include "mvvideo.h"
@@ -19,6 +20,7 @@
 #include "store.h"
 #include "tray.h"
 
+#include <KDBusService>
 #include <KLocalizedQmlContext>
 #include <QApplication>
 #include <QCommandLineParser>
@@ -887,6 +889,21 @@ int runGui(const CommandLine &cli, QApplication &app, Backend &backend)
     // 一起听：房间状态/轮询/播放指令独立于 Store；QML 从 backend.listenTogether 取。
     ListenTogether listenTogether(&client, &store, &audio);
 
+    // 单实例：第二次启动把参数交给已运行实例，然后自己退出 0。服务名是「反转的组织域名 +
+    // applicationName」；applicationName 是 yunting（数据/缓存目录与 MPRIS 靠它），而 .desktop、
+    // Flatpak 与 D-Bus 认的应用 id 是 io.github.nephelesound.Yunting。只在构造时临时换成 id
+    // 的末段，构造完立即还原（KDBusService 只在构造时读 applicationName）。
+    // 没有会话总线时（例如离屏截图）不让单实例失败拖垮界面。
+    Links links;
+    const QString applicationName = QCoreApplication::applicationName();
+    QCoreApplication::setApplicationName(QStringLiteral("Yunting"));
+    KDBusService dbusService(KDBusService::Unique | KDBusService::NoExitOnFailure);
+    QCoreApplication::setApplicationName(applicationName);
+    QObject::connect(&dbusService, &KDBusService::activateRequested, &links,
+                     [&links](const QStringList &arguments, const QString &) {
+        links.activate(arguments);
+    });
+
     // 界面是完整客户端：用户点播放就是真实收听，默认允许上报（命令行 smoke 才需要 --allow-write）
     audio.setScrobblingAllowed(true);
 
@@ -922,7 +939,8 @@ int runGui(const CommandLine &cli, QApplication &app, Backend &backend)
     ClipboardHelper clipboard;
     Diagnostics diagnostics;
     diagnostics.traffic = [&client] { return client.trafficSummary(); };
-    QVariantMap backendMap{{"store", QVariant::fromValue<QObject *>(&store)},
+    QVariantMap backendMap{{"links", QVariant::fromValue<QObject *>(&links)},
+                           {"store", QVariant::fromValue<QObject *>(&store)},
                            {"audio", QVariant::fromValue<QObject *>(&audio)},
                            {"session", QVariant::fromValue<QObject *>(&session)},
                            {"mpris", QVariant::fromValue<QObject *>(&mpris)},
@@ -942,11 +960,14 @@ int runGui(const CommandLine &cli, QApplication &app, Backend &backend)
         return 1;
 
     // 窗口创建完成后关联托盘，左键从此显示/隐藏主窗口
-    tray.setAssociatedWindow(qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst()));
+    auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
+    tray.setAssociatedWindow(window);
+    // QML 已加载：冷启动链接只在这里发一次；窗口也交给 Links，第二次启动时才能抬起它
+    links.setWindow(window);
+    links.start(cli.parser.positionalArguments());
 
     if (cli.parser.isSet(cli.screenshot)) {
         // 等首屏数据与封面到齐再截（真实网络，给足时间）；同步 grabWindow，不依赖 grabToImage 回调
-        auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
         const QString file = cli.parser.value(cli.screenshot);
         QTimer::singleShot(8000, &app, [window, file] {
             const bool saved = window && window->grabWindow().save(file);

@@ -449,6 +449,49 @@ private slots:
         QCOMPARE(entry(QStringLiteral("2")).value("songId").toDouble(), 2.0);
     }
 
+    // 只知道 id 的歌曲（链接打开）：两首各存各的；已经取到的 id 再要不会再发请求
+    void songSlotsCoexistById()
+    {
+        int songRequests = 0;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/v3/song/detail") {
+                ++songRequests;
+                const QJsonArray ids = QJsonDocument::fromJson(
+                    QUrlQuery(QString::fromLatin1(req.query))
+                        .queryItemValue(QStringLiteral("c")).toUtf8()).array();
+                QJsonArray songs;
+                for (const QJsonValue &value : ids) {
+                    const int id = value.toObject().value(QStringLiteral("id")).toInt();
+                    songs.append(QJsonObject{{"id", id},
+                                             {"name", QStringLiteral("song-%1").arg(id)},
+                                             {"dt", 1000}, {"ar", QJsonArray{}},
+                                             {"al", QJsonObject{}}});
+                }
+                respond(200, json(QJsonObject{{"code", 200}, {"songs", songs}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        const auto entry = [this](const QString &id) {
+            return m_store->data().value("song").toMap().value(id).toMap();
+        };
+        m_store->request(QStringLiteral("song:101"));
+        QVERIFY(waitUntil([&] {
+            return entry(QStringLiteral("101")).value("name").toString() == QStringLiteral("song-101");
+        }));
+        m_store->request(QStringLiteral("song:202"));
+        QVERIFY(waitUntil([&] {
+            return entry(QStringLiteral("202")).value("name").toString() == QStringLiteral("song-202");
+        }));
+        QCOMPARE(songRequests, 2);
+        QCOMPARE(entry(QStringLiteral("101")).value("id").toDouble(), 101.0);
+
+        m_store->request(QStringLiteral("song:101"));
+        QTest::qWait(150);
+        QCOMPARE(songRequests, 2);
+    }
+
     // 没有 pureMusic/nolyric 标记的空歌词可能是瞬时空包：不能永久缓存成「暂无歌词」
     void unexplainedEmptyLyricsIsNotCached()
     {
