@@ -594,6 +594,10 @@ void AudioEngine::startSource(const QString &url, const QString &level, int bitr
     qCDebug(lcPerf).nospace() << "audio url ready track="
                               << qlonglong(m_track.value("id").toDouble())
                               << " level=" << level << " ms=" << m_trackClock.elapsed();
+    // 同一首重新载入（换音质）：取址期间旧文件一直在播，用户也可能拖过。从此刻的位置接上，
+    // 不用点下换音质时记的那个（否则会倒回取址花掉的时间，拖动也会丢）
+    if (m_fileLoaded && m_pendingSeek >= 0)
+        m_pendingSeek = position();
     m_urlReady = true;
     m_fileLoaded = false;
     m_atEof = false;

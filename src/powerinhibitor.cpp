@@ -112,6 +112,10 @@ void PowerInhibitor::request(Inhibition &inhibition)
     connect(watcher, &QDBusPendingCallWatcher::finished, this,
             [this, &inhibition, path](QDBusPendingCallWatcher *w) {
         w->deleteLater();
+        // Response 比方法回包先到、已经处理过这次请求（生效后又撤掉、或被拒绝）：状态已定，
+        // 别再动 pending/handle，那可能已经属于随后发出的新请求
+        if (!m_handles.contains(path))
+            return;
         inhibition.pending = false;
         const QDBusPendingReply<QDBusObjectPath> reply = *w;
         if (reply.isError()) {
