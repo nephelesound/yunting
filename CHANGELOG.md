@@ -2,6 +2,11 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.11] - 2026-10-19
+
+### Fixed
+- Avatar pendants that fail to load are retried twice with a cache-busting query instead of staying invisible for that user until the app restarts (R1).
+
 ## [0.6.10] - 2026-10-19
 
 ### 新增

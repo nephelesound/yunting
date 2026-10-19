@@ -108,6 +108,20 @@ ScreenFrame {
             // 挂件按固定的一格取图，取到了头像才缩（坏链接时头像照常铺满）；挂件的尺寸不随头像变，不会来回重取
             Item {
                 readonly property bool framed: profilePendant.status === Image.Ready
+                property int pendantRetry: 0
+                readonly property string pendantBase: page.user ? (page.user.avatarPendant || "") : ""
+                readonly property string pendantSource: {
+                    if (pendantBase.length === 0)
+                        return "";
+                    if (pendantRetry <= 0)
+                        return pendantBase;
+                    return pendantBase + (pendantBase.indexOf("?") >= 0 ? "&" : "?")
+                        + "_retry=" + pendantRetry;
+                }
+                onPendantBaseChanged: {
+                    pendantRetry = 0;
+                    profilePendantRetry.stop();
+                }
                 Layout.preferredWidth: Tokens.trackColumn
                 Layout.preferredHeight: Tokens.trackColumn
                 PersonAvatar {
@@ -122,11 +136,22 @@ ScreenFrame {
                     id: profilePendant
                     anchors.fill: parent
                     visible: status === Image.Ready
-                    source: page.user.avatarPendant || ""
+                    source: parent.pendantSource
                     sourceSize.width: 2 * width
                     sourceSize.height: 2 * height
                     fillMode: Image.PreserveAspectFit
                     asynchronous: true
+                    onStatusChanged: {
+                        if (status === Image.Error && parent.pendantRetry < 2)
+                            profilePendantRetry.restart();
+                    }
+                }
+                Timer {
+                    id: profilePendantRetry
+                    interval: 1500
+                    repeat: false
+                    onTriggered: if (profilePendant.status === Image.Error && parent.pendantRetry < 2)
+                        parent.pendantRetry++;
                 }
             }
 

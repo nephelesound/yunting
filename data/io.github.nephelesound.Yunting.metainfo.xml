@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.11" date="2026-10-19">
+      <description>
+        <p>Avatar pendants that fail to load are retried with a fresh cache-busting URL, so a transient image failure no longer hides the pendant until the app restarts.</p>
+        <p xml:lang="zh_CN">头像挂件加载失败时会用新的缓存破坏地址重试，不再因为一次临时失败就藏到重启应用为止。</p>
+      </description>
+    </release>
     <release version="0.6.10" date="2026-10-19">
       <description>
         <p>Your own avatar pendant in the header and on user pages; user pages show anyone's worn pendant without waiting for it. The SVIP badge is a quiet tint of the accent colour, and comments, wiki and similar run down to the progress line.</p>

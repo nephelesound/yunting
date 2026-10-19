@@ -14,6 +14,21 @@ Item {
     // 页头右上角自己的头像例外：那是自己的装扮，小也要看得见
     property string pendant
     property int pendantMinSize: Tokens.height8
+    // Broken/expired pendant URLs are retried twice with a cache-busting query
+    // instead of staying invisible until the app restarts (R1).
+    property int pendantRetry: 0
+    readonly property string pendantSource: {
+        if (avatar.pendant.length === 0 || avatar.width < avatar.pendantMinSize)
+            return "";
+        if (avatar.pendantRetry <= 0)
+            return avatar.pendant;
+        return avatar.pendant + (avatar.pendant.indexOf("?") >= 0 ? "&" : "?")
+            + "_retry=" + avatar.pendantRetry;
+    }
+    onPendantChanged: {
+        avatar.pendantRetry = 0;
+        pendantRetryTimer.stop();
+    }
     // 解码尺寸：默认按显示的两倍。显示尺寸会变的地方（主页戴上挂件时头像缩小）给一个固定值，免得一缩就重新解码、闪一下占位
     property int decodeSize: 2 * Math.max(avatar.width, avatar.height)
 
@@ -51,15 +66,27 @@ Item {
     }
 
     Image {
+        id: pendantImage
         objectName: "pendant"
         anchors.centerIn: parent
         width: 1.5 * avatar.width
         height: width
         visible: avatar.pendant.length > 0 && avatar.width >= avatar.pendantMinSize && status === Image.Ready
-        source: avatar.pendant.length > 0 && avatar.width >= avatar.pendantMinSize ? avatar.pendant : ""
+        source: avatar.pendantSource
         sourceSize.width: 2 * width
         sourceSize.height: 2 * height
         fillMode: Image.PreserveAspectFit
         asynchronous: true
+        onStatusChanged: {
+            if (status === Image.Error && avatar.pendantRetry < 2)
+                pendantRetryTimer.restart();
+        }
+    }
+    Timer {
+        id: pendantRetryTimer
+        interval: 1500
+        repeat: false
+        onTriggered: if (pendantImage.status === Image.Error && avatar.pendantRetry < 2)
+            avatar.pendantRetry++;
     }
 }
