@@ -10,8 +10,10 @@ Item {
     property string name
     property string source
     // 网易云的头像挂件：一张方形、中间镂空的框图，头像占框的中间三分之二，所以框画成头像的 1.5 倍、居中，
-    // 超出头像的部分不占布局。头像小于 32 时不画（挂件缩到那么小只剩一团杂色）
+    // 超出头像的部分不占布局。头像小于 pendantMinSize 时不画（别人的挂件缩到那么小只剩一团杂色）；
+    // 页头右上角自己的头像例外：那是自己的装扮，小也要看得见
     property string pendant
+    property int pendantMinSize: Tokens.height8
 
     readonly property bool hasImage: image.status === Image.Ready
 
@@ -51,8 +53,8 @@ Item {
         anchors.centerIn: parent
         width: 1.5 * avatar.width
         height: width
-        visible: avatar.pendant.length > 0 && avatar.width >= Tokens.height8 && status === Image.Ready
-        source: avatar.pendant.length > 0 && avatar.width >= Tokens.height8 ? avatar.pendant : ""
+        visible: avatar.pendant.length > 0 && avatar.width >= avatar.pendantMinSize && status === Image.Ready
+        source: avatar.pendant.length > 0 && avatar.width >= avatar.pendantMinSize ? avatar.pendant : ""
         sourceSize.width: 2 * width
         sourceSize.height: 2 * height
         fillMode: Image.PreserveAspectFit

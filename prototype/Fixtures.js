@@ -209,7 +209,7 @@ var worst = {
               resource: { kind: "video", id: 0, vid: "A1B2", name: "x", cover: "", artist: "" } }] },
     },
     personal: {
-        account: { id: 1001, name: "一只想要变成猫但是没有成功的柴犬Official", vip: false, avatar: "" },
+        account: { id: 1001, name: "一只想要变成猫但是没有成功的柴犬Official", vip: true, vipLevel: "svip", avatar: C2, avatarPendant: PENDANT },
         savedArtists: { more: true, next: 3, count: 1284, items: [
             { id: 2, name: "一只想要变成猫但是没有成功的柴犬Official", cover: BROKEN, alias: "Shiba Inu Who Wanted To Be A Cat", albums: 128, mvs: 99 },
             { id: 3, name: "x", cover: "", alias: "", albums: 0, mvs: 0 }, { id: 1, name: "A", cover: C2, alias: "", albums: 1, mvs: 1 }] },

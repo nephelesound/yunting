@@ -150,6 +150,8 @@ Kirigami.Page {
                         implicitHeight: Tokens.height7
                         name: screen.loggedIn ? Source.account.name : ""
                         source: screen.loggedIn ? Source.sized(Source.account.avatar, 96) : ""
+                        pendant: screen.loggedIn ? Source.account.avatarPendant || "" : ""
+                        pendantMinSize: 0
                     }
                     Label {
                         id: accountName
