@@ -45,6 +45,7 @@ Flickable {
                 model: pane.similar.songs
                 delegate: TrackTile {
                     Layout.fillWidth: true
+                    Layout.bottomMargin: Tokens.space2   // 与其他曲目列表同一行距
                     current: modelData.id === pane.currentId
                     showAlbum: false   // 栏窄：专辑列让给标题
                     onActivated: Actions.playNowRequested(modelData)
