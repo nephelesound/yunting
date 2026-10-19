@@ -144,6 +144,9 @@ double AudioEngine::position() const
     // 停止或播完后 mpv 不再提供 time-pos：这些时候都用保留的位置
     if (!m_switching && m_fileLoaded && readDouble(m_controller, "time-pos", &value))
         return value;
+    // 载入中有挂起的跳转（换音质从原进度接上、载入前拖动）：那就是马上开始播放的位置
+    if (!m_fileLoaded && m_pendingSeek >= 0)
+        return m_pendingSeek;
     return m_position;
 }
 
@@ -489,6 +492,7 @@ void AudioEngine::seek(double seconds)
         return;
     }
     m_pendingSeek = target; // 地址未落地或文件还在加载，FILE_LOADED 前应用
+    emit positionChanged();
 }
 
 // 播放地址有时效（接口给 expi 秒数，通常 20 分钟）：时效内重播、切回同一首都直接用缓存。

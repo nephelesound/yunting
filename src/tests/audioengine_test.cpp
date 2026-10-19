@@ -16,6 +16,7 @@
 #include <QTemporaryDir>
 #include <QTest>
 #include <QUrl>
+#include <algorithm>
 #include <functional>
 
 namespace {
@@ -295,13 +296,19 @@ private slots:
 
         audio.setTrack(QVariantMap{{"id", 6.0}, {"dur", 3.0}});
         audio.setPlaying(true);
-        QVERIFY(waitFor([&] { return audio.position() > 0.1; }));
+        QVERIFY(waitFor([&] { return audio.position() > 0.5; }));
         QVERIFY(waitFor([&] { return api.requests == 1; }));
 
+        // 重新载入期间进度不能掉回 0（歌词会跳回开头再跳回来）
+        const double before = audio.position();
+        double lowest = before;
+        connect(&audio, &AudioEngine::positionChanged, this,
+                [&] { lowest = std::min(lowest, audio.position()); });
         audio.setQuality(QStringLiteral("higher"));
         QCOMPARE(audio.quality(), QStringLiteral("higher"));
         QVERIFY2(waitFor([&] { return api.requests == 2; }), "quality change did not refetch the URL");
-        QVERIFY2(waitFor([&] { return audio.position() > 0.1; }), "quality change did not resume playback");
+        QVERIFY2(waitFor([&] { return audio.position() > before + 0.1; }), "quality change did not resume playback");
+        QVERIFY2(lowest > before - 0.1, qPrintable(QStringLiteral("position fell to %1").arg(lowest)));
         QVERIFY(audio.playing());
         QVERIFY(failedSpy.isEmpty());
     }
