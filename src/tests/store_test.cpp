@@ -22,6 +22,8 @@
 #include <QTest>
 #include <QUrlQuery>
 
+#include <utility>
+
 class FakeApi : public QTcpServer {
 public:
     struct Request {
@@ -688,6 +690,57 @@ private slots:
         QVERIFY(waitUntil([&] { return refills == 2; }));
         held.takeFirst()(200, {});
         QVERIFY(waitUntil([&] { return heartTrackIds() == QList<double>({770, 710}); }));
+    }
+
+    // 续取失败（这里是风控拒绝）也要结束这次续取：下一次快放完时照常再要。
+    // 曾经 fetch 失败不回调，「正在续取」永远不清，私人漫游和心动模式从此再也续不上
+    void failedRefillDoesNotStopTheStream()
+    {
+        serveHeart();
+        const auto base = m_api->handler;
+        int heartRefills = 0;
+        int fmCalls = 0;
+        bool rejectNextFm = false;
+        m_api->handler = [&, base](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            const QString songId = QUrlQuery(QString::fromLatin1(req.query)).queryItemValue(QStringLiteral("songId"));
+            if (req.path == "/api/playmode/intelligence/list" && songId != QLatin1String("7")
+                && ++heartRefills == 1) {
+                respond(200, "{\"code\":-460,\"message\":\"拒绝\"}");
+                return;
+            }
+            if (req.path == "/api/v1/radio/get") {
+                ++fmCalls;
+                if (std::exchange(rejectNextFm, false)) {
+                    respond(200, "{\"code\":-460,\"message\":\"拒绝\"}");
+                    return;
+                }
+                respond(200, json(QJsonObject{{"code", 200}, {"data", QJsonArray{QJsonObject{
+                    {"id", 500 + fmCalls}, {"name", "fm"}, {"ar", QJsonArray{}}, {"al", QJsonObject{}}, {"dt", 1000}}}}}));
+                return;
+            }
+            base(req, respond);
+        };
+        const auto fmCount = [&] { return m_store->personal().value("fm").toMap().value("tracks").toList().size(); };
+
+        m_store->refresh();
+        QVERIFY(waitUntil([&] { return heartIs(7) && fmCount() == 1; }));
+        // 刷新时私人漫游取了不止一次：等它们落地，并等过流量计的 1 秒窗口
+        // （同一个请求 1 秒内第 4 次会被拦下，测试把真实里隔几首歌的续取压在了一起）
+        QTest::qWait(1100);
+        const int startupCalls = fmCalls;
+
+        rejectNextFm = true;
+        m_store->request(QStringLiteral("fm:next"));   // 被拒
+        QVERIFY(waitUntil([&] { return fmCalls == startupCalls + 1; }));
+        QTest::qWait(100);
+        m_store->request(QStringLiteral("fm:next"));   // 仍然要得出去
+        QVERIFY(waitUntil([&] { return fmCount() == 2; }));
+
+        m_store->request(QStringLiteral("heart:next:70"));   // 被拒
+        QVERIFY(waitUntil([&] { return heartRefills == 1; }));
+        QTest::qWait(100);
+        m_store->request(QStringLiteral("heart:next:71"));
+        QVERIFY(waitUntil([&] { return heartTrackIds() == QList<double>({70, 710}); }));
     }
 
     // 搜索的「用户」栏是单槽：晚到的旧词结果不能盖掉新词的

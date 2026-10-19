@@ -311,8 +311,12 @@ void Store::fetchHeart(const QVariantMap &seed, double likedId)
     m_similarSeed = seed;
     maybeFetchSimilar();
     fetchHeartBatch(seed.value("id").toDouble(), likedId, [this, seed](const QVariantList &tracks, bool ok) {
-        if (!ok || seed.value("id").toDouble() != m_heartSeedId)
+        if (seed.value("id").toDouble() != m_heartSeedId)
             return;   // 回包前红心首位又换了：等新种子那一次
+        if (!ok) {
+            m_heartSeedId = 0;   // 首批没取到：不记这个种子，下次红心列表写入时再取
+            return;
+        }
         m_requests.begin(QStringLiteral("heart"));   // 整批换：在途的续取不再属于这条流
         put("heart", QVariantMap{{"seed", seed}, {"tracks", tracks.mid(0, 30)}}, true);
         // radar / tail 由 fetchAccount 独立发起，不挂在这条链尾
@@ -368,13 +372,18 @@ void Store::endRefill(const char *stream, quint64 generation, const QVariantList
 void Store::fetchHeartBatch(double songId, double likedId,
                             std::function<void(const QVariantList &, bool)> done)
 {
-    fetch("api/playmode/intelligence/list",
+    // fetchAlways：失败也要回调（ok = false），续取才能结束、首批失败才能重来
+    fetchAlways("api/playmode/intelligence/list",
           query({{"songId", num(songId)},
                  {"type", "fromPlayAll"},
                  {"playlistId", num(likedId)},
                  {"startMusicId", num(songId)},
                  {"count", "1"}}), true,
-          [done = std::move(done)](const QJsonDocument &doc, bool /*ok*/) {
+          [this, done = std::move(done)](const QJsonDocument &doc, bool ok) {
+        if (!requestFailure(doc, ok).isEmpty()) {
+            done({}, false);
+            return;
+        }
         const QJsonObject resp = body(doc);
         QJsonArray songs;
         for (const QJsonValue &x : arr(resp, "data"))

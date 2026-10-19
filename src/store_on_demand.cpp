@@ -67,15 +67,17 @@ void Store::maybeFetchSimilar()
 }
 
 // 私人漫游续取：接口每次给一小批新歌（见 beginRefill / endRefill）。
-// 每次都要新的一批，所以不经 QueryCache；失败时什么都不改，界面下次快放完时再要
+// 每次都要新的一批，所以不经 QueryCache；失败时什么都不改，界面下次快放完时再要。
+// 用 fetchAlways：fetch 失败时不回调，续取就永远结束不了，这条流再也续不上
 void Store::requestMoreFm()
 {
     if (!beginRefill("fm"))
         return;
     const quint64 generation = m_requests.token(QStringLiteral("fm"));
-    fetch("api/v1/radio/get", {}, true, [this, generation](const QJsonDocument &doc, bool ok) {
+    fetchAlways("api/v1/radio/get", {}, true, [this, generation](const QJsonDocument &doc, bool ok) {
         QVariantList batch;
-        if (const auto parsed = sdk::parseTracks(arr(body(doc), "data")); ok && parsed)
+        if (const auto parsed = sdk::parseTracks(arr(body(doc), "data"));
+            requestFailure(doc, ok).isEmpty() && parsed)
             batch = sdk::tracksToVariantList(*parsed.value);
         endRefill("fm", generation, batch);
     });
