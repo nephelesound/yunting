@@ -4,7 +4,8 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
   <name>云听</name>
-  <summary>网易云音乐的非官方 Linux 客户端</summary>
+  <summary>Unofficial NetEase Cloud Music client</summary>
+  <summary xml:lang="zh_CN">网易云音乐的非官方 Linux 客户端</summary>
   <developer id="io.github.nephelesound">
     <name>Nephele Sound</name>
   </developer>
@@ -26,136 +27,83 @@
   </content_rating>
   <description>
     <p>
+      A NetEase Cloud Music client for Linux with a native KDE/Qt interface. It puts your
+      personal recommendations first and supports MPRIS media keys and the system tray.
+    </p>
+    <p xml:lang="zh_CN">
       为 Linux 打造的网易云音乐客户端：原生 KDE/Qt 界面，个人推荐优先，
       支持 MPRIS 媒体键与系统托盘。
     </p>
     <ul>
-      <li>每日推荐、私人漫游、心动模式与排行榜</li>
-      <li>逐行滚动的歌词、桌面歌词与评论区</li>
-      <li>和好友一起听，下载歌曲离线播放</li>
-      <li>扫码登录，红心、歌单与收藏和手机同步</li>
+      <li>Daily recommendations, personal FM, heart mode and charts</li>
+      <li xml:lang="zh_CN">每日推荐、私人漫游、心动模式与排行榜</li>
+      <li>Line-by-line scrolling lyrics, desktop lyrics and comments</li>
+      <li xml:lang="zh_CN">逐行滚动的歌词、桌面歌词与评论区</li>
+      <li>Listen together with friends, and download songs to play offline</li>
+      <li xml:lang="zh_CN">和好友一起听，下载歌曲离线播放</li>
+      <li>QR code sign-in; likes, playlists and collections stay in sync with your phone</li>
+      <li xml:lang="zh_CN">扫码登录，红心、歌单与收藏和手机同步</li>
     </ul>
     <p>
+      Yunting is developed by the community. It is not an official NetEase Cloud Music
+      application and is not affiliated with NetEase.
+    </p>
+    <p xml:lang="zh_CN">
       云听由社区开发，不是网易云音乐的官方应用，与网易公司没有关联。
     </p>
   </description>
   <screenshots>
     <screenshot type="default">
-      <caption>正在播放与逐行歌词</caption>
-      <image>https://raw.githubusercontent.com/nephelesound/yunting/master/data/screenshots/1-now-playing.png</image>
+      <caption>Now playing with line-by-line lyrics</caption>
+      <caption xml:lang="zh_CN">正在播放与逐行歌词</caption>
+      <image>https://raw.githubusercontent.com/nephelesound/yunting/v0.6.6/data/screenshots/1-now-playing.png</image>
     </screenshot>
     <screenshot>
-      <caption>发现：排行榜、新歌、新碟与精品歌单</caption>
-      <image>https://raw.githubusercontent.com/nephelesound/yunting/master/data/screenshots/2-discover.png</image>
+      <caption>Discover: charts, new songs, new albums and curated playlists</caption>
+      <caption xml:lang="zh_CN">发现：排行榜、新歌、新碟与精品歌单</caption>
+      <image>https://raw.githubusercontent.com/nephelesound/yunting/v0.6.6/data/screenshots/2-discover.png</image>
     </screenshot>
     <screenshot>
-      <caption>榜单与音质标记</caption>
-      <image>https://raw.githubusercontent.com/nephelesound/yunting/master/data/screenshots/3-chart.png</image>
+      <caption>A chart with audio quality badges</caption>
+      <caption xml:lang="zh_CN">榜单与音质标记</caption>
+      <image>https://raw.githubusercontent.com/nephelesound/yunting/v0.6.6/data/screenshots/3-chart.png</image>
     </screenshot>
     <screenshot>
-      <caption>跟随系统的深色配色</caption>
-      <image>https://raw.githubusercontent.com/nephelesound/yunting/master/data/screenshots/4-dark.png</image>
+      <caption>Dark colors that follow the system</caption>
+      <caption xml:lang="zh_CN">跟随系统的深色配色</caption>
+      <image>https://raw.githubusercontent.com/nephelesound/yunting/v0.6.6/data/screenshots/4-dark.png</image>
     </screenshot>
   </screenshots>
+  <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.6" date="2026-10-19">
+      <description>
+        <p>Comments on playlists can be liked; the now-playing cover gets a soft shadow and rounded corners; downloads keep the song's duration and a second click no longer downloads a song twice.</p>
+        <p xml:lang="zh_CN">歌单评论也能点赞；正在播放页的封面有了柔和的投影和圆角；下载的歌记下时长，取地址时再点一次不会重复下载。</p>
+      </description>
+    </release>
     <release version="0.6.5" date="2026-10-19">
       <description>
-        <p>分享对话框改成两栏，所有对话框不超出窗口；修复私人漫游与心动模式续取失败后停住、重试无反应与翻页重复等问题。完整的更新日志见仓库里的 CHANGELOG.md。</p>
+        <p>The share dialog has two columns and no dialog grows taller than the window; personal FM and heart mode no longer stop after a failed refill; fixes for retries that did nothing and duplicates when paging.</p>
+        <p xml:lang="zh_CN">分享对话框改成两栏，所有对话框不超出窗口；修复私人漫游与心动模式续取失败后停住、重试无反应与翻页重复等问题。</p>
       </description>
     </release>
     <release version="0.6.4" date="2026-10-19">
       <description>
-        <p>修复分享不在播放的歌时应用卡死、请求失败后无限重试等问题，并加入请求流量的监测与告警。完整的更新日志见仓库里的 CHANGELOG.md。</p>
+        <p>Fixes a freeze when sharing a song that is not playing and endless retries after a failed request; adds request traffic monitoring and warnings.</p>
+        <p xml:lang="zh_CN">修复分享不在播放的歌时应用卡死、请求失败后无限重试等问题，并加入请求流量的监测与告警。</p>
       </description>
     </release>
     <release version="0.6.3" date="2026-10-19">
       <description>
-        <p>心动模式改为点了就放、越听越准的播放方式；暂停与切歌淡入淡出；修复拖动进度条时的噪音。完整的更新日志见仓库里的 CHANGELOG.md。</p>
+        <p>Heart mode plays right away and improves as you listen; pausing and switching songs fade in and out; seeking no longer makes noise.</p>
+        <p xml:lang="zh_CN">心动模式改为点了就放、越听越准的播放方式；暂停与切歌淡入淡出；修复拖动进度条时的噪音。</p>
       </description>
     </release>
     <release version="0.6.2" date="2026-10-19">
       <description>
-        <p>对话框统一成 KDE 新的样式，结束一起听改为在播放队列里原地确认；修复删除歌单的对话框在歌单名很长时超出窗口。完整的更新日志见仓库里的 CHANGELOG.md。</p>
-      </description>
-    </release>
-    <release version="0.6.1" date="2026-10-19">
-      <description>
-        <p>点了新的红心后，心动模式跟着换成从这首歌出发；修复打包构建时音频测试卡住。完整的更新日志见仓库里的 CHANGELOG.md。</p>
-      </description>
-    </release>
-    <release version="0.6.0" date="2026-10-19">
-      <description>
-        <p>新增一起听、歌曲下载、歌单评论、发现与播客、歌曲百科和动态封面，并提供 Flatpak 包；修复部分新歌的歌词加载不出来。完整的更新日志见仓库里的 CHANGELOG.md。</p>
-      </description>
-    </release>
-    <release version="0.5.5" date="2026-10-18">
-      <description>
-        <p>纯音乐在歌词页显示「纯音乐，请欣赏」，不再显示「暂无歌词」。完整的更新日志见仓库里的 CHANGELOG.md。</p>
-      </description>
-    </release>
-    <release version="0.5.4" date="2026-10-18">
-      <description>
-        <p>修复扫码确认后登录没有完成的问题。完整的更新日志见仓库里的 CHANGELOG.md。</p>
-      </description>
-    </release>
-    <release version="0.5.3" date="2026-10-18">
-      <description>
-        <p>修复扫码登录取不到二维码、一直加载的问题。完整的更新日志见仓库里的 CHANGELOG.md。</p>
-      </description>
-    </release>
-    <release version="0.5.2" date="2026-10-18">
-      <description>
-        <p>私信与评论区翻页时不再跳回开头。完整的更新日志见仓库里的 CHANGELOG.md。</p>
-      </description>
-    </release>
-    <release version="0.5.1" date="2026-10-18">
-      <description>
-        <p>修复音量过小、插拔耳机后不跟随输出设备、换页时数据错乱与隐私主页报错。完整的更新日志见仓库里的 CHANGELOG.md。</p>
-      </description>
-    </release>
-    <release version="0.5.0" date="2026-10-18">
-      <description>
-        <p>MV 也改由 mpv 播放，不再需要 Qt Multimedia。完整的更新日志见仓库里的 CHANGELOG.md。</p>
-      </description>
-    </release>
-    <release version="0.4.2" date="2026-10-18">
-      <description>
-        <p>拖动桌面歌词时窗口跟手，悬停底板不再随歌词伸缩。完整的更新日志见仓库里的 CHANGELOG.md。</p>
-      </description>
-    </release>
-    <release version="0.4.1" date="2026-10-18">
-      <description>
-        <p>桌面歌词的文字阴影不再逐帧重画，并且一律是黑色。完整的更新日志见仓库里的 CHANGELOG.md。</p>
-      </description>
-    </release>
-    <release version="0.4.0" date="2026-10-18">
-      <description>
-        <p>音乐改由 mpv 播放，插拔耳机时自动跟随系统默认输出。完整的更新日志见仓库里的 CHANGELOG.md。</p>
-      </description>
-    </release>
-    <release version="0.3.0" date="2026-10-18">
-      <description>
-        <p>中性灰的系统配色下，界面按强调色染上一点色调。完整的更新日志见仓库里的 CHANGELOG.md。</p>
-      </description>
-    </release>
-    <release version="0.2.2" date="2026-10-17">
-      <description>
-        <p>桌面歌词的控制条改成 KDE 标准工具栏，修复透明区域变黑。完整的更新日志见仓库里的 CHANGELOG.md。</p>
-      </description>
-    </release>
-    <release version="0.2.1" date="2026-10-17">
-      <description>
-        <p>修复播放条评论按钮的显示。完整的更新日志见仓库里的 CHANGELOG.md。</p>
-      </description>
-    </release>
-    <release version="0.2.0" date="2026-10-17">
-      <description>
-        <p>返回时回到离开时的位置，播放条可以直接进评论区。完整的更新日志见仓库里的 CHANGELOG.md。</p>
-      </description>
-    </release>
-    <release version="0.1.0" date="2026-10-17">
-      <description>
-        <p>首个公开版本。</p>
+        <p>Dialogs follow KDE's new style, and ending a listen-together session is confirmed in place in the queue; the delete-playlist dialog no longer overflows the window for long names.</p>
+        <p xml:lang="zh_CN">对话框统一成 KDE 新的样式，结束一起听改为在播放队列里原地确认；修复删除歌单的对话框在歌单名很长时超出窗口。</p>
       </description>
     </release>
   </releases>

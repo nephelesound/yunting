@@ -1,8 +1,10 @@
 [Desktop Entry]
 Type=Application
 Name=云听
-GenericName=音乐播放器
-Comment=网易云音乐的 Linux 客户端
+GenericName=Music Player
+GenericName[zh_CN]=音乐播放器
+Comment=Unofficial NetEase Cloud Music client
+Comment[zh_CN]=网易云音乐的 Linux 客户端
 Exec=yunting
 Icon=io.github.nephelesound.Yunting
 Terminal=false
