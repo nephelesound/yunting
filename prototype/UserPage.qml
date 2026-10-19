@@ -102,25 +102,24 @@ ScreenFrame {
             Layout.maximumWidth: Tokens.trackColumn
             spacing: 0
 
-            // 戴着头像挂件时像网易一样把头像缩小：挂件图只有 352 见方，头像 160、挂件 240，在 2 倍屏上
-            // 放大约 1.4 倍，仍然清楚；铺满 280 会糊。
-            // 挂件按固定的 240 取图，取到了头像才缩（坏链接时头像照常铺满）；挂件的尺寸不随头像变，不会来回重取
+            // 左栏第一格永远是 280 的方块（与专辑、歌单、歌手页的封面同一格），戴不戴挂件页面骨架都不变：
+            // 戴着时头像缩到三分之二居中，挂件铺满这一格。挂件图只有 352 见方，2 倍屏上放大约 1.6 倍，
+            // 仍算清楚；为了更清楚把这一格改小，下面的名字、事实就和别的页对不齐了，不值。
+            // 挂件按固定的一格取图，取到了头像才缩（坏链接时头像照常铺满）；挂件的尺寸不随头像变，不会来回重取
             Item {
                 readonly property bool framed: profilePendant.status === Image.Ready
                 Layout.preferredWidth: Tokens.trackColumn
-                Layout.preferredHeight: framed ? 1.5 * Tokens.tileLg : Tokens.trackColumn
+                Layout.preferredHeight: Tokens.trackColumn
                 PersonAvatar {
                     anchors.centerIn: parent
-                    width: parent.framed ? Tokens.tileLg : parent.width
+                    width: parent.framed ? parent.width / 1.5 : parent.width
                     height: width
                     name: page.user.name
                     source: page.user.avatar
                 }
                 Image {
                     id: profilePendant
-                    anchors.centerIn: parent
-                    width: 1.5 * Tokens.tileLg
-                    height: width
+                    anchors.fill: parent
                     visible: status === Image.Ready
                     source: page.user.avatarPendant || ""
                     sourceSize.width: 2 * width
