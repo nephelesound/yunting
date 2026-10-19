@@ -578,18 +578,19 @@ Item {
             verify(pasteTarget.text.indexOf(p.page.lines[1].text) === 0);
         }
 
-        // 正在播放页的大封面：微圆角、微投影；放歌时微微浮起（投影拉长），暂停时落下一点、投影收紧
-        function test_coverLiftsWhilePlaying() {
+        // 正在播放页的大封面：微圆角、向下偏的微投影；播放 / 暂停时封面不动（状态由播放条表达）
+        function test_coverHasASteadySoftShadow() {
             const page = createTemporaryObject(nowPlayingComponent, root, {
                 track: { id: 1, name: "歌", artist: "歌手", cover: "", dur: 300 }, elapsed: 0, playing: true });
             const cover = page.coverItem;
             compare(cover.radius, Tokens.radiusLg);
-            tryCompare(cover, "shadowSize", Tokens.space4);
-            compare(cover.transform[0].y, 0);
+            compare(cover.shadowSize, Tokens.space4);
+            compare(cover.shadowYOffset, Tokens.space2);
+            const y = cover.y;
             page.playing = false;
-            tryCompare(cover, "shadowSize", Tokens.space2);
-            tryCompare(cover, "shadowYOffset", Tokens.space1);
-            tryVerify(() => cover.transform[0].y === Tokens.space1, 1000, "暂停时封面落下");
+            wait(300);
+            compare(cover.shadowSize, Tokens.space4);
+            compare(cover.y, y);
         }
 
         // 从一段长对话切到另一段：列表重建前旧的委托会用新列表读一次、下标越界。
