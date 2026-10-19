@@ -45,11 +45,15 @@ var worstLyrics = [
     { t: 40, text: "最后一句", tr: "the last line" },
 ];
 
+// 头像挂件：取自网易云官方客户端的样例数据（真实的图）；坏链接那位挂件也是坏链接
+var PENDANT = "http://p1.music.126.net/Q9-E_ebpsaEoSnk9kLWRkw==/109951168933124513.jpg";
+
 var worstComments = { songId: 903, items: [
-    { user: "一只想要变成猫但是没有成功的柴犬Official", userId: 42, avatar: C2, likes: 1284567, time: 1700000000000, id: 9001, liked: false,
+    { user: "一只想要变成猫但是没有成功的柴犬Official", userId: 42, avatar: C2, avatarPendant: PENDANT, vipLevel: "svip",
+      likes: 1284567, time: 1700000000000, id: 9001, liked: false,
       content: "第一次听这首歌是在高三晚自习结束后回家的路上，耳机里放着它，路灯一盏一盏往后退。那时候觉得未来很远，现在回头看，原来那就是最好的时候。这条评论写得很长，用来看评论在半屏宽度里最多显示几行、省略号落在哪里。还要再长一点，再长一点，再长一点。" },
     { user: "A", userId: 43, avatar: "", likes: 1, time: 1700000000000, id: 9002, liked: false, content: "好" },
-    { user: "🌙", userId: 44, avatar: BROKEN, likes: 99999, time: 1700000000000, id: 9003, liked: true, content: "😭😭😭" },
+    { user: "🌙", userId: 44, avatar: BROKEN, avatarPendant: BROKEN, vipLevel: "vip", likes: 99999, time: 1700000000000, id: 9003, liked: true, content: "😭😭😭" },
 ] };
 
 var worstHot = [];

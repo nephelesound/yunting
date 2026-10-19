@@ -121,10 +121,9 @@ ScreenFrame {
                     font.weight: Font.Light
                     elide: Text.ElideRight
                 }
-                Tag {
-                    visible: (page.user.vipType || 0) > 0
-                    text: "VIP"
+                VipTag {
                     Layout.alignment: Qt.AlignVCenter
+                    level: page.user.vipLevel || ""
                 }
                 Tag {
                     visible: (page.user.level || 0) > 0
@@ -479,10 +478,11 @@ ScreenFrame {
                         required property var modelData
                         width: people.cellWidth - Tokens.space4
                         avatar: modelData.avatar
+                        pendant: modelData.avatarPendant || ""
+                        vipLevel: modelData.vipLevel || ""
                         name: modelData.name
                         detail: modelData.signature
-                        tags: ((modelData.vipType || 0) > 0 ? [{ text: "VIP" }] : [])
-                            .concat(modelData.mutual ? [{ text: "互相关注", muted: true }] : [])
+                        tags: modelData.mutual ? [{ text: "互相关注", muted: true }] : []
                         onClicked: Actions.openUser(modelData.id)
                     }
 

@@ -9,6 +9,8 @@ AbstractButton {
     id: row
 
     property string avatar
+    property string pendant       // 头像挂件
+    property string vipLevel      // 会员标：svip | vip | ""
     property string name
     property string detail      // 签名 / 最后一条消息
     property var tags: []       // [{ text, muted }]：VIP、互相关注
@@ -41,6 +43,7 @@ AbstractButton {
             implicitHeight: Tokens.height10
             name: row.name
             source: row.avatar
+            pendant: row.pendant
         }
 
         ColumnLayout {
@@ -59,6 +62,7 @@ AbstractButton {
                     font.weight: row.unread > 0 ? Font.DemiBold : Font.Normal
                     elide: Text.ElideRight
                 }
+                VipTag { level: row.vipLevel }
                 Repeater {
                     model: row.tags
                     delegate: Tag {

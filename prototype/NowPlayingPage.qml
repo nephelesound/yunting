@@ -398,8 +398,9 @@ ScreenFrame {
         CommentsPane {
             id: commentList
             visible: page.pane === "comments"
+            x: -commentList.pendantRoom
             y: page.pitch
-            width: parent.width
+            width: parent.width + commentList.pendantRoom
             height: (page.rows - 1) * page.pitch
             thread: page.track ? Source.commentThread("song", page.track.id) : null
             active: page.pane === "comments"

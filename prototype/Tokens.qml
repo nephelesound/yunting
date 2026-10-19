@@ -61,6 +61,11 @@ QtObject {
     readonly property var desktopShadows: [[0, 0], [0.5, 0.5], [0.85, 0.8]]
     // 分享图没有封面时的底：中深灰
     readonly property color shareBlank: "#505050"
+    // 黑胶 SVIP 的会员标：网易的黑金。底是近黑、斜着有一点唱片的光泽，字是暖金；
+    // 不随配色变（这是会员的标识色，与强调色无关），深色主题下另描一圈金边与暗底分开
+    readonly property color svipDeep: "#141210"
+    readonly property color svipSheen: "#2e2924"
+    readonly property color svipGold: "#e6c793"
     // 桌面歌词：隔着一段距离看的字，三档（当前句 / 第二行）。
     // 点亮色默认是字色本身（全不透明），也可选系统强调色或这几种中间调（亮壁纸、暗壁纸上都读得出）
     // 分享图：3:4 竖图（45 × 8 宽），导出放大 3 倍（1080 × 1440）。底是封面色场，压暗到白字站得住

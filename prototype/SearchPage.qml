@@ -98,9 +98,12 @@ ScreenFrame {
 
         Kirigami.SearchField {
             id: field
+            // 空着时显示网易推荐的那句；空着回车就搜它（与网易云客户端一样）
+            readonly property var suggested: Source.defaultSearch()
+            readonly property string suggestedQuery: field.suggested ? field.suggested.realKeyword || "" : ""
             Layout.preferredWidth: page.half
             implicitHeight: Tokens.height10
-            placeholderText: "搜索歌曲、歌手、专辑、歌单"
+            placeholderText: field.suggested && field.suggested.showKeyword ? field.suggested.showKeyword : "搜索歌曲、歌手、专辑、歌单"
             text: page.query
             focus: true
             autoAccept: false
@@ -116,6 +119,8 @@ ScreenFrame {
                     return;
                 }
                 suggestions.dismissed = true;
+                if (field.text.trim() === "" && field.suggestedQuery.length > 0)
+                    field.text = field.suggestedQuery;
                 page.query = field.text.trim();
             }
             // 建议列表里上下选（焦点留在输入框，照常打字）；Esc 先收起建议

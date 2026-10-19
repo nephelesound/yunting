@@ -157,10 +157,9 @@ Kirigami.Page {
                         font.pixelSize: Tokens.textSm
                         color: Source.sessionExpired ? Kirigami.Theme.neutralTextColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                     }
-                    Tag {
-                        visible: account.active && Source.account.vip
-                        text: "VIP"
+                    VipTag {
                         Layout.alignment: Qt.AlignVCenter
+                        level: account.active ? Source.account.vipLevel || "" : ""
                     }
                 }
             }

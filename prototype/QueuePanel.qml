@@ -195,6 +195,7 @@ Kirigami.OverlayDrawer {
                             implicitHeight: Tokens.height8
                             name: member.modelData.name || ""
                             source: member.modelData.avatar || ""
+                            pendant: member.modelData.avatarPendant || ""
                         }
                         Label {
                             Layout.maximumWidth: Tokens.albumColumn - Tokens.height8
@@ -202,6 +203,7 @@ Kirigami.OverlayDrawer {
                             font.pixelSize: Tokens.textBase
                             elide: Text.ElideRight
                         }
+                        VipTag { level: member.modelData.vipLevel || "" }
                     }
                 }
                 // 第二个位置空着：等好友来

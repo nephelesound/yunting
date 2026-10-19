@@ -32,6 +32,7 @@ RowLayout {
         implicitHeight: Tokens.height8
         name: row.comment.user || ""
         source: row.comment.avatar || ""
+        pendant: row.comment.avatarPendant || ""
         HoverHandler {
             enabled: (row.comment.userId || 0) > 0
             cursorShape: Qt.PointingHandCursor
@@ -58,6 +59,7 @@ RowLayout {
                 elide: Text.ElideRight
                 onActivated: Actions.openUser(row.comment.userId)
             }
+            VipTag { level: row.comment.vipLevel || "" }
             Label {
                 text: Format.commentTime(row.comment.time)
                 font.pixelSize: Tokens.textSm

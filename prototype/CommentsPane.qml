@@ -65,6 +65,10 @@ ListView {
     }
 
     clip: true
+    // 头像挂件比头像宽出一圈（PersonAvatar）：左边留出这一圈，不然挂件左半被裁掉。
+    // 放评论区的地方把它往左挪同样的距离，正文仍与上面的枢轴对齐
+    readonly property int pendantRoom: Tokens.space2
+    leftMargin: pane.pendantRoom
     spacing: Tokens.space6   // 评论之间 24：每条是一段独立的话，间距比行内大一档才分得开
     topMargin: Tokens.space3
     bottomMargin: Tokens.space6

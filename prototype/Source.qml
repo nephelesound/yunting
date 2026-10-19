@@ -573,6 +573,13 @@ QtObject {
         return { id: id, name: "", cover: "", artist: "", artistId: 0, duration: 0, url: "",
                  playCount: 0, subscribed: false, description: "", failed: failed };
     }
+    // 搜索框空着时网易推荐的词：{ showKeyword 显示的一句, realKeyword 回车真正搜的 }；没取到是 null
+    function defaultSearch() {
+        const s = source.d.defaultSearch;
+        if (!s)
+            source.need("defaultSearch");
+        return s || null;
+    }
     // 一首歌的相似歌曲与相似歌单（正在播放页的「相似」栏）：两个槽各放一首歌的结果、带 songId，
     // 只有这一栏读，所以不按 id 分开存
     function similarTo(songId) {

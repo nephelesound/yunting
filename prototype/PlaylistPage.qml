@@ -265,6 +265,7 @@ ScreenFrame {
                 visible: page.pane === "comments" && page.commentThread !== null
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.leftMargin: -comments.pendantRoom
                 Layout.rightMargin: Tokens.pageMargin
                 thread: page.commentThread
                 active: comments.visible
