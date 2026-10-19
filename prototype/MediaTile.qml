@@ -108,9 +108,11 @@ AbstractButton {
             Layout.preferredWidth: tile.size
             Layout.preferredHeight: Tokens.height12
             spacing: 0
+            // 名字里可能带换行（自建歌单常见）：换行会顶出第二行，而省略只作用在最后一行，第一行就压到旁边的磁贴上。
+            // 磁贴的两行字都压成一行再省略
             Label {
                 Layout.fillWidth: true
-                text: tile.title
+                text: tile.title.replace(/\s+/g, " ").trim()
                 horizontalAlignment: tile.round ? Text.AlignHCenter : Text.AlignLeft
                 font.pixelSize: Tokens.textBase
                 font.weight: Font.Medium
@@ -120,7 +122,7 @@ AbstractButton {
             }
             Label {
                 Layout.fillWidth: true
-                text: tile.caption
+                text: tile.caption.replace(/\s+/g, " ").trim()
                 horizontalAlignment: tile.round ? Text.AlignHCenter : Text.AlignLeft
                 font.pixelSize: Tokens.textSm
                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)

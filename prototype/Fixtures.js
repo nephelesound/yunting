@@ -140,7 +140,7 @@ var worst = {
         similarSongs: { songId: 903, tracks: worstTracks.slice(0, 8) },
         similarPlaylists: { songId: 903, items: [
             { id: 11, name: "【温柔女声】在深夜被治愈：适合一个人听的 100 首华语民谣与独立音乐", cover: C2, count: 100 },
-            { id: 12, name: "x", cover: "", count: 0 },
+            { id: 12, name: "「中西部情绪」Home Alone\n一个人的周末 · 第二行", cover: "", count: 27 },
             { id: 13, name: "雨天", cover: BROKEN, count: 1 },
             { id: 14, name: "通勤路上", cover: C1, count: 58 },
             { id: 15, name: "Lo-fi", cover: C2, count: 3000 }] },
