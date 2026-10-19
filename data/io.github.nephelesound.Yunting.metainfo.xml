@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.13" date="2026-10-19">
+      <description>
+        <p>The listen-together button on the player bar now opens a panel that lists your mutual follows: friends who are listening together or online come first, the rest show when you last listened together. The app icon follows the colour scheme, so it is light on a dark theme. Rows in the Similar pane are spaced like every other list.</p>
+        <p xml:lang="zh_CN">点播放条上的「一起听」，弹出的面板会列出互相关注的好友：正在一起听的、在线的排在前面，其余显示上次和你一起听的时间。应用图标随配色变化，暗色主题下是浅色图标。「相似」栏的歌曲行间距与其他列表一致。</p>
+      </description>
+    </release>
     <release version="0.6.12" date="2026-10-19">
       <description>
         <p>The "Last month" listening-rank tab no longer stays on "Loading...". Switching tabs now requests the selected range, and a late response for the previous tab cannot overwrite it. Tile titles containing a line break stay on one line.</p>
