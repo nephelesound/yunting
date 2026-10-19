@@ -4,6 +4,7 @@ build/
 node_modules/
 *.user
 .cache/
+__pycache__/
 
 # 个人数据快照（scripts/snapshot.py 用登录 cookie 生成），不入库
 prototype/Personal.js
