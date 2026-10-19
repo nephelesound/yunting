@@ -219,6 +219,7 @@ private:
     // 当前登录用户正在佩戴的头像挂件；profile 接口不返回它。
     void requestAvatarPendant();
     void requestUserPendant(double uid);
+    void requestFriendListening();
     void requestArtist(const QString &key, double artistId);
     void requestArtistSongs(const QString &key, double artistId, int offset);
     void requestAlbum(const QString &key, double albumId);

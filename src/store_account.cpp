@@ -130,6 +130,7 @@ void Store::fetchAccount()
                 account.insert("avatarPendant", oldPendant);
             put("account", account, true);
             requestAvatarPendant();
+            requestFriendListening();
             // 全部红心曲目 id（播放条与行内小红心）；没有红心时接口也可能回 null。
             // 快照是在请求前算的：期间点过红心的歌用本地状态覆盖，别让旧快照把心点回去。
             const quint64 likeGeneration = m_likeGeneration;

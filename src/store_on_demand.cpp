@@ -9,6 +9,7 @@
 #include "sdk/lyrics.h"
 #include "sdk/comment.h"
 #include "sdk/mv_page.h"
+#include "sdk/friend_listening.h"
 #include "sdk/pendant.h"
 #include "sdk/search_default.h"
 #include "sdk/search_people.h"
@@ -126,6 +127,8 @@ void Store::request(const QString &key)
              s.requestSimilarPlaylists(k, k.section(u':', 1).toDouble()); }},
         {QStringLiteral("defaultSearch"), [](Store &s, const QString &) {
              s.requestDefaultSearch(); }},
+        {QStringLiteral("friendsListening"), [](Store &s, const QString &) {
+             s.requestFriendListening(); }},
         {QStringLiteral("artistSongs:"), [](Store &s, const QString &k) {
              const QStringList parts = k.split(u':');
              s.requestArtistSongs(k, parts.value(1).toDouble(), parts.value(2).toInt()); }},
@@ -406,6 +409,54 @@ void Store::requestSearch(const QString &key, const QString &raw)
             if (generation == m_searchGeneration)
                 put("search", result, false);
         });
+}
+
+// 好友在听/最近在听列表。实时状态，不缓存；只登录后请求。
+void Store::requestFriendListening()
+{
+    if (!m_client->hasMusicU())
+        return;
+    const quint64 epoch = m_epoch;
+    const quint64 token = m_requests.begin(QStringLiteral("friendsListening"));
+    sdk::fetchFriendListening(*m_client, this,
+        [this, epoch, token](sdk::Result<sdk::FriendListeningPage> result) {
+        if (epoch != m_epoch || !m_requests.current(QStringLiteral("friendsListening"), token))
+            return;
+        if (!result) {
+            emit requestFailed(QStringLiteral("friendsListening"),
+                               QStringLiteral("暂时取不到好友在听"));
+            return;
+        }
+        QVariantList items;
+        items.reserve(result.value->items.size());
+        for (const sdk::FriendListening &friendItem : result.value->items) {
+            const sdk::FriendListeningUser &user = friendItem.user;
+            items.append(QVariantMap{
+                {"userId", static_cast<double>(user.userId)},
+                {"name", user.name},
+                {"avatar", ncmSized(QJsonValue(user.avatar), 96)},
+                {"avatarPendant", user.avatarPendant},
+                {"identityIcon", user.identityIcon},
+                {"signature", user.signature},
+                {"mutual", user.mutual},
+                {"followed", user.followed},
+                {"vipType", static_cast<double>(user.vipType)},
+                {"vipLevel", user.vipLevel},
+                {"lastListen", friendItem.lastListen},
+                {"listenStatus", friendItem.listenStatus},
+                {"lastTime", static_cast<double>(friendItem.lastTime)},
+                {"online", friendItem.online},
+                {"inRoom", friendItem.inRoom},
+                {"description", friendItem.description},
+            });
+        }
+        put("friendsListening", QVariantMap{
+            {"items", items},
+            {"streakGlobalSwitch", result.value->streakGlobalSwitch},
+            {"streakUserSwitch", result.value->streakUserSwitch},
+            {"matchButtonText", result.value->matchButtonText},
+        }, false);
+    });
 }
 
 // 当前账号正在佩戴的头像挂件。profile/account 接口都不带这个字段；没有挂件时

@@ -57,6 +57,7 @@ NcmClient                 传输（cookie、weapi/明文、超时）
 - `listen_together.h/.cpp`：一起听房间创建/加入/状态/结束、心跳、播放指令、歌单同步；纯明文 `/api/listen/together/*` 表单 + typed 解析。
 - `download.h/.cpp`：单曲下载地址 typed 模型；下载文件与离线播放由 `DownloadManager` / `AudioEngine` 负责。
 - `pendant.h/.cpp`：头像挂件（`api/pendant/user/get`，支持 `userId` 查任意用户；profile 不返回）。`preferredImage()` 按 imageUrl → PC → Android → iOS → preview 回退。
+- `friend_listening.h/.cpp`：好友在听/最近在听列表（`mutual/follows/get/v2`）。当前状态、最后收听时间、在线/在房间与挂件；此接口不含正在播放的歌曲名。
 - 动态封面 live shape：`data.videoPlayUrl` + `needTransition`；`weight` 兼容上游 typo，URL 是带时效签名地址。
 - `service.h/.cpp`：唯一的 HTTP code/错误/context/JSON 信封 seam，所有 service 共用。
 - `samples/`：

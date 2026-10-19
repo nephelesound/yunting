@@ -178,6 +178,7 @@
 - [x] `--dump-store`：真实 `api/pendant/user/get` 返回本人挂件「跃龙门」，只写入 `account.avatarPendant`；profile 接口确实没有该字段
 - [x] `--store-key user:89941946`：`api/pendant/user/get?userId=` 返回对方挂件；用户主页已并入 `user.avatarPendant`
 - [x] Store 测试：慢挂件不阻塞用户页；挂件失败不污染页面缓存，下一次访问会重试并合并
+- [x] `--store-key friendsListening`：真实 `mutual/follows/get/v2` 返回好友状态、在线/房间标记与挂件
 - [x] `--listen-together-selftest`：真实建房、同步两首歌单、结束；随后 status inRoom=false
 - [x] `--refresh-session`：真实 `login/token/refresh` 返回 ok，并重拉首屏
 - [x] `make contract` 登录 + 匿名

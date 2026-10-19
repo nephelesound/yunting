@@ -2009,6 +2009,52 @@ private slots:
                  QVariantMap({{"id", 8.0}, {"name", QStringLiteral("Bob")}}));
     }
 
+    // 好友在听：mutual/follows/get/v2 的 data 信封、状态字段与挂件进入 friendsListening
+    void friendsListeningMapsPresence()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/listen/together/mutual/follows/get/v2") {
+                const QJsonObject userInfo{
+                    {"userId", 42}, {"nickname", "Friend"},
+                    {"avatarUrl", "http://p1/a.jpg"},
+                    {"avatarDetail", QJsonObject{{"identityIconUrl", "http://p1/id.png"}}},
+                    {"signature", "hi"}, {"mutual", true}, {"followed", true},
+                    {"vipType", 11}, {"vipRights", QJsonObject{
+                        {"associator", QJsonObject{{"rights", true}}}}},
+                };
+                respond(200, json(QJsonObject{{"code", 200}, {"data", QJsonObject{
+                    {"mutualFollowLists", QJsonArray{QJsonObject{
+                        {"userInfo", userInfo},
+                        {"pendant", QJsonObject{{"image", "http://p1/p.png"}}},
+                        {"lastListen", true}, {"listenStatus", 1}, {"lastTime", 1234},
+                        {"online", true}, {"inRoom", false}, {"description", "在线"},
+                    }}},
+                    {"streakGlobalSwitch", 1}, {"streakUserSwitch", 1},
+                    {"matchButtonText", "匹配"}}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("friendsListening"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("friendsListening").toMap()
+                       .value("items").toList().size() == 1;
+        }));
+        const QVariantMap page = m_store->data().value("friendsListening").toMap();
+        QCOMPARE(page.value("matchButtonText").toString(), QStringLiteral("匹配"));
+        const QVariantMap friendItem = page.value("items").toList().first().toMap();
+        QCOMPARE(friendItem.value("userId").toDouble(), 42.0);
+        QCOMPARE(friendItem.value("name").toString(), QStringLiteral("Friend"));
+        QCOMPARE(friendItem.value("avatarPendant").toString(), QStringLiteral("http://p1/p.png"));
+        QCOMPARE(friendItem.value("identityIcon").toString(), QStringLiteral("http://p1/id.png"));
+        QCOMPARE(friendItem.value("vipLevel").toString(), QStringLiteral("vip"));
+        QCOMPARE(friendItem.value("online").toBool(), true);
+        QCOMPARE(friendItem.value("lastListen").toBool(), true);
+        QCOMPARE(friendItem.value("lastTime").toDouble(), 1234.0);
+        QCOMPARE(friendItem.value("description").toString(), QStringLiteral("在线"));
+    }
+
     // 周 / 月快速切换：旧标签页的迟到回包不能覆盖新标签页的数据
     void listenRankLatestTabWins()
     {
