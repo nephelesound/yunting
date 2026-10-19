@@ -2,6 +2,12 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.1] - 2026-10-19
+
+### 修复
+- 点了新的红心后，心动模式仍从原来那首歌出发，要重启才换；现在红心列表的第一首一变，心动模式就跟着换。
+- 打包构建时（干净的 chroot，没有 PipeWire）音频测试偶尔卡住 5 分钟后失败，导致 `makepkg` 的 check 不过。
+
 ## [0.6.0] - 2026-10-19
 
 ### 新增
@@ -141,6 +147,8 @@
 - 分享：链接、二维码、Telegram 与邮件，以及带封面与歌词的分享图。
 - 「关于」窗口与「复制诊断信息」，方便反馈问题。
 
+[0.6.1]: https://github.com/nephelesound/yunting/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/nephelesound/yunting/compare/v0.5.5...v0.6.0
 [0.5.5]: https://github.com/nephelesound/yunting/compare/v0.5.4...v0.5.5
 [0.5.2]: https://github.com/nephelesound/yunting/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/nephelesound/yunting/compare/v0.5.0...v0.5.1

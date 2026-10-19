@@ -58,6 +58,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.1" date="2026-10-19">
+      <description>
+        <p>点了新的红心后，心动模式跟着换成从这首歌出发；修复打包构建时音频测试卡住。完整的更新日志见仓库里的 CHANGELOG.md。</p>
+      </description>
+    </release>
     <release version="0.6.0" date="2026-10-19">
       <description>
         <p>新增一起听、歌曲下载、歌单评论、发现与播客、歌曲百科和动态封面，并提供 Flatpak 包；修复部分新歌的歌词加载不出来。完整的更新日志见仓库里的 CHANGELOG.md。</p>
