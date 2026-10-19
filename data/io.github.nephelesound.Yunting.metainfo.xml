@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.9" date="2026-10-19">
+      <description>
+        <p>A "Similar" pane on the now-playing page; avatar pendants and distinct VIP / SVIP badges; the suggested search keyword. "Open in client" from the browser works even when the desktop portal has no display, and launching again returns to the open window at once.</p>
+        <p xml:lang="zh_CN">正在播放页多了「相似」一栏；显示头像挂件，VIP 与 SVIP 分得出；搜索框显示推荐词。浏览器里的「在客户端打开」在门户没有图形环境时也能打开，再次启动立刻回到已开的窗口。</p>
+      </description>
+    </release>
     <release version="0.6.8" date="2026-10-19">
       <description>
         <p>NetEase links open in the app: "open in client" on the web, links passed on the command line, and links copied in other apps (including phone short links), after asking. Albums and logged-out playlists can be shared, long descriptions open in full, and launching again returns to the open window.</p>
@@ -98,12 +104,6 @@
       <description>
         <p>The share dialog has two columns and no dialog grows taller than the window; personal FM and heart mode no longer stop after a failed refill; fixes for retries that did nothing and duplicates when paging.</p>
         <p xml:lang="zh_CN">分享对话框改成两栏，所有对话框不超出窗口；修复私人漫游与心动模式续取失败后停住、重试无反应与翻页重复等问题。</p>
-      </description>
-    </release>
-    <release version="0.6.4" date="2026-10-19">
-      <description>
-        <p>Fixes a freeze when sharing a song that is not playing and endless retries after a failed request; adds request traffic monitoring and warnings.</p>
-        <p xml:lang="zh_CN">修复分享不在播放的歌时应用卡死、请求失败后无限重试等问题，并加入请求流量的监测与告警。</p>
       </description>
     </release>
   </releases>
