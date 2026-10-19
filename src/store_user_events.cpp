@@ -79,6 +79,7 @@ void Store::requestUserEvents(const QString &key, double uid, qint64 cursor)
                 {"likes", static_cast<double>(event.likeCount)},
                 {"comments", static_cast<double>(event.commentCount)},
                 {"shares", static_cast<double>(event.shareCount)},
+                {"privacySetting", event.privacySetting},
             });
         }
         const bool samePerson = m_data.value("userEvents").toMap().value("userId").toDouble() == uid;

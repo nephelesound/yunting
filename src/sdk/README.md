@@ -37,9 +37,9 @@ NcmClient                 传输（cookie、weapi/明文、超时）
 - `track_service.h/.cpp`：按 id 列表批量取歌曲详情（每批 250，一次回调），返回 `Result<QList<Track>>`；Store、一起听与只给 id 的下载共用这一个实现。
 - `song_wiki.h/.cpp`：DTO、解析、归一化、legacy map 适配。
 - `song_wiki_service.h/.cpp`：三个请求的组合与回调。
-- `discovery.h/.cpp`：推荐新歌、新碟、精品歌单、精品标签、首页 banner 的 typed 模型与请求。
+- `discovery.h/.cpp`：推荐新歌、新碟、精品歌单、精品标签、首页 banner、全量歌单分类标签（`playlist/catalogue`）的 typed 模型与请求。
 - `radio.h/.cpp`：推荐节目、电台详情、节目详情、电台节目分页的 typed 模型与请求。
-- `social.h/.cpp`：用户动态流的 typed 模型、只读请求，用户关注/取关，以及动态转发/删除/可见性写请求（需要登录 cookie，不重试）。
+- `social.h/.cpp`：用户动态流（含 `privacySetting`）的 typed 模型、只读请求，用户关注/取关，以及动态转发/删除/可见性写请求（需要登录 cookie，不重试）。
 - `feed.h/.cpp`：个性化 MV、独家内容、首页 block 的 typed 模型与请求。
 - `video.h/.cpp`：视频时间线、详情、签名播放地址。
 - `notification.h/.cpp`：系统通知、评论通知、@我/转发通知（登录 weapi）。

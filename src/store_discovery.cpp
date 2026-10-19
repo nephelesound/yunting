@@ -200,6 +200,37 @@ void Store::requestHighQualityTags()
         });
 }
 
+void Store::requestPlaylistCatalogue()
+{
+    const quint64 token = m_requests.begin(QStringLiteral("playlistCatalogue"));
+    m_cache.query(
+        QStringLiteral("playlistCatalogue"),
+        [this](QueryCache::Done done) {
+            sdk::fetchPlaylistCatalogue(*m_client, this,
+                                        [done](sdk::Result<sdk::PlaylistCatalogue> result) {
+                if (!result) {
+                    done({}, false);
+                    return;
+                }
+                QVariantList tags;
+                tags.reserve(result.value->tags.size());
+                for (const sdk::PlaylistCatalogueTag &tag : result.value->tags) {
+                    tags.append(QVariantMap{
+                        {"name", tag.name},
+                        {"category", tag.category},
+                        {"count", static_cast<double>(tag.count)},
+                        {"hot", tag.hot},
+                    });
+                }
+                done(QVariantMap{{"all", result.value->allName}, {"tags", tags}}, true);
+            });
+        },
+        [this, token](const QVariant &value) {
+            if (m_requests.current(QStringLiteral("playlistCatalogue"), token))
+                put("playlistCatalogue", value, false);
+        });
+}
+
 void Store::requestHighQuality(const QString &cat, qint64 before)
 {
     // 空分类就是「全部」；游标 0/负数都是第一页

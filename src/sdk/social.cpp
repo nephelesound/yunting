@@ -74,6 +74,9 @@ Result<UserEvent> eventFrom(const QJsonObject &object, const QString &path)
     event.likeCount = infoReader.integer("likedCount");
     event.commentCount = infoReader.integer("commentCount");
     event.shareCount = infoReader.integer("shareCount");
+    event.privacySetting = static_cast<int>(infoReader.integer("privacySetting"));
+    if (event.privacySetting == 0)
+        event.privacySetting = static_cast<int>(reader.integer("privacySetting"));
 
     const qint64 infoResourceId = infoReader.integer("resourceId");
     const int infoResourceType = static_cast<int>(infoReader.integer("resourceType"));

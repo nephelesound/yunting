@@ -210,6 +210,8 @@ void Store::request(const QString &key)
              if (k == QLatin1String("discover:newAlbums")) s.requestNewAlbums(); }},
         {QStringLiteral("discover:highqualityTags"), [](Store &s, const QString &k) {
              if (k == QLatin1String("discover:highqualityTags")) s.requestHighQualityTags(); }},
+        {QStringLiteral("playlistCatalogue"), [](Store &s, const QString &k) {
+             if (k == QLatin1String("playlistCatalogue")) s.requestPlaylistCatalogue(); }},
         {QStringLiteral("discover:highquality:"), [](Store &s, const QString &k) {
              const QStringList parts = k.split(u':');
              s.requestHighQuality(parts.value(2), parts.value(3).toLongLong()); }},
@@ -323,6 +325,8 @@ void Store::requestPlaylist(const QString &key, double playlistId)
                                  {"name", pl.value("name").toString()},
                                  {"cover", ncmSized(pl.value("coverImgUrl"), 400)},
                                  {"count", pl.value("trackCount").toDouble()},
+                                 {"privacy", pl.value("privacy").toInt()},
+                                 {"tags", pl.value("tags").toArray().toVariantList()},
                                  {"id", playlistId}},
                      true);
             });

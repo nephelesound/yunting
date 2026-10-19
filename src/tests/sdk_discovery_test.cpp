@@ -98,6 +98,22 @@ private slots:
         QCOMPARE(result.value->first().hot, true);
     }
 
+    void parsesPlaylistCatalogue()
+    {
+        QJsonObject all{{"name", "全部歌单"}, {"resourceCount", 1000}};
+        QJsonObject sub{{"name", "流行"}, {"category", 1},
+                        {"resourceCount", 919}, {"hot", true}};
+        const auto result = parsePlaylistCatalogue(QJsonObject{
+            {"code", 200}, {"all", all}, {"sub", QJsonArray{sub}}});
+        QVERIFY2(result.ok(), qPrintable(result.error.message));
+        QCOMPARE(result.value->allName, QStringLiteral("全部歌单"));
+        QCOMPARE(result.value->tags.size(), 1);
+        QCOMPARE(result.value->tags.first().name, QStringLiteral("流行"));
+        QCOMPARE(result.value->tags.first().category, 1);
+        QCOMPARE(result.value->tags.first().count, qint64(919));
+        QVERIFY(result.value->tags.first().hot);
+    }
+
     void parsesBanners()
     {
         QJsonObject banner{{"typeTitle", "新碟"}, {"imageUrl", "http://banner"},

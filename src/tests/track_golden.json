@@ -11,6 +11,8 @@
                 "id": 5,
                 "name": "歌单",
                 "playCount": 34,
+                "privacy": 0,
+                "tags": [],
                 "reason": "推荐语",
                 "subscribed": true,
                 "updateTime": 1700000000000
@@ -43,6 +45,8 @@
                 "id": 5,
                 "name": "歌单",
                 "playCount": 34,
+                "privacy": 0,
+                "tags": [],
                 "reason": "推荐语",
                 "subscribed": true,
                 "updateTime": 1700000000000
@@ -75,6 +79,8 @@
                 "id": 5,
                 "name": "精品歌单",
                 "playCount": 34,
+                "privacy": 0,
+                "tags": [],
                 "reason": "",
                 "subscribed": false,
                 "updateTime": 1700000000000
@@ -106,13 +112,14 @@
                 "id": 0,
                 "name": "",
                 "playCount": 0,
+                "privacy": 0,
+                "tags": [],
                 "reason": "",
                 "subscribed": false,
                 "updateTime": 0
             },
             "name": "emptyCard",
-            "playlist": {
-            }
+            "playlist": {}
         }
     ],
     "trackLists": [
@@ -124,8 +131,7 @@
                     "alias": "",
                     "artist": "",
                     "artistId": 0,
-                    "artists": [
-                    ],
+                    "artists": [],
                     "blockedBy": "",
                     "cover": "",
                     "dur": 0,
@@ -143,8 +149,7 @@
                     "alias": "",
                     "artist": "",
                     "artistId": 0,
-                    "artists": [
-                    ],
+                    "artists": [],
                     "blockedBy": "paid",
                     "cover": "",
                     "dur": 0,
@@ -162,8 +167,7 @@
                     "alias": "",
                     "artist": "",
                     "artistId": 0,
-                    "artists": [
-                    ],
+                    "artists": [],
                     "blockedBy": "",
                     "cover": "",
                     "dur": 0,
@@ -181,8 +185,7 @@
                     "alias": "",
                     "artist": "",
                     "artistId": 0,
-                    "artists": [
-                    ],
+                    "artists": [],
                     "blockedBy": "unavailable",
                     "cover": "",
                     "dur": 0,
@@ -200,8 +203,7 @@
                     "alias": "",
                     "artist": "",
                     "artistId": 0,
-                    "artists": [
-                    ],
+                    "artists": [],
                     "blockedBy": "",
                     "cover": "",
                     "dur": 0,
@@ -572,8 +574,7 @@
                 "alias": "",
                 "artist": "",
                 "artistId": 0,
-                "artists": [
-                ],
+                "artists": [],
                 "blockedBy": "",
                 "cover": "",
                 "dur": 1,
@@ -587,8 +588,7 @@
             },
             "name": "missingAlbum",
             "song": {
-                "ar": [
-                ],
+                "ar": [],
                 "dt": 1000,
                 "id": 3,
                 "name": "无专辑"
@@ -620,8 +620,7 @@
             },
             "name": "tnsAndDurationFallback",
             "song": {
-                "al": {
-                },
+                "al": {},
                 "ar": [
                     {
                         "id": 5,
@@ -700,8 +699,7 @@
                 "alias": "",
                 "artist": "",
                 "artistId": 0,
-                "artists": [
-                ],
+                "artists": [],
                 "blockedBy": "",
                 "cover": "",
                 "dur": 1,
@@ -715,8 +713,7 @@
             },
             "name": "embeddedPrivilegeCloud",
             "song": {
-                "ar": [
-                ],
+                "ar": [],
                 "dt": 1000,
                 "id": 6,
                 "name": "无专辑",
@@ -736,8 +733,7 @@
                 "alias": "",
                 "artist": "",
                 "artistId": 0,
-                "artists": [
-                ],
+                "artists": [],
                 "blockedBy": "unavailable",
                 "cover": "",
                 "dur": 1,
@@ -751,8 +747,7 @@
             },
             "name": "embeddedPrivilegeGone",
             "song": {
-                "ar": [
-                ],
+                "ar": [],
                 "dt": 1000,
                 "id": 7,
                 "name": "无专辑",
@@ -771,8 +766,7 @@
                 "alias": "",
                 "artist": "",
                 "artistId": 0,
-                "artists": [
-                ],
+                "artists": [],
                 "blockedBy": "paid",
                 "cover": "",
                 "dur": 1,
@@ -786,8 +780,7 @@
             },
             "name": "paidUnpurchased",
             "song": {
-                "ar": [
-                ],
+                "ar": [],
                 "dt": 1000,
                 "fee": 4,
                 "id": 8,
@@ -808,8 +801,7 @@
                 "alias": "",
                 "artist": "",
                 "artistId": 0,
-                "artists": [
-                ],
+                "artists": [],
                 "blockedBy": "unavailable",
                 "cover": "",
                 "dur": 1,
@@ -823,8 +815,7 @@
             },
             "name": "paidPurchasedButStillBlocked",
             "song": {
-                "ar": [
-                ],
+                "ar": [],
                 "dt": 1000,
                 "fee": 4,
                 "id": 9,
@@ -1081,8 +1072,7 @@
                 "alias": "",
                 "artist": "",
                 "artistId": 0,
-                "artists": [
-                ],
+                "artists": [],
                 "blockedBy": "",
                 "cover": "",
                 "dur": 0,

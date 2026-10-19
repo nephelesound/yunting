@@ -20,6 +20,7 @@ constexpr auto NewAlbumsPath = "api/album/new";
 constexpr auto HighQualityPath = "api/playlist/highquality/list";
 constexpr auto HighQualityTagsPath = "api/playlist/highquality/tags";
 constexpr auto BannersPath = "api/v2/banner/get";
+constexpr auto CataloguePath = "api/playlist/catalogue";
 
 } // namespace
 
@@ -325,6 +326,62 @@ void fetchBanners(NcmClient &client, QObject *context, BannersCallback callback)
             return;
         }
         callback(parseBanners(*root.value));
+    });
+}
+
+Result<PlaylistCatalogue> parsePlaylistCatalogue(const QJsonObject &root)
+{
+    const QString rootPath = QStringLiteral("discovery.playlistCatalogue");
+    JsonReader reader(root, rootPath);
+    PlaylistCatalogue out;
+
+    const QJsonObject all = reader.object("all");
+    JsonReader allReader(all, rootPath + QStringLiteral(".all"));
+    out.allName = allReader.string("name");
+    if (!allReader.ok())
+        return Result<PlaylistCatalogue>::failure(
+            endpointError(ErrorKind::Parse, CataloguePath, allReader.error(),
+                          rootPath + QStringLiteral(".all")));
+
+    const QJsonArray sub = reader.array("sub");
+    if (!reader.ok())
+        return Result<PlaylistCatalogue>::failure(
+            endpointError(ErrorKind::Parse, CataloguePath, reader.error(),
+                          rootPath + QStringLiteral(".sub")));
+    out.tags.reserve(sub.size());
+    for (qsizetype i = 0; i < sub.size(); ++i) {
+        const QString path = rootPath + QStringLiteral(".sub[%1]").arg(i);
+        if (!sub.at(i).isObject())
+            return Result<PlaylistCatalogue>::failure(
+                endpointError(ErrorKind::Parse, CataloguePath,
+                              path + QStringLiteral(": expected object"), path));
+        JsonReader item(sub.at(i).toObject(), path);
+        PlaylistCatalogueTag tag;
+        tag.name = item.string("name");
+        tag.category = static_cast<int>(item.integer("category"));
+        tag.count = item.integer("resourceCount");
+        tag.hot = item.boolean("hot");
+        if (!item.ok())
+            return Result<PlaylistCatalogue>::failure(
+                endpointError(ErrorKind::Parse, CataloguePath, item.error(), path));
+        if (!tag.name.isEmpty())
+            out.tags.append(std::move(tag));
+    }
+    return Result<PlaylistCatalogue>::success(std::move(out));
+}
+
+void fetchPlaylistCatalogue(NcmClient &client, QObject *context,
+                            PlaylistCatalogueCallback callback)
+{
+    if (!callback)
+        return;
+    getJson(client, context, QString::fromLatin1(CataloguePath), {}, false,
+            [callback = std::move(callback)](Result<QJsonObject> root) {
+        if (!root) {
+            callback(Result<PlaylistCatalogue>::failure(root.error));
+            return;
+        }
+        callback(parsePlaylistCatalogue(*root.value));
     });
 }
 

@@ -120,6 +120,7 @@ Store::Store(NcmClient *client, QObject *parent)
         {"newSongs", nullVariant()},
         {"newAlbums", nullVariant()},
         {"highqualityTags", nullVariant()},
+        {"playlistCatalogue", nullVariant()},
         {"highquality", nullVariant()},
         {"recommendedMvs", nullVariant()},
         {"recommendedPrograms", nullVariant()},

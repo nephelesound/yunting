@@ -113,6 +113,8 @@ Result<PlaylistCard> cardFrom(const QJsonObject &playlist, const char *coverKey,
     out.creatorName = creatorReader.string("nickname");
     out.updateTime = reader.integer("updateTime");
     out.subscribed = reader.boolean("subscribed");
+    out.privacy = static_cast<int>(reader.integer("privacy"));
+    out.tags = reader.stringList("tags");
     out.reason = reader.string("copywriter");
     if (!reader.ok())
         return Result<PlaylistCard>::failure(parseError(reader, reader.path()));
@@ -251,6 +253,10 @@ QVariantList tracksToVariantList(const QList<Track> &tracks)
 
 QVariantMap playlistCardToVariantMap(const PlaylistCard &card)
 {
+    QVariantList tags;
+    tags.reserve(card.tags.size());
+    for (const QString &tag : card.tags)
+        tags.append(tag);
     return {
         {"id", static_cast<double>(card.id)},
         {"name", card.name},
@@ -262,6 +268,8 @@ QVariantMap playlistCardToVariantMap(const PlaylistCard &card)
         {"creatorName", card.creatorName},
         {"updateTime", static_cast<double>(card.updateTime)},
         {"subscribed", card.subscribed},
+        {"privacy", static_cast<double>(card.privacy)},
+        {"tags", tags},
         {"reason", card.reason},
     };
 }

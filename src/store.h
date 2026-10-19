@@ -98,6 +98,13 @@ public:
     Q_INVOKABLE void setUserFollowed(double userId, bool followed);
     // 评论点赞：kind 为 "song" / "playlist"；乐观更新该线程的热评与分页槽，失败回滚并发 commentLikeFailed
     Q_INVOKABLE void setCommentLiked(const QString &kind, double ownerId, double commentId, bool liked);
+    // 评论互动：kind 为 "song" / "playlist"；targetUserId 是被抱一抱的评论作者
+    Q_INVOKABLE void hugComment(const QString &kind, double ownerId, double commentId, double targetUserId);
+    Q_INVOKABLE void reportComment(const QString &kind, double ownerId, double commentId, int reason);
+    // 动态写：转发 / 删除 / 可见性（0 所有人, 1 关注, 2 仅自己, 6 互关）
+    Q_INVOKABLE void forwardEvent(double eventId, double eventUserId, const QString &text);
+    Q_INVOKABLE void deleteEvent(double eventId);
+    Q_INVOKABLE void setEventPrivacy(double eventId, int privacy);
     // 发送文本 / 当前歌曲私信；成功后重取当前对话与会话列表，结果经 inboxMessageSent/Failed 发出
     Q_INVOKABLE void sendInboxText(double userId, const QString &text);
     Q_INVOKABLE void sendInboxSong(double userId, double songId, const QString &text = {});
@@ -135,6 +142,10 @@ signals:
     void followFailed(const QString &action, const QString &message);
     void commentLikeFailed(const QString &kind, double ownerId, double commentId, const QString &message);
     void commentLikeSucceeded(const QString &kind, double ownerId, double commentId, bool liked);
+    void commentActionSucceeded(const QString &action, double commentId);
+    void commentActionFailed(const QString &action, double commentId, const QString &message);
+    void eventActionSucceeded(const QString &action, double eventId);
+    void eventActionFailed(const QString &action, double eventId, const QString &message);
     // 按需请求失败（含信箱与私信对话）：请求时的 key 与给用户看的一句话；成功走 dataChanged
     void requestFailed(const QString &key, const QString &message);
     // 预期内的不可见状态（例如对方设置了隐私）：在对应页面内说明，不弹全局错误
@@ -255,6 +266,7 @@ private:
     void requestNewSongs();
     void requestNewAlbums();
     void requestHighQualityTags();
+    void requestPlaylistCatalogue();
     void requestHighQuality(const QString &cat, qint64 before);
     void requestRecommendedMvs();
     void requestRecommendedPrograms();

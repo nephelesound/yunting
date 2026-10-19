@@ -49,6 +49,7 @@ struct UserEvent {
     qint64 likeCount = 0;  // info.likedCount
     qint64 commentCount = 0; // info.commentCount
     qint64 shareCount = 0; // info.shareCount
+    int privacySetting = 0; // info.privacySetting: 0 everyone, 1 following, 2 only me, 6 mutual
     qint64 eventTime = 0;  // events[].eventTime (milliseconds)
 };
 

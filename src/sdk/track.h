@@ -22,6 +22,7 @@
 #include <QJsonObject>
 #include <QList>
 #include <QString>
+#include <QStringList>
 #include <QVariantList>
 #include <QVariantMap>
 
@@ -93,6 +94,8 @@ struct PlaylistCard {
     QString creatorName;     // creator.nickname
     qint64 updateTime = 0;   // updateTime (milliseconds)
     bool subscribed = false; // subscribed
+    int privacy = 0;         // privacy: 0 public, 10 private
+    QStringList tags;        // tags[]
     QString reason;          // copywriter (推荐语)
 };
 

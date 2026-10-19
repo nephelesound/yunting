@@ -4,6 +4,8 @@
 #include "json_util.h"
 #include "ncmclient.h"
 #include "normalize.h"
+#include "sdk/comment.h"
+#include "sdk/social.h"
 #include "sdk/user_social.h"
 
 #include <QJsonDocument>
@@ -164,5 +166,162 @@ void Store::requestUserSubcount()
             {"mvCount", counts.mvCount},
             {"djRadioCount", counts.djRadioCount},
         }, false);
+    });
+}
+
+namespace {
+QString commentThreadFor(const QString &kind, double ownerId)
+{
+    if (kind == QLatin1String("playlist"))
+        return sdk::commentThreadId(sdk::CommentThreadKind::Playlist, static_cast<qint64>(ownerId));
+    return sdk::commentThreadId(sdk::CommentThreadKind::Song, static_cast<qint64>(ownerId));
+}
+
+QString commentActionName(const QString &kind)
+{
+    return kind == QLatin1String("playlist") ? QStringLiteral("歌单评论") : QStringLiteral("歌曲评论");
+}
+} // namespace
+
+void Store::hugComment(const QString &kind, double ownerId, double commentId, double targetUserId)
+{
+    const QString action = commentActionName(kind) + QStringLiteral("抱一抱");
+    if (kind != QLatin1String("song") && kind != QLatin1String("playlist")) {
+        emit commentActionFailed(action, commentId, QStringLiteral("评论类型无效"));
+        return;
+    }
+    if (!m_client->hasMusicU()) {
+        emit commentActionFailed(action, commentId, QStringLiteral("登录后才能抱一抱"));
+        return;
+    }
+    if (ownerId <= 0 || commentId <= 0 || targetUserId <= 0) {
+        emit commentActionFailed(action, commentId, QStringLiteral("评论信息无效"));
+        return;
+    }
+    const QString threadId = commentThreadFor(kind, ownerId);
+    sdk::hugComment(*m_client, threadId, static_cast<qint64>(commentId),
+                    static_cast<qint64>(targetUserId), this,
+                    [this, action, commentId](sdk::Result<bool> result) {
+        if (!result) {
+            emit commentActionFailed(action, commentId,
+                                     requestFailure(result.error, QStringLiteral("暂时不能抱一抱")));
+            return;
+        }
+        emit commentActionSucceeded(action, commentId);
+    });
+}
+
+void Store::reportComment(const QString &kind, double ownerId, double commentId, int reason)
+{
+    const QString action = commentActionName(kind) + QStringLiteral("举报");
+    if (kind != QLatin1String("song") && kind != QLatin1String("playlist")) {
+        emit commentActionFailed(action, commentId, QStringLiteral("评论类型无效"));
+        return;
+    }
+    if (!m_client->hasMusicU()) {
+        emit commentActionFailed(action, commentId, QStringLiteral("登录后才能举报"));
+        return;
+    }
+    if (ownerId <= 0 || commentId <= 0 || reason < 0) {
+        emit commentActionFailed(action, commentId, QStringLiteral("举报信息无效"));
+        return;
+    }
+    const QString threadId = commentThreadFor(kind, ownerId);
+    sdk::reportComment(*m_client, threadId, static_cast<qint64>(commentId), reason, this,
+                       [this, action, commentId](sdk::Result<bool> result) {
+        if (!result) {
+            emit commentActionFailed(action, commentId,
+                                     requestFailure(result.error, QStringLiteral("暂时不能举报")));
+            return;
+        }
+        emit commentActionSucceeded(action, commentId);
+    });
+}
+
+void Store::forwardEvent(double eventId, double eventUserId, const QString &text)
+{
+    const QString action = QStringLiteral("转发动态");
+    if (!m_client->hasMusicU()) {
+        emit eventActionFailed(action, eventId, QStringLiteral("登录后才能转发动态"));
+        return;
+    }
+    if (eventId <= 0 || eventUserId <= 0) {
+        emit eventActionFailed(action, eventId, QStringLiteral("动态信息无效"));
+        return;
+    }
+    sdk::forwardEvent(*m_client, static_cast<qint64>(eventId),
+                      static_cast<qint64>(eventUserId), text, this,
+                      [this, action, eventId](sdk::Result<bool> result) {
+        if (!result) {
+            emit eventActionFailed(action, eventId,
+                                   requestFailure(result.error, QStringLiteral("暂时不能转发动态")));
+            return;
+        }
+        emit eventActionSucceeded(action, eventId);
+    });
+}
+
+void Store::deleteEvent(double eventId)
+{
+    const QString action = QStringLiteral("删除动态");
+    if (!m_client->hasMusicU()) {
+        emit eventActionFailed(action, eventId, QStringLiteral("登录后才能删除动态"));
+        return;
+    }
+    if (eventId <= 0) {
+        emit eventActionFailed(action, eventId, QStringLiteral("动态信息无效"));
+        return;
+    }
+    sdk::deleteEvent(*m_client, static_cast<qint64>(eventId), this,
+                     [this, action, eventId](sdk::Result<bool> result) {
+        if (!result) {
+            emit eventActionFailed(action, eventId,
+                                   requestFailure(result.error, QStringLiteral("暂时不能删除动态")));
+            return;
+        }
+        QVariantMap page = m_data.value("userEvents").toMap();
+        QVariantList items = page.value("items").toList();
+        for (qsizetype i = items.size() - 1; i >= 0; --i) {
+            if (items.at(i).toMap().value("id").toDouble() == eventId)
+                items.removeAt(i);
+        }
+        page.insert("items", items);
+        put("userEvents", page, false);
+        emit eventActionSucceeded(action, eventId);
+    });
+}
+
+void Store::setEventPrivacy(double eventId, int privacy)
+{
+    const QString action = QStringLiteral("修改动态可见性");
+    if (!m_client->hasMusicU()) {
+        emit eventActionFailed(action, eventId, QStringLiteral("登录后才能修改动态可见性"));
+        return;
+    }
+    if (eventId <= 0
+        || (privacy != 0 && privacy != 1 && privacy != 2 && privacy != 6)) {
+        emit eventActionFailed(action, eventId, QStringLiteral("动态可见性无效"));
+        return;
+    }
+    sdk::setEventPrivacy(*m_client, static_cast<qint64>(eventId), privacy, this,
+                         [this, action, eventId, privacy](sdk::Result<bool> result) {
+        if (!result) {
+            emit eventActionFailed(action, eventId,
+                                   requestFailure(result.error,
+                                                  QStringLiteral("暂时不能修改动态可见性")));
+            return;
+        }
+        QVariantMap page = m_data.value("userEvents").toMap();
+        QVariantList items = page.value("items").toList();
+        for (QVariant &value : items) {
+            QVariantMap item = value.toMap();
+            if (item.value("id").toDouble() == eventId) {
+                item.insert("privacySetting", privacy);
+                value = item;
+            }
+        }
+        page.insert("items", items);
+        put("userEvents", page, false);
+        emit eventActionSucceeded(action, eventId);
     });
 }

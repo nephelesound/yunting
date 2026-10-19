@@ -85,6 +85,18 @@ struct HighQualityTag {
     bool hot = false;
 };
 
+struct PlaylistCatalogueTag {
+    QString name;           // sub[].name
+    int category = 0;       // sub[].category
+    qint64 count = 0;       // sub[].resourceCount
+    bool hot = false;       // sub[].hot
+};
+
+struct PlaylistCatalogue {
+    QString allName;        // all.name
+    QList<PlaylistCatalogueTag> tags; // sub[]
+};
+
 struct HighQualityPlaylistPage {
     QList<HighQualityPlaylist> items;
     bool more = false;      // top-level more
@@ -96,6 +108,7 @@ using NewAlbumsCallback = std::function<void(Result<QList<NewAlbum>>)>;
 using HighQualityPlaylistsCallback = std::function<void(Result<HighQualityPlaylistPage>)>;
 using HighQualityTagsCallback = std::function<void(Result<QList<HighQualityTag>>)>;
 using BannersCallback = std::function<void(Result<QList<Banner>>)>;
+using PlaylistCatalogueCallback = std::function<void(Result<PlaylistCatalogue>)>;
 
 void fetchNewSongs(NcmClient &client, int limit, QObject *context,
                    NewSongsCallback callback);
@@ -106,6 +119,8 @@ void fetchHighQualityPlaylists(NcmClient &client, QString cat, int limit, qint64
 void fetchHighQualityTags(NcmClient &client, QObject *context,
                           HighQualityTagsCallback callback);
 void fetchBanners(NcmClient &client, QObject *context, BannersCallback callback);
+void fetchPlaylistCatalogue(NcmClient &client, QObject *context,
+                            PlaylistCatalogueCallback callback);
 
 // Pure parsers, exposed for tests and for callers that already hold a response.
 Result<QList<NewSong>> parseNewSongs(const QJsonObject &root);
@@ -113,5 +128,6 @@ Result<QList<NewAlbum>> parseNewAlbums(const QJsonObject &root);
 Result<HighQualityPlaylistPage> parseHighQualityPlaylists(const QJsonObject &root);
 Result<QList<HighQualityTag>> parseHighQualityTags(const QJsonObject &root);
 Result<QList<Banner>> parseBanners(const QJsonObject &root);
+Result<PlaylistCatalogue> parsePlaylistCatalogue(const QJsonObject &root);
 
 } // namespace ncm::sdk

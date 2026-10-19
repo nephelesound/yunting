@@ -96,11 +96,12 @@
 | `data.newSongs` | `discover:newSongs` | `[Track]` |
 | `data.newAlbums` | `discover:newAlbums` | `[{ id,name,cover,artist,artistId,publishTime,size }]` |
 | `data.highqualityTags` | `discover:highqualityTags` | `[{ name,hot }]` |
+| `data.playlistCatalogue` | `playlistCatalogue` | `{ all, tags:[{name,category,count,hot}] }`：全量歌单分类标签 |
 | `data.highquality` | `discover:highquality:<cat>[:<next>]` | 分页：`{ cat,more,next,items:[{id,name,cover,count,plays,description,creator}] }`；`cat=全部` 表示不筛分类 |
 | `data.recommendedMvs` | `discover:mvs` | `[{ id,name,cover,artist,artistId,duration,playCount,reason }]` |
 | `data.recommendedPrograms` | `discover:programs` | `[Program]` |
 | `data.radio` | `radio:<id>[:<next>]` | 分页：`{ id,name,cover,description,dj:{id,name,avatar},programCount,subCount,playCount,more,next,programs:[Program] }`；翻页复用同 id 的详情 |
-| `data.userEvents` | `userEvents:<uid>[:<next>]` | 分页：`{ userId,more,next,items:[{id,action,text,time,user,resource,likes,comments,shares}] }`；隐私拒绝时 `items:[]` 另带 `restricted` / `message` |
+| `data.userEvents` | `userEvents:<uid>[:<next>]` | 分页：`{ userId,more,next,items:[{id,action,text,time,user,resource,likes,comments,shares,privacySetting}] }`；隐私拒绝时 `items:[]` 另带 `restricted` / `message` |
 | `personal.savedArtists` | `library:artists[:<next>]` | 分页：`{ more,next,count,items:[{id,name,cover,alias,albums,mvs}] }` |
 | `personal.savedAlbums` | `library:albums[:<next>]` | 分页：`{ more,next,count,items:[{id,name,cover,artist,artistId,size}] }` |
 | `personal.savedMvs` | `library:mvs[:<next>]` | 分页：`{ more,next,count,items:[{kind,id,vid,name,cover,artist,duration,playCount}] }`；`kind=mv` 时 `id` 为数字、`vid` 为空；`kind=video` 时 `id` 为 0、`vid` 为字符串 |
@@ -108,6 +109,15 @@
 | `data.commentNotices` | `notify:comments[:<next>]` | 分页：`{ more,next,total,items:[{id,time,user,content,repliedContent,resource}] }` |
 | `data.forwards` | `notify:forwards[:<next>]` | 分页：`{ more,next,newCount,items:[{id,time,user,message,resource}] }` |
 | `data.dynamicCover` | `dynamicCover:<songId>` | `{ songId,url,width,height }`；没有动态封面或未登录时 `url:""`、尺寸 0，不报错；签名 URL 不写磁盘缓存 |
+
+`data.playlistDetails.<id>` 现在带 `privacy`（0 公开 / 10 私密）和 `tags[]`，界面可直接显示当前隐私与标签。
+
+## 写操作接缝
+
+- `hugComment(kind, ownerId, commentId, targetUserId)` / `reportComment(kind, ownerId, commentId, reason)`：成功后 `commentActionSucceeded(action, commentId)`，失败 `commentActionFailed(action, commentId, message)`。
+- `forwardEvent(eventId, eventUserId, text)` / `deleteEvent(eventId)` / `setEventPrivacy(eventId, privacy)`：成功后 `eventActionSucceeded(action, eventId)`，失败 `eventActionFailed(action, eventId, message)`；删除和可见性会同步 `data.userEvents.items`。
+- 云盘上传：`uploadCloudSong(path)` / `cancelCloudUpload()`，进度 `cloudUploadProgress(sent,total)`，结果 `cloudUploadFinished(songId)` / `cloudUploadFailed(message)`。
+- 歌单：`setPlaylistPrivacy` / `setPlaylistTags` / `importPlaylistFromText` / `importPlaylistFromLinks`，导入成功 `playlistImportStarted(taskId)`。
 
 「分页」的槽：第一页的 key 不带游标；之后每页的 key 在末尾加 `:<next>`，取回的条目**接在同一个槽的 items 后面**
 （与关注 / 粉丝、私信一样），`more` 为 false 时没有下一页。`next` 是游标或 offset，由 Store 给，界面原样带回。
