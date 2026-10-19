@@ -1,16 +1,10 @@
 # Maintainer: sudoskys <tururu02 at gmail dot com>
-# 云听的 -git 包（跟主干构建）。不在 AUR 上：用户按 README「安装」克隆仓库后在这里 makepkg -si。
-# 本地试打包这个仓库的已提交内容：
+# 云听的发行版包：按 pkgver 取对应的 git 标签构建，只装发布过的版本。发版时把 pkgver 改成新版本号。
+# 不在 AUR 上：用户按 README「安装」克隆仓库后在这里 makepkg -si。
+# 本地试打包这个仓库（标签要已存在）：
 #   YUNTING_REPO="git+file://$(git rev-parse --show-toplevel)" makepkg -si
-# 改了这个文件后重新生成 .SRCINFO：makepkg --printsrcinfo > .SRCINFO
-pkgname=yunting-git
-_name=yunting
-# 占位版本：makepkg 入口的 lint 要求静态 pkgver，pkgver() 成功后会被就地改写
-pkgver=0.1
-pkgver() {
-  cd "$srcdir/$_name"
-  printf 'r%s.%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
-}
+pkgname=yunting
+pkgver=0.6.1
 pkgrel=1
 pkgdesc='Native KDE client for NetEase Cloud Music (Qt 6 / Kirigami)'
 arch=(x86_64 aarch64)
@@ -25,15 +19,14 @@ depends=(
   zstd
 )
 makedepends=(cmake ninja git)
-provides=("$_name")
-conflicts=("$_name")
+conflicts=(yunting-git)   # 以前从主干构建的包；装这个时 pacman 会提示替换
 # 系统 makepkg.conf 默认开 debug：会把剥过符号的二进制挪进 -debug 子包，主包变空
 options=(!debug)
-source=("$_name::${YUNTING_REPO:-git+https://github.com/nephelesound/yunting.git}")
+source=("$pkgname::${YUNTING_REPO:-git+https://github.com/nephelesound/yunting.git}#tag=v$pkgver")
 sha256sums=(SKIP)
 
 build() {
-  cmake -S "$_name/src" -B build -G Ninja \
+  cmake -S "$pkgname/src" -B build -G Ninja \
     -DCMAKE_BUILD_TYPE=None \
     -DCMAKE_INSTALL_PREFIX=/usr
   cmake --build build
