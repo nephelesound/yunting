@@ -237,6 +237,14 @@ private slots:
         QTest::qWait(150);
         QCOMPARE(lyricRequests.value(QStringLiteral("21")), 1);
         QCOMPARE(lyricRequests.value(QStringLiteral("22")), 1);
+
+        // 只留最近 8 首：再要 7 首之后，最早的 21 被挤掉，22 还在；最近要过的排在后面（22 刚又要过）
+        for (int id = 31; id <= 37; ++id)
+            m_store->request(QStringLiteral("lyrics:%1").arg(id));
+        QVERIFY(waitUntil([&] { return !lyricsOf(37).isEmpty(); }));
+        QCOMPARE(m_store->data().value("lyrics").toMap().size(), 8);
+        QVERIFY(lyricsOf(21).isEmpty());
+        QVERIFY(!lyricsOf(22).isEmpty());
     }
 
     // 没有 pureMusic/nolyric 标记的空歌词可能是瞬时空包：不能永久缓存成「暂无歌词」

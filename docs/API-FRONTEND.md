@@ -76,7 +76,7 @@
 | `data.userLevel` | `userLevel` | `{ level,nowPlayCount,nextPlayCount,nowLoginCount,nextLoginCount,progress,info }` |
 | `data.userSubcount` | `userSubcount` | `{ artistCount,createdPlaylistCount,subPlaylistCount,mvCount,djRadioCount }` |
 | `data.commentReplies` | `commentReplies:<songId>:<commentId>[:<before>]` | `{ songId,commentId,before,more,items:[评论字段] }` |
-| `data.lyrics` | `lyrics:<songId>` | 句子表 `[{t,text,tr}]`；同槽的 `data.lyricsTrackId` 标明是哪首，`data.lyricsPureMusic` 为 true 表示纯音乐（空歌词是正确结果，界面说「纯音乐，请欣赏」） |
+| `data.lyrics` | `lyrics:<songId>` | 按歌存：`{ "<songId>": { lines:[{t,text,tr}], pureMusic } }`，只留最近 8 首；`pureMusic` 为 true 表示纯音乐（空歌词是正确结果，界面说「纯音乐，请欣赏」）。几处同时要不同歌的歌词各取各的 |
 | `data.lyricsNew` | `lyricsNew:<songId>` | `{ songId,lrc,tlyric,yrc,klyric,romalrc,lines:[{t,text,tr}] }` |
 | `data.searchSuggest` | `searchSuggest:<query>` | `{ query,order[],songs:[{id,name,artist,album}],artists:[{id,name,cover}],albums:[{id,name,artist,artistId}],playlists:[{id,name,cover,count}] }`；最新请求的查询优先，不落盘 |
 | `data.newSongs` | `discover:newSongs` | `[Track]` |
