@@ -19,6 +19,13 @@ ListView {
 
     signal loginRequested()
 
+    // 抱一抱：登录后、别人的评论、知道评论的作者与这条的 id 时才有（抱自己没有意义）
+    function canHug(comment) {
+        const me = Source.account ? Source.account.id : 0;
+        return pane.loggedIn && pane.thread !== null && (comment.id || 0) > 0
+            && (comment.userId || 0) > 0 && comment.userId !== me;
+    }
+
     readonly property var hot: pane.thread && pane.active ? Source.hotComments(pane.thread) : ({ loaded: false, items: [], total: 0 })
     readonly property var latest: pane.thread && pane.active ? Source.latestFor(pane.thread) : null
     function key(c) { return c.user + "\n" + c.time + "\n" + c.content; }
@@ -114,6 +121,8 @@ ListView {
             Layout.fillWidth: true
             comment: entry.modelData
             threadOpen: pane.openThread === entry.modelData.id
+            huggable: pane.canHug(entry.modelData)
+            onHugRequested: Source.hugComment(pane.thread, entry.modelData)
             onLikeRequested: liked => {
                 if (!pane.loggedIn) {
                     pane.loginRequested();
@@ -141,6 +150,8 @@ ListView {
                     comment: modelData
                     likeable: false
                     threadOf: entry.modelData.id || 0
+                    huggable: pane.canHug(modelData)
+                    onHugRequested: Source.hugComment(pane.thread, modelData)
                 }
             }
             LinkText {

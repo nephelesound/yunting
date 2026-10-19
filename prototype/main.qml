@@ -518,6 +518,49 @@ Kirigami.ApplicationWindow {
         }
     }
 
+    // 转发动态：可以附一句话，不写也行（网易云允许空附言转发）
+    AppDialog {
+        id: forwardDialog
+        property var event: null
+        function ask(event) {
+            forwardDialog.event = event;
+            forwardText.text = "";
+            forwardDialog.open();
+            forwardText.forceActiveFocus();
+        }
+        title: "转发动态"
+        acceptText: "转发"
+        acceptIconName: "document-share"
+        onAccepted: Source.forwardEvent(forwardDialog.event, forwardText.text.trim())
+        FormCard.FormTextFieldDelegate {
+            id: forwardText
+            label: "说点什么"
+            placeholderText: "可以不写"
+            maximumLength: 140
+            onAccepted: forwardDialog.accept()
+        }
+    }
+
+    // 删除自己的动态不可撤销：引一句它的内容，说清楚删的是哪条
+    AppDialog {
+        id: deleteEventDialog
+        property var event: null
+        function ask(event) {
+            deleteEventDialog.event = event;
+            deleteEventDialog.open();
+        }
+        readonly property string excerpt: {
+            const e = deleteEventDialog.event;
+            const text = e ? (e.text || (e.resource && e.resource.name) || "") : "";
+            return text.length > 30 ? text.slice(0, 30) + "…" : text;
+        }
+        title: "删除动态"
+        message: (deleteEventDialog.excerpt ? "删除「" + deleteEventDialog.excerpt + "」？" : "删除这条动态？") + "删除后无法恢复。"
+        acceptText: "删除"
+        acceptIconName: "edit-delete"
+        onAccepted: Source.deleteEvent(deleteEventDialog.event.id)
+    }
+
     // 歌单简介：多行文字，可以清空（空简介也是合法的保存）
     AppDialog {
         id: playlistDescriptionDialog
@@ -581,6 +624,21 @@ Kirigami.ApplicationWindow {
     Connections {
         target: root.backend ? root.backend.store : null
         ignoreUnknownSignals: true
+        // 评论与动态的写操作：成功一句话，失败说原因（action 是 Store 给的动作名，例如「歌曲评论抱一抱」「删除动态」）
+        function onCommentActionSucceeded(action, commentId) {
+            if (action.endsWith("抱一抱"))
+                root.notify("已抱一抱");
+        }
+        function onCommentActionFailed(action, commentId, message) {
+            root.fail((action.endsWith("抱一抱") ? "没能抱一抱" : action + "失败") + "：" + message);
+        }
+        function onEventActionSucceeded(action, eventId) {
+            root.notify(({ "转发动态": "已转发", "删除动态": "已删除动态", "修改动态可见性": "已修改可见范围" })[action]
+                        || action + "完成");
+        }
+        function onEventActionFailed(action, eventId, message) {
+            root.fail(action + "失败：" + message);
+        }
         // 导入只是建好了任务：网易云在后台匹配，完成后歌单出现在「我的」
         function onPlaylistImportStarted(taskId) {
             root.notify("已开始导入，匹配完成后歌单会出现在「我的」", "long");
@@ -1370,6 +1428,8 @@ Kirigami.ApplicationWindow {
             parentText: root.parentName
             onLeaveRequested: root.goBack()
             onLoginRequested: root.requestLogin()
+            onForwardEventRequested: event => forwardDialog.ask(event)
+            onDeleteEventRequested: event => deleteEventDialog.ask(event)
             onFollowToggled: (id, followed) => {
                 if (!root.loggedIn) {
                     root.notify("关注需要登录", "long", "扫码登录", () => root.requestLogin());

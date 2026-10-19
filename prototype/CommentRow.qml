@@ -20,6 +20,31 @@ RowLayout {
 
     signal likeRequested(bool liked)
     signal threadToggled()
+    signal hugRequested()
+    property bool huggable: false   // 别人的评论、已登录、知道它属于哪一首歌或哪个歌单时才有「抱一抱」
+
+    // 低频动作放进菜单：右键，或悬停时出现的「⋯」
+    function openMenu(item, x, y) { commentMenu.popup(item, x, y); }
+    TapHandler {
+        acceptedButtons: Qt.RightButton
+        onTapped: eventPoint => row.openMenu(row, eventPoint.position.x, eventPoint.position.y)
+    }
+    HoverHandler { id: rowHover }
+    Menu {
+        id: commentMenu
+        MenuItem {
+            visible: row.huggable
+            height: visible ? implicitHeight : 0
+            icon.name: "love"
+            text: "抱一抱"
+            onTriggered: row.hugRequested()
+        }
+        MenuItem {
+            icon.name: "edit-copy"
+            text: "复制评论"
+            onTriggered: Clipboard.copy(row.comment.content || "")
+        }
+    }
 
     readonly property var quoted: row.comment.beReplied && row.comment.beReplied.length > 0
                                   && row.comment.beReplied[0].id !== row.threadOf ? row.comment.beReplied[0] : null
@@ -67,6 +92,16 @@ RowLayout {
                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             }
             Item { Layout.fillWidth: true }
+            // 只在悬停（或菜单开着）时出现：不给每条评论常驻一个按钮。占位不变，赞的位置不跳
+            IconButton {
+                opacity: rowHover.hovered || commentMenu.visible ? 1 : 0
+                enabled: opacity > 0
+                implicitWidth: Tokens.height7
+                implicitHeight: Tokens.height7
+                icon.name: "overflow-menu"
+                text: "更多"
+                onClicked: row.openMenu(this, 0, height)
+            }
             AbstractButton {
                 id: like
                 readonly property bool liked: row.comment.liked === true

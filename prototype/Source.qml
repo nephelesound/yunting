@@ -731,6 +731,17 @@ QtObject {
     function setUserFollowed(id, followed) { if (source.live) source.live.setUserFollowed(id, followed); }
     // 评论点赞：live 走 Store 乐观更新；原型不写网络
     function setCommentLiked(t, commentId, liked) { if (source.live) source.live.setCommentLiked(t.kind, t.id, commentId, liked); }
+    // 抱一抱：抱的是评论的作者（targetUserId），结果经 commentActionSucceeded / Failed 回来
+    function hugComment(t, comment) {
+        if (source.live)
+            source.live.hugComment(t.kind, t.id, comment.id, comment.userId);
+    }
+    // 动态：转发（可附一句话）、删除、可见范围（privacySetting：0 所有人、1 我关注的人、6 互相关注、2 仅自己）
+    function forwardEvent(event, text) { if (source.live) source.live.forwardEvent(event.id, event.user.id, text || ""); }
+    function deleteEvent(eventId) { if (source.live) source.live.deleteEvent(eventId); }
+    function setEventPrivacy(eventId, privacy) { if (source.live) source.live.setEventPrivacy(eventId, privacy); }
+    readonly property var eventPrivacyLevels: [{ value: 0, text: "所有人可见" }, { value: 1, text: "我关注的人可见" },
+                                               { value: 6, text: "互相关注的人可见" }, { value: 2, text: "仅自己可见" }]
     function logout() { if (source.live) source.live.logout(); }
 
     // 当前句：最后一个开始时间不晚于 elapsed 的句子（正在播放页与桌面歌词共用这一条规则）。

@@ -38,6 +38,10 @@ ScreenFrame {
     heading: page.user.name || "用户"
 
     signal followToggled(real id, bool followed)
+    signal forwardEventRequested(var event)
+    signal deleteEventRequested(var event)
+    // 这是自己的主页：动态可以改可见范围、删除
+    readonly property bool mine: Source.account !== null && page.userId === Source.account.id
 
     // 听歌排行、关注、粉丝后端不缓存：切到那一栏（或换周 / 月）时要一次，已经有了就不再要
     function load() {
@@ -375,10 +379,54 @@ ScreenFrame {
                             elide: Text.ElideRight
                         }
                         Label {
-                            text: Format.commentTime(event.entry.time || 0)
+                            // 自己的动态不是所有人可见时，可见范围跟在时间后面
+                            readonly property var level: page.mine && (event.entry.privacySetting || 0) !== 0
+                                ? Source.eventPrivacyLevels.find(l => l.value === event.entry.privacySetting) : null
+                            text: Format.commentTime(event.entry.time || 0) + (level ? " · " + level.text : "")
                             font.pixelSize: Tokens.textSm
                             font.features: { "tnum": 1 }
                             color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                        }
+                        // 转发；自己的动态还能改可见范围、删除。登录后才有
+                        IconButton {
+                            visible: Source.account !== null && (event.entry.id || 0) > 0
+                            implicitWidth: Tokens.height7
+                            implicitHeight: Tokens.height7
+                            icon.name: "overflow-menu"
+                            text: "更多"
+                            onClicked: eventMenu.popup(this, 0, height)
+                        }
+                        Menu {
+                            id: eventMenu
+                            MenuItem {
+                                icon.name: "document-share"
+                                text: "转发…"
+                                onTriggered: page.forwardEventRequested(event.entry)
+                            }
+                            Menu {
+                                id: privacyMenu
+                                enabled: page.mine
+                                title: "可见范围"
+                                icon.name: "view-private"
+                                Repeater {
+                                    model: Source.eventPrivacyLevels
+                                    delegate: MenuItem {
+                                        required property var modelData
+                                        text: modelData.text
+                                        checkable: true
+                                        checked: (event.entry.privacySetting || 0) === modelData.value
+                                        autoExclusive: true
+                                        onTriggered: Source.setEventPrivacy(event.entry.id, modelData.value)
+                                    }
+                                }
+                            }
+                            MenuItem {
+                                visible: page.mine
+                                height: visible ? implicitHeight : 0
+                                icon.name: "edit-delete"
+                                text: "删除动态…"
+                                onTriggered: page.deleteEventRequested(event.entry)
+                            }
                         }
                     }
                     Label {
