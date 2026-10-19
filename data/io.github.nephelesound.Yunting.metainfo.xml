@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.10" date="2026-10-19">
+      <description>
+        <p>Your own avatar pendant in the header and on user pages; user pages show anyone's worn pendant without waiting for it. The SVIP badge is a quiet tint of the accent colour, and comments, wiki and similar run down to the progress line.</p>
+        <p xml:lang="zh_CN">页头和用户主页显示自己的头像挂件，别人主页戴着的挂件也显示，且不再拖慢主页；SVIP 标改为主题色的淡渐变；评论、百科、相似一直铺到进度线。</p>
+      </description>
+    </release>
     <release version="0.6.9" date="2026-10-19">
       <description>
         <p>A "Similar" pane on the now-playing page; avatar pendants and distinct VIP / SVIP badges; the suggested search keyword. "Open in client" from the browser works even when the desktop portal has no display, and launching again returns to the open window at once.</p>
@@ -98,12 +104,6 @@
       <description>
         <p>Comments on playlists can be liked; the now-playing cover gets a soft shadow and rounded corners; downloads keep the song's duration and a second click no longer downloads a song twice.</p>
         <p xml:lang="zh_CN">歌单评论也能点赞；正在播放页的封面有了柔和的投影和圆角；下载的歌记下时长，取地址时再点一次不会重复下载。</p>
-      </description>
-    </release>
-    <release version="0.6.5" date="2026-10-19">
-      <description>
-        <p>The share dialog has two columns and no dialog grows taller than the window; personal FM and heart mode no longer stop after a failed refill; fixes for retries that did nothing and duplicates when paging.</p>
-        <p xml:lang="zh_CN">分享对话框改成两栏，所有对话框不超出窗口；修复私人漫游与心动模式续取失败后停住、重试无反应与翻页重复等问题。</p>
       </description>
     </release>
   </releases>
