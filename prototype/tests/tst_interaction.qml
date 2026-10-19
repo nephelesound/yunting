@@ -447,6 +447,39 @@ Item {
             compare(calls, [["playlist", 24381616, 9667509659, true]]);
         }
 
+        // 在途的下载只看 DownloadManager.active：点了就算在下（不等进度），在下时再点不重复下，
+        // 取消后 active 里那条消失就回到「未下载」，不留页面自己的一份。
+        function test_downloadStateFollowsManagerActive() {
+            const manager = Qt.createQmlObject(`import QtQuick
+                QtObject {
+                    property var downloads: []
+                    property var active: []
+                    property var started: []
+                    signal finished(real songId, string path)
+                    signal failed(real songId, string message)
+                    function downloadTrack(track, level) {
+                        started = started.concat([track.id]);
+                        active = active.concat([{ id: track.id, name: track.name, artist: "", progress: 0, level: level }]);
+                    }
+                    function cancel(songId) { active = active.filter(a => a.id !== songId); }
+                }`, root);
+            const saved = Source.downloads;
+            Source.downloads = manager;
+            Source.download({ id: 77, name: "歌" }, "lossless");
+            const afterStart = Source.downloadState(77);
+            Source.download({ id: 77, name: "歌" }, "lossless");
+            manager.active = [{ id: 77, name: "歌", artist: "", progress: 0.5, level: "lossless" }];
+            const progress = Source.downloading[77];
+            Source.cancelDownload(77);
+            const afterCancel = Source.downloadState(77);
+            Source.downloads = saved;
+            compare(afterStart, "active");
+            compare(manager.started, [77]);
+            compare(progress, 0.5);
+            compare(afterCancel, "none");
+            manager.destroy();
+        }
+
         // 评论行：「N 条回复」展开楼中楼；楼中楼里回复的正是父评论时不再引一遍；长评论折起后可展开
         function test_commentRowRepliesQuoteAndExpand() {
             const quoteOfParent = [{ id: 1, user: "甲", userId: 5, content: "原话" }];

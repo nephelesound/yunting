@@ -1,6 +1,7 @@
 #pragma once
 // DownloadManager: signed-URL download -> persistent file + metadata.
-// UI-agnostic; QML reads `downloads` and calls downloadTrack()/remove().
+// UI-agnostic; QML reads `downloads`/`active` and calls downloadTrack()/remove().
+// `active` owns the in-flight truth from start() until finish/failure/cancel.
 // Files live in yuntingDownloadsDir() and AudioEngine prefers them over network.
 #include <QHash>
 #include <QJsonObject>
@@ -44,6 +45,7 @@ signals:
 
 private:
     struct Job {
+        quint64 token = 0;  // 旧任务已取消又重开后，迟到的回调靠它作废
         QNetworkReply *reply = nullptr;
         QFile *file = nullptr;
         QVariantMap meta;
@@ -53,7 +55,8 @@ private:
     };
 
     void start(const QVariantMap &track, const QString &level);
-    void begin(const QVariantMap &track, const QString &level);
+    void begin(const QVariantMap &track, const QString &level, quint64 token);
+    bool dropJob(qint64 songId, quint64 token);
     void load();
     void save();
     void setDownloads(QVariantList downloads);
@@ -64,4 +67,5 @@ private:
     QNetworkAccessManager *m_network;
     QVariantList m_downloads;
     QHash<qint64, Job> m_jobs;
+    quint64 m_nextJobToken = 0;
 };

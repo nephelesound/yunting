@@ -52,16 +52,25 @@ DownloadManager::DownloadManager(NcmClient *client, QObject *parent)
 
 DownloadManager::~DownloadManager()
 {
-    for (auto it = m_jobs.begin(); it != m_jobs.end(); ++it) {
+    // 先清空任务再 abort：abort 可能同步触发 finished，回调不该在析构中再改状态
+    QList<QNetworkReply *> replies;
+    QList<QFile *> files;
+    for (auto it = m_jobs.cbegin(); it != m_jobs.cend(); ++it) {
         if (it->reply)
-            it->reply->abort();
-        if (it->file) {
-            it->file->close();
-            it->file->remove();
-            delete it->file;
-        }
+            replies.append(it->reply);
+        if (it->file)
+            files.append(it->file);
     }
     m_jobs.clear();
+    for (QNetworkReply *reply : std::as_const(replies)) {
+        reply->disconnect(this);
+        reply->abort();
+    }
+    for (QFile *file : std::as_const(files)) {
+        file->close();
+        file->remove();
+        delete file;
+    }
 }
 
 QVariantList DownloadManager::active() const
@@ -183,15 +192,30 @@ void DownloadManager::start(const QVariantMap &track, const QString &level)
     }
     if (m_jobs.contains(songId))
         return;
+
+    const QString requestedLevel = level.isEmpty() ? QStringLiteral("lossless") : level;
+    const quint64 token = ++m_nextJobToken;
+    // 从接受到这个 id 起任务就在 m_jobs 里：取详情、等地址的阶段也出现在 active 中。
+    Job job;
+    job.token = token;
+    job.meta = normalizeTrack(track);
+    job.meta.insert(QStringLiteral("level"), requestedLevel);
+    m_jobs.insert(songId, job);
+    emit activeChanged();
+
     if (track.value(QStringLiteral("dur")).toDouble() > 0) {
-        begin(track, level);
+        begin(track, requestedLevel, token);
         return;
     }
 
     // 只给了 id（下载菜单直接按 id 取地址）时先取歌曲详情，补时长与展示信息；
     // 取不到也照常下载，记录里的 dur 落 0。
     ncm::sdk::fetchSongDetails(*m_client, {songId}, false, this,
-        [this, track, level](ncm::sdk::Result<QList<ncm::sdk::Track>> result) {
+        [this, track, requestedLevel, songId, token](
+            ncm::sdk::Result<QList<ncm::sdk::Track>> result) {
+        auto it = m_jobs.find(songId);
+        if (it == m_jobs.end() || it->token != token)
+            return;  // 已取消，或同一 id 已开始新任务
         QVariantMap resolved = track;
         if (result && !result.value->isEmpty()) {
             const QVariantMap details =
@@ -203,20 +227,32 @@ void DownloadManager::start(const QVariantMap &track, const QString &level)
                     resolved.insert(field, details.value(field));
             }
         }
-        begin(resolved, level);
+        begin(resolved, requestedLevel, token);
     });
 }
 
-void DownloadManager::begin(const QVariantMap &rawTrack, const QString &level)
+void DownloadManager::begin(const QVariantMap &rawTrack, const QString &level, quint64 token)
 {
     // 参数、已下载与在途检查只在 start() 做一次；begin 只负责取地址并落盘。
     const QVariantMap track = normalizeTrack(rawTrack);
     const qint64 songId = variantId(track.value(QStringLiteral("id")));
+    auto it = m_jobs.find(songId);
+    if (it == m_jobs.end() || it->token != token)
+        return;
 
-    const QString requestedLevel = level.isEmpty() ? QStringLiteral("lossless") : level;
-    ncm::sdk::fetchSongDownload(*m_client, songId, requestedLevel, this,
-        [this, track, songId, requestedLevel](ncm::sdk::Result<ncm::sdk::SongDownload> result) {
+    // 展示字段可能刚被详情补全；active 读的是这份 meta
+    it->meta = track;
+    it->meta.insert(QStringLiteral("level"), level);
+    emit activeChanged();
+
+    ncm::sdk::fetchSongDownload(*m_client, songId, level, this,
+        [this, songId, level, token](ncm::sdk::Result<ncm::sdk::SongDownload> result) {
+        auto it = m_jobs.find(songId);
+        if (it == m_jobs.end() || it->token != token)
+            return;  // 等待地址时被取消：迟到的回复不能再落盘
         if (!result) {
+            if (!dropJob(songId, token))
+                return;
             emit failed(songId, result.error.kind == ncm::sdk::ErrorKind::Network
                 ? QStringLiteral("网络不可用，无法下载")
                 : QStringLiteral("取不到下载地址"));
@@ -224,6 +260,8 @@ void DownloadManager::begin(const QVariantMap &rawTrack, const QString &level)
         }
         const ncm::sdk::SongDownload &info = *result.value;
         if (info.url.isEmpty()) {
+            if (!dropJob(songId, token))
+                return;
             emit failed(songId, QStringLiteral("这首歌没有可用的下载地址"));
             return;
         }
@@ -235,6 +273,8 @@ void DownloadManager::begin(const QVariantMap &rawTrack, const QString &level)
         auto *file = new QFile(part, this);
         if (!file->open(QIODevice::WriteOnly | QIODevice::Truncate)) {
             delete file;
+            if (!dropJob(songId, token))
+                return;
             emit failed(songId, QStringLiteral("无法写入下载目录"));
             return;
         }
@@ -248,36 +288,39 @@ void DownloadManager::begin(const QVariantMap &rawTrack, const QString &level)
         request.setRawHeader("Referer", "https://music.163.com/");
         QNetworkReply *reply = m_network->get(request);
 
-        Job job;
-        job.reply = reply;
-        job.file = file;
-        job.finalPath = path;
-        job.meta = track;
-        job.meta.insert(QStringLiteral("size"), static_cast<double>(info.size));
-        job.meta.insert(QStringLiteral("level"), info.level.isEmpty() ? requestedLevel : info.level);
-        job.meta.insert(QStringLiteral("type"), ext);
-        job.meta.insert(QStringLiteral("md5"), info.md5);
-        job.meta.insert(QStringLiteral("path"), path);
-        m_jobs.insert(songId, job);
-        emit activeChanged();
+        it->reply = reply;
+        it->file = file;
+        it->finalPath = path;
+        it->meta.insert(QStringLiteral("size"), static_cast<double>(info.size));
+        it->meta.insert(QStringLiteral("type"), ext);
+        it->meta.insert(QStringLiteral("md5"), info.md5);
+        it->meta.insert(QStringLiteral("path"), path);
+        const QString actualLevel = info.level.isEmpty() ? level : info.level;
+        if (it->meta.value(QStringLiteral("level")).toString() != actualLevel) {
+            it->meta.insert(QStringLiteral("level"), actualLevel);
+            emit activeChanged();
+        }
 
-        QObject::connect(reply, &QNetworkReply::readyRead, this, [reply, file] {
-            file->write(reply->readAll());
+        QObject::connect(reply, &QNetworkReply::readyRead, this, [this, reply, songId, token] {
+            auto current = m_jobs.find(songId);
+            if (current == m_jobs.end() || current->token != token || !current->file)
+                return;
+            current->file->write(reply->readAll());
         });
         QObject::connect(reply, &QNetworkReply::downloadProgress, this,
-                         [this, songId](qint64 received, qint64 total) {
-            auto it = m_jobs.find(songId);
-            if (it != m_jobs.end()) {
-                it->received = received;
-                it->total = total;
-                emit activeChanged();
-            }
+                         [this, songId, token](qint64 received, qint64 total) {
+            auto current = m_jobs.find(songId);
+            if (current == m_jobs.end() || current->token != token)
+                return;
+            current->received = received;
+            current->total = total;
+            emit activeChanged();
             emit progress(songId, received, total);
         });
         QObject::connect(reply, &QNetworkReply::finished, this,
-                         [this, reply, songId] {
+                         [this, reply, songId, token] {
             auto it = m_jobs.find(songId);
-            if (it == m_jobs.end()) {
+            if (it == m_jobs.end() || it->token != token) {
                 reply->deleteLater();
                 return;
             }
@@ -319,12 +362,23 @@ void DownloadManager::begin(const QVariantMap &rawTrack, const QString &level)
     });
 }
 
+bool DownloadManager::dropJob(qint64 songId, quint64 token)
+{
+    auto it = m_jobs.find(songId);
+    if (it == m_jobs.end() || it->token != token)
+        return false;
+    m_jobs.erase(it);
+    emit activeChanged();
+    return true;
+}
+
 void DownloadManager::cancel(double songId)
 {
     const qint64 id = static_cast<qint64>(songId);
     auto it = m_jobs.find(id);
     if (it == m_jobs.end())
         return;
+    // 三个阶段的清理相同：先去掉在途记录，迟到的回复再按 token 作废。
     Job job = it.value();
     m_jobs.erase(it);
     emit activeChanged();
@@ -335,7 +389,7 @@ void DownloadManager::cancel(double songId)
         job.file->remove();
         delete job.file;
     }
-    emit failed(id, QStringLiteral("下载已取消"));
+    // 用户自己取消不是失败，不发 failed；调用方看 active 消失即可。
 }
 
 void DownloadManager::remove(double songId)

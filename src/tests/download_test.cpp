@@ -391,13 +391,22 @@ private slots:
     {
         const double songId = 910006;
         const QString url = audioUrl(*m_api, songId);
-        m_api->handler = [songId, url](const FakeApi::Request &request, QTcpSocket *sock) {
+        m_api->handler = [this, songId, url](const FakeApi::Request &request, QTcpSocket *sock) {
             if (request.path == "/api/song/enhance/download/url/v1") {
                 FakeApi::respondJson(sock, 200, downloadUrl(songId, url));
             } else if (request.path.startsWith("/audio/")) {
+                // 写到一半就停住：任务仍在 streaming，测试在中途取消
                 sock->write("HTTP/1.1 200 OK\r\nContent-Type: audio/flac\r\n"
-                            "Content-Length: 4\r\nConnection: close\r\n\r\nab");
+                            "Content-Length: 24576\r\nConnection: close\r\n\r\n");
+                sock->write(QByteArray(8192, 'a'));
                 sock->flush();
+                QPointer<QTcpSocket> guard(sock);
+                QTimer::singleShot(100, this, [guard] {
+                    if (guard) {
+                        guard->write(QByteArray(8192, 'b'));
+                        guard->flush();
+                    }
+                });
             } else {
                 FakeApi::respond(sock, 404, "not found", "text/plain");
             }
@@ -413,11 +422,251 @@ private slots:
                               },
                               QStringLiteral("lossless"));
 
-        QVERIFY(waitFor([&] { return !manager.active().isEmpty(); }));
+        QVERIFY(waitFor([&] {
+            const QVariantList items = manager.active();
+            return !items.isEmpty()
+                && items.at(0).toMap().value("progress").toDouble() > 0.0;
+        }));
         manager.cancel(songId);
         QVERIFY(manager.active().isEmpty());
-        QCOMPARE(failed.count(), 1);
-        QCOMPARE(failed.at(0).at(1).toString(), QStringLiteral("下载已取消"));
+        // 用户自己取消不是失败：调用方已知道结果，不能再收到 failed
+        QCOMPARE(failed.count(), 0);
+        QVERIFY(manager.downloads().isEmpty());
+        QVERIFY(!QFile::exists(manager.localPath(songId)));
+    }
+
+    void activeListShowsDownloadBeforeUrlAnswer()
+    {
+        const double songId = 910008;
+        const QString url = audioUrl(*m_api, songId);
+        bool urlRequested = false;
+        QTcpSocket *urlSocket = nullptr;
+        m_api->handler = [&](const FakeApi::Request &request, QTcpSocket *sock) {
+            if (request.path == "/api/song/enhance/download/url/v1") {
+                urlRequested = true;
+                urlSocket = sock;
+            } else if (request.path.startsWith("/audio/")) {
+                FakeApi::respond(sock, 200, "abcd", "audio/flac");
+            } else {
+                FakeApi::respond(sock, 404, "not found", "text/plain");
+            }
+        };
+
+        DownloadManager manager(m_client);
+        QSignalSpy finished(&manager, &DownloadManager::finished);
+        manager.downloadTrack(QVariantMap{
+                                  {"id", songId},
+                                  {"name", "等待曲"},
+                                  {"artist", "等待歌手"},
+                                  {"dur", 3.0},
+                              },
+                              QStringLiteral("lossless"));
+
+        // 地址请求还没回：任务已在 active 里，进度 0
+        QCOMPARE(manager.active().size(), 1);
+        const QVariantMap active = manager.active().at(0).toMap();
+        QCOMPARE(active.value("id").toDouble(), songId);
+        QCOMPARE(active.value("name").toString(), QStringLiteral("等待曲"));
+        QCOMPARE(active.value("artist").toString(), QStringLiteral("等待歌手"));
+        QCOMPARE(active.value("level").toString(), QStringLiteral("lossless"));
+        QCOMPARE(active.value("progress").toDouble(), 0.0);
+        QVERIFY(waitFor([&] { return urlRequested; }));
+        QCOMPARE(manager.active().size(), 1);
+
+        FakeApi::respondJson(urlSocket, 200, downloadUrl(songId, url));
+        QVERIFY(waitFor([&] { return finished.count() > 0; }));
+    }
+
+    void secondStartWhileWaitingForUrlSendsNoSecondRequest()
+    {
+        const double songId = 910009;
+        const QString url = audioUrl(*m_api, songId);
+        int urlRequests = 0;
+        QTcpSocket *urlSocket = nullptr;
+        m_api->handler = [&](const FakeApi::Request &request, QTcpSocket *sock) {
+            if (request.path == "/api/song/enhance/download/url/v1") {
+                ++urlRequests;
+                urlSocket = sock;
+            } else if (request.path.startsWith("/audio/")) {
+                FakeApi::respond(sock, 200, "abcd", "audio/flac");
+            } else {
+                FakeApi::respond(sock, 404, "not found", "text/plain");
+            }
+        };
+
+        DownloadManager manager(m_client);
+        QSignalSpy finished(&manager, &DownloadManager::finished);
+        const QVariantMap track{
+            {"id", songId},
+            {"name", "重复曲"},
+            {"artist", "重复歌手"},
+            {"dur", 3.0},
+        };
+        manager.downloadTrack(track, QStringLiteral("lossless"));
+        QVERIFY(waitFor([&] { return urlRequests == 1; }));
+
+        manager.downloadTrack(track, QStringLiteral("lossless"));
+        manager.download(songId);
+        QTest::qWait(200);
+
+        QCOMPARE(urlRequests, 1);
+        QCOMPARE(manager.active().size(), 1);
+
+        FakeApi::respondJson(urlSocket, 200, downloadUrl(songId, url));
+        QVERIFY(waitFor([&] { return finished.count() > 0; }));
+    }
+
+    void cancelWhileWaitingForUrlLeavesNoFileOrRecord()
+    {
+        const double songId = 910010;
+        const QString url = audioUrl(*m_api, songId);
+        bool urlRequested = false;
+        QTcpSocket *urlSocket = nullptr;
+        m_api->handler = [&](const FakeApi::Request &request, QTcpSocket *sock) {
+            if (request.path == "/api/song/enhance/download/url/v1") {
+                urlRequested = true;
+                urlSocket = sock;
+            } else if (request.path.startsWith("/audio/")) {
+                FakeApi::respond(sock, 200, "abcd", "audio/flac");
+            } else {
+                FakeApi::respond(sock, 404, "not found", "text/plain");
+            }
+        };
+
+        DownloadManager manager(m_client);
+        QSignalSpy activeChanged(&manager, &DownloadManager::activeChanged);
+        QSignalSpy failed(&manager, &DownloadManager::failed);
+        QSignalSpy finished(&manager, &DownloadManager::finished);
+        manager.downloadTrack(QVariantMap{
+                                  {"id", songId},
+                                  {"name", "取消等待曲"},
+                                  {"artist", "取消等待歌手"},
+                                  {"dur", 3.0},
+                              },
+                              QStringLiteral("lossless"));
+        QVERIFY(waitFor([&] { return urlRequested; }));
+        const int changesBeforeCancel = activeChanged.count();
+
+        manager.cancel(songId);
+        QVERIFY(manager.active().isEmpty());
+        QVERIFY(activeChanged.count() > changesBeforeCancel);
+
+        // 迟到的地址回复不能复活任务
+        FakeApi::respondJson(urlSocket, 200, downloadUrl(songId, url));
+        QTest::qWait(200);
+
+        QCOMPARE(failed.count(), 0);
+        QCOMPARE(finished.count(), 0);
+        QVERIFY(manager.downloads().isEmpty());
+        QVERIFY(!QFile::exists(manager.localPath(songId)));
+        QVERIFY(QDir(manager.directory())
+                    .entryList(QStringList{QString::number(static_cast<qint64>(songId))
+                                           + QStringLiteral(".*")},
+                               QDir::Files)
+                    .isEmpty());
+    }
+
+    void cancelWhileResolvingDetailsSendsNoUrlRequest()
+    {
+        const double songId = 910011;
+        const QString url = audioUrl(*m_api, songId);
+        int detailRequests = 0;
+        int urlRequests = 0;
+        QTcpSocket *detailSocket = nullptr;
+        m_api->handler = [&](const FakeApi::Request &request, QTcpSocket *sock) {
+            if (request.path == "/api/v3/song/detail") {
+                ++detailRequests;
+                detailSocket = sock;
+            } else if (request.path == "/api/song/enhance/download/url/v1") {
+                ++urlRequests;
+                FakeApi::respondJson(sock, 200, downloadUrl(songId, url));
+            } else if (request.path.startsWith("/audio/")) {
+                FakeApi::respond(sock, 200, "abcd", "audio/flac");
+            } else {
+                FakeApi::respond(sock, 404, "not found", "text/plain");
+            }
+        };
+
+        DownloadManager manager(m_client);
+        QSignalSpy failed(&manager, &DownloadManager::failed);
+        QSignalSpy finished(&manager, &DownloadManager::finished);
+        manager.download(songId);
+        QVERIFY(waitFor([&] { return detailRequests == 1; }));
+        QCOMPARE(manager.active().size(), 1);
+        QCOMPARE(manager.active().at(0).toMap().value("progress").toDouble(), 0.0);
+
+        manager.cancel(songId);
+        QVERIFY(manager.active().isEmpty());
+
+        // 详情迟到也不能继续取地址、落盘或记一条下载
+        FakeApi::respondJson(detailSocket, 200, QJsonObject{
+            {"code", 200},
+            {"songs", QJsonArray{QJsonObject{
+                {"id", songId},
+                {"name", "取消详情曲"},
+                {"dt", 215000.0},
+                {"ar", QJsonArray{QJsonObject{{"id", 7}, {"name", "取消详情歌手"}}}},
+                {"al", QJsonObject{{"id", 8}, {"name", "取消详情专辑"}}},
+            }}},
+            {"privileges", QJsonArray{}},
+        });
+        QTest::qWait(200);
+
+        QCOMPARE(urlRequests, 0);
+        QCOMPARE(failed.count(), 0);
+        QCOMPARE(finished.count(), 0);
+        QVERIFY(manager.downloads().isEmpty());
+        QVERIFY(!QFile::exists(manager.localPath(songId)));
+    }
+
+    void activeListUpdatesNameWhenDetailsResolve()
+    {
+        const double songId = 910012;
+        const QString url = audioUrl(*m_api, songId);
+        bool detailRequested = false;
+        QTcpSocket *detailSocket = nullptr;
+        m_api->handler = [&](const FakeApi::Request &request, QTcpSocket *sock) {
+            if (request.path == "/api/v3/song/detail") {
+                detailRequested = true;
+                detailSocket = sock;
+            } else if (request.path == "/api/song/enhance/download/url/v1") {
+                FakeApi::respondJson(sock, 200, downloadUrl(songId, url));
+            } else if (request.path.startsWith("/audio/")) {
+                FakeApi::respond(sock, 200, "abcd", "audio/flac");
+            } else {
+                FakeApi::respond(sock, 404, "not found", "text/plain");
+            }
+        };
+
+        DownloadManager manager(m_client);
+        QSignalSpy activeChanged(&manager, &DownloadManager::activeChanged);
+        QSignalSpy finished(&manager, &DownloadManager::finished);
+        manager.download(songId);
+        QVERIFY(waitFor([&] { return detailRequested; }));
+        QCOMPARE(manager.active().size(), 1);
+        QVERIFY(manager.active().at(0).toMap().value("name").toString().isEmpty());
+
+        FakeApi::respondJson(detailSocket, 200, QJsonObject{
+            {"code", 200},
+            {"songs", QJsonArray{QJsonObject{
+                {"id", songId},
+                {"name", "补全曲"},
+                {"dt", 215000.0},
+                {"ar", QJsonArray{QJsonObject{{"id", 7}, {"name", "补全歌手"}}}},
+                {"al", QJsonObject{{"id", 8}, {"name", "补全专辑"}}},
+            }}},
+            {"privileges", QJsonArray{}},
+        });
+        QVERIFY(waitFor([&] {
+            const QVariantList items = manager.active();
+            return !items.isEmpty()
+                && items.at(0).toMap().value("name").toString() == QStringLiteral("补全曲");
+        }));
+        QCOMPARE(manager.active().at(0).toMap().value("artist").toString(),
+                 QStringLiteral("补全歌手"));
+        // 开始 + 详情补全，两次都让 active 的读法变了
+        QVERIFY(activeChanged.count() >= 2);
+        QVERIFY(waitFor([&] { return finished.count() > 0; }));
     }
 
     void parsesDownload()

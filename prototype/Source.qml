@@ -439,7 +439,13 @@ QtObject {
     // downloaded 是下好的（带 id/name/artist/album/cover/size/level/path）；正在下的进度只在信号里，记在 downloading
     property var downloads: null
     readonly property var downloaded: source.downloads ? source.downloads.downloads : []
-    property var downloading: ({})   // songId → 已下比例 0–1
+    // songId → 已下比例 0–1。在途的下载只有 DownloadManager.active 一份：从点下载到下完、失败或取消
+    readonly property var downloading: {
+        const progress = {};
+        for (const a of (source.downloads ? source.downloads.active : []))
+            progress[a.id] = a.progress;
+        return progress;
+    }
     signal downloadFinished(string name)
     signal downloadFailed(string name, string message)
     function downloadState(songId) {
@@ -450,7 +456,7 @@ QtObject {
     // 下好的文件当曲目放：播放器按 id 先找本地文件
     function downloadedTrack(d) {
         return { id: d.id, name: d.name, artist: d.artist, album: d.album, albumId: 0, artistId: 0,
-                 artists: [{ id: 0, name: d.artist }], cover: d.cover, dur: 0, fee: 0, alias: "", quality: d.level || "",
+                 artists: [{ id: 0, name: d.artist }], cover: d.cover, dur: d.dur || 0, fee: 0, alias: "", quality: d.level || "",
                  reason: "", mv: 0, playable: true };
     }
     property var downloadNames: ({})   // songId → 歌名（下完 / 失败时提示用）
@@ -458,36 +464,15 @@ QtObject {
         if (!source.downloads || source.downloadState(track.id) !== "none")
             return;
         source.downloadNames = Object.assign({}, source.downloadNames, { [track.id]: track.name });
-        source.downloading = Object.assign({}, source.downloading, { [track.id]: 0 });
         source.downloads.downloadTrack(track, level);
     }
-    function forgetDownload(songId) {
-        const active = Object.assign({}, source.downloading);
-        delete active[songId];
-        source.downloading = active;
-    }
-    // 先忘掉再取消：取消会同步发出 failed（「下载已取消」），那时已不在 downloading 里，不当失败提示
-    function cancelDownload(songId) {
-        source.forgetDownload(songId);
-        if (source.downloads)
-            source.downloads.cancel(songId);
-    }
+    // 自己取消不算失败：DownloadManager 不发 failed，active 里那条消失即可
+    function cancelDownload(songId) { if (source.downloads) source.downloads.cancel(songId); }
     function removeDownload(songId) { if (source.downloads) source.downloads.remove(songId); }
     readonly property Connections _downloads: Connections {
         target: source.downloads
-        function onProgress(songId, received, total) {
-            source.downloading = Object.assign({}, source.downloading, { [songId]: total > 0 ? received / total : 0 });
-        }
-        function onFinished(songId, path) {
-            source.forgetDownload(songId);
-            source.downloadFinished(source.downloadNames[songId] || "");
-        }
-        function onFailed(songId, message) {
-            if (source.downloading[songId] === undefined)
-                return;
-            source.forgetDownload(songId);
-            source.downloadFailed(source.downloadNames[songId] || "", message);
-        }
+        function onFinished(songId, path) { source.downloadFinished(source.downloadNames[songId] || ""); }
+        function onFailed(songId, message) { source.downloadFailed(source.downloadNames[songId] || "", message); }
     }
 
     // 自己的累计听歌时长（秒）与升级进度；还没取到时为 0 / null
