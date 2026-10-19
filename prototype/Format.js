@@ -48,6 +48,24 @@ function commentTime(ms) {
     return d.getFullYear() === now.getFullYear() ? md : d.getFullYear() + "年" + md;
 }
 
+// 多久以前（毫秒时间戳）：一分钟内「刚刚」，一小时内按分钟，一天内按小时，昨天，再早同评论时间
+function ago(ms) {
+    if (!ms)
+        return "";
+    const minutes = Math.floor((Date.now() - ms) / 60000);
+    if (minutes < 1)
+        return "刚刚";
+    if (minutes < 60)
+        return minutes + " 分钟前";
+    if (minutes < 24 * 60)
+        return Math.floor(minutes / 60) + " 小时前";
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (new Date(ms).toDateString() === yesterday.toDateString())
+        return "昨天";
+    return commentTime(ms);
+}
+
 // 播放音质档位（AudioEngine.quality）的显示名
 function qualityLevel(level) {
     return ({ auto: "自动", standard: "标准", higher: "较高", exhigh: "极高", lossless: "无损", hires: "Hi-Res" })[level] || "自动";

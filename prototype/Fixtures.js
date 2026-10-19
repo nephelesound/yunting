@@ -144,6 +144,18 @@ var worst = {
             { id: 13, name: "雨天", cover: BROKEN, count: 1 },
             { id: 14, name: "通勤路上", cover: C1, count: 58 },
             { id: 15, name: "Lo-fi", cover: C2, count: 3000 }] },
+        // 顺序故意打乱：在房间里、在线的应排到前面；最后一位既不在线也没一起听过，只剩空描述
+        friendsListening: { streakGlobalSwitch: 0, streakUserSwitch: 0, matchButtonText: "", items: [
+            { userId: 2, name: "一只想要变成猫但是没有成功的柴犬Official", avatar: C2, avatarPendant: PENDANT, vipLevel: "svip",
+              online: false, inRoom: false, lastListen: true, lastTime: 1700000000000, description: "" },
+            { userId: 3, name: "Jo", avatar: "", avatarPendant: "", vipLevel: "",
+              online: true, inRoom: false, lastListen: false, lastTime: 0, description: "在线" },
+            { userId: 4, name: "🌙", avatar: BROKEN, avatarPendant: BROKEN, vipLevel: "vip",
+              online: true, inRoom: true, lastListen: true, lastTime: Date.now() - 3 * 3600000, description: "在线" },
+            { userId: 5, name: "x", avatar: C1, avatarPendant: "", vipLevel: "",
+              online: false, inRoom: false, lastListen: true, lastTime: Date.now() - 12 * 60000, description: "" },
+            { userId: 6, name: "早睡早起的人", avatar: C1, avatarPendant: "", vipLevel: "",
+              online: false, inRoom: false, lastListen: false, lastTime: 0, description: "" }] },
         userSubcount: { artistCount: 1284, mvCount: 99999, createdPlaylistCount: 2, subPlaylistCount: 1, djRadioCount: 12 },
         newSongs: worstTracks.slice(0, 20),
         newAlbums: [{ id: 1, name: "我想要两颗西柚（Live）- 2023 网易云音乐年度盛典现场版 豪华纪念版（含未公开 Demo 与现场返场）", cover: BROKEN, artist: "茄子蛋 / 告五人 / 草东没有派对 / 落日飞车", artistId: 2, publishTime: 1700000000000, size: 128 },

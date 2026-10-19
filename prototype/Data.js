@@ -8233,3 +8233,5 @@ var defaultSearch = null
 var similarSongs = null
 
 var similarPlaylists = null
+
+var friendsListening = null

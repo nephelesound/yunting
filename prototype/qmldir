@@ -67,4 +67,5 @@ NoticeRow NoticeRow.qml
 SimListenTogether SimListenTogether.qml
 SimDownloads SimDownloads.qml
 ListenTogetherLink ListenTogetherLink.qml
+ListenPopup ListenPopup.qml
 CommentsPane CommentsPane.qml

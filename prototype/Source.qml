@@ -580,6 +580,14 @@ QtObject {
             source.need("defaultSearch");
         return s || null;
     }
+    // 一起听面板的好友（互相关注）：在房间里、在线的排前面，其余按上次和你一起听由近到远。没取到是空表
+    readonly property var friendsListening: {
+        const items = source.d.friendsListening ? source.d.friendsListening.items || [] : [];
+        const rank = f => f.inRoom ? 2 : f.online ? 1 : 0;
+        return items.slice().sort((a, b) => rank(b) - rank(a) || (b.lastTime || 0) - (a.lastTime || 0));
+    }
+    // 打开一起听的面板时重取一次（用户的动作，不是绑定求值）
+    function refreshFriendsListening() { if (source.live) source.live.request("friendsListening"); }
     // 一首歌的相似歌曲与相似歌单（正在播放页的「相似」栏）：两个槽各放一首歌的结果、带 songId，
     // 只有这一栏读，所以不按 id 分开存
     function similarTo(songId) {

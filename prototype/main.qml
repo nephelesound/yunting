@@ -522,6 +522,8 @@ Kirigami.ApplicationWindow {
         }
         else if (root.startOverlay === "equalizer")
             playerBar.openEqualizer();
+        else if (root.startOverlay === "listen")
+            Qt.callLater(() => playerBar.openListenPopup());
         else if (root.startOverlay === "quality")
             Qt.callLater(() => playerBar.openQualityMenu());
         else if (root.startOverlay === "fullscreen")

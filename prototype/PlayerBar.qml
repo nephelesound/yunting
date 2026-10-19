@@ -61,7 +61,29 @@ Item {
     property string togetherText     // 「正在和某某一起听」
 
     function openEqualizer() { eqPanel.showAt(bar); }
+    // 宽窗口挂在播放条的一起听按钮上，窄窗口（按钮收进「更多」）挂在「更多」上
+    function openListenPopup(anchor) {
+        listenPopup.anchorItem = anchor || listenButton;
+        listenPopup.open();
+    }
     function openQualityMenu() { qualityMenu.popup(qualityButton, 0, -qualityMenu.implicitHeight - Tokens.space2); }
+
+    ListenPopup {
+        id: listenPopup
+        property Item anchorItem: listenButton
+        // 左缘对齐挂靠的按钮。逐级累加 x 而不是 mapToItem：绑定读到每一级的 x，布局变了跟着变
+        x: {
+            let left = 0;
+            for (let item = anchorItem; item && item !== bar; item = item.parent)
+                left += item.x;
+            return left;
+        }
+        y: -height - Tokens.space2      // 浮在播放条顶边（进度线）之上
+        active: bar.active
+        busy: bar.listenBusy
+        onStartRequested: bar.listenStartRequested()
+        onJoinRequested: bar.listenJoinRequested()
+    }
 
     // 没有曲目或时长未知时进度为 0、不能拖动，传输控件整体禁用
     readonly property real duration: bar.track ? bar.track.dur : 0
@@ -188,30 +210,15 @@ Item {
                 ToolTip.delay: 600
                 onClicked: bar.commentsRequested()
             }
-            // 一起听：和喜欢、分享、评论同属「对这首歌做什么」。不在房间时弹原生菜单（开始 / 用链接加入），
-            // 在房间时是强调色，点开队列（房间那一段在队列顶上）
+            // 一起听：和喜欢、分享、评论同属「对这首歌做什么」。不在房间时弹出面板（开始 / 用链接加入，
+            // 下面是好友在不在线），在房间时是强调色，点开队列（房间那一段在队列顶上）
             IconButton {
                 id: listenButton
                 visible: !hud.compact && bar.canListen
                 icon.name: "group-symbolic"
                 icon.color: bar.together ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor
                 text: bar.together ? bar.togetherText : "和好友一起听"
-                onClicked: bar.together ? bar.queueRequested() : listenMenu.popup(listenButton, 0, -listenMenu.implicitHeight - Tokens.space2)
-            }
-            Menu {
-                id: listenMenu
-                MenuItem {
-                    enabled: bar.active && !bar.listenBusy
-                    icon.name: "group-symbolic"
-                    text: "开始一起听"
-                    onTriggered: bar.listenStartRequested()
-                }
-                MenuItem {
-                    enabled: !bar.listenBusy
-                    icon.name: "insert-link-symbolic"
-                    text: "用链接加入…"
-                    onTriggered: bar.listenJoinRequested()
-                }
+                onClicked: bar.together ? bar.queueRequested() : bar.openListenPopup()
             }
         }
 
@@ -378,8 +385,7 @@ Item {
                         height: visible ? implicitHeight : 0
                         icon.name: "group-symbolic"
                         text: bar.together ? bar.togetherText : "和好友一起听…"
-                        onTriggered: bar.together ? bar.queueRequested()
-                            : listenMenu.popup(moreButton, 0, -listenMenu.implicitHeight - Tokens.space2)
+                        onTriggered: bar.together ? bar.queueRequested() : bar.openListenPopup(moreButton)
                     }
                     MenuItem {
                         icon.name: "view-fullscreen"
