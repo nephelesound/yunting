@@ -104,10 +104,9 @@ ScreenFrame {
 
             // 戴着头像挂件时像网易一样把头像缩小：挂件图只有 352 见方，头像 160、挂件 240，在 2 倍屏上
             // 放大约 1.4 倍，仍然清楚；铺满 280 会糊。
-            // 是否戴挂件按有没有链接定，不按图取没取到：头像大小一变挂件就重取，按状态定会来回跳
+            // 挂件按固定的 240 取图，取到了头像才缩（坏链接时头像照常铺满）；挂件的尺寸不随头像变，不会来回重取
             Item {
-                readonly property string pendant: page.user.avatarPendant || ""
-                readonly property bool framed: pendant.length > 0
+                readonly property bool framed: profilePendant.status === Image.Ready
                 Layout.preferredWidth: Tokens.trackColumn
                 Layout.preferredHeight: framed ? 1.5 * Tokens.tileLg : Tokens.trackColumn
                 PersonAvatar {
@@ -116,7 +115,18 @@ ScreenFrame {
                     height: width
                     name: page.user.name
                     source: page.user.avatar
-                    pendant: parent.pendant
+                }
+                Image {
+                    id: profilePendant
+                    anchors.centerIn: parent
+                    width: 1.5 * Tokens.tileLg
+                    height: width
+                    visible: status === Image.Ready
+                    source: page.user.avatarPendant || ""
+                    sourceSize.width: 2 * width
+                    sourceSize.height: 2 * height
+                    fillMode: Image.PreserveAspectFit
+                    asynchronous: true
                 }
             }
 

@@ -350,8 +350,7 @@ def anonymous():
            js("forwards", None), js("userEvents", None), js("dynamicCover", None), js("radio", None),
            js("newSongs", None), js("newAlbums", None), js("highquality", None), js("highqualityTags", None),
            js("recommendedMvs", None), js("recommendedPrograms", None), js("searchSuggest", None),
-           js("defaultSearch", None), js("similarSongs", None), js("similarPlaylists", None),
-           js("avatarPendant", None)])
+           js("defaultSearch", None), js("similarSongs", None), js("similarPlaylists", None)])
     return tracks
 
 

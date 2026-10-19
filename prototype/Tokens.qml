@@ -40,6 +40,7 @@ QtObject {
     readonly property real tintPressed: 0.15  // 按下
     readonly property real tonal: 0.1         // 静止的淡色调面：VIP 标签、无封面的入口磁贴
     readonly property real tonalHover: 0.15
+    readonly property real tonalStrong: 0.35  // 浓一档的淡色调：SVIP 会员标渐变的起点（正文色字在上面仍 ≥ 4.5:1）
     readonly property real placeholder: 0.05  // 封面加载前的占位底
     readonly property real track: 0.15        // 进度线未播放段
     readonly property real faded: 0.25        // 压暗：过期的二维码、封面占位图标
