@@ -183,6 +183,61 @@ private slots:
         QVERIFY(audio.duration() < 3.1);
     }
 
+    // 暂停先淡出：按下暂停后界面立刻是暂停，声音再走一小段（淡出）才停住
+    void pauseFadesOutBeforeStopping()
+    {
+        QVERIFY(writeSilentWav(m_dir.filePath("long.wav"), 3));
+        ApiServer api;
+        QVERIFY(api.listen(QHostAddress::LocalHost));
+        api.audioUrl = QUrl::fromLocalFile(m_dir.filePath("long.wav")).toString();
+
+        NcmClient client(nullptr, false);
+        client.setApiBase(QStringLiteral("http://127.0.0.1:%1/").arg(api.serverPort()));
+        AudioEngine audio(&client);
+
+        audio.setTrack(QVariantMap{{"id", 1.0}, {"dur", 3.0}});
+        audio.setPlaying(true);
+        QVERIFY2(waitFor([&] { return audio.position() > 0.2; }), "playback did not start");
+
+        audio.setPlaying(false);
+        QVERIFY(!audio.playing());
+        const double atPause = audio.position();
+        QVERIFY2(waitFor([&] { return audio.position() > atPause; }, 200), "no fade-out: sound stopped at once");
+        QTest::qWait(400);
+        const double stopped = audio.position();
+        QTest::qWait(300);
+        QCOMPARE(audio.position(), stopped);
+    }
+
+    // 正在出声时切歌：新曲目立刻生效；淡出中的上一首不把进度或「播完」带给新曲目；淡完后新曲目从头播
+    void switchingWhilePlayingFadesTheOldTrackOut()
+    {
+        QVERIFY(writeSilentWav(m_dir.filePath("long.wav"), 3));
+        ApiServer api;
+        QVERIFY(api.listen(QHostAddress::LocalHost));
+        api.audioUrl = QUrl::fromLocalFile(m_dir.filePath("long.wav")).toString();
+
+        NcmClient client(nullptr, false);
+        client.setApiBase(QStringLiteral("http://127.0.0.1:%1/").arg(api.serverPort()));
+        AudioEngine audio(&client);
+        QSignalSpy finishedSpy(&audio, &AudioEngine::finished);
+
+        audio.setTrack(QVariantMap{{"id", 1.0}, {"dur", 3.0}});
+        audio.setPlaying(true);
+        QVERIFY2(waitFor([&] { return audio.position() > 1.0; }), "playback did not start");
+
+        audio.setTrack(QVariantMap{{"id", 2.0}, {"dur", 5.0}});
+        QCOMPARE(audio.track().value("id").toDouble(), 2.0);
+        QCOMPARE(audio.position(), 0.0);
+        QTest::qWait(150);   // 上一首还在淡出
+        QCOMPARE(audio.position(), 0.0);
+        QCOMPARE(audio.duration(), 5.0);   // 新曲目的时长（文件加载前用元数据），不是上一首的 3 秒
+        QVERIFY2(waitFor([&] { return audio.position() > 0.1; }), "new track did not start after the fade");
+        QVERIFY(audio.position() < 1.0);
+        QVERIFY(audio.playing());
+        QVERIFY(finishedSpy.isEmpty());
+    }
+
     void seekLandsAndEmitsSeeked()
     {
         QVERIFY(writeSilentWav(m_dir.filePath("long.wav"), 3));

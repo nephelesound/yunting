@@ -128,7 +128,9 @@ ScreenFrame {
                         from: 0
                         to: Math.max(1, seek.duration)
                         readonly property real duration: page.player ? page.player.duration : 0
-                        onMoved: page.player.position = value
+                        // 拖动中只动滑块与时间，松手才跳一次（逐步跳会解出一串碎片，听起来是噪音）；方向键一步一跳
+                        onMoved: if (!seek.pressed) page.player.position = value
+                        onPressedChanged: if (!seek.pressed) page.player.position = value
                         Binding {
                             target: seek
                             property: "value"

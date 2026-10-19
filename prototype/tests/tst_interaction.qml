@@ -21,6 +21,7 @@ Item {
     Component { id: spyComponent; SignalSpy {} }
     Component { id: queueComponent; QueuePanel {} }
     Component { id: roomComponent; SimListenTogether {} }
+    Component { id: barComponent; PlayerBar { width: root.width } }
     // 定位按钮：与歌单页、歌手页同一种接法（LocateCurrent 挂在 ListView 上）
     Component {
         id: locateComponent
@@ -170,6 +171,23 @@ Item {
             panel.currentIndex = 1;                        // 切到下一首：B 离开「接下来」
             tryVerify(() => names() === "XD");
             verify(list.itemAtIndex(1) === rowD, "切歌后其余行原地保留");
+        }
+
+        // 拖进度条：拖动中进度线跟着手、不跳转（逐步跳转会解出一串碎片，听起来是噪音）；松手只跳一次
+        function test_scrubbingSeeksOnceOnRelease() {
+            const bar = createTemporaryObject(barComponent, root, { track: root.track, elapsed: 10 });
+            const seeks = createTemporaryObject(spyComponent, root, { target: bar, signalName: "seekRequested" });
+            const area = findChild(bar, "progressArea");
+            const y = area.height / 2;
+            mousePress(area, area.width * 0.2, y);
+            mouseMove(area, area.width * 0.4, y);
+            mouseMove(area, area.width * 0.6, y);
+            compare(seeks.count, 0, "拖动中不跳转");
+            fuzzyCompare(bar.shownElapsed, root.track.dur * 0.6, 1);
+            mouseRelease(area, area.width * 0.6, y);
+            compare(seeks.count, 1);
+            fuzzyCompare(seeks.signalArguments[0][0], root.track.dur * 0.6, 1);
+            compare(bar.shownElapsed, 10, "松手后回到播放位置（由引擎更新）");
         }
 
         // 一起听的「结束」：好友在时在原地问一句（不另开一层弹窗、下面的队列不跳），取消或关上抽屉都不结束；

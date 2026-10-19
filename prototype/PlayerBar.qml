@@ -66,6 +66,9 @@ Item {
     // 没有曲目或时长未知时进度为 0、不能拖动，传输控件整体禁用
     readonly property real duration: bar.track ? bar.track.dur : 0
     readonly property bool active: !!bar.track
+    // 拖动进度时只有进度线与时间跟着手走，松手才跳转一次：拖动中每一步都跳，会解出一串碎片，听起来是噪音
+    property real scrubTo: -1
+    readonly property real shownElapsed: bar.scrubTo >= 0 ? bar.scrubTo : bar.elapsed
 
     implicitHeight: Tokens.lineStrong + Tokens.hudHeight
 
@@ -78,7 +81,7 @@ Item {
         color: Qt.alpha(Kirigami.Theme.textColor, Tokens.track)
 
         Rectangle {
-            width: bar.duration > 0 ? parent.width * Math.min(1, bar.elapsed / bar.duration) : 0
+            width: bar.duration > 0 ? parent.width * Math.min(1, bar.shownElapsed / bar.duration) : 0
             height: parent.height
             color: Kirigami.Theme.highlightColor
         }
@@ -91,9 +94,15 @@ Item {
         anchors.verticalCenter: progressTrack.verticalCenter
         height: Tokens.space4
         cursorShape: Qt.PointingHandCursor
-        function seekTo(x) { bar.seekRequested(bar.duration * Math.max(0, Math.min(1, x / width))); }
-        onPressed: mouse => seekTo(mouse.x)
-        onPositionChanged: mouse => { if (pressed) seekTo(mouse.x); }
+        objectName: "progressArea"
+        function at(x) { return bar.duration * Math.max(0, Math.min(1, x / width)); }
+        onPressed: mouse => bar.scrubTo = at(mouse.x)
+        onPositionChanged: mouse => { if (pressed) bar.scrubTo = at(mouse.x); }
+        onReleased: {
+            bar.seekRequested(bar.scrubTo);
+            bar.scrubTo = -1;
+        }
+        onCanceled: bar.scrubTo = -1
     }
 
     Item {
@@ -300,7 +309,7 @@ Item {
                 id: timeLabel
                 Layout.rightMargin: Tokens.space3
                 visible: bar.duration > 0
-                text: Format.elapsed(bar.elapsed) + " / " + Format.duration(bar.duration)
+                text: Format.elapsed(bar.shownElapsed) + " / " + Format.duration(bar.duration)
                 font.pixelSize: Tokens.textSm
                 font.features: { "tnum": 1 }
                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)

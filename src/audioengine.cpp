@@ -16,6 +16,7 @@
 #include <QPointer>
 #include <QTimer>
 #include <QUrlQuery>
+#include <QVariantAnimation>
 #include <algorithm>
 #include <cstdio>
 
@@ -24,6 +25,9 @@ using namespace ncm;
 namespace {
 // 10 段均衡的频点与旧 DSP 路径一致；lavfi 的 equalizer 是峰值滤波，Q 也取同一个值。
 constexpr int kEqFrequencies[10] = {31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000};
+// 淡出要快（按下去就该开始安静），淡入稍长（声音回来不突兀）
+constexpr int kFadeOutMs = 250;
+constexpr int kFadeInMs = 400;
 
 QString number(double value)
 {
@@ -101,9 +105,18 @@ AudioEngine::AudioEngine(NcmClient *client, QObject *parent)
     if (systemAudioOff())
         option("ao", "null");
 
-    // mpv 的 volume 已是三次曲线；再叠一层对数换算会让 50% 的滑条几乎听不见
-    m_controller->setProperty(QStringLiteral("volume"), m_volume * 100.0);
+    applyVolume();
     m_controller->setProperty(QStringLiteral("mute"), m_muted);
+
+    m_fadeAnimation = new QVariantAnimation(this);
+    connect(m_fadeAnimation, &QVariantAnimation::valueChanged, this, [this](const QVariant &value) {
+        m_fade = value.toDouble();
+        applyVolume();
+    });
+    connect(m_fadeAnimation, &QVariantAnimation::finished, this, [this] {
+        if (const auto done = std::exchange(m_afterFade, {}))
+            done();
+    });
 
     connect(m_controller, &MpvController::propertyChanged, this, &AudioEngine::handleProperty);
     connect(m_controller, &MpvController::fileLoaded, this, &AudioEngine::onFileLoaded);
@@ -127,16 +140,16 @@ AudioEngine::~AudioEngine() = default;
 double AudioEngine::position() const
 {
     double value = 0;
-    if (readDouble(m_controller, "time-pos", &value))
+    // 淡出中的 time-pos 是上一首的；停止或播完后 mpv 不再提供 time-pos：都用保留的位置
+    if (!m_switching && readDouble(m_controller, "time-pos", &value))
         return value;
-    // 停止或播完后 mpv 不再提供 time-pos：保留最后的位置
     return m_position;
 }
 
 double AudioEngine::duration() const
 {
     double value = 0;
-    if (readDouble(m_controller, "duration", &value) && value > 0)
+    if (!m_switching && readDouble(m_controller, "duration", &value) && value > 0)   // 淡出中的是上一首的
         return value;
     if (m_duration > 0)
         return m_duration;
@@ -149,10 +162,17 @@ void AudioEngine::setTrack(const QVariantMap &track)
         return;
     // 切歌前把上一首的收听时长上报（位置 >= 1 秒才算）
     scrobbleFinish();
-    // 旧文件挂起的 end-file 事件不能落到新曲目上
-    discardEvents();
-    m_controller->command({QStringLiteral("stop")});
-    discardEvents();
+    m_pendingSource.reset();
+    if (!m_switching && m_playing && m_fileLoaded && m_fade > 0) {
+        // 正在出声：上一首先淡出，淡完再换（finishSwitch）；连续切歌只换最后一首
+        m_switching = true;
+        fadeTo(0, kFadeOutMs, [this] { finishSwitch(); });
+    } else if (!m_switching) {
+        // 旧文件挂起的 end-file 事件不能落到新曲目上
+        discardEvents();
+        m_controller->command({QStringLiteral("stop")});
+        discardEvents();
+    }
     m_track = track;
     m_pendingSeek = -1;   // 上一首的跳转只属于上一首，不能落到新曲目上
     m_urlReady = false;
@@ -181,20 +201,59 @@ void AudioEngine::setPlaying(bool playing)
     if (playing == m_playing)
         return;
     m_playing = playing;
-    if (playing) {
+    if (m_switching) {
+        // 上一首正在淡出：新的一首加载完再按 m_playing 决定出不出声
+    } else if (playing) {
         if (m_atEof && m_urlReady && !m_sourceUrl.isEmpty()) {
             // 播完后 mpv 已回到 idle，再次按播放要重新加载同一地址
             startSource(m_sourceUrl, m_playedLevel, m_playedBitrate);
         } else if (m_fileLoaded) {
             setPaused(false);
+            fadeTo(1, kFadeInMs);
         }
         // 文件还在加载：FILE_LOADED 里再解除暂停
     } else {
-        setPaused(true);
+        if (m_fileLoaded && !m_atEof)
+            fadeTo(0, kFadeOutMs, [this] { setPaused(true); });
+        else
+            setPaused(true);   // 没在出声（还在加载、已播完）：没什么可淡的
         // 暂停也结算一次；恢复后不会重复上报
         scrobbleFinish();
     }
     emit playingChanged();
+}
+
+void AudioEngine::fadeTo(double target, int ms, std::function<void()> done)
+{
+    m_fadeAnimation->stop();
+    m_afterFade = {};
+    if (m_fade == target) {
+        if (done)
+            done();
+        return;
+    }
+    m_afterFade = std::move(done);
+    m_fadeAnimation->setStartValue(m_fade);
+    m_fadeAnimation->setEndValue(target);
+    m_fadeAnimation->setDuration(ms);
+    m_fadeAnimation->start();
+}
+
+void AudioEngine::applyVolume()
+{
+    // mpv 的 volume 已是三次曲线；再叠一层对数换算会让 50% 的滑条几乎听不见
+    m_controller->setProperty(QStringLiteral("volume"), m_volume * m_fade * 100.0);
+}
+
+void AudioEngine::finishSwitch()
+{
+    m_switching = false;
+    // 旧文件挂起的事件（含淡出期间的 end-file）不能落到新曲目上
+    discardEvents();
+    m_controller->command({QStringLiteral("stop")});
+    discardEvents();
+    if (const auto source = std::exchange(m_pendingSource, std::nullopt))
+        startSource(source->url, source->level, source->bitrate);
 }
 
 void AudioEngine::setPaused(bool paused)
@@ -208,7 +267,7 @@ void AudioEngine::setVolume(double volume)
     if (clamped == m_volume)
         return;
     m_volume = clamped;
-    m_controller->setProperty(QStringLiteral("volume"), clamped * 100.0);
+    applyVolume();
     emit volumeChanged();
 }
 
@@ -500,6 +559,10 @@ void AudioEngine::resolveUrl(double songId)
 
 void AudioEngine::startSource(const QString &url, const QString &level, int bitrate)
 {
+    if (m_switching) {
+        m_pendingSource = PendingSource{url, level, bitrate};   // 上一首淡完再播
+        return;
+    }
     m_playedLevel = level;
     m_playedBitrate = bitrate;
     qCDebug(lcPerf).nospace() << "audio url ready track="
@@ -560,6 +623,8 @@ void AudioEngine::handleProperty(const QString &name, const QVariant &value)
         m_audioDeviceDebounce->start();
         return;
     }
+    if (m_switching)
+        return;   // 还在淡出的上一首：它的进度、时长、播完都不属于已经换上的新曲目
     if (name == QLatin1String("time-pos")) {
         m_position = value.toDouble();
         if (m_playing && m_position > 0)
@@ -602,13 +667,17 @@ void AudioEngine::onFileLoaded()
             emit positionChanged();
         }
     }
-    if (m_playing)
+    if (m_playing) {
         setPaused(false);
+        fadeTo(1, kFadeInMs);   // 切歌、暂停后淡出过才会淡入；自然接下一首时音量本来就在
+    }
     emit durationChanged();
 }
 
 void AudioEngine::onEndFile(const QString &reason)
 {
+    if (m_switching)
+        return;   // 淡出中的上一首播完了：新曲目还没开始，不算它播完
     m_fileLoaded = false;
     if (reason == QLatin1String("eof")) {
         m_atEof = true;

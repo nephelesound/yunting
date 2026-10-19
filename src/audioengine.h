@@ -6,6 +6,8 @@
 // 播放走 libmpv：audio-device=auto 跟随 PipeWire/PulseAudio 的系统默认输出；EQ、低音与
 // 空间感是 mpv 的 lavfi 滤镜。队列与「下一首」不在这里：自然播完只发 finished()，
 // 切歌规则只有 Playback 那一份。
+// 淡入淡出（与网易云相同）：暂停先淡出再停，继续先出声再淡入；正在出声时切歌，上一首淡出、
+// 新的一首淡入（新地址在淡出期间照常去取）。自然播完接下一首不淡，免得削掉前奏。
 #include <QDateTime>
 #include <QElapsedTimer>
 #include <QHash>
@@ -16,7 +18,11 @@
 #include <QVariantList>
 #include <QVariantMap>
 
+#include <functional>
+#include <optional>
+
 class MpvController;
+class QVariantAnimation;
 class NcmClient;
 class QTimer;
 
@@ -128,6 +134,12 @@ private:
     void onFileLoaded();
     void onEndFile(const QString &reason);
     void setPaused(bool paused);
+    // mpv 的音量 = 用户音量 × m_fade。mpv 的音量刻度本身按听感分布，匀速改它听起来就是匀速的淡入淡出。
+    // 新的一次淡变接替正在进行的那次，被接替的那次不再执行它的 done
+    void fadeTo(double target, int ms, std::function<void()> done = {});
+    void applyVolume();
+    // 上一首淡出完毕：停掉它，播淡出期间取到的新地址
+    void finishSwitch();
     // 滤镜链始终挂在一个带标签的 lavfi 上，运行中改参数只发 af-command
     void applyFilters();
     void updateFilter(const char *target, const char *command, double value);
@@ -185,4 +197,16 @@ private:
     qint64 m_playedMs = 0;
     bool m_playClockRunning = false;
     bool m_firstAudioLogged = false;
+
+    QVariantAnimation *m_fadeAnimation = nullptr;
+    double m_fade = 1.0;
+    std::function<void()> m_afterFade;
+    // 上一首正在淡出：它的事件不再落到新曲目上，新曲目的地址先存在 m_pendingSource
+    bool m_switching = false;
+    struct PendingSource {
+        QString url;
+        QString level;
+        int bitrate = 320000;
+    };
+    std::optional<PendingSource> m_pendingSource;
 };
