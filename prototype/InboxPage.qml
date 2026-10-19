@@ -409,9 +409,9 @@ ScreenFrame {
 
             // 发私信：Enter 或「发送」都走同一条 Store 写请求；发送后由 Store 重取历史，
             // 不在本地伪插一条，避免服务器拒绝时界面先出现一条并不存在的消息。
+            // 左缘与上面消息的头像对齐（消息列表那一圈挂件余量是往左借的，这里不再缩进）
             RowLayout {
                 Layout.fillWidth: true
-                Layout.leftMargin: Tokens.pendantRoom
                 Layout.rightMargin: Tokens.pageMargin
                 spacing: Tokens.space2
                 TextField {
@@ -429,7 +429,7 @@ ScreenFrame {
                     visible: page.currentId > 0
                     implicitWidth: Tokens.height8
                     implicitHeight: Tokens.height8
-                    icon.name: "media-playlist-append"
+                    icon.name: "document-share"   // 与播放条的「分享」同一个图标
                     icon.width: Tokens.iconSm
                     icon.height: Tokens.iconSm
                     enabled: page.loggedIn && !page.sending
@@ -448,13 +448,6 @@ ScreenFrame {
                     enabled: page.loggedIn && !page.sending && composer.text.trim().length > 0
                     onClicked: page.sendMessage()
                 }
-            }
-
-            Label {
-                Layout.rightMargin: Tokens.pageMargin
-                text: "私信会同步到你的网易云账号；分享内容请从播放条或页面菜单发送"
-                font.pixelSize: Tokens.textSm
-                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             }
         }
     }

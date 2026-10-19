@@ -86,7 +86,7 @@ SHOTS = home:page=home home-anon:account=anonymous,page=home charts:page=charts 
         join:fixture=one,page=home,startOverlay=join logout:fixture=one,page=home,startOverlay=logout \
         worst-saved:fixture=worst,listKey=artists,page=saved worst-suggest:fixture=worst,searchQuery=x,page=search,startOverlay=suggest \
         worst-events:fixture=worst,userId=2,page=user,startPane=events \
-        worst-inbox-comments:fixture=worst,page=inbox,startPane=comments one-inbox-forwards:fixture=one,page=inbox,startPane=forwards \
+        worst-inbox-messages:fixture=worst,page=inbox worst-inbox-comments:fixture=worst,page=inbox,startPane=comments one-inbox-forwards:fixture=one,page=inbox,startPane=forwards \
         worst-discover-highquality:fixture=worst,page=charts,startPane=highquality one-discover-programs:fixture=one,page=charts,startPane=programs \
         worst-radio:fixture=worst,listKey=radio:7,page=list \
         worst-search-users:fixture=worst,searchQuery=x,searchCollection=users,page=search worst-reorder:fixture=worst,page=playlists,startOverlay=reorder \
