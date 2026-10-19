@@ -33,6 +33,7 @@ set(YUNTING_SDK_SOURCES
     sdk/dynamic_cover.h sdk/dynamic_cover.cpp
     sdk/search_suggest.h sdk/search_suggest.cpp
     sdk/notify.h sdk/notify.cpp
+    sdk/search_default.h sdk/search_default.cpp
     sdk/lyrics.h sdk/lyrics.cpp
     sdk/user_social.h sdk/user_social.cpp
     sdk/comment.h sdk/comment.cpp

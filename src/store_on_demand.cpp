@@ -9,6 +9,7 @@
 #include "sdk/lyrics.h"
 #include "sdk/comment.h"
 #include "sdk/mv_page.h"
+#include "sdk/search_default.h"
 #include "sdk/search_people.h"
 #include "sdk/track.h"
 #include "sdk/track_service.h"
@@ -122,6 +123,8 @@ void Store::request(const QString &key)
              s.requestSimilarSongs(k, k.section(u':', 1).toDouble()); }},
         {QStringLiteral("similarPlaylists:"), [](Store &s, const QString &k) {
              s.requestSimilarPlaylists(k, k.section(u':', 1).toDouble()); }},
+        {QStringLiteral("defaultSearch"), [](Store &s, const QString &) {
+             s.requestDefaultSearch(); }},
         {QStringLiteral("artistSongs:"), [](Store &s, const QString &k) {
              const QStringList parts = k.split(u':');
              s.requestArtistSongs(k, parts.value(1).toDouble(), parts.value(2).toInt()); }},
@@ -401,6 +404,40 @@ void Store::requestSearch(const QString &key, const QString &raw)
             // 用户已经输入了更新的搜索词：旧请求晚到也不能覆盖当前结果
             if (generation == m_searchGeneration)
                 put("search", result, false);
+        });
+}
+
+// 搜索框为空时的默认关键词/活动词。
+void Store::requestDefaultSearch()
+{
+    const quint64 token = m_requests.begin(QStringLiteral("defaultSearch"));
+    m_cache.query(QStringLiteral("defaultSearch"),
+        [this](QueryCache::Done done) {
+            m_client->get(QStringLiteral("api/search/defaultkeyword/get"), {}, false,
+                          [done](const QJsonDocument &doc, bool ok) {
+                const QJsonObject resp = body(doc);
+                if (!ok || resp.value("code").toInt() != 200) {
+                    done({}, false);
+                    return;
+                }
+                const auto parsed = sdk::parseDefaultSearch(resp);
+                if (!parsed) {
+                    done({}, false);
+                    return;
+                }
+                const sdk::DefaultSearch &value = *parsed.value;
+                done(QVariantMap{{"showKeyword", value.showKeyword},
+                                 {"realKeyword", value.realKeyword},
+                                 {"searchType", value.searchType},
+                                 {"action", value.action},
+                                 {"alg", value.alg},
+                                 {"imageUrl", value.imageUrl}},
+                     true);
+            });
+        },
+        [this, token](const QVariant &result) {
+            if (m_requests.current(QStringLiteral("defaultSearch"), token))
+                put("defaultSearch", result, false);
         });
 }
 
