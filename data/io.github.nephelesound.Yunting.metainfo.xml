@@ -58,6 +58,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.2" date="2026-10-19">
+      <description>
+        <p>对话框统一成 KDE 新的样式，结束一起听改为在播放队列里原地确认；修复删除歌单的对话框在歌单名很长时超出窗口。完整的更新日志见仓库里的 CHANGELOG.md。</p>
+      </description>
+    </release>
     <release version="0.6.1" date="2026-10-19">
       <description>
         <p>点了新的红心后，心动模式跟着换成从这首歌出发；修复打包构建时音频测试卡住。完整的更新日志见仓库里的 CHANGELOG.md。</p>

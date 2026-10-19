@@ -2,6 +2,16 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.2] - 2026-10-19
+
+### 变化
+- 对话框统一成 KDE 新的样式：标题、内容与按钮同样的边距，圆角，同样的宽度；输入框带标签，删除与退出登录的按钮用各自的图标。
+- 结束一起听不再另弹对话框：好友在时，在播放队列里原地问一句「好友那边也会停止播放」，下面的队列不跳动；还没人加入时直接结束。
+- Arch 的 PKGBUILD 改为构建发布版本（包名 `yunting`），更新只需 `git pull && makepkg -si`；以前的 `yunting-git` 会提示替换。
+
+### 修复
+- 歌单名很长时，删除歌单的对话框比窗口还宽，标题和按钮被截掉。
+
 ## [0.6.1] - 2026-10-19
 
 ### 修复
@@ -147,6 +157,7 @@
 - 分享：链接、二维码、Telegram 与邮件，以及带封面与歌词的分享图。
 - 「关于」窗口与「复制诊断信息」，方便反馈问题。
 
+[0.6.2]: https://github.com/nephelesound/yunting/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/nephelesound/yunting/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/nephelesound/yunting/compare/v0.5.5...v0.6.0
 [0.5.5]: https://github.com/nephelesound/yunting/compare/v0.5.4...v0.5.5
