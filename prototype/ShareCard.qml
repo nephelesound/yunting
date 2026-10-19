@@ -70,6 +70,8 @@ Item {
                 color: "white"
                 font.pixelSize: Tokens.text2xl
                 font.weight: Font.DemiBold
+                lineHeightMode: Text.FixedHeight
+                lineHeight: Tokens.line2xl
                 wrapMode: Text.Wrap
                 maximumLineCount: 2
                 elide: Text.ElideRight
@@ -135,6 +137,8 @@ Item {
                         color: "white"
                         font.pixelSize: Tokens.text2xl
                         font.weight: Font.DemiBold
+                        lineHeightMode: Text.FixedHeight
+                        lineHeight: Tokens.line2xl
                         wrapMode: Text.Wrap
                         maximumLineCount: 2
                         elide: Text.ElideRight
@@ -145,6 +149,8 @@ Item {
                         text: lyric.modelData.tr || ""
                         color: card.inkSecondary
                         font.pixelSize: Tokens.textSm
+                        lineHeightMode: Text.FixedHeight
+                        lineHeight: Tokens.lineSm
                         wrapMode: Text.Wrap
                         maximumLineCount: 2
                         elide: Text.ElideRight

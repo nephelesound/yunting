@@ -119,7 +119,8 @@ RowLayout {
             Layout.fillWidth: true
             text: row.comment.content || ""
             font.pixelSize: Tokens.textBase
-            lineHeight: 1.4
+            lineHeightMode: Text.FixedHeight
+            lineHeight: Tokens.lineBase
             wrapMode: Text.Wrap
             maximumLineCount: row.expanded ? 1000 : 6
             elide: Text.ElideRight

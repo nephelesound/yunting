@@ -69,6 +69,8 @@ RowLayout {
             visible: text.length > 0
             text: row.text
             font.pixelSize: Tokens.textBase
+            lineHeightMode: Text.FixedHeight
+            lineHeight: Tokens.lineBase
             wrapMode: Text.Wrap
         }
         Label {
@@ -76,6 +78,8 @@ RowLayout {
             visible: row.quote.length > 0
             text: "回复你的评论：" + row.quote
             font.pixelSize: Tokens.textSm
+            lineHeightMode: Text.FixedHeight
+            lineHeight: Tokens.lineSm
             color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             wrapMode: Text.Wrap
             maximumLineCount: 2

@@ -190,6 +190,8 @@ ScreenFrame {
                 visible: text.length > 0
                 text: page.user.signature
                 font.pixelSize: Tokens.textSm
+                lineHeightMode: Text.FixedHeight
+                lineHeight: Tokens.lineSm
                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                 wrapMode: Text.Wrap
                 maximumLineCount: 3
@@ -384,6 +386,8 @@ ScreenFrame {
                         visible: text.length > 0
                         text: event.entry.text || ""
                         font.pixelSize: Tokens.textBase
+                        lineHeightMode: Text.FixedHeight
+                        lineHeight: Tokens.lineBase
                         wrapMode: Text.Wrap
                     }
                     ResourceRow {

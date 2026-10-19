@@ -44,11 +44,15 @@ Flickable {
     component Body: Label {
         Layout.fillWidth: true
         font.pixelSize: Tokens.textBase
+        lineHeightMode: Text.FixedHeight
+        lineHeight: Tokens.lineBase
         wrapMode: Text.Wrap
     }
     component Note: Label {
         Layout.fillWidth: true
         font.pixelSize: Tokens.textSm
+        lineHeightMode: Text.FixedHeight
+        lineHeight: Tokens.lineSm
         color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
         wrapMode: Text.Wrap
     }
@@ -103,6 +107,8 @@ Flickable {
                         Layout.maximumWidth: Tokens.albumColumn
                         text: modelData.label
                         font.pixelSize: Tokens.textBase
+                        lineHeightMode: Text.FixedHeight
+                        lineHeight: Tokens.lineBase   // 与右边的值同一行高，首行对齐
                         color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                         wrapMode: Text.Wrap
                     }
@@ -126,6 +132,8 @@ Flickable {
                             width: parent.width
                             text: value.modelData.text
                             font.pixelSize: Tokens.textBase
+                            lineHeightMode: Text.FixedHeight
+                            lineHeight: Tokens.lineBase
                             wrapMode: Text.Wrap
                         }
                         LinkText {
@@ -136,6 +144,8 @@ Flickable {
                                 ? [{ text: Format.elapsed(value.modelData.chorus.start) + " – " + Format.elapsed(value.modelData.chorus.end), link: true }]
                                 : []
                             font.pixelSize: Tokens.textBase
+                            lineHeightMode: Text.FixedHeight
+                            lineHeight: Tokens.lineBase
                             ToolTip.text: "从副歌听起"
                             ToolTip.visible: chorus.hoveredPart >= 0
                             ToolTip.delay: Kirigami.Units.toolTipDelay
@@ -148,6 +158,8 @@ Flickable {
                             width: parent.width
                             parts: value.modelData.people.map(p => ({ text: p.name, artistId: p.id }))
                             font.pixelSize: Tokens.textBase
+                            lineHeightMode: Text.FixedHeight
+                            lineHeight: Tokens.lineBase
                         }
                         Flow {
                             id: tags

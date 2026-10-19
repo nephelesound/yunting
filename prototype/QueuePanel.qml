@@ -7,7 +7,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
-import org.kde.prison as Prison
 import "Format.js" as Format
 
 Kirigami.OverlayDrawer {
@@ -239,17 +238,10 @@ Kirigami.OverlayDrawer {
                 visible: listenSection.waiting
                 Layout.fillWidth: true
                 spacing: Tokens.space4
-                Rectangle {
-                    implicitWidth: Tokens.tileSm
-                    implicitHeight: Tokens.tileSm
-                    radius: Tokens.radius
-                    color: "white"   // 二维码要白底才扫得出，深色主题下也一样
-                    Prison.Barcode {
-                        anchors.fill: parent
-                        anchors.margins: Tokens.space1
-                        barcodeType: Prison.Barcode.QRCode
-                        content: panel.room ? panel.room.shareUrl : ""
-                    }
+                QrCode {
+                    Layout.alignment: Qt.AlignTop
+                    maxSide: Tokens.tileLg
+                    content: panel.room ? panel.room.shareUrl : ""
                 }
                 ColumnLayout {
                     Layout.fillWidth: true

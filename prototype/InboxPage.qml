@@ -105,8 +105,10 @@ ScreenFrame {
         // 左：会话
         ListView {
             id: list
-            // 会话列宽一栏（400）：名字与最后一句都要看得出；右边留出滚动条的位置，不压在时间与未读数上
-            Layout.preferredWidth: Tokens.measureMax + Tokens.pendantRoom
+            // 会话列约占页宽的三分之一，在 400（一栏）到 480 之间：窄窗口不挤对话，宽窗口里最后一句少截一点，
+            // 右边不会空出一大片。右边留出滚动条的位置，不压在时间与未读数上
+            Layout.preferredWidth: Math.round(Math.max(Tokens.measureMax, Math.min(Tokens.wideRow, page.width / 3)))
+                + Tokens.pendantRoom
             Layout.leftMargin: -Tokens.pendantRoom   // 给头像挂件留的那一圈（Tokens.pendantRoom）
             Layout.fillHeight: true
             leftMargin: Tokens.pendantRoom

@@ -19,6 +19,8 @@ ColumnLayout {
         Layout.fillWidth: true
         text: blurb.text
         font.pixelSize: Tokens.textSm
+        lineHeightMode: Text.FixedHeight
+        lineHeight: Tokens.lineSm
         color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
         wrapMode: Text.Wrap
         maximumLineCount: 3

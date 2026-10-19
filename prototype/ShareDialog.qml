@@ -13,7 +13,6 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtCore
 import org.kde.kirigami as Kirigami
-import org.kde.prison as Prison
 
 AppDialog {
     id: share
@@ -269,17 +268,9 @@ AppDialog {
                     anchors.left: parent.left
                     anchors.bottom: parent.bottom
                     spacing: Tokens.space3
-                    Rectangle {
-                        implicitWidth: scanArea.side
-                        implicitHeight: scanArea.side
-                        radius: Tokens.radius
-                        color: "white"
-                        Prison.Barcode {
-                            anchors.fill: parent
-                            anchors.margins: Tokens.space1
-                            barcodeType: Prison.Barcode.QRCode
-                            content: share.visible ? share.shareUrl : ""
-                        }
+                    QrCode {
+                        maxSide: scanArea.side
+                        content: share.visible ? share.shareUrl : ""
                     }
                     Label {
                         Layout.alignment: Qt.AlignVCenter

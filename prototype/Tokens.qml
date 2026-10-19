@@ -88,6 +88,13 @@ QtObject {
     readonly property int textBase: 16
     readonly property int textSm: 14
     readonly property int textXs: 12
+    // 多行正文的行高（像素，配 lineHeightMode: Text.FixedHeight）：约 1.5 倍字号，W3C clreq 建议中文正文
+    // 行距为字号的 50%–100%。用固定像素而不用倍数：倍数乘的是字体自带的行高，鸿蒙黑体 1.17、Noto CJK 1.45，
+    // 同一个倍数在不同系统上差出一截。单行文字不设
+    readonly property int line2xl: 32
+    readonly property int lineBase: 24
+    readonly property int lineSm: 22
+    readonly property int lineXs: 18
 
     // 图标：跟随 Breeze 的尺寸档（16/22/32），其它尺寸会被缩回最近一档
     readonly property int iconSm: 16
