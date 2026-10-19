@@ -140,8 +140,9 @@ AudioEngine::~AudioEngine() = default;
 double AudioEngine::position() const
 {
     double value = 0;
-    // 淡出中的 time-pos 是上一首的；停止或播完后 mpv 不再提供 time-pos：都用保留的位置
-    if (!m_switching && readDouble(m_controller, "time-pos", &value))
+    // 淡出中、以及 loadfile 之后新文件载入之前，time-pos 都还是上一首的；
+    // 停止或播完后 mpv 不再提供 time-pos：这些时候都用保留的位置
+    if (!m_switching && m_fileLoaded && readDouble(m_controller, "time-pos", &value))
         return value;
     return m_position;
 }
@@ -149,7 +150,7 @@ double AudioEngine::position() const
 double AudioEngine::duration() const
 {
     double value = 0;
-    if (!m_switching && readDouble(m_controller, "duration", &value) && value > 0)   // 淡出中的是上一首的
+    if (!m_switching && m_fileLoaded && readDouble(m_controller, "duration", &value) && value > 0)   // 同上
         return value;
     if (m_duration > 0)
         return m_duration;
@@ -625,6 +626,8 @@ void AudioEngine::handleProperty(const QString &name, const QVariant &value)
     }
     if (m_switching)
         return;   // 还在淡出的上一首：它的进度、时长、播完都不属于已经换上的新曲目
+    if (!m_fileLoaded && (name == QLatin1String("time-pos") || name == QLatin1String("duration")))
+        return;   // loadfile 之后、新文件载入之前，这两项还是上一首的
     if (name == QLatin1String("time-pos")) {
         m_position = value.toDouble();
         if (m_playing && m_position > 0)
