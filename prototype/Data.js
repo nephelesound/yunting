@@ -8235,3 +8235,5 @@ var similarSongs = null
 var similarPlaylists = null
 
 var friendsListening = null
+
+var playlistCatalogue = null

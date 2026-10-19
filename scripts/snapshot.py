@@ -351,7 +351,7 @@ def anonymous():
            js("newSongs", None), js("newAlbums", None), js("highquality", None), js("highqualityTags", None),
            js("recommendedMvs", None), js("recommendedPrograms", None), js("searchSuggest", None),
            js("defaultSearch", None), js("similarSongs", None), js("similarPlaylists", None),
-           js("friendsListening", None)])
+           js("friendsListening", None), js("playlistCatalogue", None)])
     return tracks
 
 

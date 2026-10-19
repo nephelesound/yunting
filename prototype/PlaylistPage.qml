@@ -35,6 +35,8 @@ ScreenFrame {
     signal renameRequested(real id, string name)
     signal describeRequested(real id, string description)
     signal deleteRequested(real id, string name)
+    signal privacyToggled(real id, bool makePrivate)
+    signal tagsRequested(real id, var tags)
     signal subscribeToggled(real id, string name, bool subscribed)
     signal albumSubscriptionToggled(real id, bool subscribed)
     signal shareRequested(string kind, real id, string title, string cover)
@@ -73,6 +75,18 @@ ScreenFrame {
                 Layout.fillWidth: true
                 Layout.topMargin: Tokens.space4
                 items: page.list.facts
+            }
+            // 私密与标签：一行弱化的说明，跟在数字下面；都没有就不占地方
+            Label {
+                objectName: "listMeta"
+                readonly property var parts: (page.list.privateList ? ["私密歌单"] : []).concat(page.list.tags || [])
+                visible: parts.length > 0
+                Layout.fillWidth: true
+                Layout.topMargin: Tokens.space1
+                text: parts.join(" · ")
+                font.pixelSize: Tokens.textSm
+                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                elide: Text.ElideRight
             }
 
             Blurb {
@@ -185,6 +199,20 @@ ScreenFrame {
                         icon.name: "document-edit"
                         text: "编辑简介…"
                         onTriggered: page.describeRequested(page.list.listId, page.list.description || "")
+                    }
+                    MenuItem {
+                        visible: page.list.owned || false
+                        height: visible ? implicitHeight : 0
+                        icon.name: "tag"
+                        text: "编辑标签…"
+                        onTriggered: page.tagsRequested(page.list.listId, page.list.tags || [])
+                    }
+                    MenuItem {
+                        visible: page.list.owned || false
+                        height: visible ? implicitHeight : 0
+                        icon.name: page.list.privateList ? "view-visible" : "view-private"
+                        text: page.list.privateList ? "设为公开歌单" : "设为私密歌单"
+                        onTriggered: page.privacyToggled(page.list.listId, !page.list.privateList)
                     }
                     MenuItem {
                         visible: page.list.owned || false

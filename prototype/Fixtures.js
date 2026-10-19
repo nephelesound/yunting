@@ -161,6 +161,17 @@ var worst = {
         newAlbums: [{ id: 1, name: "我想要两颗西柚（Live）- 2023 网易云音乐年度盛典现场版 豪华纪念版（含未公开 Demo 与现场返场）", cover: BROKEN, artist: "茄子蛋 / 告五人 / 草东没有派对 / 落日飞车", artistId: 2, publishTime: 1700000000000, size: 128 },
                     { id: 2, name: "x", cover: "", artist: "", artistId: 0, publishTime: 0, size: 0 },
                     { id: 3, name: "雨", cover: C2, artist: "A", artistId: 1, publishTime: 1600000000000, size: 1 }],
+        // 歌单标签目录：category 0 语种 / 1 风格 / 2 场景 / 3 情感 / 4 主题
+        playlistCatalogue: { all: "全部歌单", tags: [
+            { name: "华语", category: 0, count: 1, hot: true }, { name: "欧美", category: 0, count: 1, hot: true },
+            { name: "日语", category: 0, count: 1, hot: false }, { name: "粤语", category: 0, count: 1, hot: false },
+            { name: "流行", category: 1, count: 1, hot: true }, { name: "独立", category: 1, count: 1, hot: false },
+            { name: "民谣", category: 1, count: 1, hot: true }, { name: "电子", category: 1, count: 1, hot: true },
+            { name: "后摇", category: 1, count: 1, hot: false }, { name: "R&B/Soul", category: 1, count: 1, hot: false },
+            { name: "夜晚", category: 2, count: 1, hot: true }, { name: "学习", category: 2, count: 1, hot: true },
+            { name: "驾车", category: 2, count: 1, hot: false }, { name: "安静", category: 3, count: 1, hot: true },
+            { name: "治愈", category: 3, count: 1, hot: true }, { name: "影视原声", category: 4, count: 1, hot: true },
+            { name: "ACG", category: 4, count: 1, hot: true }] },
         highqualityTags: [{ name: "华语", hot: true }, { name: "流行", hot: true }, { name: "摇滚", hot: false }, { name: "民谣", hot: true },
                           { name: "电子", hot: false }, { name: "说唱", hot: false }, { name: "轻音乐", hot: true }, { name: "爵士", hot: false },
                           { name: "古典", hot: false }, { name: "ACG", hot: true }, { name: "影视原声", hot: false }, { name: "夜晚", hot: false }],
@@ -264,7 +275,8 @@ var worst = {
         recent: { total: 99999, tracks: worstTracks.slice(0, 30) },
         cloud: { count: 1284, size: 64315222016, maxSize: 64424509440, tracks: worstTracks.slice(0, 30) },
         mine: [
-            { id: 11, name: "我喜欢的音乐之外的、真正只在深夜一个人开车时才会听的歌（2019—2026 持续更新）", cover: C2, count: 1284, reason: "" },
+            { id: 11, name: "我喜欢的音乐之外的、真正只在深夜一个人开车时才会听的歌（2019—2026 持续更新）", cover: C2, count: 1284, reason: "",
+              privacy: 10, tags: ["华语", "独立", "夜晚"] },
             { id: 12, name: "空", cover: "", count: 0, reason: "" },
         ],
         subscribed: [

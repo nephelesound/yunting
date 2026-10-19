@@ -707,6 +707,20 @@ QtObject {
     function renamePlaylist(id, name) { if (source.live) source.live.renamePlaylist(id, name); }
     function setPlaylistDescription(id, description) { if (source.live) source.live.setPlaylistDescription(id, description); }
     function deletePlaylist(id) { if (source.live) source.live.deletePlaylist(id); }
+    function setPlaylistPrivacy(id, makePrivate) { if (source.live) source.live.setPlaylistPrivacy(id, makePrivate); }
+    function setPlaylistTags(id, tags) { if (source.live) source.live.setPlaylistTags(id, tags); }
+    // 歌单标签目录，按网易云的五类分组：[{ name: "语种", tags: ["华语", …] }, …]；没取到时为空（先要一次）
+    readonly property var playlistCatalogue: {
+        const c = source.d.playlistCatalogue;
+        if (!c) {
+            source.need("playlistCatalogue");
+            return [];
+        }
+        const names = ["语种", "风格", "场景", "情感", "主题"];
+        return names.map((name, category) => ({ name: name,
+                                                 tags: (c.tags || []).filter(t => t.category === category).map(t => t.name) }))
+            .filter(group => group.tags.length > 0);
+    }
     function setPlaylistSubscribed(id, subscribed) { if (source.live) source.live.setPlaylistSubscribed(id, subscribed); }
     // 自己创建的歌单的顺序：ids 是完整的新顺序
     function reorderPlaylists(ids) { if (source.live) source.live.reorderPlaylists(ids); }
@@ -889,9 +903,13 @@ QtObject {
                     source.need(key);
                 const mine = source.myPlaylists.find(pl => pl.id === id);
                 const owned = mine !== undefined && mine.owned && id !== (p.liked.id || 0);
+                // 隐私与标签：歌单卡片带的（我的歌单）优先，其次是按需取回的详情；privacy 10 = 私密
+                const privacy = card.privacy !== undefined ? card.privacy : detail.privacy || 0;
                 return { heading: card.name, cover: source.sized(card.cover, 560), tracks: tracks,
                          ranked: source.toplists.some(t => t.id === id),
                          facts: card.count > 0 ? [source.songs(card.count)] : [],
+                         privateList: Number(privacy) === 10,
+                         tags: (card.tags && card.tags.length > 0 ? card.tags : detail.tags) || [],
                          description: card.description || detail.description || card.reason || "",
                          // 歌单操作（左栏「更多」）：自己建的可改名/删除，别人的可收藏/取消收藏；
                          // 自己建的歌单里，曲目菜单多一项「从歌单中移除」

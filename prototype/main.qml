@@ -8,6 +8,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.kirigamiaddons.formcard as FormCard
 
@@ -447,6 +448,76 @@ Kirigami.ApplicationWindow {
         }
     }
 
+    // 歌单标签：网易云的标签目录按「语种 / 风格 / 场景 / 情感 / 主题」分组，最多选 3 个（网易云的上限）；
+    // 选满后其余的变灰。全部取消也是合法的保存
+    AppDialog {
+        id: tagsDialog
+        property real playlistId
+        property var chosen: []
+        readonly property int limit: 3
+        function ask(id, tags) {
+            tagsDialog.playlistId = id;
+            tagsDialog.chosen = (tags || []).slice(0, tagsDialog.limit);
+            tagsDialog.open();
+        }
+        function toggle(tag) {
+            tagsDialog.chosen = tagsDialog.chosen.indexOf(tag) >= 0
+                ? tagsDialog.chosen.filter(t => t !== tag) : tagsDialog.chosen.concat([tag]);
+        }
+        title: "编辑歌单标签"
+        acceptText: "保存"
+        message: tagsDialog.chosen.length > 0
+            ? "已选 " + tagsDialog.chosen.length + " / " + tagsDialog.limit + "：" + tagsDialog.chosen.join("、")
+            : "最多选 " + tagsDialog.limit + " 个"
+        onAccepted: {
+            root.noteOnSuccess(tagsDialog.playlistId, "更新歌单标签",
+                               tagsDialog.chosen.length > 0 ? "已更新歌单标签" : "已清除歌单标签");
+            Source.setPlaylistTags(tagsDialog.playlistId, tagsDialog.chosen);
+        }
+        Label {
+            visible: Source.playlistCatalogue.length === 0
+            Layout.fillWidth: true
+            Layout.margins: Tokens.space3
+            text: "正在取回标签…"
+            color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+        }
+        Repeater {
+            model: Source.playlistCatalogue
+            delegate: ColumnLayout {
+                id: tagGroup
+                required property var modelData
+                Layout.fillWidth: true
+                Layout.leftMargin: Tokens.space3
+                Layout.rightMargin: Tokens.space3
+                Layout.bottomMargin: Tokens.space4
+                spacing: Tokens.space2
+                Label {
+                    text: tagGroup.modelData.name
+                    font.pixelSize: Tokens.textSm
+                    color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                }
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: Tokens.space2
+                    Repeater {
+                        model: tagGroup.modelData.tags
+                        delegate: Kirigami.Chip {
+                            id: tagChip
+                            required property string modelData
+                            text: tagChip.modelData
+                            closable: false
+                            checkable: true
+                            enabled: tagChip.checked || tagsDialog.chosen.length < tagsDialog.limit
+                            // 点一下 Chip 会自己翻转 checked；跟着 chosen 重新绑回来，再开对话框时不留上次的状态
+                            Binding on checked { value: tagsDialog.chosen.indexOf(tagChip.modelData) >= 0 }
+                            onClicked: tagsDialog.toggle(tagChip.modelData)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // 歌单简介：多行文字，可以清空（空简介也是合法的保存）
     AppDialog {
         id: playlistDescriptionDialog
@@ -613,6 +684,8 @@ Kirigami.ApplicationWindow {
             Qt.callLater(() => (root.pageStack.currentItem as SearchPage).showSuggestions())
         else if (root.startOverlay === "join")
             joinDialog.open();
+        else if (root.startOverlay === "tags")
+            Qt.callLater(() => tagsDialog.ask(shown().listId || 0, shown().tags || []));
         else if (root.startOverlay === "import")
             Qt.callLater(() => importDialog.ask());
         else if (root.startOverlay === "rename")
@@ -1243,6 +1316,11 @@ Kirigami.ApplicationWindow {
             onRenameRequested: (id, name) => playlistNameDialog.ask(id, name, null)
             onDescribeRequested: (id, description) => playlistDescriptionDialog.ask(id, description)
             onDeleteRequested: (id, name) => deleteDialog.ask(id, name)
+            onPrivacyToggled: (id, makePrivate) => {
+                root.noteOnSuccess(id, "修改歌单隐私", makePrivate ? "已设为私密歌单，只有你能看到" : "已设为公开歌单");
+                Source.setPlaylistPrivacy(id, makePrivate);
+            }
+            onTagsRequested: (id, tags) => tagsDialog.ask(id, tags)
             onSubscribeToggled: (id, name, subscribed) => {
                 root.noteOnSuccess(id, subscribed ? "收藏歌单" : "取消收藏歌单", (subscribed ? "已收藏「" : "已取消收藏「") + name + "」");
                 Source.setPlaylistSubscribed(id, subscribed);
