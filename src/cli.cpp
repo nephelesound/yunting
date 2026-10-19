@@ -12,9 +12,6 @@
 #include "listentogether.h"
 #include "mpris.h"
 #include "mvvideo.h"
-#ifdef YUNTING_QRCODE
-#include "qrcodeimage.h"
-#endif
 #include "ncmclient.h"
 #include "powerinhibitor.h"
 #include "sdk/listen_together.h"
@@ -925,11 +922,6 @@ int runGui(const CommandLine &cli, QApplication &app, Backend &backend)
     ClipboardHelper clipboard;
     Diagnostics diagnostics;
     diagnostics.traffic = [&client] { return client.trafficSummary(); };
-    bool qrAvailable = false;
-#ifdef YUNTING_QRCODE
-    engine.addImageProvider(QStringLiteral("qrcode"), new QrCodeImageProvider);
-    qrAvailable = true;
-#endif
     QVariantMap backendMap{{"store", QVariant::fromValue<QObject *>(&store)},
                            {"audio", QVariant::fromValue<QObject *>(&audio)},
                            {"session", QVariant::fromValue<QObject *>(&session)},
@@ -939,8 +931,7 @@ int runGui(const CommandLine &cli, QApplication &app, Backend &backend)
                            {"clipboard", QVariant::fromValue<QObject *>(&clipboard)},
                            {"diagnostics", QVariant::fromValue<QObject *>(&diagnostics)},
                            {"listenTogether", QVariant::fromValue<QObject *>(&listenTogether)},
-                           {"downloads", QVariant::fromValue<QObject *>(&downloads)},
-                           {"qr", qrAvailable}};
+                           {"downloads", QVariant::fromValue<QObject *>(&downloads)}};
     engine.setInitialProperties({{"backend", backendMap}});
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
                      [] { QCoreApplication::exit(1); }, Qt::QueuedConnection);

@@ -36,55 +36,30 @@ ColumnLayout {
         }
     }
 
-    Label {
-        text: "发送到"
-        font.pixelSize: Tokens.textSm
-        color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
-    }
-
-    Repeater {
-        model: [
-            { key: "telegram", title: "通过 Telegram 发送", icon: "org.telegram.desktop" },
-            { key: "email", title: "通过邮件发送", icon: "mail-send-symbolic" },
-        ]
-        delegate: AbstractButton {
-            id: row
-            required property var modelData
-            Layout.fillWidth: true
-            implicitHeight: Tokens.height10
-            hoverEnabled: true
-            leftPadding: Tokens.space2
-            rightPadding: Tokens.space2
-            Accessible.name: row.modelData.title
-            onClicked: targets.launch(row.modelData.key)
-            background: Rectangle {
-                radius: Tokens.radius
-                color: Qt.alpha(Kirigami.Theme.highlightColor,
-                                row.down ? Tokens.tintPressed : row.hovered ? Tokens.tintHover : 0)
-                border.width: row.visualFocus ? Tokens.lineStrong : 0
-                border.color: Kirigami.Theme.highlightColor
-                Behavior on color { ColorAnimation { duration: Tokens.motionFast } }
-            }
-            contentItem: RowLayout {
-                spacing: Tokens.space3
-                Kirigami.Icon {
-                    implicitWidth: Tokens.iconMd
-                    implicitHeight: Tokens.iconMd
-                    source: row.modelData.icon
-                }
-                Label {
-                    Layout.fillWidth: true
-                    text: row.modelData.title
-                    font.pixelSize: Tokens.textBase
-                    elide: Text.ElideRight
-                }
-                Kirigami.Icon {
-                    implicitWidth: Tokens.iconSm
-                    implicitHeight: Tokens.iconSm
-                    source: "go-next-symbolic"
-                    color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
-                    isMask: true
-                }
+    // 一行：「发送到」和两个去处，与上面复制链接的那排按钮同一种样子
+    RowLayout {
+        spacing: Tokens.space2
+        Label {
+            Layout.rightMargin: Tokens.space2
+            text: "发送到"
+            font.pixelSize: Tokens.textSm
+            color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+        }
+        Repeater {
+            model: [
+                { key: "telegram", title: "Telegram", icon: "org.telegram.desktop" },
+                { key: "email", title: "邮件", icon: "mail-send-symbolic" },
+            ]
+            delegate: Button {
+                id: target
+                required property var modelData
+                implicitHeight: Tokens.height8
+                icon.name: target.modelData.icon
+                icon.width: Tokens.iconSm
+                icon.height: Tokens.iconSm
+                text: target.modelData.title
+                font.pixelSize: Tokens.textSm
+                onClicked: targets.launch(target.modelData.key)
             }
         }
     }

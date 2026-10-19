@@ -7,6 +7,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import org.kde.prison as Prison
 
 Item {
     id: card
@@ -15,7 +16,6 @@ Item {
     property string subtitle
     property string cover
     property string url
-    property bool qrAvailable: false
     property var lines: []   // 选中的歌词：[{ text, tr }]，至多 maxLines 句
 
     // 3 句是 3:4 里放得下的上限：每句至多两行，加译文
@@ -182,20 +182,19 @@ Item {
             }
             Rectangle {
                 id: qr
-                visible: card.qrAvailable && card.url.length > 0
+                visible: card.url.length > 0
                 Layout.preferredWidth: Tokens.height12
                 Layout.preferredHeight: Tokens.height12
                 radius: Tokens.radius
                 color: "white"
-                Image {
+                Prison.Barcode {
                     anchors.fill: parent
                     anchors.margins: Tokens.space1
-                    source: qr.visible ? "image://qrcode/" + encodeURIComponent(card.url) : ""
-                    sourceSize.width: 240
-                    sourceSize.height: 240
+                    barcodeType: Prison.Barcode.QRCode
+                    content: card.url
+                    // 导出按 3 倍重绘，但 Barcode 按自己的尺寸画一张贴图再放大：不给大贴图，导出的码是糊的、扫不出
+                    textureSize: Qt.size(240, 240)
                     smooth: false            // 模块边缘保持锐利，扫得快
-                    fillMode: Image.PreserveAspectFit
-                    asynchronous: true
                 }
             }
         }

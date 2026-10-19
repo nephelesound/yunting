@@ -301,7 +301,6 @@ Kirigami.ApplicationWindow {
     ShareDialog {
         id: shareDialog
         objectName: "shareDialog"
-        qrAvailable: root.backend && root.backend.qr === true
     }
 
     // 曲目菜单与歌单写操作

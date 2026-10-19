@@ -1,5 +1,5 @@
 # 云听的 Flatpak：所有发行版通用。KDE 运行时已带 Kirigami、Kirigami Addons、Prison、KStatusNotifierItem、
-# qrencode、OpenSSL 与 ffmpeg；这里只补运行时没有的 qtkeychain、layer-shell-qt 与 mpv 一套（照 Flathub 上 Haruna 的写法）。
+# OpenSSL 与 ffmpeg；这里只补运行时没有的 qtkeychain、layer-shell-qt 与 mpv 一套（照 Flathub 上 Haruna 的写法）。
 # 本地构建：flatpak-builder --user --install --force-clean build/flatpak packaging/flatpak/io.github.nephelesound.Yunting.yml
 app-id: io.github.nephelesound.Yunting
 runtime: org.kde.Platform

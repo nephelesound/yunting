@@ -15,7 +15,6 @@ depends=(
   kirigami kirigami-addons kcoreaddons ki18n kcolorscheme kconfig kstatusnotifieritem prison
   qtkeychain-qt6 openssl
   layer-shell-qt   # Wayland 下桌面歌词置顶
-  qrencode         # 分享二维码
   zstd
 )
 makedepends=(cmake ninja git)
