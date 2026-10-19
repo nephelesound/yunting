@@ -1,14 +1,14 @@
-// 扫码登录：Kirigami 原生对话框（浮层，自带遮罩与投影）。一次性动作，状态全部来自 session：
+// 扫码登录：一次性动作，状态全部来自 session：
 //   waiting 等待扫码 · scanned 已扫码、等手机确认 · expired 二维码过期、可刷新 · done 登录成功（对话框自己关闭）。
 // session 是 SimSession（原型）或 C++ Session（应用），接口相同。二维码用 KDE 自带的 org.kde.prison 生成。
-// 打开时开始轮询，取消或关闭时停止；取消永远可用。
+// 打开时开始轮询，关闭（右上角或 Esc）时停止。
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.prison as Prison
 
-Kirigami.Dialog {
+AppDialog {
     id: dialog
 
     required property var session   // 鸭子类型：SimSession 或 C++ Session
@@ -16,17 +16,6 @@ Kirigami.Dialog {
     readonly property string state: dialog.session.state
 
     title: "扫码登录"
-    // 不用 standardButtons：没加载 Qt 翻译时标准按钮会显示英文 Cancel
-    standardButtons: Kirigami.Dialog.NoButton
-    customFooterActions: [
-        Kirigami.Action {
-            text: "取消"
-            icon.name: "dialog-cancel-symbolic"
-            onTriggered: dialog.close()
-        }
-    ]
-    padding: Tokens.space6
-    preferredWidth: Tokens.measureMax
 
     onOpened: if (dialog.state === "idle" || dialog.state === "done" || dialog.state === "error")
         dialog.session.start()
@@ -34,6 +23,8 @@ Kirigami.Dialog {
     onStateChanged: if (dialog.state === "done") dialog.close()
 
     ColumnLayout {
+        Layout.fillWidth: true
+        Layout.margins: Tokens.space3   // 与标题同一内边距
         spacing: Tokens.space4
 
         // 二维码：过期时淡出并叠一个刷新按钮，位置不变，用户的视线不用移动

@@ -5,7 +5,6 @@
 //   分享图：一张竖图（ShareCard），左边是缩略图；歌曲可以选一句歌词放进去（连同下一句）。保存进「图片」文件夹或复制。
 //   发送到：链接分享用 Telegram / 邮件自己的 URL scheme，放在 ShareTargets.qml；
 //         不走 Purpose 的 Export（它把 urls 当本地文件，会把 https://... 当未知文件上传）。
-// 真正浮在页面之上的对话框：阴影与外框由 Kirigami 给出。
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -14,7 +13,7 @@ import QtQuick.Layouts
 import QtCore
 import org.kde.kirigami as Kirigami
 
-Kirigami.Dialog {
+AppDialog {
     id: share
 
     property string shareTitle
@@ -32,9 +31,7 @@ Kirigami.Dialog {
         ? Source.lyrics(share.trackId).filter(line => line.text.length > 0) : []
 
     title: "分享"
-    padding: Tokens.space6
     preferredWidth: Tokens.measureMax + Tokens.trackColumn - Tokens.space6 * 2   // 640
-    standardButtons: Kirigami.Dialog.NoButton
 
     onOpened: {
         copied.which = "";
@@ -96,6 +93,8 @@ Kirigami.Dialog {
     }
 
     ColumnLayout {
+        Layout.fillWidth: true
+        Layout.margins: Tokens.space3   // 与标题、按钮同一内边距
         spacing: Tokens.space6
 
         // 分享的是什么

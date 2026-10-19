@@ -109,6 +109,7 @@ QtObject {
     readonly property int hudHeight: height12 + 2 * space4   // 80
     readonly property int trackRow: height12                  // 48
     readonly property int trackColumn: 280                    // 35 × 8
+    readonly property int dialogWidth: 440                    // 对话框的宽度（55 × 8）：放得下一条链接，所有对话框一致
     readonly property int measureMax: 400                     // 正在播放封面的最大边长（50 × 8）
     readonly property int wideRow: 480                        // 曲目行宽于此时显示专辑列（60 × 8）
     readonly property int albumColumn: 160                    // 专辑列宽（20 × 8）

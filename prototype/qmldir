@@ -38,6 +38,7 @@ HomePage HomePage.qml
 IconButton IconButton.qml
 InboxPage InboxPage.qml
 LoginDialog LoginDialog.qml
+AppDialog AppDialog.qml
 QueuePanel QueuePanel.qml
 MediaTile MediaTile.qml
 MinePage MinePage.qml

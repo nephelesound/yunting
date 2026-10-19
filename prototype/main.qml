@@ -9,6 +9,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import org.kde.kirigami as Kirigami
+import org.kde.kirigamiaddons.formcard as FormCard
 
 Kirigami.ApplicationWindow {
     id: root
@@ -77,32 +78,20 @@ Kirigami.ApplicationWindow {
     }
 
     // 用好友发来的链接加入：链接或房间号都行
-    Kirigami.PromptDialog {
+    AppDialog {
         id: joinDialog
         title: "加入一起听"
-        standardButtons: Kirigami.Dialog.NoButton
-        customFooterActions: [
-            Kirigami.Action {
-                text: "加入"
-                icon.name: "dialog-ok"
-                enabled: joinField.text.trim().length > 0
-                onTriggered: joinDialog.accept()
-            },
-            Kirigami.Action {
-                text: "取消"
-                icon.name: "dialog-cancel"
-                onTriggered: joinDialog.reject()
-            }
-        ]
+        acceptText: "加入"
+        acceptEnabled: joinField.text.trim().length > 0
         onOpened: {
             joinField.text = "";
             joinField.forceActiveFocus();
         }
         onAccepted: root.listenRoom.joinRoom(joinField.text.trim())
-        TextField {
+        FormCard.FormTextFieldDelegate {
             id: joinField
-            implicitWidth: Tokens.trackColumn + Tokens.albumColumn
-            placeholderText: "粘贴好友发来的一起听链接"
+            label: "好友发来的链接"
+            placeholderText: "粘贴一起听链接或房间号"
             onAccepted: if (joinField.text.trim().length > 0) joinDialog.accept()
         }
     }
@@ -350,7 +339,7 @@ Kirigami.ApplicationWindow {
     }
 
     // 新建（id = 0，可带一首要加进去的歌）或重命名（id > 0）共用一个对话框
-    Kirigami.PromptDialog {
+    AppDialog {
         id: playlistNameDialog
         property real playlistId
         property var pendingTrack: null
@@ -363,20 +352,8 @@ Kirigami.ApplicationWindow {
             nameField.selectAll();
         }
         title: playlistNameDialog.playlistId > 0 ? "重命名歌单" : "新建歌单"
-        standardButtons: Kirigami.Dialog.NoButton
-        customFooterActions: [
-            Kirigami.Action {
-                text: playlistNameDialog.playlistId > 0 ? "重命名" : "创建"
-                icon.name: "dialog-ok"
-                enabled: nameField.text.trim().length > 0
-                onTriggered: playlistNameDialog.accept()
-            },
-            Kirigami.Action {
-                text: "取消"
-                icon.name: "dialog-cancel"
-                onTriggered: playlistNameDialog.reject()
-            }
-        ]
+        acceptText: playlistNameDialog.playlistId > 0 ? "重命名" : "创建"
+        acceptEnabled: nameField.text.trim().length > 0
         onAccepted: {
             const name = nameField.text.trim();
             if (playlistNameDialog.playlistId > 0) {
@@ -387,16 +364,16 @@ Kirigami.ApplicationWindow {
                 Source.createPlaylist(name);
             }
         }
-        TextField {
+        FormCard.FormTextFieldDelegate {
             id: nameField
-            placeholderText: "歌单名称"
+            label: "歌单名称"
             maximumLength: 40
             onAccepted: if (nameField.text.trim().length > 0) playlistNameDialog.accept()
         }
     }
 
     // 歌单简介：多行文字，可以清空（空简介也是合法的保存）
-    Kirigami.PromptDialog {
+    AppDialog {
         id: playlistDescriptionDialog
         property real playlistId
         function ask(id, description) {
@@ -404,37 +381,22 @@ Kirigami.ApplicationWindow {
             descriptionArea.text = description;
             playlistDescriptionDialog.open();
             descriptionArea.forceActiveFocus();
-            descriptionArea.cursorPosition = descriptionArea.length;
         }
         title: "编辑歌单简介"
-        standardButtons: Kirigami.Dialog.NoButton
-        customFooterActions: [
-            Kirigami.Action {
-                text: "保存"
-                icon.name: "dialog-ok"
-                onTriggered: playlistDescriptionDialog.accept()
-            },
-            Kirigami.Action {
-                text: "取消"
-                icon.name: "dialog-cancel"
-                onTriggered: playlistDescriptionDialog.reject()
-            }
-        ]
+        acceptText: "保存"
         onAccepted: {
             root.noteOnSuccess(playlistDescriptionDialog.playlistId, "更新歌单描述", "已更新歌单简介");
             Source.setPlaylistDescription(playlistDescriptionDialog.playlistId, descriptionArea.text.trim());
         }
-        TextArea {
+        FormCard.FormTextAreaDelegate {
             id: descriptionArea
-            implicitWidth: Tokens.trackColumn + Tokens.albumColumn
-            implicitHeight: Tokens.tileLg
+            label: "简介"
             placeholderText: "介绍一下这个歌单"
-            wrapMode: TextEdit.Wrap
         }
     }
 
-    // 删除歌单不可撤销：明确说出删的是哪个，确认按钮用否定色
-    Kirigami.PromptDialog {
+    // 删除歌单不可撤销：明确说出删的是哪个
+    AppDialog {
         id: deleteDialog
         property real playlistId
         property string playlistName
@@ -444,20 +406,9 @@ Kirigami.ApplicationWindow {
             deleteDialog.open();
         }
         title: "删除歌单"
-        subtitle: "删除「" + deleteDialog.playlistName + "」？歌单里的歌不会从网易云消失，但这个歌单无法恢复。"
-        standardButtons: Kirigami.Dialog.NoButton
-        customFooterActions: [
-            Kirigami.Action {
-                text: "删除"
-                icon.name: "edit-delete"
-                onTriggered: deleteDialog.accept()
-            },
-            Kirigami.Action {
-                text: "取消"
-                icon.name: "dialog-cancel"
-                onTriggered: deleteDialog.reject()
-            }
-        ]
+        message: "删除「" + deleteDialog.playlistName + "」？歌单里的歌不会从网易云消失，但这个歌单无法恢复。"
+        acceptText: "删除"
+        acceptIconName: "edit-delete"
         onAccepted: {
             root.noteOnSuccess(deleteDialog.playlistId, "删除歌单", "已删除歌单「" + deleteDialog.playlistName + "」");
             Source.deletePlaylist(deleteDialog.playlistId);
@@ -467,23 +418,12 @@ Kirigami.ApplicationWindow {
     }
 
     // 退出登录要重新扫码：确认一次
-    Kirigami.PromptDialog {
+    AppDialog {
         id: logoutDialog
         title: "退出登录"
-        subtitle: "退出后个人推荐、红心与歌单都会隐藏，下次需要重新扫码登录。"
-        standardButtons: Kirigami.Dialog.NoButton
-        customFooterActions: [
-            Kirigami.Action {
-                text: "退出登录"
-                icon.source: Tokens.logoutIcon
-                onTriggered: logoutDialog.accept()
-            },
-            Kirigami.Action {
-                text: "取消"
-                icon.name: "dialog-cancel"
-                onTriggered: logoutDialog.reject()
-            }
-        ]
+        message: "退出后个人推荐、红心与歌单都会隐藏，下次需要重新扫码登录。"
+        acceptText: "退出登录"
+        acceptIconSource: Tokens.logoutIcon
         onAccepted: {
             Source.logout();
             root.switchPivot("home");
@@ -574,6 +514,14 @@ Kirigami.ApplicationWindow {
             Qt.callLater(() => (root.pageStack.currentItem as PlaylistsPage).reordering = true)
         else if (root.startOverlay === "suggest")
             Qt.callLater(() => (root.pageStack.currentItem as SearchPage).showSuggestions())
+        else if (root.startOverlay === "join")
+            joinDialog.open();
+        else if (root.startOverlay === "rename")
+            Qt.callLater(() => playlistNameDialog.ask(root.openList.listId || 0, root.openList.heading || "", null));
+        else if (root.startOverlay === "delete")
+            Qt.callLater(() => deleteDialog.ask(root.openList.listId || 0, root.openList.heading || ""));
+        else if (root.startOverlay === "logout")
+            logoutDialog.open();
         else if (root.startOverlay === "describe")
             Qt.callLater(() => playlistDescriptionDialog.ask(root.openList.listId || 0, root.openList.description || ""));
         else if (root.startOverlay === "login") {

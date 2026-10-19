@@ -916,7 +916,7 @@ int runGui(const CommandLine &cli, QApplication &app, Backend &backend)
     // MV 画面：libmpv 渲染进 QML；原型与截图不注册这个类型，MvPage 退回内置替身
     qmlRegisterType<MvVideo>("org.nephelesound.yunting", 1, 0, "MvVideo");
     QQmlApplicationEngine engine;
-    // kirigami-addons 的页面（「关于」）用 i18nd() 取自己的译文；应用自己的界面不走 i18n
+    // kirigami-addons（「关于」页、对话框）用 i18nd() 取自己的译文；应用自己的界面不走 i18n
     KLocalization::setupLocalizedContext(&engine);
     ImageCacheFactory imageCache(imageCacheDir);
     engine.setNetworkAccessManagerFactory(&imageCache);
