@@ -50,6 +50,9 @@ ScreenFrame {
     readonly property int pitch: Tokens.height12
     readonly property int rows: Math.floor((areaHeight - Tokens.space6) / pitch)
     readonly property int areaHeight: rightHalf.parent ? rightHalf.parent.height : 0
+    // 评论、百科、相似是往下读的文档，不是按行的节拍：一直铺到进度线（与列表页的曲目表一样），
+    // 末尾的留白在各栏自己的滚动里。只有歌词守着行格：当前句停在封面中线，上下对称，底下剩的是格子的边距
+    readonly property int readingHeight: page.areaHeight - page.pitch
     // 封面占奇数行，中线正好穿过某一行的中心，当前句就停在那一行；留两行给封面下方的事实
     readonly property int coverRows: { const n = Math.min(7, page.rows - 2); return n % 2 ? n : n - 1; }
     readonly property int coverTopRow: Math.max(1, Math.floor((page.rows - page.coverRows - 1) / 2))
@@ -401,7 +404,7 @@ ScreenFrame {
             x: -commentList.pendantRoom
             y: page.pitch
             width: parent.width + commentList.pendantRoom
-            height: (page.rows - 1) * page.pitch
+            height: page.readingHeight
             thread: page.track ? Source.commentThread("song", page.track.id) : null
             active: page.pane === "comments"
             loggedIn: page.loggedIn
@@ -413,7 +416,7 @@ ScreenFrame {
             visible: page.pane === "wiki" && page.wiki !== null && !page.wiki.empty
             y: page.pitch
             width: parent.width
-            height: (page.rows - 1) * page.pitch
+            height: page.readingHeight
             topMargin: Tokens.space3
             wiki: page.wiki || ({})
             onSeekRequested: seconds => page.seekRequested(seconds)
@@ -426,7 +429,7 @@ ScreenFrame {
             visible: page.pane === "similar" && similarPane.filled
             y: page.pitch
             width: parent.width
-            height: (page.rows - 1) * page.pitch
+            height: page.readingHeight
             topMargin: Tokens.space3
             similar: page.similar || ({ songs: [], playlists: [] })
             currentId: page.track ? page.track.id : 0
