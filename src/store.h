@@ -90,6 +90,9 @@ public:
     Q_INVOKABLE void setUserFollowed(double userId, bool followed);
     // 评论点赞：kind 为 "song" / "playlist"；乐观更新该线程的热评与分页槽，失败回滚并发 commentLikeFailed
     Q_INVOKABLE void setCommentLiked(const QString &kind, double ownerId, double commentId, bool liked);
+    // 发送文本 / 当前歌曲私信；成功后重取当前对话与会话列表，结果经 inboxMessageSent/Failed 发出
+    Q_INVOKABLE void sendInboxText(double userId, const QString &text);
+    Q_INVOKABLE void sendInboxSong(double userId, double songId, const QString &text = {});
 
 public slots:
     // AudioEngine 打卡成功后调用：本地「最近播放」立刻反映刚听的歌，不必等下次 refresh
@@ -121,6 +124,9 @@ signals:
     void requestFailed(const QString &key, const QString &message);
     // 预期内的不可见状态（例如对方设置了隐私）：在对应页面内说明，不弹全局错误
     void requestRestricted(const QString &key, const QString &message);
+    // 私信发送结果；成功后会重新拉当前对话与会话列表
+    void inboxMessageSent(double userId);
+    void inboxMessageFailed(double userId, const QString &message);
 
 private slots:
     // NcmClient 每个请求的落地真相：收敛 online / sessionExpired 与欠账刷新
@@ -240,9 +246,11 @@ private:
     void requestMoreHeart(double songId);
     void requestMv(const QString &key, double mvId);
     void requestUser(const QString &key, double uid);
-    // -- 只读信箱：data.inbox / data.inboxThread；不落盘，退出/换号清空
+    // -- 信箱：data.inbox / data.inboxThread；不落盘，退出/换号清空。
+    // 私信发送是唯一的写操作，其余为只读。
     void requestInbox(int offset);
     void requestInboxThread(double userId, qint64 before);
+    void sendInboxPayload(double userId, QUrlQuery form);
     // -- 听歌足迹：data.listenTotal / listenRealtime / listenRank；仅登录后
     void requestListenTotal();
     void requestListenRealtime(const QString &type);

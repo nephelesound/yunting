@@ -1,0 +1,204 @@
+openapi: 3.1.0
+info:
+  title: Yunting — NetEase Cloud Music backend contract
+  version: 0.1.0
+  description: |
+    Language-independent contract for the NetEase Cloud Music endpoints used by
+    Yunting. The C++ implementation is `src/sdk/`; this document adds no runtime
+    code and is not a code-generation source for a second client stack.
+
+    Scope: the social and remaining backend surfaces in `docs/API-REMAINING.md`.
+    Listen Together and Messaging are complete first.
+
+    Transport:
+    - Reads accept plain `GET /api/<path>`.
+    - Writes prefer `POST /weapi/<path>` (AES-128-CBC twice + RSA, `params` /
+      `encSecKey`, `csrf_token`). Several social writes also accept a plain
+      `POST /api/<path>` form; `x-transport` records the endpoint family.
+    - Requests never use `/eapi` or `/xeapi`.
+
+    A response is successful only when `code` is `200`. `301` is a missing or
+    expired session; `250`/`405`/`-460` are risk control/rate limits; `488` is a
+    closed Listen Together room.
+  contact:
+    name: Yunting
+    url: https://github.com/nephelesound/yunting
+  license:
+    name: GPL-3.0-or-later
+    identifier: GPL-3.0-or-later
+servers:
+  - url: https://music.163.com
+    description: Web session host (`MUSIC_U` + `__csrf`).
+tags:
+  - name: ListenTogether
+    description: Room lifecycle, playback sync, invitations and in-room social data.
+  - name: Messaging
+    description: Private messages, conversations and invitation cards.
+  - name: Social
+    description: Events, topics and friend presence.
+  - name: Comments
+    description: Read, like, hug/report and delete comment actions.
+  - name: Playlists
+    description: Privacy, cover and import writes.
+  - name: Cloud
+    description: Cloud upload/import/delete.
+  - name: Account
+    description: Login, profile, avatar and VIP.
+  - name: Search
+    description: Hot searches.
+  - name: Lyrics
+    description: Lyric excerpts.
+security:
+  - musicUCookie: []
+    csrfToken: []
+paths:
+  /api/listen/together/room/create:
+    $ref: './paths/listen-together.yaml#/createRoom'
+  /api/listen/together/room/check:
+    $ref: './paths/listen-together.yaml#/checkRoom'
+  /api/listen/together/play/invitation/accept:
+    $ref: './paths/listen-together.yaml#/acceptInvitation'
+  /api/listen/together/status/get:
+    $ref: './paths/listen-together.yaml#/getStatus'
+  /api/listen/together/end/v2:
+    $ref: './paths/listen-together.yaml#/endRoom'
+  /api/listen/together/heartbeat:
+    $ref: './paths/listen-together.yaml#/heartbeat'
+  /api/listen/together/play/command/report:
+    $ref: './paths/listen-together.yaml#/reportPlayCommand'
+  /api/listen/together/sync/playlist/get:
+    $ref: './paths/listen-together.yaml#/getSyncPlaylist'
+  /api/listen/together/sync/list/command/report:
+    $ref: './paths/listen-together.yaml#/reportPlaylist'
+  /api/listen/together/multi/invite:
+    $ref: './paths/listen-together.yaml#/multiInvite'
+  /api/listen/together/invite/message/send:
+    $ref: './paths/listen-together.yaml#/inviteMessage'
+  /api/listen/together/mutual/follows/get/v2:
+    $ref: './paths/listen-together.yaml#/mutualFollows'
+  /api/listen/together/privilege/get:
+    $ref: './paths/listen-together.yaml#/privileges'
+  /api/listen/together/relation/statistics/get/v2:
+    $ref: './paths/listen-together.yaml#/relationStatistics'
+  /api/listen/together/vip/gift/report:
+    $ref: './paths/listen-together.yaml#/vipGift'
+  /api/listen/together/sync/notice:
+    $ref: './paths/listen-together.yaml#/syncNotice'
+  /api/msg/private/users:
+    $ref: './paths/messaging.yaml#/listConversations'
+  /api/msg/private/history:
+    $ref: './paths/messaging.yaml#/getHistory'
+  /api/msg/private/send:
+    $ref: './paths/messaging.yaml#/sendMessage'
+  /api/msg/notices:
+    $ref: './paths/messaging.yaml#/notices'
+  /api/v1/event/get:
+    $ref: './paths/social.yaml#/listEvents'
+  /api/event/get/{uid}:
+    $ref: './paths/social.yaml#/getUserEvents'
+  /api/event/forward:
+    $ref: './paths/social.yaml#/forwardEvent'
+  /api/event/delete:
+    $ref: './paths/social.yaml#/deleteEvent'
+  /api/event/privacy/op:
+    $ref: './paths/social.yaml#/setEventPrivacy'
+  /api/act/hot:
+    $ref: './paths/social.yaml#/listHotTopics'
+  /api/act/detail:
+    $ref: './paths/social.yaml#/getTopicDetail'
+  /api/act/event/hot:
+    $ref: './paths/social.yaml#/getTopicEvents'
+  /api/topic/sub:
+    $ref: './paths/social.yaml#/subscribeTopic'
+  /api/topic/unsub:
+    $ref: './paths/social.yaml#/unsubscribeTopic'
+  /api/topic/sublist:
+    $ref: './paths/social.yaml#/listSubscribedTopics'
+  /api/v1/resource/comments/{threadId}:
+    $ref: './paths/comments.yaml#/getComments'
+  /api/resource/comment/floor/get:
+    $ref: './paths/comments.yaml#/getReplies'
+  /api/v1/comment/like:
+    $ref: './paths/comments.yaml#/likeComment'
+  /api/v1/comment/unlike:
+    $ref: './paths/comments.yaml#/unlikeComment'
+  /api/v2/resource/comments/hug/listener:
+    $ref: './paths/comments.yaml#/hugComment'
+  /api/v2/resource/comments/hug/list:
+    $ref: './paths/comments.yaml#/listCommentHugs'
+  /api/report/reportcomment:
+    $ref: './paths/comments.yaml#/reportComment'
+  /api/resource/comments/delete:
+    $ref: './paths/comments.yaml#/deleteComment'
+  /api/playlist/update/privacy:
+    $ref: './paths/playlists.yaml#/setPrivacy'
+  /api/playlist/cover/update:
+    $ref: './paths/playlists.yaml#/updateCover'
+  /api/playlist/import/name/task/create:
+    $ref: './paths/playlists.yaml#/createImport'
+  /api/playlist/import/task/status/v2:
+    $ref: './paths/playlists.yaml#/getImportStatus'
+  /api/playlist/subscribe:
+    $ref: './paths/playlists.yaml#/subscribe'
+  /api/playlist/unsubscribe:
+    $ref: './paths/playlists.yaml#/unsubscribe'
+  /api/cloud/upload/check:
+    $ref: './paths/cloud.yaml#/checkUpload'
+  /api/nos/token/alloc:
+    $ref: './paths/cloud.yaml#/allocateToken'
+  /api/upload/cloud/info/v2:
+    $ref: './paths/cloud.yaml#/saveCloudInfo'
+  /api/cloud/pub/v2:
+    $ref: './paths/cloud.yaml#/publish'
+  /api/cloud/del:
+    $ref: './paths/cloud.yaml#/deleteSongs'
+  /api/v1/cloud/get:
+    $ref: './paths/cloud.yaml#/listSongs'
+  /api/cloud/upload/check/v2:
+    $ref: './paths/cloud.yaml#/checkImport'
+  /api/cloud/user/song/import:
+    $ref: './paths/cloud.yaml#/importSongs'
+  /api/w/login/cellphone:
+    $ref: './paths/account.yaml#/loginCellphone'
+  /api/w/login:
+    $ref: './paths/account.yaml#/loginEmail'
+  /api/sms/captcha/sent:
+    $ref: './paths/account.yaml#/sendCaptcha'
+  /api/sms/captcha/verify:
+    $ref: './paths/account.yaml#/verifyCaptcha'
+  /api/user/profile/update:
+    $ref: './paths/account.yaml#/updateProfile'
+  /api/user/avatar/upload/v1:
+    $ref: './paths/account.yaml#/updateAvatar'
+  /api/music-vip-membership/client/vip/info:
+    $ref: './paths/account.yaml#/vipInfo'
+  /api/vipnewcenter/app/level/task/list:
+    $ref: './paths/account.yaml#/vipTasks'
+  /api/vip-center-bff/task/sign:
+    $ref: './paths/account.yaml#/vipSign'
+  /api/hot/search/info/get:
+    $ref: './paths/search-lyrics.yaml#/hotSearchInfo'
+  /api/hotsearchlist/get:
+    $ref: './paths/search-lyrics.yaml#/hotSearchList'
+  /api/hot/search/relate/song/get:
+    $ref: './paths/search-lyrics.yaml#/relateSongs'
+  /api/song/play/lyrics/mark/song:
+    $ref: './paths/search-lyrics.yaml#/lyricMarkSong'
+  /api/song/play/lyrics/mark/user/page:
+    $ref: './paths/search-lyrics.yaml#/lyricMarkPage'
+  /api/song/play/lyrics/mark/add:
+    $ref: './paths/search-lyrics.yaml#/lyricMarkAdd'
+  /api/song/play/lyrics/mark/del:
+    $ref: './paths/search-lyrics.yaml#/lyricMarkDelete'
+components:
+  securitySchemes:
+    musicUCookie:
+      type: apiKey
+      in: cookie
+      name: MUSIC_U
+      description: Web session cookie. Do not mix it with eapi/client-only identities.
+    csrfToken:
+      type: apiKey
+      in: query
+      name: csrf_token
+      description: Value of the `__csrf` cookie, also embedded in the request body.

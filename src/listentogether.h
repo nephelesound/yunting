@@ -7,6 +7,8 @@
 // 服务器 playCommand 按 serverSeq 单调应用；本地播放变化反向上报，但远端正在
 // 应用时（remoteApplying）不回声。
 #include <QHash>
+#include <QJsonArray>
+#include <QJsonObject>
 #include <QObject>
 #include <QString>
 #include <QVariantList>
@@ -62,6 +64,8 @@ public:
     Q_INVOKABLE void leaveRoom();
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void syncQueue(const QVariantList &songIds);
+    // 邀请互关好友；房间必须已创建，调用方可在未入房时先 createRoom()。
+    Q_INVOKABLE void inviteUser(double userId);
     Q_INVOKABLE void setRemoteApplying(bool applying);
 
 signals:
@@ -72,6 +76,7 @@ signals:
     void remoteApplyingChanged();
     void errorChanged();
     void leftRoom();
+    void userInvited(double userId);
     // 服务器下发的播放指令；type 保留服务器原样（QML 自己转小写）。
     void commandReceived(QString type, double songId, double progressMs, bool playing);
 
@@ -90,6 +95,8 @@ private:
     void stopTimers();
 
     void refreshStatus();
+    QJsonObject playlistContext() const;
+    QJsonArray playlistVersions() const;
     void fetchSyncPlaylist();
     void sendHeartbeat();
     void applySync(const ncm::sdk::ListenTogetherSync &sync);
@@ -150,8 +157,13 @@ private:
     bool m_heartbeatInFlight = false;
 
     qint64 m_lastServerSeq = 0;
-    qint64 m_playlistVersion = 0;
+    qint64 m_playlistVersion = 0;      // 本机最近一次发出的歌单版本（迟到的回包不覆盖新的）
+    // 各成员的歌单版本（userId → version，同步回包里的）与播放模式：改歌单时原样带回，自己的 +1。
+    // 只带自己的版本时服务器不认这次改动，对方的列表就不变
+    QHash<qint64, qint64> m_versions;
+    QString m_playMode;
     qint64 m_clientSeq = 0;
+    quint64 m_syncRequestSeq = 0;   // 每次上报歌单递增，迟到的旧回包不能覆盖新队列
     qint64 m_lastSongId = 0;
     qint64 m_lastQueueRetryMs = 0;
     bool queueComplete(const QList<qint64> &ids) const;

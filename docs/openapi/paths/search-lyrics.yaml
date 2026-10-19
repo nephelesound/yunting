@@ -1,0 +1,166 @@
+hotSearchInfo:
+  get:
+    operationId: getHotSearchInfo
+    tags: [Search]
+    summary: Read the current hot searches
+    security: []
+    x-transport: api
+    responses:
+      '200':
+        description: Hot searches.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/search-lyrics.yaml#/HotSearchResponse'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+hotSearchList:
+  get:
+    operationId: getHotSearchList
+    tags: [Search]
+    summary: Read the legacy hot-search list
+    security: []
+    x-transport: api
+    responses:
+      '200':
+        description: Hot searches.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/search-lyrics.yaml#/HotSearchListResponse'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+relateSongs:
+  get:
+    operationId: getHotSearchSongs
+    tags: [Search]
+    summary: Read songs related to one hot search word
+    security:
+      - {}
+      - musicUCookie: []
+    x-transport: api
+    parameters:
+      - name: searchWord
+        in: query
+        required: true
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Related songs.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ApiOk'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+lyricMarkSong:
+  post:
+    operationId: getLyricMarks
+    tags: [Lyrics]
+    summary: Read the lyric excerpts for one song
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/search-lyrics.yaml#/LyricMarkRequest'
+    responses:
+      '200':
+        description: Lyric excerpts.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ApiOk'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+lyricMarkPage:
+  post:
+    operationId: listLyricMarks
+    tags: [Lyrics]
+    summary: Read the caller's lyric notebook
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: false
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/search-lyrics.yaml#/LyricMarkPageRequest'
+    responses:
+      '200':
+        description: Lyric notebook page.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ApiOk'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+lyricMarkAdd:
+  post:
+    operationId: saveLyricMark
+    tags: [Lyrics]
+    summary: Add or replace a lyric excerpt
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/search-lyrics.yaml#/LyricMarkAddRequest'
+    responses:
+      '200':
+        description: Excerpt saved.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+lyricMarkDelete:
+  post:
+    operationId: deleteLyricMarks
+    tags: [Lyrics]
+    summary: Delete lyric excerpts
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/search-lyrics.yaml#/LyricMarkDeleteRequest'
+    responses:
+      '200':
+        description: Excerpts deleted.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'

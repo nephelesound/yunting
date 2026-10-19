@@ -19,10 +19,12 @@ Kirigami.OverlayDrawer {
     property var room: null   // 一起听（C++ ListenTogether 或原型替身）；未登录时为 null
     property bool confirmingEnd: false   // 房主点了「结束」，在原地确认；关上抽屉就算取消
     onClosed: panel.confirmingEnd = false
+    onOpened: if (panel.room) Source.refreshFriendsListening()
 
     signal activated(int index)
     signal listenEndRequested()
     signal listenLinkCopied()
+    signal listenInviteRequested(real userId, string name)
     signal nowPlayingRequested()
     signal smartToggled(bool enabled)
     signal removeRequested(int index)
@@ -264,6 +266,36 @@ Kirigami.OverlayDrawer {
                             Clipboard.copy(panel.room.shareUrl);
                             panel.listenLinkCopied();
                         }
+                    }
+                }
+            }
+
+            // 互关好友一键点名邀请：二维码/链接仍保留，给不在好友列表里的人
+            ColumnLayout {
+                id: inviteFriends
+                readonly property var candidates: (Source.friendsListening || []).filter(
+                    f => !listenSection.users.some(u => u.userId === f.userId))
+                visible: listenSection.waiting && candidates.length > 0
+                Layout.fillWidth: true
+                spacing: Tokens.space1
+                Label {
+                    Layout.fillWidth: true
+                    text: "邀请好友"
+                    font.pixelSize: Tokens.textSm
+                    color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                }
+                Repeater {
+                    model: inviteFriends.candidates.slice(0, 4)
+                    delegate: PersonRow {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        width: parent.width
+                        avatar: modelData.avatar || ""
+                        pendant: modelData.avatarPendant || ""
+                        name: modelData.name || ""
+                        detail: modelData.online ? (modelData.description || "在线")
+                            : modelData.lastTime > 0 ? "上次一起听 · " + Format.ago(modelData.lastTime) : ""
+                        onClicked: panel.listenInviteRequested(modelData.userId, modelData.name || "")
                     }
                 }
             }

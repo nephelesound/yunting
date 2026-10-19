@@ -1,0 +1,52 @@
+ApiOk:
+  type: object
+  required: [code]
+  properties:
+    code:
+      type: integer
+      const: 200
+    message:
+      type: string
+    msg:
+      type: string
+  additionalProperties: true
+
+ApiError:
+  type: object
+  required: [code]
+  properties:
+    code:
+      type: integer
+    message:
+      type: string
+    msg:
+      type: string
+  additionalProperties: true
+
+ActionResult:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        data:
+          type: object
+          properties:
+            result:
+              type: boolean
+            success:
+              type: boolean
+            message:
+              type: string
+          additionalProperties: true
+
+NumericId:
+  oneOf:
+    - type: integer
+      minimum: 0
+    - type: string
+      pattern: '^[0-9]+$'
+
+JsonArrayString:
+  type: string
+  description: Compact JSON array, for example `"[123,456]"`.
+  examples: ['[123,456]']

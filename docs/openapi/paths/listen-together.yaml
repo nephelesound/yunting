@@ -1,0 +1,436 @@
+createRoom:
+  post:
+    operationId: createListenTogetherRoom
+    tags: [ListenTogether]
+    summary: Create a listen-together room
+    description: Creates the caller's room. The room id is a string and must stay a string.
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/listen-together.yaml#/RoomCreateRequest'
+    responses:
+      '200':
+        description: Room created.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/listen-together.yaml#/RoomCreateResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '405':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+checkRoom:
+  post:
+    operationId: checkListenTogetherRoom
+    tags: [ListenTogether]
+    summary: Check whether a room can be joined
+    description: Call before accepting an invitation so a full/expired room shows the server's copywriting.
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/listen-together.yaml#/RoomCheckRequest'
+    responses:
+      '200':
+        description: Joinability result.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/listen-together.yaml#/RoomCheckResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+acceptInvitation:
+  post:
+    operationId: acceptListenTogetherInvitation
+    tags: [ListenTogether]
+    summary: Accept a listen-together invitation
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/listen-together.yaml#/AcceptInvitationRequest'
+    responses:
+      '200':
+        description: Joined room.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/listen-together.yaml#/AcceptInvitationResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '488':
+        $ref: '../components/responses.yaml#/RoomLost'
+
+getStatus:
+  post:
+    operationId: getListenTogetherStatus
+    tags: [ListenTogether]
+    summary: Get the current room state
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: false
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            type: object
+            additionalProperties: false
+    responses:
+      '200':
+        description: Current room state.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/listen-together.yaml#/RoomStatusResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+endRoom:
+  post:
+    operationId: endListenTogetherRoom
+    tags: [ListenTogether]
+    summary: End the current room
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/listen-together.yaml#/EndRoomRequest'
+    responses:
+      '200':
+        description: Room ended.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '488':
+        $ref: '../components/responses.yaml#/RoomLost'
+
+heartbeat:
+  post:
+    operationId: sendListenTogetherHeartbeat
+    tags: [ListenTogether]
+    summary: Report playback position and playlist versions
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/listen-together.yaml#/HeartbeatRequest'
+    responses:
+      '200':
+        description: Heartbeat accepted.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '488':
+        $ref: '../components/responses.yaml#/RoomLost'
+
+reportPlayCommand:
+  post:
+    operationId: reportListenTogetherPlayCommand
+    tags: [ListenTogether]
+    summary: Report a play/pause/seek/next/prev command
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/listen-together.yaml#/PlayCommandRequest'
+    responses:
+      '200':
+        description: Command accepted.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '488':
+        $ref: '../components/responses.yaml#/RoomLost'
+
+getSyncPlaylist:
+  post:
+    operationId: getListenTogetherPlaylist
+    tags: [ListenTogether]
+    summary: Pull the room queue and latest command
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/listen-together.yaml#/SyncPlaylistRequest'
+    responses:
+      '200':
+        description: Current play command and queue.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/listen-together.yaml#/SyncPlaylistResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '488':
+        $ref: '../components/responses.yaml#/RoomLost'
+
+reportPlaylist:
+  post:
+    operationId: reportListenTogetherPlaylist
+    tags: [ListenTogether]
+    summary: Replace the room queue
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/listen-together.yaml#/ReportPlaylistRequest'
+    responses:
+      '200':
+        description: Queue accepted.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '488':
+        $ref: '../components/responses.yaml#/RoomLost'
+
+multiInvite:
+  post:
+    operationId: inviteListenTogetherUsers
+    tags: [ListenTogether]
+    summary: Invite one or more friends directly into the room
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/listen-together.yaml#/InviteUsersRequest'
+    responses:
+      '200':
+        description: Invitation sent.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '488':
+        $ref: '../components/responses.yaml#/RoomLost'
+
+inviteMessage:
+  post:
+    operationId: sendListenTogetherInviteMessage
+    tags: [ListenTogether, Messaging]
+    summary: Send the inbox invitation card to one friend
+    description: The recipient receives a type-23 `generalMsg` whose nativeUrl is `orpheus://nm/play/listenTogether?roomId=…&inviterId=…`.
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/listen-together.yaml#/InviteMessageRequest'
+    responses:
+      '200':
+        description: Invitation card sent.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '488':
+        $ref: '../components/responses.yaml#/RoomLost'
+
+mutualFollows:
+  post:
+    operationId: getListenTogetherFriends
+    tags: [ListenTogether, Social]
+    summary: List mutual follows with listening presence
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: false
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            type: object
+            additionalProperties: false
+    responses:
+      '200':
+        description: Friend directory.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/listen-together.yaml#/MutualFollowsResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+privileges:
+  post:
+    operationId: getListenTogetherPrivileges
+    tags: [ListenTogether]
+    summary: Check the other member's playback rights
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/listen-together.yaml#/PrivilegeRequest'
+    responses:
+      '200':
+        description: Per-track privilege list.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/listen-together.yaml#/PrivilegeResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+relationStatistics:
+  post:
+    operationId: getListenTogetherStatistics
+    tags: [ListenTogether, Social]
+    summary: Get cumulative listen-together counters for two members
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/listen-together.yaml#/StatisticsRequest'
+    responses:
+      '200':
+        description: Pair statistics.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/listen-together.yaml#/StatisticsResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+vipGift:
+  post:
+    operationId: reportListenTogetherVipGift
+    tags: [ListenTogether, Social]
+    summary: Report a VIP gift sent inside the room
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/listen-together.yaml#/VipGiftRequest'
+    responses:
+      '200':
+        description: Gift reported.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '488':
+        $ref: '../components/responses.yaml#/RoomLost'
+
+syncNotice:
+  post:
+    operationId: notifyListenTogetherPlaylistChange
+    tags: [ListenTogether]
+    summary: Notify the room that the queue changed
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/listen-together.yaml#/SyncNoticeRequest'
+    responses:
+      '200':
+        description: Notice accepted.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'

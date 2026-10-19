@@ -1,7 +1,8 @@
-// 私信（只读：网易云的私信接口只开放读取）。主从两栏：
+// 私信：主从两栏：
 // 左＝会话（谁、最后一条说了什么、什么时候、几条没读），默认打开最近的一段；
 // 右＝这段对话，按时间从上到下，最新的在底部，往上滚接着取更早的。
 // 对方分享的歌、歌单、专辑、MV 照原样可用：歌点了就放，其余点了打开。
+// 底部可以发送文本；图片/表情消息直接显示，卡片类消息按分享物打开。
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -18,6 +19,36 @@ ScreenFrame {
     property real currentId
     property real peer: 0   // 打开的那段对话的对方 uid
     property string pane: "messages"   // messages | comments | forwards | notices
+    property bool sending: false
+    function sendMessage() {
+        const text = composer.text.trim();
+        if (!page.loggedIn || page.sending || text.length === 0)
+            return;
+        page.sending = true;
+        if (!Source.sendInboxMessage(page.peer, text))
+            page.sending = false;
+    }
+    function shareCurrentSong() {
+        if (!page.loggedIn || page.sending || page.currentId <= 0)
+            return;
+        page.sending = true;
+        if (!Source.shareInboxSong(page.peer, page.currentId, composer.text.trim()))
+            page.sending = false;
+    }
+    Connections {
+        target: Source.live
+        ignoreUnknownSignals: true
+        function onInboxMessageSent(userId) {
+            if (userId === page.peer) {
+                composer.text = "";
+                page.sending = false;
+            }
+        }
+        function onInboxMessageFailed(userId, message) {
+            if (userId === page.peer)
+                page.sending = false;
+        }
+    }
 
     // 未读数（通知计数接口）；评论 / @我 / 通知只在切到那一栏时取
     readonly property var counts: Source.d.notifications || ({})
@@ -33,7 +64,13 @@ ScreenFrame {
     Component.onCompleted: if (page.loggedIn) Source.need("inbox")
     // 读过的私信服务器会记成已读：离开时重取页头的未读数
     Component.onDestruction: if (page.loggedIn) Source.need("notifications")
-    onPeerChanged: if (page.peer > 0 && page.thread.pending) Source.need("inboxThread:" + page.peer)
+    onPeerChanged: {
+        if (page.peer > 0 && page.thread.pending)
+            Source.need("inboxThread:" + page.peer);
+        // 切换会话时不要把上一个会话未发出的文字发给新对象
+        composer.text = "";
+        page.sending = false;
+    }
     // 会话到了还没选：打开最近的一段
     readonly property real firstPeer: page.conversations.items.length > 0 ? page.conversations.items[0].userId : 0
     onFirstPeerChanged: if (page.peer === 0) page.peer = page.firstPeer
@@ -264,6 +301,32 @@ ScreenFrame {
                             selectedTextColor: Kirigami.Theme.highlightedTextColor
                             wrapMode: Text.Wrap
                         }
+                        // 表情包 / 图片私信：官方消息把图片放在 picInfo 里，文字通常为空。
+                        // 保持原始宽高比，最大不超过一栏宽；表情图本来就小，不会铺满整行。
+                        Item {
+                            readonly property var picture: message.messageData.message.image || null
+                            Layout.fillWidth: true
+                            implicitHeight: picture ? pictureTile.height : 0
+                            visible: picture !== null
+                            Image {
+                                id: pictureTile
+                                readonly property var picture: parent.picture
+                                readonly property real naturalWidth: picture && picture.width > 0 ? picture.width : 240
+                                readonly property real naturalHeight: picture && picture.height > 0 ? picture.height : naturalWidth
+                                // 表情包按官方尺寸小图显示；用户发的图片最宽 320，保持宽高比
+                                readonly property real maxWidth: picture && picture.emojiGroupId > 0 ? 96 : 320
+                                width: Math.min(parent.width, Tokens.measureMax,
+                                                Math.min(naturalWidth, maxWidth))
+                                height: width * naturalHeight / naturalWidth
+                                source: picture ? picture.url : ""
+                                sourceSize.width: width * 2
+                                sourceSize.height: height * 2
+                                fillMode: Image.PreserveAspectFit
+                                asynchronous: true
+                                smooth: true
+                            }
+                        }
+
                         // 分享的歌：与列表里的曲目行一样，点了就放
                         // 分享物宽度固定为一栏（窄于 wideRow 时曲目行自己收起专辑列，成为紧凑的一张「歌」）。
                         // 外面套一层占满列宽的容器：定宽的子项不能反过来把整列压窄、被布局居中
@@ -315,6 +378,7 @@ ScreenFrame {
                             visible: card !== null
                             SharedItem {
                                 id: cardTile
+                                objectName: "messageCard"
                                 readonly property var card: parent.card
                                 readonly property bool invite: parent.invite
                                 width: Math.min(parent.width, Tokens.measureMax)
@@ -343,10 +407,52 @@ ScreenFrame {
                 }
             }
 
-            // 能力边界说清楚：这里只能看，回复要去官方客户端
+            // 发私信：Enter 或「发送」都走同一条 Store 写请求；发送后由 Store 重取历史，
+            // 不在本地伪插一条，避免服务器拒绝时界面先出现一条并不存在的消息。
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.leftMargin: Tokens.pendantRoom
+                Layout.rightMargin: Tokens.pageMargin
+                spacing: Tokens.space2
+                TextField {
+                    id: composer
+                    objectName: "inboxComposer"
+                    Layout.fillWidth: true
+                    placeholderText: page.peerItem ? "发私信给 " + page.peerItem.name : "发私信"
+                    font.pixelSize: Tokens.textBase
+                    enabled: page.loggedIn
+                    onAccepted: page.sendMessage()
+                    onTextChanged: if (text.length === 0) page.sending = false
+                }
+                ToolButton {
+                    objectName: "inboxShareSong"
+                    visible: page.currentId > 0
+                    implicitWidth: Tokens.height8
+                    implicitHeight: Tokens.height8
+                    icon.name: "media-playlist-append"
+                    icon.width: Tokens.iconSm
+                    icon.height: Tokens.iconSm
+                    enabled: page.loggedIn && !page.sending
+                    ToolTip.text: "分享正在播放的歌曲"
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 600
+                    onClicked: page.shareCurrentSong()
+                }
+                Button {
+                    objectName: "inboxSend"
+                    implicitHeight: Tokens.height8
+                    flat: true
+                    icon.name: "document-send"
+                    text: "发送"
+                    font.pixelSize: Tokens.textSm
+                    enabled: page.loggedIn && !page.sending && composer.text.trim().length > 0
+                    onClicked: page.sendMessage()
+                }
+            }
+
             Label {
                 Layout.rightMargin: Tokens.pageMargin
-                text: "云听只能查看私信；回复请在网易云音乐 App 里进行"
+                text: "私信会同步到你的网易云账号；分享内容请从播放条或页面菜单发送"
                 font.pixelSize: Tokens.textSm
                 color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             }

@@ -1,0 +1,168 @@
+CloudUploadCheckRequest:
+  type: object
+  required: [md5, length, bitrate, version]
+  properties:
+    bitrate:
+      type: string
+      default: '999000'
+    ext:
+      type: string
+      default: ''
+    length:
+      type: integer
+      format: int64
+      description: File size in bytes.
+    md5:
+      type: string
+    songId:
+      type: string
+      default: '0'
+    version:
+      type: integer
+      const: 1
+  additionalProperties: false
+
+CloudUploadCheckResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        needUpload:
+          type: boolean
+        songId:
+          type: integer
+          format: int64
+      additionalProperties: true
+
+NosTokenRequest:
+  type: object
+  required: [bucket, ext, filename, type]
+  properties:
+    bucket:
+      type: string
+      default: jd-musicrep-privatecloud-audio-public
+    ext:
+      type: string
+    filename:
+      type: string
+    local:
+      type: boolean
+      default: false
+    nos_product:
+      type: integer
+      default: 3
+    type:
+      type: string
+      enum: [audio, other]
+    md5:
+      type: string
+    return_body:
+      type: string
+  additionalProperties: false
+
+NosTokenResult:
+  type: object
+  properties:
+    objectKey:
+      type: string
+    token:
+      type: string
+    docId:
+      type: string
+    resourceId:
+      type: string
+  additionalProperties: true
+
+NosTokenResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        result:
+          $ref: '#/NosTokenResult'
+      additionalProperties: true
+
+CloudInfoRequest:
+  type: object
+  required: [md5, songid, filename, resourceId]
+  properties:
+    md5:
+      type: string
+    songid:
+      type: integer
+      format: int64
+    filename:
+      type: string
+    song:
+      type: string
+    album:
+      type: string
+    artist:
+      type: string
+    bitrate:
+      type: string
+    resourceId:
+      type: string
+  additionalProperties: false
+
+CloudInfoResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        songId:
+          type: integer
+          format: int64
+      additionalProperties: true
+
+CloudPublishRequest:
+  type: object
+  required: [songid]
+  properties:
+    songid:
+      type: integer
+      format: int64
+  additionalProperties: false
+
+CloudDeleteRequest:
+  type: object
+  required: [songIds]
+  properties:
+    songIds:
+      $ref: './common.yaml#/JsonArrayString'
+  additionalProperties: false
+
+CloudListRequest:
+  type: object
+  properties:
+    limit:
+      type: integer
+      default: 30
+    offset:
+      type: integer
+      default: 0
+  additionalProperties: false
+
+CloudImportCheckRequest:
+  type: object
+  required: [uploadType, songs]
+  properties:
+    uploadType:
+      type: integer
+      const: 0
+    songs:
+      type: string
+      description: Compact JSON array of {md5,songId,bitrate,fileSize}.
+  additionalProperties: false
+
+CloudImportRequest:
+  type: object
+  required: [uploadType, songs]
+  properties:
+    uploadType:
+      type: integer
+      const: 0
+    songs:
+      type: string
+      description: Compact JSON array of {songId,bitrate,song,artist,album,fileName}.
+  additionalProperties: false

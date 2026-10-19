@@ -53,6 +53,7 @@ Item {
     signal fullscreenRequested()
     signal listenStartRequested()
     signal listenJoinRequested()
+    signal listenFriendInviteRequested(real userId, string name)
 
     property bool desktopLyricsShown
     property bool canListen          // 一起听可用（登录后）
@@ -86,6 +87,7 @@ Item {
         busy: bar.listenBusy
         onStartRequested: bar.listenStartRequested()
         onJoinRequested: bar.listenJoinRequested()
+        onFriendInviteRequested: (userId, name) => bar.listenFriendInviteRequested(userId, name)
     }
 
     // 没有曲目或时长未知时进度为 0、不能拖动，传输控件整体禁用

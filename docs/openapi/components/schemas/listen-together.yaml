@@ -1,0 +1,483 @@
+ListenTogetherUser:
+  type: object
+  required: [userId]
+  properties:
+    userId:
+      type: integer
+      format: int64
+    nickname:
+      type: string
+    avatarUrl:
+      type: string
+      format: uri
+    pendantData:
+      type: object
+      properties:
+        imageUrl:
+          type: string
+          format: uri
+      additionalProperties: true
+    identityIcon:
+      type: string
+      format: uri
+    identityName:
+      type: string
+    vipType:
+      type: integer
+    vipRights:
+      type: object
+      additionalProperties: true
+  additionalProperties: true
+
+RoomInfo:
+  type: object
+  required: [roomId]
+  properties:
+    roomId:
+      type: string
+      description: Server-provided room id. Never coerce it to a number.
+    chatRoomId:
+      type: string
+    creatorId:
+      type: integer
+      format: int64
+    agoraChannelId:
+      type: integer
+      format: int64
+    roomUsers:
+      type: array
+      items:
+        $ref: '#/ListenTogetherUser'
+  additionalProperties: true
+
+PlaylistVersion:
+  type: object
+  required: [userId, version]
+  properties:
+    userId:
+      type: integer
+      format: int64
+    version:
+      type: integer
+      format: int64
+  additionalProperties: true
+
+PlayCommand:
+  type: object
+  required: [commandType]
+  properties:
+    userId:
+      type: integer
+      format: int64
+    commandType:
+      type: string
+      enum: [PLAY, PAUSE, GOTO, NEXT, PREV, seek, REPLACE]
+    progress:
+      type: integer
+      description: Milliseconds.
+    playStatus:
+      type: string
+      enum: [PLAY, PAUSE, PLAYING]
+    formerSongId:
+      $ref: './common.yaml#/NumericId'
+    targetSongId:
+      $ref: './common.yaml#/NumericId'
+    clientSeq:
+      type: integer
+      format: int64
+    serverSeq:
+      type: integer
+      format: int64
+  additionalProperties: true
+
+PlaylistState:
+  type: object
+  properties:
+    displayList:
+      oneOf:
+        - type: array
+          items:
+            $ref: './common.yaml#/NumericId'
+        - type: object
+          properties:
+            changed:
+              type: boolean
+            result:
+              type: array
+              items:
+                $ref: './common.yaml#/NumericId'
+          additionalProperties: true
+    randomList:
+      oneOf:
+        - type: array
+          items:
+            $ref: './common.yaml#/NumericId'
+        - type: object
+          properties:
+            changed:
+              type: boolean
+            result:
+              type: array
+              items:
+                $ref: './common.yaml#/NumericId'
+          additionalProperties: true
+    replace:
+      type: boolean
+    replaced:
+      type: boolean
+      description: Older payload spelling retained for compatibility.
+    version:
+      type: array
+      items:
+        $ref: '#/PlaylistVersion'
+    playMode:
+      type: string
+      enum: [ORDER_LOOP, SINGLE_LOOP, RANDOM]
+  additionalProperties: true
+
+RoomCreateRequest:
+  type: object
+  required: [refer]
+  properties:
+    refer:
+      type: string
+      default: songplay_more
+  additionalProperties: false
+
+RoomCreateResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        data:
+          type: object
+          required: [roomInfo]
+          properties:
+            roomInfo:
+              $ref: '#/RoomInfo'
+          additionalProperties: true
+
+RoomCheckRequest:
+  type: object
+  required: [roomId]
+  properties:
+    roomId:
+      type: string
+  additionalProperties: false
+
+RoomCheckResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        data:
+          type: object
+          properties:
+            joinable:
+              type: boolean
+            type:
+              type: string
+              description: "`sameRoom` means the caller is already in this room."
+            status:
+              type: string
+            copywriting:
+              type: [string, 'null']
+          additionalProperties: true
+
+AcceptInvitationRequest:
+  type: object
+  required: [refer, roomId, inviterId]
+  properties:
+    refer:
+      type: string
+      enum: [inbox_invite, third_party_invite, sysaction_reminder]
+    roomId:
+      type: string
+    inviterId:
+      type: integer
+      format: int64
+  additionalProperties: false
+
+AcceptInvitationResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        data:
+          type: object
+          required: [roomInfo]
+          properties:
+            roomInfo:
+              $ref: '#/RoomInfo'
+          additionalProperties: true
+
+RoomStatusResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        data:
+          type: object
+          properties:
+            inRoom:
+              type: boolean
+            status:
+              type: string
+            roomInfo:
+              oneOf:
+                - $ref: '#/RoomInfo'
+                - type: 'null'
+          additionalProperties: true
+
+EndRoomRequest:
+  type: object
+  required: [roomId]
+  properties:
+    roomId:
+      type: string
+  additionalProperties: false
+
+HeartbeatRequest:
+  type: object
+  required: [roomId, songId, playStatus, progress]
+  properties:
+    roomId:
+      type: string
+    songId:
+      $ref: './common.yaml#/NumericId'
+    playStatus:
+      type: string
+      enum: [PLAY, PAUSE]
+    progress:
+      type: integer
+      description: Milliseconds.
+    playlistVersion:
+      type: array
+      items:
+        $ref: '#/PlaylistVersion'
+      x-form-encoding: json
+  additionalProperties: false
+
+PlayCommandRequest:
+  type: object
+  required: [roomId, commandInfo]
+  properties:
+    roomId:
+      type: string
+    commandInfo:
+      type: string
+      description: Compact JSON object matching `PlayCommand`.
+      x-json-string: '#/PlayCommand'
+  additionalProperties: false
+
+SyncPlaylistRequest:
+  type: object
+  required: [roomId]
+  properties:
+    roomId:
+      type: string
+    playlistParam:
+      type: string
+      description: Compact JSON object with local displayList/randomList/versions.
+      x-json-string: '#/PlaylistState'
+  additionalProperties: false
+
+SyncPlaylistResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        data:
+          type: object
+          properties:
+            playCommand:
+              oneOf:
+                - $ref: '#/PlayCommand'
+                - type: 'null'
+            playlist:
+              oneOf:
+                - $ref: '#/PlaylistState'
+                - type: 'null'
+          additionalProperties: true
+
+ReportPlaylistRequest:
+  type: object
+  required: [roomId, playlistParam, clientSeq]
+  properties:
+    roomId:
+      type: string
+    playlistParam:
+      type: string
+      description: Compact JSON object with commandType=REPLACE and the full queue.
+      x-json-string: '#/PlaylistState'
+    clientSeq:
+      type: integer
+      format: int64
+  additionalProperties: false
+
+InviteUsersRequest:
+  type: object
+  required: [roomId, inviteUids]
+  properties:
+    roomId:
+      type: string
+    groupIds:
+      $ref: './common.yaml#/JsonArrayString'
+    inviteUids:
+      $ref: './common.yaml#/JsonArrayString'
+  additionalProperties: false
+
+InviteMessageRequest:
+  type: object
+  required: [roomId, acceptorId]
+  properties:
+    roomId:
+      type: string
+    acceptorId:
+      type: integer
+      format: int64
+  additionalProperties: false
+
+MutualFollow:
+  type: object
+  required: [userInfo]
+  properties:
+    userInfo:
+      $ref: '#/ListenTogetherUser'
+    customNickname:
+      type: string
+    lastListen:
+      type: boolean
+    listenStatus:
+      type: integer
+    lastTime:
+      type: integer
+      format: int64
+      description: Milliseconds.
+    online:
+      type: boolean
+    inRoom:
+      type: boolean
+    description:
+      type: string
+  additionalProperties: true
+
+MutualFollowsResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        data:
+          type: object
+          properties:
+            mutualFollowLists:
+              type: array
+              items:
+                $ref: '#/MutualFollow'
+            streakGlobalSwitch:
+              type: integer
+            streakUserSwitch:
+              type: integer
+            matchButtonText:
+              type: string
+          additionalProperties: true
+
+PrivilegeRequest:
+  type: object
+  required: [otherUserId]
+  properties:
+    otherUserId:
+      type: integer
+      format: int64
+    trackIds:
+      type: array
+      items:
+        $ref: './common.yaml#/NumericId'
+      description: Omit to ask for every track in the room.
+      x-form-encoding: json
+  additionalProperties: false
+
+TrackPrivilege:
+  type: object
+  required: [songId, playable]
+  properties:
+    songId:
+      type: integer
+      format: int64
+    playable:
+      type: boolean
+    unplayableType:
+      type: string
+    unplayableUserIds:
+      type: array
+      items:
+        type: integer
+        format: int64
+    unplayableOuterIds:
+      type: array
+      items:
+        type: integer
+        format: int64
+  additionalProperties: true
+
+PrivilegeResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        data:
+          type: object
+          properties:
+            result:
+              type: array
+              items:
+                $ref: '#/TrackPrivilege'
+          additionalProperties: true
+
+StatisticsRequest:
+  type: object
+  required: [roomId, roomUserIds]
+  properties:
+    roomId:
+      type: string
+    roomUserIds:
+      $ref: './common.yaml#/JsonArrayString'
+  additionalProperties: false
+
+StatisticsResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        data:
+          type: object
+          properties:
+            listenCount:
+              type: integer
+              format: int64
+            totalConnectionTime:
+              type: integer
+              format: int64
+              description: Seconds.
+          additionalProperties: true
+
+VipGiftRequest:
+  type: object
+  required: [sku, receiver, roomId]
+  properties:
+    sku:
+      type: string
+    receiver:
+      type: integer
+      format: int64
+    roomId:
+      type: string
+  additionalProperties: false
+
+SyncNoticeRequest:
+  type: object
+  required: [roomId]
+  properties:
+    roomId:
+      type: string
+  additionalProperties: false

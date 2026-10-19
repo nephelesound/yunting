@@ -1,0 +1,230 @@
+EventUser:
+  type: object
+  required: [userId]
+  properties:
+    userId:
+      type: integer
+      format: int64
+    nickname:
+      type: string
+    avatarUrl:
+      type: string
+      format: uri
+  additionalProperties: true
+
+EventResource:
+  type: object
+  properties:
+    kind:
+      type: string
+      enum: [song, playlist, album, mv, video, artist, program, event, other]
+    id:
+      type: integer
+      format: int64
+    name:
+      type: string
+    cover:
+      type: string
+      format: uri
+    artist:
+      type: string
+  additionalProperties: true
+
+Event:
+  type: object
+  required: [id]
+  properties:
+    id:
+      type: integer
+      format: int64
+    action:
+      type: string
+    text:
+      type: string
+    time:
+      type: integer
+      format: int64
+    user:
+      $ref: '#/EventUser'
+    resource:
+      $ref: '#/EventResource'
+    likes:
+      type: integer
+    comments:
+      type: integer
+    shares:
+      type: integer
+    privacySetting:
+      type: integer
+      enum: [0, 1, 2, 6]
+  additionalProperties: true
+
+EventListRequest:
+  type: object
+  properties:
+    pagesize:
+      type: integer
+      default: 20
+    lasttime:
+      type: integer
+      format: int64
+      default: -1
+  additionalProperties: false
+
+UserEventRequest:
+  type: object
+  properties:
+    getcounts:
+      type: boolean
+      default: true
+    time:
+      type: integer
+      format: int64
+      default: -1
+    limit:
+      type: integer
+      default: 30
+    total:
+      type: boolean
+      default: false
+    fromRN:
+      type: string
+      enum: ['true']
+      default: 'true'
+  additionalProperties: false
+
+EventPageResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/Event'
+        more:
+          type: boolean
+        lasttime:
+          type: integer
+          format: int64
+        size:
+          type: integer
+      additionalProperties: true
+
+ForwardEventRequest:
+  type: object
+  required: [forwards, id, eventUserId]
+  properties:
+    forwards:
+      type: string
+    id:
+      type: integer
+      format: int64
+    eventUserId:
+      type: integer
+      format: int64
+  additionalProperties: false
+
+DeleteEventRequest:
+  type: object
+  required: [id]
+  properties:
+    id:
+      type: integer
+      format: int64
+  additionalProperties: false
+
+EventPrivacyRequest:
+  type: object
+  required: [eventId, privacy]
+  properties:
+    eventId:
+      type: integer
+      format: int64
+    privacy:
+      type: integer
+      enum: [0, 1, 2, 6]
+      description: 0 everyone, 1 following, 2 only me, 6 mutual follows.
+  additionalProperties: false
+
+Topic:
+  type: object
+  required: [id]
+  properties:
+    id:
+      type: integer
+      format: int64
+    name:
+      type: string
+    description:
+      type: string
+    coverUrl:
+      type: string
+      format: uri
+    participantCount:
+      type: integer
+    eventCount:
+      type: integer
+  additionalProperties: true
+
+TopicListRequest:
+  type: object
+  properties:
+    limit:
+      type: integer
+      default: 20
+    offset:
+      type: integer
+      default: 0
+  additionalProperties: false
+
+TopicListResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/Topic'
+      additionalProperties: true
+
+TopicDetailRequest:
+  type: object
+  required: [actid]
+  properties:
+    actid:
+      type: integer
+      format: int64
+  additionalProperties: false
+
+TopicDetailResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        data:
+          $ref: '#/Topic'
+      additionalProperties: true
+
+TopicSubRequest:
+  type: object
+  required: [id]
+  properties:
+    id:
+      type: integer
+      format: int64
+  additionalProperties: false
+
+SubscribedTopicsResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/Topic'
+        more:
+          type: boolean
+      additionalProperties: true

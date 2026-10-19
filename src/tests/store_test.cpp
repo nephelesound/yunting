@@ -1853,6 +1853,98 @@ private slots:
         QCOMPARE(m_store->data().value("inboxThread").toMap().value("items").toList().size(), 1);
     }
 
+    // 私信发送走明文的 /api/msg/private/send；成功后重取当前对话与会话列表。
+    void sendsInboxText()
+    {
+        QByteArray sentBody;
+        m_api->handler = [&sentBody](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/msg/private/send") {
+                sentBody = req.body;
+                respond(200, "{\"code\":200,\"id\":99}");
+                return;
+            }
+            if (req.path == "/weapi/msg/private/history"
+                || req.path == "/weapi/msg/private/users") {
+                respond(200, "{\"code\":200,\"more\":false,\"msgs\":[]}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        QSignalSpy sent(m_store, &Store::inboxMessageSent);
+        QSignalSpy failed(m_store, &Store::inboxMessageFailed);
+        m_store->sendInboxText(7, QStringLiteral("  hello  "));
+        QVERIFY(waitUntil([&] { return sent.count() == 1; }));
+        QCOMPARE(failed.count(), 0);
+        QCOMPARE(sent.first().at(0).toDouble(), 7.0);
+        QVERIFY(sentBody.contains("type=text"));
+        QVERIFY(sentBody.contains("msg=hello"));
+        QVERIFY(sentBody.contains("userIds=%5B7%5D"));
+        QVERIFY(sentBody.contains("csrf_token=csrf"));
+    }
+
+    // 分享歌曲：type=song，id 为歌曲 id，msg 可空。
+    void sharesInboxSong()
+    {
+        QByteArray sentBody;
+        m_api->handler = [&sentBody](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/msg/private/send") {
+                sentBody = req.body;
+                respond(200, "{\"code\":200,\"id\":100}");
+                return;
+            }
+            if (req.path == "/weapi/msg/private/history"
+                || req.path == "/weapi/msg/private/users") {
+                respond(200, "{\"code\":200,\"more\":false,\"msgs\":[]}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        QSignalSpy sent(m_store, &Store::inboxMessageSent);
+        m_store->sendInboxSong(7, 3376894533.0, QStringLiteral("听听这个"));
+        QVERIFY(waitUntil([&] { return sent.count() == 1; }));
+        QVERIFY(sentBody.contains("type=song"));
+        QVERIFY(sentBody.contains("id=3376894533"));
+        QVERIFY(sentBody.contains("msg=%E5%90%AC%E5%90%AC%E8%BF%99%E4%B8%AA"));
+        QVERIFY(sentBody.contains("userIds=%5B7%5D"));
+    }
+
+    // 表情/图片私信：type 16 的内容在 picInfo 里，文字通常为空，界面要能拿到图片地址与尺寸。
+    void inboxImageMessages()
+    {
+        const QJsonObject payload{
+            {"type", 16}, {"msg", ""},
+            {"picInfo", QJsonObject{{"picUrl", "http://p1.music.126.net/emoji.jpg"},
+                                    {"width", 240}, {"height", 240},
+                                    {"format", "jpg"}, {"emojiGroupId", 4001}}},
+        };
+        m_api->handler = [payload](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/weapi/msg/private/history") {
+                const QJsonObject row{
+                    {"id", 70}, {"time", 170},
+                    {"fromUser", QJsonObject{{"userId", 7}, {"nickname", "Peer"}}},
+                    {"toUser", QJsonObject{{"userId", 1}}},
+                    {"msg", QString::fromUtf8(QJsonDocument(payload).toJson(QJsonDocument::Compact))},
+                };
+                respond(200, json(QJsonObject{{"code", 200}, {"more", false},
+                                              {"msgs", QJsonArray{row}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        m_store->request(QStringLiteral("inboxThread:7"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("inboxThread").toMap().value("items").toList().size() == 1;
+        }));
+        const QVariantMap message = m_store->data().value("inboxThread").toMap()
+                                        .value("items").toList().first().toMap()
+                                        .value("message").toMap();
+        QCOMPARE(message.value("kind").toString(), QStringLiteral("image"));
+        const QVariantMap image = message.value("image").toMap();
+        QVERIFY(image.value("url").toString().contains("emoji.jpg"));
+        QCOMPARE(image.value("width").toInt(), 240);
+        QCOMPARE(image.value("height").toInt(), 240);
+    }
+
     // 卡片类私信（真实回包的形状）：type 23 的 generalMsg 把应用内链接包在 orpheus://open?url1=…&url2=<升级页> 里，
     // 一起听邀请就是其中一种；type 12 是推广链接
     void inboxCardsAndListenInvites()

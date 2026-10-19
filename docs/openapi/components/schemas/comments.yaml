@@ -1,0 +1,213 @@
+CommentLikeRequest:
+  type: object
+  required: [threadId, commentId]
+  properties:
+    threadId:
+      type: string
+      description: Resource prefix plus owner id, e.g. `R_SO_4_108485` or `A_PL_0_3778678`.
+    commentId:
+      type: integer
+      format: int64
+  additionalProperties: false
+
+CommentUser:
+  type: object
+  properties:
+    userId:
+      type: integer
+      format: int64
+    nickname:
+      type: string
+    avatarUrl:
+      type: string
+      format: uri
+    avatarDetail:
+      type: object
+      additionalProperties: true
+    vipRights:
+      type: object
+      additionalProperties: true
+    vipType:
+      type: integer
+  additionalProperties: true
+
+Comment:
+  type: object
+  required: [id, content]
+  properties:
+    id:
+      type: integer
+      format: int64
+    content:
+      type: string
+    user:
+      $ref: '#/CommentUser'
+    likes:
+      type: integer
+    liked:
+      type: boolean
+    time:
+      type: integer
+      format: int64
+    parentId:
+      type: integer
+      format: int64
+    replyCount:
+      type: integer
+    beReplied:
+      type: array
+      items:
+        type: object
+        additionalProperties: true
+  additionalProperties: true
+
+CommentsRequest:
+  type: object
+  properties:
+    limit:
+      type: integer
+      default: 20
+    offset:
+      type: integer
+      default: 0
+    beforeTime:
+      type: integer
+      format: int64
+      default: 0
+  additionalProperties: false
+
+CommentPageResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        data:
+          type: object
+          properties:
+            comments:
+              type: array
+              items:
+                $ref: '#/Comment'
+            totalCount:
+              type: integer
+            cursor:
+              type: string
+            hasMore:
+              type: boolean
+          additionalProperties: true
+      additionalProperties: true
+
+CommentRepliesRequest:
+  type: object
+  required: [parentCommentId, threadId]
+  properties:
+    parentCommentId:
+      type: integer
+      format: int64
+    threadId:
+      type: string
+    time:
+      type: integer
+      format: int64
+      default: 0
+    limit:
+      type: integer
+      default: 20
+  additionalProperties: false
+
+CommentRepliesResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        data:
+          type: object
+          properties:
+            comments:
+              type: array
+              items:
+                $ref: '#/Comment'
+          additionalProperties: true
+        comments:
+          type: array
+          items:
+            $ref: '#/Comment'
+        more:
+          type: boolean
+      additionalProperties: true
+
+HugRequest:
+  type: object
+  required: [targetUserId, commentId, threadId]
+  properties:
+    targetUserId:
+      type: integer
+      format: int64
+    commentId:
+      type: integer
+      format: int64
+    threadId:
+      type: string
+  additionalProperties: false
+
+HugListRequest:
+  type: object
+  required: [targetUserId, commentId, threadId]
+  properties:
+    targetUserId:
+      type: integer
+      format: int64
+    commentId:
+      type: integer
+      format: int64
+    threadId:
+      type: string
+    cursor:
+      type: string
+      default: '-1'
+    pageNo:
+      type: integer
+      default: 1
+    idCursor:
+      type: integer
+      format: int64
+      default: -1
+    pageSize:
+      type: integer
+      default: 100
+  additionalProperties: false
+
+HugListResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        data:
+          type: object
+          additionalProperties: true
+      additionalProperties: true
+
+ReportCommentRequest:
+  type: object
+  required: [threadId, commentId, reason]
+  properties:
+    threadId:
+      type: string
+    commentId:
+      type: integer
+      format: int64
+    reason:
+      type: integer
+      description: Report reason code from the report panel.
+  additionalProperties: false
+
+DeleteCommentRequest:
+  type: object
+  required: [commentId, threadId]
+  properties:
+    commentId:
+      type: integer
+      format: int64
+    threadId:
+      type: string
+  additionalProperties: false

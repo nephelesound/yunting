@@ -1,0 +1,222 @@
+getComments:
+  parameters:
+    - name: threadId
+      in: path
+      required: true
+      schema:
+        type: string
+  post:
+    operationId: getComments
+    tags: [Comments]
+    summary: Read a comment thread
+    security:
+      - {}
+      - musicUCookie: []
+    x-transport: weapi
+    requestBody:
+      required: false
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/comments.yaml#/CommentsRequest'
+    responses:
+      '200':
+        description: Comment page.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/comments.yaml#/CommentPageResponse'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+getReplies:
+  post:
+    operationId: getCommentReplies
+    tags: [Comments]
+    summary: Read a comment's floor replies
+    security:
+      - {}
+      - musicUCookie: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/comments.yaml#/CommentRepliesRequest'
+    responses:
+      '200':
+        description: Reply page.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/comments.yaml#/CommentRepliesResponse'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+likeComment:
+  post:
+    operationId: likeComment
+    tags: [Comments]
+    summary: Like a comment
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/comments.yaml#/CommentLikeRequest'
+    responses:
+      '200':
+        description: Liked.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '405':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+unlikeComment:
+  post:
+    operationId: unlikeComment
+    tags: [Comments]
+    summary: Remove a comment like
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/comments.yaml#/CommentLikeRequest'
+    responses:
+      '200':
+        description: Unliked.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+hugComment:
+  post:
+    operationId: hugComment
+    tags: [Comments]
+    summary: Hug a comment
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/comments.yaml#/HugRequest'
+    responses:
+      '200':
+        description: Hugged.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+listCommentHugs:
+  post:
+    operationId: listCommentHugs
+    tags: [Comments]
+    summary: List the users who hugged a comment
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/comments.yaml#/HugListRequest'
+    responses:
+      '200':
+        description: Hug list.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/comments.yaml#/HugListResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+reportComment:
+  post:
+    operationId: reportComment
+    tags: [Comments]
+    summary: Report a comment
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/comments.yaml#/ReportCommentRequest'
+    responses:
+      '200':
+        description: Report accepted.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+deleteComment:
+  post:
+    operationId: deleteComment
+    tags: [Comments]
+    summary: Delete one of the caller's comments
+    description: The official PC route accepts a web session; the reference library uses xeapi, so verify with weapi before shipping.
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/comments.yaml#/DeleteCommentRequest'
+    responses:
+      '200':
+        description: Deleted.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '405':
+        $ref: '../components/responses.yaml#/RateLimited'

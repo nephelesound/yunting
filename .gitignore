@@ -27,3 +27,6 @@ prototype/Personal.js
 !docs/
 docs/*
 !docs/API-FRONTEND.md
+!docs/API-REMAINING.md
+!docs/openapi/
+!docs/openapi/**

@@ -1,0 +1,169 @@
+setPrivacy:
+  post:
+    operationId: setPlaylistPrivacy
+    tags: [Playlists]
+    summary: Set a playlist public/private
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/playlists.yaml#/SetPlaylistPrivacyRequest'
+    responses:
+      '200':
+        description: Privacy changed.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '405':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+updateCover:
+  post:
+    operationId: updatePlaylistCover
+    tags: [Playlists]
+    summary: Set a playlist cover from an uploaded image
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/playlists.yaml#/UpdatePlaylistCoverRequest'
+    responses:
+      '200':
+        description: Cover changed.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/playlists.yaml#/UpdatePlaylistCoverResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '405':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+createImport:
+  post:
+    operationId: createPlaylistImportTask
+    tags: [Playlists]
+    summary: Start a metadata/text/link playlist import
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/playlists.yaml#/ImportPlaylistRequest'
+    responses:
+      '200':
+        description: Import task created.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/playlists.yaml#/ImportPlaylistResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+getImportStatus:
+  post:
+    operationId: getPlaylistImportStatus
+    tags: [Playlists]
+    summary: Poll a playlist import task
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/playlists.yaml#/ImportStatusRequest'
+    responses:
+      '200':
+        description: Task status.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ApiOk'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+subscribe:
+  post:
+    operationId: subscribePlaylist
+    tags: [Playlists]
+    summary: Subscribe to a playlist
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/playlists.yaml#/SubscribePlaylistRequest'
+    responses:
+      '200':
+        description: Subscribed.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '405':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+unsubscribe:
+  post:
+    operationId: unsubscribePlaylist
+    tags: [Playlists]
+    summary: Unsubscribe from a playlist
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/playlists.yaml#/SubscribePlaylistRequest'
+    responses:
+      '200':
+        description: Unsubscribed.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '405':
+        $ref: '../components/responses.yaml#/RateLimited'

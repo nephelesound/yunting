@@ -311,6 +311,38 @@ private slots:
         QVERIFY(result.value->playlist.replaced);
     }
 
+    // 官方客户端的 playlist 形状：replace + 两个 {changed,result} 对象 + 版本/模式。
+    void parsesOfficialSyncPlaylistShape()
+    {
+        const QJsonObject playlist{
+            {QStringLiteral("replace"), true},
+            {QStringLiteral("displayList"),
+             QJsonObject{{QStringLiteral("changed"), true},
+                         {QStringLiteral("result"), QJsonArray{101, QStringLiteral("102")}}}},
+            {QStringLiteral("randomList"),
+             QJsonObject{{QStringLiteral("changed"), false},
+                         {QStringLiteral("result"), QJsonArray{QStringLiteral("102"), 101}}}},
+            {QStringLiteral("version"),
+             QJsonArray{QJsonObject{{QStringLiteral("userId"), 7}, {QStringLiteral("version"), 5}},
+                        QJsonObject{{QStringLiteral("userId"), 42}, {QStringLiteral("version"), 9}}}},
+            {QStringLiteral("playMode"), QStringLiteral("SINGLE_LOOP")},
+        };
+        const auto result = parseSyncPlaylist(
+            envelope(QJsonObject{{QStringLiteral("playlist"), playlist}}));
+        QVERIFY2(result.ok(), qPrintable(result.error.message));
+        QVERIFY(result.value->playlist.replaced);
+        QVERIFY(result.value->playlist.displayChanged);
+        QVERIFY(!result.value->playlist.randomChanged);
+        QCOMPARE(result.value->playlist.displayList, (QList<qint64>{101, 102}));
+        QCOMPARE(result.value->playlist.randomList, (QList<qint64>{102, 101}));
+        QCOMPARE(result.value->playlist.playMode, QStringLiteral("SINGLE_LOOP"));
+        QCOMPARE(result.value->playlist.versions.size(), 2);
+        QCOMPARE(result.value->playlist.versions.at(0).userId, qint64(7));
+        QCOMPARE(result.value->playlist.versions.at(0).version, qint64(5));
+        QCOMPARE(result.value->playlist.versions.at(1).userId, qint64(42));
+        QCOMPARE(result.value->playlist.versions.at(1).version, qint64(9));
+    }
+
     void syncCommandNormalizesAbsentSongIds()
     {
         const QJsonObject command{
@@ -393,12 +425,13 @@ private slots:
                  QStringLiteral("listenTogether.sync.data.playlist.displayList.result"));
 
         const QJsonObject badRandom{
-            {QStringLiteral("randomList"), QJsonObject{}}};
+            {QStringLiteral("randomList"),
+             QJsonObject{{QStringLiteral("result"), QStringLiteral("bad")}}}};
         const auto random = parseSyncPlaylist(
             envelope(QJsonObject{{QStringLiteral("playlist"), badRandom}}));
         QVERIFY(!random.ok());
         QCOMPARE(random.error.path,
-                 QStringLiteral("listenTogether.sync.data.playlist.randomList"));
+                 QStringLiteral("listenTogether.sync.data.playlist.randomList.result"));
 
         const QJsonObject badReplaced{
             {QStringLiteral("replaced"), QStringLiteral("yes")}};
@@ -440,6 +473,158 @@ private slots:
         QCOMPARE(result.error.kind, ErrorKind::Parse);
         QCOMPARE(result.error.endpoint, SyncEndpoint);
         QCOMPARE(result.error.path, QStringLiteral("listenTogether.sync.data"));
+    }
+
+    void parsesPrivileges()
+    {
+        const auto result = parsePrivileges(envelope(QJsonObject{
+            {QStringLiteral("result"),
+             QJsonArray{
+                 QJsonObject{
+                     {QStringLiteral("songId"), QStringLiteral("101")},
+                     {QStringLiteral("playable"), false},
+                     {QStringLiteral("unplayableType"), QStringLiteral("vip")},
+                     {QStringLiteral("unplayableUserIds"), QJsonArray{7, QStringLiteral("42")}},
+                     {QStringLiteral("unplayableOuterIds"), QJsonArray{QStringLiteral("9")}},
+                 },
+                 QJsonObject{
+                     {QStringLiteral("songId"), 102},
+                     {QStringLiteral("playable"), true},
+                 },
+             }}}));
+        QVERIFY2(result.ok(), qPrintable(result.error.message));
+        QCOMPARE(result.value->size(), 2);
+        QCOMPARE(result.value->at(0).songId, qint64(101));
+        QVERIFY(!result.value->at(0).playable);
+        QCOMPARE(result.value->at(0).unplayableType, QStringLiteral("vip"));
+        QCOMPARE(result.value->at(0).unplayableUserIds, (QList<qint64>{7, 42}));
+        QCOMPARE(result.value->at(0).unplayableOuterIds, (QList<qint64>{9}));
+        QCOMPARE(result.value->at(1).songId, qint64(102));
+        QVERIFY(result.value->at(1).playable);
+        QVERIFY(result.value->at(1).unplayableUserIds.isEmpty());
+    }
+
+    void privilegesAcceptMissingOrEmptyResult()
+    {
+        const auto missing = parsePrivileges(envelope(QJsonObject{}));
+        QVERIFY2(missing.ok(), qPrintable(missing.error.message));
+        QVERIFY(missing.value->isEmpty());
+
+        const auto nullResult = parsePrivileges(envelope(QJsonObject{
+            {QStringLiteral("result"), QJsonValue::Null}}));
+        QVERIFY2(nullResult.ok(), qPrintable(nullResult.error.message));
+        QVERIFY(nullResult.value->isEmpty());
+    }
+
+    void privilegesRejectMalformedRows()
+    {
+        const QString endpoint = QStringLiteral("api/listen/together/privilege/get");
+        const auto wrongResult = parsePrivileges(envelope(QJsonObject{
+            {QStringLiteral("result"), QStringLiteral("bad")}}));
+        QVERIFY(!wrongResult.ok());
+        QCOMPARE(wrongResult.error.endpoint, endpoint);
+        QCOMPARE(wrongResult.error.path,
+                 QStringLiteral("listenTogether.privileges.data.result"));
+
+        const auto wrongRow = parsePrivileges(envelope(QJsonObject{
+            {QStringLiteral("result"), QJsonArray{QStringLiteral("bad")}}}));
+        QVERIFY(!wrongRow.ok());
+        QCOMPARE(wrongRow.error.path,
+                 QStringLiteral("listenTogether.privileges.data.result[0]"));
+
+        const auto wrongPlayable = parsePrivileges(envelope(QJsonObject{
+            {QStringLiteral("result"),
+             QJsonArray{QJsonObject{{QStringLiteral("playable"), QStringLiteral("yes")}}}}}));
+        QVERIFY(!wrongPlayable.ok());
+        QCOMPARE(wrongPlayable.error.path,
+                 QStringLiteral("listenTogether.privileges.data.result[0].playable"));
+
+        const auto wrongUsers = parsePrivileges(envelope(QJsonObject{
+            {QStringLiteral("result"),
+             QJsonArray{QJsonObject{{QStringLiteral("playable"), true},
+                                    {QStringLiteral("unplayableUserIds"),
+                                     QStringLiteral("bad")}}}}}));
+        QVERIFY(!wrongUsers.ok());
+        QCOMPARE(wrongUsers.error.path,
+                 QStringLiteral("listenTogether.privileges.data.result[0].unplayableUserIds"));
+
+        const auto missingData = parsePrivileges(
+            QJsonObject{{QStringLiteral("code"), 200}});
+        QVERIFY(!missingData.ok());
+        QCOMPARE(missingData.error.path, QStringLiteral("listenTogether.privileges.data"));
+    }
+
+    void parsesRelationStatistics()
+    {
+        const auto result = parseRelationStatistics(envelope(QJsonObject{
+            {QStringLiteral("listenCount"), 12},
+            {QStringLiteral("totalConnectionTime"), 345}}));
+        QVERIFY2(result.ok(), qPrintable(result.error.message));
+        QCOMPARE(result.value->listenCount, qint64(12));
+        QCOMPARE(result.value->totalConnectionTime, qint64(345));
+    }
+
+    void relationStatisticsToleratesMissingCounters()
+    {
+        const auto result = parseRelationStatistics(envelope(QJsonObject{}));
+        QVERIFY2(result.ok(), qPrintable(result.error.message));
+        QCOMPARE(result.value->listenCount, qint64(0));
+        QCOMPARE(result.value->totalConnectionTime, qint64(0));
+    }
+
+    void relationStatisticsRejectsWrongTypes()
+    {
+        const QString endpoint =
+            QStringLiteral("api/listen/together/relation/statistics/get/v2");
+        const auto wrongCount = parseRelationStatistics(envelope(QJsonObject{
+            {QStringLiteral("listenCount"), QStringLiteral("12")}}));
+        QVERIFY(!wrongCount.ok());
+        QCOMPARE(wrongCount.error.endpoint, endpoint);
+        QCOMPARE(wrongCount.error.path,
+                 QStringLiteral("listenTogether.statistics.data.listenCount"));
+
+        const auto wrongTime = parseRelationStatistics(envelope(QJsonObject{
+            {QStringLiteral("totalConnectionTime"), true}}));
+        QVERIFY(!wrongTime.ok());
+        QCOMPARE(wrongTime.error.path,
+                 QStringLiteral("listenTogether.statistics.data.totalConnectionTime"));
+
+        const auto missingData = parseRelationStatistics(
+            QJsonObject{{QStringLiteral("code"), 200}});
+        QVERIFY(!missingData.ok());
+        QCOMPARE(missingData.error.path,
+                 QStringLiteral("listenTogether.statistics.data"));
+    }
+
+    void parsesActionResults()
+    {
+        const auto rootMessage = parseActionResult(QJsonObject{
+            {QStringLiteral("code"), 200},
+            {QStringLiteral("message"), QStringLiteral("invited")}});
+        QVERIFY2(rootMessage.ok(), qPrintable(rootMessage.error.message));
+        QVERIFY(rootMessage.value->success);
+        QCOMPARE(rootMessage.value->message, QStringLiteral("invited"));
+
+        const auto dataMessage = parseActionResult(QJsonObject{
+            {QStringLiteral("code"), 200},
+            {QStringLiteral("data"), QJsonObject{{QStringLiteral("message"),
+                                                  QStringLiteral("gifted")}}}});
+        QVERIFY2(dataMessage.ok(), qPrintable(dataMessage.error.message));
+        QCOMPARE(dataMessage.value->message, QStringLiteral("gifted"));
+
+        const auto wrongMessage = parseActionResult(QJsonObject{
+            {QStringLiteral("code"), 200},
+            {QStringLiteral("message"), 42}});
+        QVERIFY(!wrongMessage.ok());
+        QCOMPARE(wrongMessage.error.path,
+                 QStringLiteral("listenTogether.action.message"));
+
+        const auto wrongData = parseActionResult(QJsonObject{
+            {QStringLiteral("code"), 200},
+            {QStringLiteral("data"), QStringLiteral("bad")}});
+        QVERIFY(!wrongData.ok());
+        QCOMPARE(wrongData.error.path,
+                 QStringLiteral("listenTogether.action.data"));
     }
 
     void parsesResultFlags()

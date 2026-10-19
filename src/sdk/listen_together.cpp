@@ -1,5 +1,7 @@
 #include "sdk/listen_together.h"
 
+#include "ncmclient.h"
+
 #include "sdk/sdk_json.h"
 #include "sdk/service.h"
 #include "sdk/user_vip.h"
@@ -23,6 +25,11 @@ constexpr auto SyncPlaylistPath = "api/listen/together/sync/playlist/get";
 constexpr auto HeartbeatPath = "api/listen/together/heartbeat";
 constexpr auto PlayCommandPath = "api/listen/together/play/command/report";
 constexpr auto SyncListCommandPath = "api/listen/together/sync/list/command/report";
+constexpr auto InviteMessagePath = "api/listen/together/invite/message/send";
+constexpr auto PrivilegePath = "api/listen/together/privilege/get";
+constexpr auto StatisticsPath = "api/listen/together/relation/statistics/get/v2";
+constexpr auto VipGiftPath = "api/listen/together/vip/gift/report";
+constexpr auto SyncNoticePath = "api/listen/together/sync/notice";
 
 // The generic parseListenResult carries no service endpoint; label its errors
 // with the REST namespace. Service callers use the exact endpoint instead.
@@ -219,51 +226,171 @@ Result<ListenTogetherCommand> commandFrom(const QJsonObject &object, const QStri
     return Result<ListenTogetherCommand>::success(std::move(command));
 }
 
+// The web client advertises a song list either as a bare array (older
+// payloads) or as {"changed": bool, "result": [...]}. Missing lists are valid:
+// a room with no queue yet returns no displayList/randomList at all.
+Result<QList<qint64>> songIdList(const QJsonValue &value, const QString &path,
+                                const char *endpoint)
+{
+    if (value.isUndefined() || value.isNull())
+        return Result<QList<qint64>>::success({});
+
+    QJsonValue list = value;
+    QString listPath = path;
+    if (value.isObject()) {
+        listPath = fieldPath(path, "result");
+        list = value.toObject().value(QStringLiteral("result"));
+        if (list.isUndefined() || list.isNull())
+            return Result<QList<qint64>>::success({});
+    }
+    if (!list.isArray()) {
+        return Result<QList<qint64>>::failure(endpointError(
+            ErrorKind::Parse, decodeEndpoint(endpoint),
+            listPath + QStringLiteral(": expected array"), listPath));
+    }
+
+    QList<qint64> ids;
+    const QJsonArray array = list.toArray();
+    ids.reserve(array.size());
+    for (qsizetype i = 0; i < array.size(); ++i) {
+        const auto id = songIdValue(array.at(i), indexedPath(listPath, i), endpoint);
+        if (!id)
+            return Result<QList<qint64>>::failure(id.error);
+        ids.append(*id.value);
+    }
+    return Result<QList<qint64>>::success(std::move(ids));
+}
+
+// Arrays such as unplayableUserIds are optional; every present element must be
+// a numeric id (string or number), and null entries are ignored.
+Result<QList<qint64>> idList(const QJsonValue &value, const QString &path,
+                             const char *endpoint)
+{
+    if (value.isUndefined() || value.isNull())
+        return Result<QList<qint64>>::success({});
+    if (!value.isArray())
+        return Result<QList<qint64>>::failure(endpointError(
+            ErrorKind::Parse, decodeEndpoint(endpoint),
+            path + QStringLiteral(": expected array"), path));
+
+    QList<qint64> ids;
+    const QJsonArray array = value.toArray();
+    ids.reserve(array.size());
+    for (qsizetype i = 0; i < array.size(); ++i) {
+        const auto id = songIdValue(array.at(i), indexedPath(path, i), endpoint);
+        if (!id)
+            return Result<QList<qint64>>::failure(id.error);
+        if (*id.value > 0)
+            ids.append(*id.value);
+    }
+    return Result<QList<qint64>>::success(std::move(ids));
+}
+
 Result<ListenTogetherPlaylist> playlistFrom(const QJsonObject &object, const QString &path,
                                             const char *endpoint)
 {
-    JsonReader reader(object, path);
     ListenTogetherPlaylist playlist;
-    QString badPath;
 
-    playlist.replaced = reader.boolean("replaced");
-    if (!reader.ok() && badPath.isEmpty())
-        badPath = fieldPath(path, "replaced");
-    const QJsonArray randomList = reader.array("randomList");
-    if (!reader.ok() && badPath.isEmpty())
-        badPath = fieldPath(path, "randomList");
-    if (!reader.ok())
-        return parseFailure<ListenTogetherPlaylist>(decodeEndpoint(endpoint), reader, badPath);
-
-    const QString randomPath = fieldPath(path, "randomList");
-    playlist.randomList.reserve(randomList.size());
-    for (qsizetype i = 0; i < randomList.size(); ++i) {
-        const auto id = songIdValue(randomList.at(i), indexedPath(randomPath, i), endpoint);
-        if (!id)
-            return Result<ListenTogetherPlaylist>::failure(id.error);
-        playlist.randomList.append(*id.value);
+    const QString replacePath = fieldPath(path, "replace");
+    const QJsonValue replaceValue = object.value(QStringLiteral("replace"));
+    if (!replaceValue.isUndefined() && !replaceValue.isNull()) {
+        if (!replaceValue.isBool())
+            return Result<ListenTogetherPlaylist>::failure(endpointError(
+                ErrorKind::Parse, decodeEndpoint(endpoint),
+                replacePath + QStringLiteral(": expected boolean"), replacePath));
+        playlist.replaced = replaceValue.toBool();
+    } else {
+        // Older snapshots and the previous SDK tests used "replaced"; keep it
+        // readable while the web client uses "replace".
+        const QString oldPath = fieldPath(path, "replaced");
+        const QJsonValue oldValue = object.value(QStringLiteral("replaced"));
+        if (!oldValue.isUndefined() && !oldValue.isNull()) {
+            if (!oldValue.isBool())
+                return Result<ListenTogetherPlaylist>::failure(endpointError(
+                    ErrorKind::Parse, decodeEndpoint(endpoint),
+                    oldPath + QStringLiteral(": expected boolean"), oldPath));
+            playlist.replaced = oldValue.toBool();
+        }
     }
 
-    const QString displayPath = fieldPath(path, "displayList");
-    const QJsonValue displayValue = object.value(QStringLiteral("displayList"));
-    if (!displayValue.isUndefined() && !displayValue.isNull()) {
-        if (!displayValue.isObject())
-            return itemTypeFailure<ListenTogetherPlaylist>(decodeEndpoint(endpoint), displayPath);
-
-        JsonReader displayReader(displayValue.toObject(), displayPath);
-        const QJsonArray displayList = displayReader.array("result");
-        const QString resultPath = fieldPath(displayPath, "result");
-        if (!displayReader.ok())
-            return parseFailure<ListenTogetherPlaylist>(decodeEndpoint(endpoint), displayReader,
-                                                        resultPath);
-
-        playlist.displayList.reserve(displayList.size());
-        for (qsizetype i = 0; i < displayList.size(); ++i) {
-            const auto id = songIdValue(displayList.at(i), indexedPath(resultPath, i), endpoint);
-            if (!id)
-                return Result<ListenTogetherPlaylist>::failure(id.error);
-            playlist.displayList.append(*id.value);
+    const auto randomValue = object.value(QStringLiteral("randomList"));
+    const auto random = songIdList(randomValue, fieldPath(path, "randomList"), endpoint);
+    if (!random)
+        return Result<ListenTogetherPlaylist>::failure(random.error);
+    playlist.randomList = *random.value;
+    if (!randomValue.isUndefined() && !randomValue.isNull()) {
+        playlist.randomChanged = true;
+        if (randomValue.isObject()
+            && !randomValue.toObject().value(QStringLiteral("changed")).isUndefined()) {
+            const QJsonValue changed = randomValue.toObject().value(QStringLiteral("changed"));
+            if (!changed.isBool())
+                return Result<ListenTogetherPlaylist>::failure(endpointError(
+                    ErrorKind::Parse, decodeEndpoint(endpoint),
+                    fieldPath(fieldPath(path, "randomList"), "changed")
+                        + QStringLiteral(": expected boolean"),
+                    fieldPath(fieldPath(path, "randomList"), "changed")));
+            playlist.randomChanged = changed.toBool();
         }
+    }
+
+    const auto displayValue = object.value(QStringLiteral("displayList"));
+    const auto display = songIdList(displayValue, fieldPath(path, "displayList"), endpoint);
+    if (!display)
+        return Result<ListenTogetherPlaylist>::failure(display.error);
+    playlist.displayList = *display.value;
+    if (!displayValue.isUndefined() && !displayValue.isNull()) {
+        playlist.displayChanged = true;
+        if (displayValue.isObject()
+            && !displayValue.toObject().value(QStringLiteral("changed")).isUndefined()) {
+            const QJsonValue changed = displayValue.toObject().value(QStringLiteral("changed"));
+            if (!changed.isBool())
+                return Result<ListenTogetherPlaylist>::failure(endpointError(
+                    ErrorKind::Parse, decodeEndpoint(endpoint),
+                    fieldPath(fieldPath(path, "displayList"), "changed")
+                        + QStringLiteral(": expected boolean"),
+                    fieldPath(fieldPath(path, "displayList"), "changed")));
+            playlist.displayChanged = changed.toBool();
+        }
+    }
+
+    // version 是每个成员各自改歌单的版本号；下一次上报要把别人的版本原样带回，
+    // 只带自己的版本时服务器会认为这次改动没有合并对方的队列。
+    const QString versionsPath = fieldPath(path, "version");
+    const QJsonValue versionsValue = object.value(QStringLiteral("version"));
+    if (!versionsValue.isUndefined() && !versionsValue.isNull()) {
+        if (!versionsValue.isArray())
+            return Result<ListenTogetherPlaylist>::failure(endpointError(
+                ErrorKind::Parse, decodeEndpoint(endpoint),
+                versionsPath + QStringLiteral(": expected array"), versionsPath));
+        const QJsonArray versions = versionsValue.toArray();
+        playlist.versions.reserve(versions.size());
+        for (qsizetype i = 0; i < versions.size(); ++i) {
+            const QString entryPath = indexedPath(versionsPath, i);
+            if (!versions.at(i).isObject())
+                return Result<ListenTogetherPlaylist>::failure(endpointError(
+                    ErrorKind::Parse, decodeEndpoint(endpoint),
+                    entryPath + QStringLiteral(": expected object"), entryPath));
+            const QJsonObject entry = versions.at(i).toObject();
+            const auto userId = songIdValue(entry.value(QStringLiteral("userId")),
+                                            fieldPath(entryPath, "userId"), endpoint);
+            if (!userId)
+                return Result<ListenTogetherPlaylist>::failure(userId.error);
+            const auto version = songIdValue(entry.value(QStringLiteral("version")),
+                                             fieldPath(entryPath, "version"), endpoint);
+            if (!version)
+                return Result<ListenTogetherPlaylist>::failure(version.error);
+            playlist.versions.append({*userId.value, *version.value});
+        }
+    }
+
+    const QString playModePath = fieldPath(path, "playMode");
+    const QJsonValue playModeValue = object.value(QStringLiteral("playMode"));
+    if (!playModeValue.isUndefined() && !playModeValue.isNull()) {
+        if (!playModeValue.isString())
+            return Result<ListenTogetherPlaylist>::failure(endpointError(
+                ErrorKind::Parse, decodeEndpoint(endpoint),
+                playModePath + QStringLiteral(": expected string"), playModePath));
+        playlist.playMode = playModeValue.toString();
     }
 
     return Result<ListenTogetherPlaylist>::success(std::move(playlist));
@@ -426,6 +553,142 @@ Result<ListenTogetherResult> parseListenResult(const QJsonObject &root)
     return resultFrom(root, ResultPath);
 }
 
+Result<QList<ListenTogetherPrivilege>> parsePrivileges(const QJsonObject &root)
+{
+    const QString rootPath = QStringLiteral("listenTogether.privileges");
+    const auto data = dataObject(root, PrivilegePath, rootPath);
+    if (!data)
+        return Result<QList<ListenTogetherPrivilege>>::failure(data.error);
+
+    const QString dataPath = fieldPath(rootPath, "data");
+    const QJsonValue rowsValue = data.value->value(QStringLiteral("result"));
+    if (rowsValue.isUndefined() || rowsValue.isNull())
+        return Result<QList<ListenTogetherPrivilege>>::success({});
+    if (!rowsValue.isArray())
+        return itemTypeFailure<QList<ListenTogetherPrivilege>>(
+            decodeEndpoint(PrivilegePath), fieldPath(dataPath, "result"));
+
+    const QString rowsPath = fieldPath(dataPath, "result");
+    const QJsonArray rows = rowsValue.toArray();
+    QList<ListenTogetherPrivilege> privileges;
+    privileges.reserve(rows.size());
+    for (qsizetype i = 0; i < rows.size(); ++i) {
+        const QString entryPath = indexedPath(rowsPath, i);
+        if (!rows.at(i).isObject())
+            return itemTypeFailure<QList<ListenTogetherPrivilege>>(
+                decodeEndpoint(PrivilegePath), entryPath);
+        const QJsonObject object = rows.at(i).toObject();
+        ListenTogetherPrivilege privilege;
+
+        const auto songId = songIdValue(object.value(QStringLiteral("songId")),
+                                        fieldPath(entryPath, "songId"), PrivilegePath);
+        if (!songId)
+            return Result<QList<ListenTogetherPrivilege>>::failure(songId.error);
+        privilege.songId = *songId.value;
+
+        const QJsonValue playable = object.value(QStringLiteral("playable"));
+        if (!playable.isBool())
+            return Result<QList<ListenTogetherPrivilege>>::failure(endpointError(
+                ErrorKind::Parse, decodeEndpoint(PrivilegePath),
+                fieldPath(entryPath, "playable") + QStringLiteral(": expected boolean"),
+                fieldPath(entryPath, "playable")));
+        privilege.playable = playable.toBool();
+
+        const QJsonValue unplayableType = object.value(QStringLiteral("unplayableType"));
+        if (!unplayableType.isUndefined() && !unplayableType.isNull()) {
+            if (!unplayableType.isString())
+                return Result<QList<ListenTogetherPrivilege>>::failure(endpointError(
+                    ErrorKind::Parse, decodeEndpoint(PrivilegePath),
+                    fieldPath(entryPath, "unplayableType") + QStringLiteral(": expected string"),
+                    fieldPath(entryPath, "unplayableType")));
+            privilege.unplayableType = unplayableType.toString();
+        }
+
+        const auto userIds = idList(object.value(QStringLiteral("unplayableUserIds")),
+                                    fieldPath(entryPath, "unplayableUserIds"), PrivilegePath);
+        if (!userIds)
+            return Result<QList<ListenTogetherPrivilege>>::failure(userIds.error);
+        privilege.unplayableUserIds = *userIds.value;
+
+        const auto outerIds = idList(object.value(QStringLiteral("unplayableOuterIds")),
+                                     fieldPath(entryPath, "unplayableOuterIds"), PrivilegePath);
+        if (!outerIds)
+            return Result<QList<ListenTogetherPrivilege>>::failure(outerIds.error);
+        privilege.unplayableOuterIds = *outerIds.value;
+
+        privileges.append(std::move(privilege));
+    }
+    return Result<QList<ListenTogetherPrivilege>>::success(std::move(privileges));
+}
+
+Result<ListenTogetherStatistics> parseRelationStatistics(const QJsonObject &root)
+{
+    const QString rootPath = QStringLiteral("listenTogether.statistics");
+    const auto data = dataObject(root, StatisticsPath, rootPath);
+    if (!data)
+        return Result<ListenTogetherStatistics>::failure(data.error);
+
+    const QString dataPath = fieldPath(rootPath, "data");
+    const QJsonObject payload = *data.value;
+    ListenTogetherStatistics statistics;
+
+    const auto readCounter = [&](const char *key, qint64 &out) -> std::optional<Error> {
+        const QJsonValue value = payload.value(QLatin1String(key));
+        if (value.isUndefined() || value.isNull())
+            return std::nullopt;
+        if (!value.isDouble())
+            return endpointError(ErrorKind::Parse, decodeEndpoint(StatisticsPath),
+                                 fieldPath(dataPath, key) + QStringLiteral(": expected number"),
+                                 fieldPath(dataPath, key));
+        out = static_cast<qint64>(value.toDouble());
+        return std::nullopt;
+    };
+
+    if (const auto error = readCounter("listenCount", statistics.listenCount))
+        return Result<ListenTogetherStatistics>::failure(*error);
+    if (const auto error = readCounter("totalConnectionTime", statistics.totalConnectionTime))
+        return Result<ListenTogetherStatistics>::failure(*error);
+    return Result<ListenTogetherStatistics>::success(std::move(statistics));
+}
+
+Result<ListenTogetherResult> parseActionResult(const QJsonObject &root)
+{
+    ListenTogetherResult result;
+    result.success = true;
+
+    QString message;
+    const QJsonValue dataValue = root.value(QStringLiteral("data"));
+    if (dataValue.isObject()) {
+        const QJsonValue inner = dataValue.toObject().value(QStringLiteral("message"));
+        if (!inner.isUndefined() && !inner.isNull()) {
+            if (!inner.isString())
+                return Result<ListenTogetherResult>::failure(endpointError(
+                    ErrorKind::Parse, decodeEndpoint(ResultPath),
+                    QStringLiteral("listenTogether.action.data.message: expected string"),
+                    QStringLiteral("listenTogether.action.data.message")));
+            message = inner.toString();
+        }
+    } else if (!dataValue.isUndefined() && !dataValue.isNull()) {
+        return Result<ListenTogetherResult>::failure(endpointError(
+            ErrorKind::Parse, decodeEndpoint(ResultPath),
+            QStringLiteral("listenTogether.action.data: expected object"),
+            QStringLiteral("listenTogether.action.data")));
+    }
+
+    if (message.isEmpty()) {
+        const QJsonValue rootMessage = root.value(QStringLiteral("message"));
+        if (rootMessage.isString())
+            message = rootMessage.toString();
+        else if (!rootMessage.isUndefined() && !rootMessage.isNull())
+            return Result<ListenTogetherResult>::failure(endpointError(
+                ErrorKind::Parse, decodeEndpoint(ResultPath),
+                QStringLiteral("listenTogether.action.message: expected string"),
+                QStringLiteral("listenTogether.action.message")));
+    }
+    result.message = std::move(message);
+    return Result<ListenTogetherResult>::success(std::move(result));
+}
+
 void createRoom(NcmClient &client, QObject *context, RoomCallback callback)
 {
     if (!callback)
@@ -529,8 +792,8 @@ void checkRoom(NcmClient &client, QString roomId, QObject *context, CheckCallbac
     }, true);
 }
 
-void fetchSyncPlaylist(NcmClient &client, QString roomId, QObject *context,
-                       SyncCallback callback)
+void fetchSyncPlaylist(NcmClient &client, QString roomId, QJsonObject playlistParam,
+                       QObject *context, SyncCallback callback)
 {
     if (!callback)
         return;
@@ -541,6 +804,10 @@ void fetchSyncPlaylist(NcmClient &client, QString roomId, QObject *context,
     }
     QUrlQuery form;
     form.addQueryItem(QStringLiteral("roomId"), roomId);
+    if (!playlistParam.isEmpty()) {
+        form.addQueryItem(QStringLiteral("playlistParam"),
+                          QString::fromUtf8(QJsonDocument(playlistParam).toJson(QJsonDocument::Compact)));
+    }
     postFormJson(client, context, decodeEndpoint(SyncPlaylistPath), std::move(form),
                  [callback = std::move(callback)](Result<QJsonObject> root) {
         if (!root) {
@@ -552,7 +819,8 @@ void fetchSyncPlaylist(NcmClient &client, QString roomId, QObject *context,
 }
 
 void reportHeartbeat(NcmClient &client, QString roomId, qint64 songId, QString playStatus,
-                     qint64 progressMs, QObject *context, ResultCallback callback)
+                     qint64 progressMs, QJsonArray playlistVersion, QObject *context,
+                     ResultCallback callback)
 {
     if (!callback)
         return;
@@ -566,6 +834,10 @@ void reportHeartbeat(NcmClient &client, QString roomId, qint64 songId, QString p
     form.addQueryItem(QStringLiteral("songId"), QString::number(songId));
     form.addQueryItem(QStringLiteral("playStatus"), playStatus);
     form.addQueryItem(QStringLiteral("progress"), QString::number(progressMs));
+    if (!playlistVersion.isEmpty()) {
+        form.addQueryItem(QStringLiteral("playlistVersion"),
+                          QString::fromUtf8(QJsonDocument(playlistVersion).toJson(QJsonDocument::Compact)));
+    }
     postFormJson(client, context, decodeEndpoint(HeartbeatPath), std::move(form),
                  [callback = std::move(callback)](Result<QJsonObject> root) {
         if (!root) {
@@ -601,7 +873,7 @@ void reportPlayCommand(NcmClient &client, QString roomId, QJsonObject commandInf
 }
 
 void reportPlaylist(NcmClient &client, QString roomId, QJsonObject playlistParam,
-                    QObject *context, ResultCallback callback)
+                    qint64 clientSeq, QObject *context, ResultCallback callback)
 {
     if (!callback)
         return;
@@ -614,6 +886,7 @@ void reportPlaylist(NcmClient &client, QString roomId, QJsonObject playlistParam
     form.addQueryItem(QStringLiteral("roomId"), roomId);
     form.addQueryItem(QStringLiteral("playlistParam"),
                       QString::fromUtf8(QJsonDocument(playlistParam).toJson(QJsonDocument::Compact)));
+    form.addQueryItem(QStringLiteral("clientSeq"), QString::number(clientSeq));
     postFormJson(client, context, decodeEndpoint(SyncListCommandPath), std::move(form),
                  [callback = std::move(callback)](Result<QJsonObject> root) {
         if (!root) {
@@ -621,6 +894,207 @@ void reportPlaylist(NcmClient &client, QString roomId, QJsonObject playlistParam
             return;
         }
         callback(resultFrom(*root.value, SyncListCommandPath));
+    }, true);
+}
+
+void inviteUsers(NcmClient &client, QString roomId, QList<qint64> userIds,
+                 QObject *context, ResultCallback callback)
+{
+    if (!callback)
+        return;
+    if (roomId.isEmpty()) {
+        callback(invalidRequest<ListenTogetherResult>(
+            "api/listen/together/multi/invite", QStringLiteral("roomId must not be empty")));
+        return;
+    }
+
+    QStringList ids;
+    ids.reserve(userIds.size());
+    for (qint64 userId : std::as_const(userIds)) {
+        if (userId > 0)
+            ids.append(QString::number(userId));
+    }
+    if (ids.isEmpty()) {
+        callback(invalidRequest<ListenTogetherResult>(
+            "api/listen/together/multi/invite",
+            QStringLiteral("at least one invited user is required")));
+        return;
+    }
+
+    QUrlQuery form;
+    form.addQueryItem(QStringLiteral("roomId"), roomId);
+    form.addQueryItem(QStringLiteral("groupIds"), QStringLiteral("[]"));
+    form.addQueryItem(QStringLiteral("inviteUids"),
+                      QStringLiteral("[") + ids.join(u',') + QStringLiteral("]"));
+    const QString csrf = client.cookieJar().value(QStringLiteral("__csrf"));
+    if (!csrf.isEmpty())
+        form.addQueryItem(QStringLiteral("csrf_token"), csrf);
+    postFormJson(client, context, QStringLiteral("api/listen/together/multi/invite"),
+                 std::move(form),
+                 [callback = std::move(callback)](Result<QJsonObject> root) {
+        if (!root) {
+            callback(Result<ListenTogetherResult>::failure(root.error));
+            return;
+        }
+        ListenTogetherResult result;
+        result.success = true;
+        // The invite endpoint reports failures through code/message; non-200
+        // codes are already classified by postFormJson.
+        result.message = root.value->value(QStringLiteral("message")).toString();
+        callback(Result<ListenTogetherResult>::success(std::move(result)));
+    }, true);
+}
+
+void sendInviteMessage(NcmClient &client, QString roomId, qint64 acceptorId,
+                       QObject *context, ResultCallback callback)
+{
+    if (!callback)
+        return;
+    if (roomId.isEmpty()) {
+        callback(invalidRequest<ListenTogetherResult>(
+            InviteMessagePath, QStringLiteral("roomId must not be empty")));
+        return;
+    }
+    if (acceptorId <= 0) {
+        callback(invalidRequest<ListenTogetherResult>(
+            InviteMessagePath, QStringLiteral("acceptorId must be positive")));
+        return;
+    }
+    QUrlQuery form;
+    form.addQueryItem(QStringLiteral("roomId"), roomId);
+    form.addQueryItem(QStringLiteral("acceptorId"), QString::number(acceptorId));
+    const QString csrf = client.cookieJar().value(QStringLiteral("__csrf"));
+    if (!csrf.isEmpty())
+        form.addQueryItem(QStringLiteral("csrf_token"), csrf);
+    postFormJson(client, context, decodeEndpoint(InviteMessagePath), std::move(form),
+                 [callback = std::move(callback)](Result<QJsonObject> root) {
+        if (!root) {
+            callback(Result<ListenTogetherResult>::failure(root.error));
+            return;
+        }
+        callback(parseActionResult(*root.value));
+    }, true);
+}
+
+void fetchPrivileges(NcmClient &client, qint64 otherUserId, QList<qint64> trackIds,
+                     QObject *context, PrivilegeCallback callback)
+{
+    if (!callback)
+        return;
+    if (otherUserId <= 0) {
+        callback(invalidRequest<QList<ListenTogetherPrivilege>>(
+            PrivilegePath, QStringLiteral("otherUserId must be positive")));
+        return;
+    }
+    QUrlQuery form;
+    form.addQueryItem(QStringLiteral("otherUserId"), QString::number(otherUserId));
+    if (!trackIds.isEmpty()) {
+        QJsonArray ids;
+        for (qint64 id : std::as_const(trackIds)) {
+            if (id > 0)
+                ids.append(QString::number(id));
+        }
+        if (!ids.isEmpty())
+            form.addQueryItem(QStringLiteral("trackIds"),
+                              QString::fromUtf8(QJsonDocument(ids).toJson(QJsonDocument::Compact)));
+    }
+    postFormJson(client, context, decodeEndpoint(PrivilegePath), std::move(form),
+                 [callback = std::move(callback)](Result<QJsonObject> root) {
+        if (!root) {
+            callback(Result<QList<ListenTogetherPrivilege>>::failure(root.error));
+            return;
+        }
+        callback(parsePrivileges(*root.value));
+    }, true);
+}
+
+void fetchRelationStatistics(NcmClient &client, QString roomId, QList<qint64> userIds,
+                             QObject *context, StatisticsCallback callback)
+{
+    if (!callback)
+        return;
+    if (roomId.isEmpty()) {
+        callback(invalidRequest<ListenTogetherStatistics>(
+            StatisticsPath, QStringLiteral("roomId must not be empty")));
+        return;
+    }
+    QJsonArray ids;
+    for (qint64 userId : std::as_const(userIds)) {
+        if (userId > 0)
+            ids.append(QString::number(userId));
+    }
+    if (ids.isEmpty()) {
+        callback(invalidRequest<ListenTogetherStatistics>(
+            StatisticsPath, QStringLiteral("at least one userId is required")));
+        return;
+    }
+    QUrlQuery form;
+    form.addQueryItem(QStringLiteral("roomId"), roomId);
+    form.addQueryItem(QStringLiteral("roomUserIds"),
+                      QString::fromUtf8(QJsonDocument(ids).toJson(QJsonDocument::Compact)));
+    postFormJson(client, context, decodeEndpoint(StatisticsPath), std::move(form),
+                 [callback = std::move(callback)](Result<QJsonObject> root) {
+        if (!root) {
+            callback(Result<ListenTogetherStatistics>::failure(root.error));
+            return;
+        }
+        callback(parseRelationStatistics(*root.value));
+    }, true);
+}
+
+void reportVipGift(NcmClient &client, QString sku, qint64 receiver, QString roomId,
+                   QObject *context, ResultCallback callback)
+{
+    if (!callback)
+        return;
+    if (roomId.isEmpty()) {
+        callback(invalidRequest<ListenTogetherResult>(
+            VipGiftPath, QStringLiteral("roomId must not be empty")));
+        return;
+    }
+    if (sku.isEmpty()) {
+        callback(invalidRequest<ListenTogetherResult>(
+            VipGiftPath, QStringLiteral("sku must not be empty")));
+        return;
+    }
+    if (receiver <= 0) {
+        callback(invalidRequest<ListenTogetherResult>(
+            VipGiftPath, QStringLiteral("receiver must be positive")));
+        return;
+    }
+    QUrlQuery form;
+    form.addQueryItem(QStringLiteral("sku"), sku);
+    form.addQueryItem(QStringLiteral("receiver"), QString::number(receiver));
+    form.addQueryItem(QStringLiteral("roomId"), roomId);
+    postFormJson(client, context, decodeEndpoint(VipGiftPath), std::move(form),
+                 [callback = std::move(callback)](Result<QJsonObject> root) {
+        if (!root) {
+            callback(Result<ListenTogetherResult>::failure(root.error));
+            return;
+        }
+        callback(parseActionResult(*root.value));
+    }, true);
+}
+
+void notifyPlaylistChange(NcmClient &client, QString roomId, QObject *context,
+                          ResultCallback callback)
+{
+    if (!callback)
+        return;
+    if (roomId.isEmpty()) {
+        callback(invalidRequest<ListenTogetherResult>(
+            SyncNoticePath, QStringLiteral("roomId must not be empty")));
+        return;
+    }
+    QUrlQuery form;
+    form.addQueryItem(QStringLiteral("roomId"), roomId);
+    postFormJson(client, context, decodeEndpoint(SyncNoticePath), std::move(form),
+                 [callback = std::move(callback)](Result<QJsonObject> root) {
+        if (!root) {
+            callback(Result<ListenTogetherResult>::failure(root.error));
+            return;
+        }
+        callback(parseActionResult(*root.value));
     }, true);
 }
 

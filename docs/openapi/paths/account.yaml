@@ -1,0 +1,220 @@
+loginCellphone:
+  post:
+    operationId: loginWithCellphone
+    tags: [Account]
+    summary: Sign in with a phone number and password or captcha
+    security: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/account.yaml#/LoginCellphoneRequest'
+    responses:
+      '200':
+        description: Session established.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/account.yaml#/LoginResponse'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '405':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+loginEmail:
+  post:
+    operationId: loginWithEmail
+    tags: [Account]
+    summary: Sign in with an email and password
+    security: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/account.yaml#/LoginEmailRequest'
+    responses:
+      '200':
+        description: Session established.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/account.yaml#/LoginResponse'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '405':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+sendCaptcha:
+  post:
+    operationId: sendLoginCaptcha
+    tags: [Account]
+    summary: Send an SMS login captcha
+    security: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/account.yaml#/CaptchaSentRequest'
+    responses:
+      '200':
+        description: Captcha sent.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '405':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+verifyCaptcha:
+  post:
+    operationId: verifyLoginCaptcha
+    tags: [Account]
+    summary: Verify an SMS login captcha
+    security: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/account.yaml#/CaptchaVerifyRequest'
+    responses:
+      '200':
+        description: Captcha accepted.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+updateProfile:
+  post:
+    operationId: updateProfile
+    tags: [Account]
+    summary: Edit the signed-in profile
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/account.yaml#/UpdateProfileRequest'
+    responses:
+      '200':
+        description: Profile updated.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+updateAvatar:
+  post:
+    operationId: updateAvatar
+    tags: [Account]
+    summary: Set the avatar from an uploaded image
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/account.yaml#/AvatarRequest'
+    responses:
+      '200':
+        description: Avatar updated.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+vipInfo:
+  post:
+    operationId: getVipInfo
+    tags: [Account]
+    summary: Read the caller's VIP state
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    responses:
+      '200':
+        description: VIP state.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/account.yaml#/VipInfoResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+vipTasks:
+  post:
+    operationId: listVipTasks
+    tags: [Account]
+    summary: List VIP level tasks
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    responses:
+      '200':
+        description: VIP task list.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ApiOk'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+vipSign:
+  post:
+    operationId: signVipTask
+    tags: [Account]
+    summary: Complete the daily VIP check-in
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: false
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/account.yaml#/VipSignRequest'
+    responses:
+      '200':
+        description: Check-in result.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ApiOk'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'

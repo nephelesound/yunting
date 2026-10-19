@@ -1,0 +1,216 @@
+checkUpload:
+  post:
+    operationId: checkCloudUpload
+    tags: [Cloud]
+    summary: Check whether an audio file already exists in the cloud
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/cloud.yaml#/CloudUploadCheckRequest'
+    responses:
+      '200':
+        description: Upload decision.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/cloud.yaml#/CloudUploadCheckResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+allocateToken:
+  post:
+    operationId: allocateNosToken
+    tags: [Cloud]
+    summary: Allocate an upload token and object key
+    description: After this call, upload bytes to the LBS-provided NOS host with `x-nos-token`, then call `saveCloudInfo`.
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/cloud.yaml#/NosTokenRequest'
+    responses:
+      '200':
+        description: Upload credentials.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/cloud.yaml#/NosTokenResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+saveCloudInfo:
+  post:
+    operationId: saveCloudUploadInfo
+    tags: [Cloud]
+    summary: Register an uploaded file as a cloud song
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/cloud.yaml#/CloudInfoRequest'
+    responses:
+      '200':
+        description: Cloud song registered.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/cloud.yaml#/CloudInfoResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+publish:
+  post:
+    operationId: publishCloudSong
+    tags: [Cloud]
+    summary: Publish a registered cloud song
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/cloud.yaml#/CloudPublishRequest'
+    responses:
+      '200':
+        description: Published.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+deleteSongs:
+  post:
+    operationId: deleteCloudSongs
+    tags: [Cloud]
+    summary: Delete cloud songs
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/cloud.yaml#/CloudDeleteRequest'
+    responses:
+      '200':
+        description: Deleted.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+listSongs:
+  post:
+    operationId: listCloudSongs
+    tags: [Cloud]
+    summary: List cloud songs
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: false
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/cloud.yaml#/CloudListRequest'
+    responses:
+      '200':
+        description: Cloud song page.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ApiOk'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+checkImport:
+  post:
+    operationId: checkCloudImport
+    tags: [Cloud]
+    summary: Match a local file against the catalog for cloud import
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/cloud.yaml#/CloudImportCheckRequest'
+    responses:
+      '200':
+        description: Per-song import decision (`upload` 0/1/2).
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ApiOk'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+importSongs:
+  post:
+    operationId: importCloudSongs
+    tags: [Cloud]
+    summary: Import matched songs into the cloud
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/cloud.yaml#/CloudImportRequest'
+    responses:
+      '200':
+        description: Imported.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'

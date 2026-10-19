@@ -1,0 +1,215 @@
+MessageUser:
+  type: object
+  required: [userId]
+  properties:
+    userId:
+      type: integer
+      format: int64
+    nickname:
+      type: string
+    avatarUrl:
+      type: string
+      format: uri
+    avatarDetail:
+      type: object
+      additionalProperties: true
+  additionalProperties: true
+
+ConversationListRequest:
+  type: object
+  properties:
+    offset:
+      type: integer
+      minimum: 0
+      default: 0
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 100
+      default: 30
+    total:
+      type: string
+      enum: ['true', 'false']
+      default: 'true'
+  additionalProperties: false
+
+Conversation:
+  type: object
+  required: [userId]
+  properties:
+    userId:
+      type: integer
+      format: int64
+    nickname:
+      type: string
+    avatarUrl:
+      type: string
+      format: uri
+    lastMsg:
+      type: string
+    lastMsgId:
+      type: integer
+      format: int64
+    lastTime:
+      type: integer
+      format: int64
+    unread:
+      type: integer
+    messageCount:
+      type: integer
+  additionalProperties: true
+
+ConversationListResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        msgs:
+          type: array
+          items:
+            $ref: '#/Conversation'
+        newMsgCount:
+          type: integer
+        more:
+          type: boolean
+      additionalProperties: true
+
+HistoryRequest:
+  type: object
+  required: [userId]
+  properties:
+    userId:
+      type: integer
+      format: int64
+    limit:
+      type: integer
+      default: 30
+    time:
+      type: integer
+      format: int64
+      description: Cursor; 0 fetches the newest page.
+      default: 0
+    total:
+      type: string
+      enum: ['true', 'false']
+      default: 'true'
+  additionalProperties: false
+
+Message:
+  type: object
+  required: [id, fromUser, toUser, msg]
+  properties:
+    id:
+      type: integer
+      format: int64
+    fromUser:
+      $ref: '#/MessageUser'
+    toUser:
+      $ref: '#/MessageUser'
+    msg:
+      type: string
+      description: Compact JSON payload. Text messages carry `{"msg":"..."}`.
+    time:
+      type: integer
+      format: int64
+    batchId:
+      type: integer
+      format: int64
+  additionalProperties: true
+
+HistoryResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        msgs:
+          type: array
+          items:
+            $ref: '#/Message'
+        more:
+          type: boolean
+      additionalProperties: true
+
+SendMessageRequest:
+  type: object
+  required: [type, userIds]
+  properties:
+    type:
+      type: string
+      enum: [text, song, album, playlist, mv, program, comment, pic]
+      default: text
+    userIds:
+      type: string
+      description: Compact JSON array of recipient ids, for example `"[123]"`.
+      examples: ['[123]']
+    msg:
+      type: string
+    id:
+      type: integer
+      format: int64
+      description: Resource id for song/album/playlist/mv/program/comment.
+    threadId:
+      type: string
+      description: Required when `type=comment`.
+    picinfo:
+      type: string
+      description: Compact JSON `{picIdStr,width,height,format,type}` after image upload.
+  additionalProperties: false
+
+SendMessageResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        newMsgs:
+          type: array
+          items:
+            $ref: '#/Message'
+        id:
+          type: integer
+          format: int64
+          description: Legacy/compatibility field; prefer `newMsgs`.
+      additionalProperties: true
+
+NoticesRequest:
+  type: object
+  properties:
+    limit:
+      type: integer
+      default: 20
+    lasttime:
+      type: integer
+      format: int64
+      description: Cursor; omit for the first page.
+  additionalProperties: false
+
+Notice:
+  type: object
+  properties:
+    id:
+      type: integer
+      format: int64
+    time:
+      type: integer
+      format: int64
+    user:
+      $ref: '#/MessageUser'
+    text:
+      type: string
+    resource:
+      type: object
+      additionalProperties: true
+  additionalProperties: true
+
+NoticesResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        notices:
+          type: array
+          items:
+            $ref: '#/Notice'
+        more:
+          type: boolean
+      additionalProperties: true

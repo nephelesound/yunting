@@ -20,11 +20,13 @@ QtObject {
     property var tracks: []
 
     signal commandReceived(string type, real songId, real progressMs, bool playing)
+    signal userInvited(real userId)
     signal leftRoom()
 
     function createRoom() { room.state = "waiting"; }
     function joinRoom(ref) { room.host = false; room.state = "together"; }
     function leaveRoom() { room.state = "none"; room.leftRoom(); }
     function syncQueue(ids) {}
+    function inviteUser(userId) { room.userInvited(userId); }
     function setRemoteApplying(applying) { room.remoteApplying = applying; }
 }

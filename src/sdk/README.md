@@ -54,7 +54,7 @@ NcmClient                 传输（cookie、weapi/明文、超时）
 - `search_people.h/.cpp`：Cloudsearch 用户/电台结果行纯解析（type=1002/1009）。
 - `mv_page.h/.cpp`：MV 详情 typed 模型；签名播放地址仍由 Store 的 `mvUrl:<id>` 状态机刷新。
 - `account_feed.h/.cpp`：首页榜单卡、热搜词、红心 id 纯解析；榜单/热搜上限与顺序由 SDK 固定。
-- `listen_together.h/.cpp`：一起听房间创建/加入/状态/结束、心跳、播放指令、歌单同步；纯明文 `/api/listen/together/*` 表单 + typed 解析。
+- `listen_together.h/.cpp`：一起听房间创建/加入/状态/结束、心跳、播放指令、歌单同步，以及邀请消息、成员点歌权限、双人累计统计、房间送 VIP、队列变更提醒；纯明文 `/api/listen/together/*` 表单 + typed 解析。
 - `download.h/.cpp`：单曲下载地址 typed 模型；下载文件与离线播放由 `DownloadManager` / `AudioEngine` 负责。
 - `pendant.h/.cpp`：头像挂件（`api/pendant/user/get`，支持 `userId` 查任意用户；profile 不返回）。`preferredImage()` 按 imageUrl → PC → Android → iOS → preview 回退。
 - `friend_listening.h/.cpp`：好友在听/最近在听列表（`mutual/follows/get/v2`）。当前状态、最后收听时间、在线/在房间与挂件；此接口不含正在播放的歌曲名。

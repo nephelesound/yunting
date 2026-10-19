@@ -1,0 +1,99 @@
+HotSearchItem:
+  type: object
+  required: [searchWord]
+  properties:
+    searchWord:
+      type: string
+    toUserWord:
+      type: string
+    score:
+      type: integer
+      format: int64
+    iconType:
+      type: integer
+    iconUrl:
+      type: string
+      format: uri
+    content:
+      type: string
+    url:
+      type: string
+    alg:
+      type: string
+  additionalProperties: true
+
+HotSearchResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        data:
+          type: object
+          properties:
+            hotSearches:
+              type: array
+              items:
+                $ref: '#/HotSearchItem'
+          additionalProperties: true
+      additionalProperties: true
+
+HotSearchListResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/HotSearchItem'
+      additionalProperties: true
+
+RelateSongsRequest:
+  type: object
+  required: [searchWord]
+  properties:
+    searchWord:
+      type: string
+  additionalProperties: false
+
+LyricMarkRequest:
+  type: object
+  required: [songId]
+  properties:
+    songId:
+      type: integer
+      format: int64
+  additionalProperties: false
+
+LyricMarkPageRequest:
+  type: object
+  properties:
+    limit:
+      type: integer
+      default: 10
+    offset:
+      type: integer
+      default: 0
+  additionalProperties: false
+
+LyricMarkAddRequest:
+  type: object
+  required: [songId, data]
+  properties:
+    songId:
+      type: integer
+      format: int64
+    markId:
+      type: string
+    data:
+      type: string
+      description: Compact JSON array of {translateType,startTimeStamp,translateLyricsText,originalLyricsText}.
+  additionalProperties: false
+
+LyricMarkDeleteRequest:
+  type: object
+  required: [markIds]
+  properties:
+    markIds:
+      $ref: './common.yaml#/JsonArrayString'
+  additionalProperties: false

@@ -1,0 +1,113 @@
+listConversations:
+  post:
+    operationId: listConversations
+    tags: [Messaging]
+    summary: List private-message conversations
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/messaging.yaml#/ConversationListRequest'
+    responses:
+      '200':
+        description: Conversation page.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/messaging.yaml#/ConversationListResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+getHistory:
+  post:
+    operationId: getConversationHistory
+    tags: [Messaging]
+    summary: Read one conversation page
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/messaging.yaml#/HistoryRequest'
+    responses:
+      '200':
+        description: Message page, newest first.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/messaging.yaml#/HistoryResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+sendMessage:
+  post:
+    operationId: sendMessage
+    tags: [Messaging]
+    summary: Send a text, song or resource card
+    description: |
+      There is no separate reply endpoint: replying is another `type=text`
+      message to the same `userIds`. A successful response carries `newMsgs`;
+      `code=2202` means the recipient rejected the message.
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/messaging.yaml#/SendMessageRequest'
+    responses:
+      '200':
+        description: Message sent.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/messaging.yaml#/SendMessageResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '405':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+notices:
+  post:
+    operationId: listNotices
+    tags: [Messaging]
+    summary: List system notices
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: false
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/messaging.yaml#/NoticesRequest'
+    responses:
+      '200':
+        description: Notice page.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/messaging.yaml#/NoticesResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'

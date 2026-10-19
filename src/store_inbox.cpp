@@ -1,4 +1,5 @@
-// 只读信箱：私信会话与历史。只走 weapi、只进内存；不缓存到磁盘，不发任何写请求。
+// 信箱：私信会话与历史（weapi，只进内存、不落盘）以及发送文本（明文 /api/msg/private/send）。
+// 除发送外不发任何写请求。
 #include "store.h"
 
 #include "json_util.h"
@@ -110,6 +111,8 @@ QString payloadKind(const QJsonObject &payload)
 {
     if (const QVariantMap card = cardOf(payload); !card.isEmpty())
         return card.value("kind").toString();
+    if (payload.value("picInfo").isObject())
+        return QStringLiteral("image");
     for (const char *key : {"song", "album", "playlist", "mv", "program", "event", "dj"})
         if (payload.contains(QLatin1String(key)))
             return QString::fromLatin1(key);
@@ -149,6 +152,19 @@ QVariantMap normalizePayload(const QJsonObject &payload)
             {"cover", ncmSized(m.value("cover"), 300)},
             {"artist", m.value("artistName").toString()},
         });
+    }
+    if (payload.value("picInfo").isObject()) {
+        const QJsonObject pic = payload.value("picInfo").toObject();
+        const QString url = pic.value("picUrl").toString();
+        if (!url.isEmpty()) {
+            out.insert("image", QVariantMap{
+                {"url", ncmSized(url, 480)},
+                {"width", pic.value("width").toInt()},
+                {"height", pic.value("height").toInt()},
+                {"format", pic.value("format").toString()},
+                {"emojiGroupId", pic.value("emojiGroupId").toDouble()},
+            });
+        }
     }
     return out;
 }
@@ -298,4 +314,68 @@ void Store::requestInboxThread(double userId, qint64 before)
             {"items", items},
         }, before > 0 && samePerson, false);
     });
+}
+
+void Store::sendInboxPayload(double userId, QUrlQuery form)
+{
+    if (!m_client->hasMusicU()) {
+        emit inboxMessageFailed(userId, QStringLiteral("登录后才能发送私信"));
+        return;
+    }
+    const QString csrf = m_client->cookieJar().value(QStringLiteral("__csrf"));
+    if (!csrf.isEmpty())
+        form.addQueryItem(QStringLiteral("csrf_token"), csrf);
+
+    const quint64 epoch = m_epoch;
+    // 私信发送走明文的 /api/msg/private/send（官方客户端与 ncm-api 的同一路径）；
+    // weapi 的旧 /send/text 不是同一条链路，不能混用。
+    m_client->postForm(QStringLiteral("api/msg/private/send"), form, true,
+                       [this, userId, epoch](const NcmClient::Response &response) {
+        if (epoch != m_epoch)
+            return;
+        const QString failure = requestFailure(response);
+        if (!failure.isEmpty()) {
+            emit inboxMessageFailed(userId, failure);
+            return;
+        }
+        // 对方拒收 / 不能发给自己时服务端仍回 code 200，但 id 为 -1。
+        if (response.doc.object().value(QStringLiteral("id")).toDouble() <= 0) {
+            emit inboxMessageFailed(userId, QStringLiteral("对方没有接收这条私信"));
+            return;
+        }
+        // 回包只有新消息 id，正文以服务器历史为准；重取当前对话与会话列表。
+        requestInboxThread(userId, 0);
+        requestInbox(0);
+        emit inboxMessageSent(userId);
+    });
+}
+
+void Store::sendInboxText(double userId, const QString &text)
+{
+    const QString message = text.trimmed();
+    if (userId <= 0 || message.isEmpty()) {
+        emit inboxMessageFailed(userId, QStringLiteral("私信内容不能为空"));
+        return;
+    }
+    QUrlQuery form;
+    form.addQueryItem(QStringLiteral("type"), QStringLiteral("text"));
+    form.addQueryItem(QStringLiteral("msg"), message);
+    form.addQueryItem(QStringLiteral("userIds"),
+                      QStringLiteral("[%1]").arg(qlonglong(userId)));
+    sendInboxPayload(userId, std::move(form));
+}
+
+void Store::sendInboxSong(double userId, double songId, const QString &text)
+{
+    if (userId <= 0 || songId <= 0) {
+        emit inboxMessageFailed(userId, QStringLiteral("没有可分享的歌曲"));
+        return;
+    }
+    QUrlQuery form;
+    form.addQueryItem(QStringLiteral("type"), QStringLiteral("song"));
+    form.addQueryItem(QStringLiteral("id"), QString::number(qlonglong(songId)));
+    form.addQueryItem(QStringLiteral("msg"), text.trimmed());
+    form.addQueryItem(QStringLiteral("userIds"),
+                      QStringLiteral("[%1]").arg(qlonglong(userId)));
+    sendInboxPayload(userId, std::move(form));
 }

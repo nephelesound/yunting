@@ -62,9 +62,44 @@ Kirigami.ApplicationWindow {
         return other ? "正在和 " + other.name + " 一起听" : "一起听：等好友加入";
     }
     ListenTogetherLink { room: root.listenRoom; playback: playback }
+    // 点好友邀请：还没有房间时先建房，房间状态到达后再发邀请；已经在房间里就直接发。
+    property real pendingListenInviteUid: 0
+    function inviteListenFriend(userId, name) {
+        if (!root.loggedIn) {
+            root.requestLogin();
+            return;
+        }
+        if (userId <= 0)
+            return;
+        if (root.listenRoom.inRoom) {
+            root.listenRoom.inviteUser(userId);
+            root.notify("正在邀请" + (name ? "「" + name + "」" : "好友") + "…");
+            return;
+        }
+        root.pendingListenInviteUid = userId;
+        root.listenRoom.createRoom();
+        queuePanel.open();
+        root.notify("正在创建一起听房间…");
+    }
     Connections {
         target: root.listenRoom
         function onLeftRoom() { root.notify("一起听已结束"); }
+        function onUserInvited(userId) {
+            root.notify("邀请已发送");
+        }
+        function onErrorChanged() {
+            if (root.listenRoom.error.length > 0) {
+                root.pendingListenInviteUid = 0;
+                root.fail(root.listenRoom.error);
+            }
+        }
+        function onStateChanged() {
+            if (root.pendingListenInviteUid > 0 && root.listenRoom.inRoom) {
+                const uid = root.pendingListenInviteUid;
+                root.pendingListenInviteUid = 0;
+                root.listenRoom.inviteUser(uid);
+            }
+        }
     }
 
     // 下载：应用里是 C++ DownloadManager，原型里是替身（截图 harness 用 downloadsFilled 放几首已下载的）
@@ -292,6 +327,7 @@ Kirigami.ApplicationWindow {
         room: root.loggedIn ? root.listenRoom : null
         onListenEndRequested: root.listenRoom.leaveRoom()
         onListenLinkCopied: root.notify("已复制邀请链接")
+        onListenInviteRequested: (userId, name) => root.inviteListenFriend(userId, name)
     }
 
     LoginDialog {
@@ -470,6 +506,12 @@ Kirigami.ApplicationWindow {
         }
         function onCommentLikeFailed(kind, ownerId, commentId, message) {
             root.fail("评论点赞失败：" + message);
+        }
+        function onInboxMessageSent(userId) {
+            root.notify("私信已发送");
+        }
+        function onInboxMessageFailed(userId, message) {
+            root.fail("私信发送失败：" + message);
         }
         function onRequestRestricted(key, message) {
             Source.markRequestRestricted(key, message);
@@ -1086,6 +1128,7 @@ Kirigami.ApplicationWindow {
             queuePanel.open();
         }
         onListenJoinRequested: joinDialog.open()
+        onListenFriendInviteRequested: (userId, name) => root.inviteListenFriend(userId, name)
         track: root.currentTrack
         playing: playback.engine.playing
         elapsed: playback.engine.position

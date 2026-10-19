@@ -432,6 +432,18 @@ QtObject {
         if (t.more && !t.pending)
             source.retryKey("inboxThread:" + t.userId + ":" + t.before);
     }
+    function sendInboxMessage(userId, text) {
+        if (!source.live)
+            return false;
+        source.live.sendInboxText(userId, text);
+        return true;
+    }
+    function shareInboxSong(userId, songId, text) {
+        if (!source.live)
+            return false;
+        source.live.sendInboxSong(userId, songId, text || "");
+        return true;
+    }
     // 未读私信数（自己的主页上「私信」旁边用）：打开自己的主页、离开私信页时各取一次通知计数，不在后台轮询
     readonly property int unreadMessages: source.d.notifications ? source.d.notifications.msg : 0
 

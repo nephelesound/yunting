@@ -1,6 +1,7 @@
 // 一起听（不在房间时）：播放条上的按钮弹出的小面板。先是两个动作（开始 / 用链接加入），
 // 下面是互相关注的好友在不在线、上次和你一起听是什么时候——这正是「找谁一起听」要看的。在房间里、在线的排前面。
-// 接口不给好友在听哪首、也没有点名邀请，所以点一位好友是打开他的主页；邀请仍走开始后的扫码 / 发链接。
+// 点好友就是邀请：还没开房时由 main 先建房再把邀请发出去；房间已开时直接调用房间接口。
+// 邀请成功后房间面板会打开，等待对方加入。
 // 浮在播放条上的真浮层：有投影（与右键菜单同一层级）
 pragma ComponentBehavior: Bound
 
@@ -18,6 +19,7 @@ Popup {
 
     signal startRequested()
     signal joinRequested()
+    signal friendInviteRequested(double userId, string name)
 
     // 好友多时只露几行，其余在面板里滚动
     readonly property int shownRows: 6
@@ -102,7 +104,7 @@ Popup {
                 detail: popup.status(modelData)
                 onClicked: {
                     popup.close();
-                    Actions.openUser(modelData.userId);
+                    popup.friendInviteRequested(modelData.userId, modelData.name || "");
                 }
             }
         }

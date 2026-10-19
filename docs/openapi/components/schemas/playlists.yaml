@@ -1,0 +1,83 @@
+SetPlaylistPrivacyRequest:
+  type: object
+  required: [id, privacy]
+  properties:
+    id:
+      type: integer
+      format: int64
+    privacy:
+      type: integer
+      enum: [0, 10]
+      description: 0 public, 10 private.
+  additionalProperties: false
+
+UpdatePlaylistCoverRequest:
+  type: object
+  required: [id, coverImgId]
+  properties:
+    id:
+      type: integer
+      format: int64
+    coverImgId:
+      type: string
+      description: docId returned by the image upload flow.
+  additionalProperties: false
+
+UpdatePlaylistCoverResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        url:
+          type: string
+          format: uri
+      additionalProperties: true
+
+ImportPlaylistRequest:
+  type: object
+  properties:
+    importStarPlaylist:
+      type: boolean
+      default: false
+      description: Import "我喜欢的音乐" instead of creating a playlist.
+    playlistName:
+      type: string
+      description: Used by text/link imports.
+    local:
+      type: string
+      description: Compact JSON array of {name, artist, album}.
+    songs:
+      type: string
+      description: Compact JSON array of {name, type, url} entries.
+  additionalProperties: false
+
+ImportPlaylistResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        data:
+          type: object
+          properties:
+            taskId:
+              type: integer
+              format: int64
+          additionalProperties: true
+      additionalProperties: true
+
+ImportStatusRequest:
+  type: object
+  required: [taskIds]
+  properties:
+    taskIds:
+      $ref: './common.yaml#/JsonArrayString'
+  additionalProperties: false
+
+SubscribePlaylistRequest:
+  type: object
+  required: [id]
+  properties:
+    id:
+      type: integer
+      format: int64
+  additionalProperties: false

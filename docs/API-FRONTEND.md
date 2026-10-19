@@ -3,6 +3,10 @@
 这份只列**前端实际能消费的字段**与**还没接但值得接的接口**。原始端点见
 `docs/reference/ncm-api-enhanced/module/`；数据形状以 `data` / `personal` 为准。
 
+进度表里剩余功能的请求规格（一起听、私信、动态、评论互动、歌单/云盘/账户）见
+[`API-REMAINING.md`](API-REMAINING.md)；机器可校验的 OpenAPI 契约见
+[`openapi/openapi.yaml`](openapi/openapi.yaml)。
+
 ## Typed SDK
 
 新接口不再直接把 `QJsonObject` / `QVariantMap` 拆进 Store 或页面。SDK 边界在 `src/sdk/`：

@@ -19,6 +19,7 @@ Item {
     Component { id: tileComponent; TrackTile { width: 900 } }
     Component { id: nowPlayingComponent; NowPlayingPage { width: root.width; height: root.height } }
     Component { id: inboxComponent; InboxPage { width: root.width; height: root.height } }
+    Component { id: listenPopupComponent; ListenPopup { active: true } }
     Component { id: spyComponent; SignalSpy {} }
     Component { id: queueComponent; QueuePanel {} }
     Component { id: roomComponent; SimListenTogether {} }
@@ -695,6 +696,65 @@ Item {
                 page.peer = 6;
                 wait(100);
                 compare(page.thread.items.length, 0);
+            } finally {
+                Source.snapshot = saved;
+            }
+        }
+
+        // 播放条面板里的好友行现在会发起真实邀请，而不是只打开用户主页
+        function test_clickingAListenFriendInvitesThem() {
+            const saved = Source.snapshot;
+            Source.snapshot = {
+                data: Object.assign({}, saved.data, {
+                    friendsListening: { items: [{ userId: 5, name: "Jo", avatar: "", online: true,
+                                                  inRoom: false, lastTime: 0, lastListen: 0 }] },
+                }),
+                personal: saved.personal,
+            };
+            try {
+                const popup = createTemporaryObject(listenPopupComponent, root);
+                popup.open();
+                const invites = createTemporaryObject(spyComponent, root,
+                    { target: popup, signalName: "friendInviteRequested" });
+                tryVerify(() => popup.visible && findChild(popup, "listenFriends").count === 1);
+                const list = findChild(popup, "listenFriends");
+                tryVerify(() => list.itemAtIndex(0) !== null);
+                const row = list.itemAtIndex(0);
+                mouseClick(row, row.width / 2, row.height / 2);
+                compare(invites.count, 1);
+                compare(invites.signalArguments[0][0], 5);
+                compare(invites.signalArguments[0][1], "Jo");
+            } finally {
+                Source.snapshot = saved;
+            }
+        }
+
+        // 私信里的一起听邀请必须真的发出去；卡片看起来能点、实际被布局或 enabled 挡住过一次
+        function test_clickingAListenInviteJoinsTheRoom() {
+            const saved = Source.snapshot;
+            const invite = { key: "9", id: 9, fromUserId: 5, fromName: "Jo", fromAvatar: "", mine: false,
+                             time: 1700000000000, batchId: "",
+                             message: { kind: "listen", text: "一起听",
+                                        listen: { roomId: "room-1", inviterId: "5", title: "加入一起听", cover: "", subtitle: "" } } };
+            Source.snapshot = {
+                data: Object.assign({}, saved.data, {
+                    inbox: { unread: 0, more: false, items: [
+                        { key: "5", userId: 5, name: "Jo", avatar: "", lastText: "一起听", lastTime: 1, unread: 0 }] },
+                    inboxThread: { userId: 5, before: 0, more: false, items: [invite] },
+                }),
+                personal: saved.personal,
+            };
+            const joins = createTemporaryObject(spyComponent, root, { target: Actions, signalName: "listenJoinRequested" });
+            try {
+                const page = createTemporaryObject(inboxComponent, root, { peer: 5, loggedIn: true });
+                tryVerify(() => page.thread.items.length === 1);
+                const card = findChild(page, "messageCard");
+                verify(card !== null);
+                tryVerify(() => card.width > 0 && card.height > 0 && card.visible);
+                mouseClick(card, card.width / 2, card.height / 2);
+                compare(joins.count, 1);
+                compare(joins.signalArguments[0][0], "room-1");
+                compare(joins.signalArguments[0][1], "5");
             } finally {
                 Source.snapshot = saved;
             }

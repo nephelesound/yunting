@@ -1,0 +1,303 @@
+listEvents:
+  post:
+    operationId: listEvents
+    tags: [Social]
+    summary: Read the signed-in account's event feed
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: false
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/social.yaml#/EventListRequest'
+    responses:
+      '200':
+        description: Event page.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/social.yaml#/EventPageResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+getUserEvents:
+  parameters:
+    - name: uid
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+  post:
+    operationId: getUserEvents
+    tags: [Social]
+    summary: Read one user's public event feed
+    security:
+      - {}
+      - musicUCookie: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/social.yaml#/UserEventRequest'
+    responses:
+      '200':
+        description: Event page; private accounts return an empty list.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/social.yaml#/EventPageResponse'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+forwardEvent:
+  post:
+    operationId: forwardEvent
+    tags: [Social]
+    summary: Forward someone's event
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/social.yaml#/ForwardEventRequest'
+    responses:
+      '200':
+        description: Forwarded.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '405':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+deleteEvent:
+  post:
+    operationId: deleteEvent
+    tags: [Social]
+    summary: Delete one of the caller's events
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/social.yaml#/DeleteEventRequest'
+    responses:
+      '200':
+        description: Deleted.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+setEventPrivacy:
+  post:
+    operationId: setEventPrivacy
+    tags: [Social]
+    summary: Change one event's visibility
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/social.yaml#/EventPrivacyRequest'
+    responses:
+      '200':
+        description: Visibility changed.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+listHotTopics:
+  post:
+    operationId: listHotTopics
+    tags: [Social]
+    summary: List hot topics
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: false
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/social.yaml#/TopicListRequest'
+    responses:
+      '200':
+        description: Hot topics.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/social.yaml#/TopicListResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+getTopicDetail:
+  post:
+    operationId: getTopicDetail
+    tags: [Social]
+    summary: Read one topic
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/social.yaml#/TopicDetailRequest'
+    responses:
+      '200':
+        description: Topic detail.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/social.yaml#/TopicDetailResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+getTopicEvents:
+  post:
+    operationId: getTopicEvents
+    tags: [Social]
+    summary: Read the hot events under a topic
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/social.yaml#/TopicDetailRequest'
+    responses:
+      '200':
+        description: Topic event page.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/social.yaml#/EventPageResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+subscribeTopic:
+  post:
+    operationId: subscribeTopic
+    tags: [Social]
+    summary: Subscribe to a topic
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/social.yaml#/TopicSubRequest'
+    responses:
+      '200':
+        description: Subscribed.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+unsubscribeTopic:
+  post:
+    operationId: unsubscribeTopic
+    tags: [Social]
+    summary: Unsubscribe from a topic
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: api
+    requestBody:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/social.yaml#/TopicSubRequest'
+    responses:
+      '200':
+        description: Unsubscribed.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/common.yaml#/ActionResult'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+listSubscribedTopics:
+  post:
+    operationId: listSubscribedTopics
+    tags: [Social]
+    summary: List subscribed topics
+    security:
+      - musicUCookie: []
+        csrfToken: []
+    x-transport: weapi
+    requestBody:
+      required: false
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '../components/schemas/social.yaml#/TopicListRequest'
+    responses:
+      '200':
+        description: Subscribed topics.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/social.yaml#/SubscribedTopicsResponse'
+      '301':
+        $ref: '../components/responses.yaml#/NotLoggedIn'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'

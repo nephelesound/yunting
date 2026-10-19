@@ -1,0 +1,152 @@
+LoginCellphoneRequest:
+  type: object
+  required: [phone]
+  properties:
+    phone:
+      type: string
+    countrycode:
+      type: string
+      default: '86'
+    password:
+      type: string
+      description: Plain password; the client sends its md5 as `password`.
+    captcha:
+      type: string
+    remember:
+      type: string
+      enum: ['true', 'false']
+      default: 'true'
+    secureCaptcha:
+      type: string
+  additionalProperties: false
+
+LoginEmailRequest:
+  type: object
+  required: [username, password]
+  properties:
+    username:
+      type: string
+    password:
+      type: string
+      description: md5 of the password.
+    rememberLogin:
+      type: boolean
+      default: true
+  additionalProperties: false
+
+LoginResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        account:
+          type: object
+          additionalProperties: true
+        profile:
+          type: object
+          additionalProperties: true
+        bindings:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+      additionalProperties: true
+
+CaptchaSentRequest:
+  type: object
+  required: [cellphone]
+  properties:
+    ctcode:
+      type: string
+      default: '86'
+    secrete:
+      type: string
+      default: music_middleuser_pclogin
+    cellphone:
+      type: string
+  additionalProperties: false
+
+CaptchaVerifyRequest:
+  type: object
+  required: [cellphone, captcha]
+  properties:
+    ctcode:
+      type: string
+      default: '86'
+    cellphone:
+      type: string
+    captcha:
+      type: string
+  additionalProperties: false
+
+UpdateProfileRequest:
+  type: object
+  properties:
+    nickname:
+      type: string
+    signature:
+      type: string
+    gender:
+      type: integer
+    birthday:
+      type: integer
+      format: int64
+    province:
+      type: integer
+    city:
+      type: integer
+    avatarImgId:
+      type: string
+  additionalProperties: false
+
+AvatarRequest:
+  type: object
+  required: [imgid]
+  properties:
+    imgid:
+      type: string
+      description: docId returned by the image upload flow.
+  additionalProperties: false
+
+VipInfoResponse:
+  allOf:
+    - $ref: './common.yaml#/ApiOk'
+    - type: object
+      properties:
+        data:
+          type: object
+          properties:
+            associator:
+              type: object
+              properties:
+                expireTime:
+                  type: integer
+                  format: int64
+                vipLevel:
+                  type: integer
+                iconUrl:
+                  type: string
+              additionalProperties: true
+            redplus:
+              type: object
+              properties:
+                expireTime:
+                  type: integer
+                  format: int64
+                vipLevel:
+                  type: integer
+              additionalProperties: true
+            musicPackage:
+              type: object
+              properties:
+                expireTime:
+                  type: integer
+                  format: int64
+              additionalProperties: true
+          additionalProperties: true
+      additionalProperties: true
+
+VipSignRequest:
+  type: object
+  properties: {}
+  additionalProperties: false

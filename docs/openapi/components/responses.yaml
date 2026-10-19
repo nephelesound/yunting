@@ -1,0 +1,27 @@
+BadRequest:
+  description: Missing or malformed parameters.
+  content:
+    application/json:
+      schema:
+        $ref: './schemas/common.yaml#/ApiError'
+
+NotLoggedIn:
+  description: Session missing or expired (`code=301`).
+  content:
+    application/json:
+      schema:
+        $ref: './schemas/common.yaml#/ApiError'
+
+RateLimited:
+  description: Risk control or rate limit (`code=405` / `-460` / `250`).
+  content:
+    application/json:
+      schema:
+        $ref: './schemas/common.yaml#/ApiError'
+
+RoomLost:
+  description: Listen-together room closed or expired (`code=488`).
+  content:
+    application/json:
+      schema:
+        $ref: './schemas/common.yaml#/ApiError'

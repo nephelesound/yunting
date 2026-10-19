@@ -11,6 +11,7 @@
 #include <QDateTime>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QLoggingCategory>
 #include <QSet>
 #include <QTimer>
 #include <QUrl>
@@ -18,6 +19,8 @@
 #include <utility>
 
 namespace {
+
+Q_LOGGING_CATEGORY(lcListen, "yunting.listen")
 
 namespace sdk = ncm::sdk;
 
@@ -264,6 +267,8 @@ void ListenTogether::adoptRoom(const sdk::ListenTogetherRoom &room, qint64 invit
         m_lastServerSeq = 0;
         m_clientSeq = 0;
         m_playlistVersion = 0;
+        m_versions.clear();
+        m_playMode.clear();
         m_remoteTimer->stop();
         if (m_remoteApplying) {
             m_remoteApplying = false;
@@ -352,6 +357,8 @@ void ListenTogether::clearRoom(bool emitLeft)
     m_lastServerSeq = 0;
     m_clientSeq = 0;
     m_playlistVersion = 0;
+    m_versions.clear();
+    m_playMode.clear();
     clearError();
 
     emit stateChanged();
@@ -428,16 +435,36 @@ void ListenTogether::joinRoom(const QString &roomRef, const QString &inviterId)
     const quint64 action = ++m_actionGeneration;
     setBusy(true);
 
-    sdk::acceptRoom(*m_client, roomId, inviter, this,
-                    [this, action, inviter](sdk::Result<sdk::ListenTogetherRoom> result) {
+    // 先查房间是否还能加入：满员/已失效时服务器会给一句可展示的 copywriting。
+    // 直接 accept 会让界面在错误里静默不动，用户会以为点击没有被处理。
+    sdk::checkRoom(*m_client, roomId, this,
+                   [this, action, roomId, inviter](sdk::Result<sdk::ListenTogetherCheck> check) {
         if (action != m_actionGeneration)
             return;
-        setBusy(false);
-        if (!result) {
-            setError(apiErrorText(result.error, QStringLiteral("加入一起听房间失败")));
+        if (check && !check.value->joinable) {
+            if ((m_inRoom && m_roomId == roomId)
+                || check.value->type.compare(QLatin1String("sameRoom"), Qt::CaseInsensitive) == 0) {
+                setBusy(false);
+                clearError();
+                return;   // 已经在这个房间里，点邀请不该报错
+            }
+            setBusy(false);
+            setError(check.value->copywriting.isEmpty()
+                         ? QStringLiteral("这个一起听房间现在无法加入")
+                         : check.value->copywriting);
             return;
         }
-        adoptRoom(*result.value, inviter);
+        sdk::acceptRoom(*m_client, roomId, inviter, this,
+                        [this, action, inviter](sdk::Result<sdk::ListenTogetherRoom> result) {
+            if (action != m_actionGeneration)
+                return;
+            setBusy(false);
+            if (!result) {
+                setError(apiErrorText(result.error, QStringLiteral("加入一起听房间失败")));
+                return;
+            }
+            adoptRoom(*result.value, inviter);
+        });
     });
 }
 
@@ -516,6 +543,48 @@ void ListenTogether::refreshStatus()
     });
 }
 
+// 官方客户端拉歌单时也带本地队列：服务器用 displayList/randomList 计算差异并返回
+// 需要替换的列表。只传 roomId 时只能拿到旧缓存，房主改了队列对方也不会变。
+QJsonObject ListenTogether::playlistContext() const
+{
+    QJsonArray display;
+    QJsonArray random;
+    qint64 anchorPosition = -1;
+    const qint64 nowPlaying = currentSongId();
+    for (qsizetype i = 0; i < m_trackIds.size(); ++i) {
+        const qint64 id = variantId(m_trackIds.at(i));
+        if (id <= 0)
+            continue;
+        const QString value = QString::number(id);
+        display.append(value);
+        random.append(value);
+        if (id == nowPlaying)
+            anchorPosition = i;
+    }
+
+    QJsonObject param;
+    param.insert(QStringLiteral("displayList"), display);
+    param.insert(QStringLiteral("randomList"), random);
+    param.insert(QStringLiteral("anchorSongId"), QString::number(nowPlaying));
+    param.insert(QStringLiteral("anchorPosition"), static_cast<double>(anchorPosition));
+    param.insert(QStringLiteral("clientSeq"), static_cast<double>(m_clientSeq));
+    if (!m_playMode.isEmpty())
+        param.insert(QStringLiteral("playMode"), m_playMode);
+    return param;
+}
+
+QJsonArray ListenTogether::playlistVersions() const
+{
+    QJsonArray versions;
+    for (auto it = m_versions.cbegin(); it != m_versions.cend(); ++it) {
+        versions.append(QJsonObject{
+            {QStringLiteral("userId"), static_cast<double>(it.key())},
+            {QStringLiteral("version"), static_cast<double>(it.value())},
+        });
+    }
+    return versions;
+}
+
 void ListenTogether::fetchSyncPlaylist()
 {
     if (!m_inRoom || m_syncInFlight || m_roomId.isEmpty())
@@ -524,13 +593,16 @@ void ListenTogether::fetchSyncPlaylist()
     const quint64 generation = m_generation;
     const QString roomId = m_roomId;
     m_syncInFlight = true;
-    sdk::fetchSyncPlaylist(*m_client, roomId, this,
+    sdk::fetchSyncPlaylist(*m_client, roomId, playlistContext(), this,
                            [this, generation, roomId](sdk::Result<sdk::ListenTogetherSync> result) {
         if (generation != m_generation || roomId != m_roomId)
             return;
         m_syncInFlight = false;
-        if (!result)
+        if (!result) {
+            // 解析失败时不要把旧队列当最新状态；下一次轮询再试。
+            qCDebug(lcListen) << "sync playlist failed:" << result.error.message;
             return;
+        }
         applySync(*result.value);
     });
 }
@@ -548,7 +620,8 @@ void ListenTogether::sendHeartbeat()
     const qint64 progress = audioProgressMs();
 
     m_heartbeatInFlight = true;
-    sdk::reportHeartbeat(*m_client, roomId, songId, playStatus, progress, this,
+    sdk::reportHeartbeat(*m_client, roomId, songId, playStatus, progress,
+                         playlistVersions(), this,
                          [this, generation, roomId](sdk::Result<sdk::ListenTogetherResult>) {
         if (generation != m_generation || roomId != m_roomId)
             return;
@@ -558,6 +631,17 @@ void ListenTogether::sendHeartbeat()
 
 void ListenTogether::applySync(const sdk::ListenTogetherSync &sync)
 {
+    qCDebug(lcListen) << "sync playlist display" << sync.playlist.displayList.size()
+                      << "random" << sync.playlist.randomList.size()
+                      << "replace" << sync.playlist.replaced
+                      << "command" << sync.command.has_value();
+    if (!sync.playlist.versions.isEmpty()) {
+        m_versions.clear();
+        for (const sdk::ListenTogetherVersion &entry : sync.playlist.versions)
+            m_versions.insert(entry.userId, entry.version);
+    }
+    if (!sync.playlist.playMode.isEmpty())
+        m_playMode = sync.playlist.playMode;
     applyPlaylist(sync.playlist);
     if (sync.command)
         applyCommand(*sync.command);
@@ -565,8 +649,19 @@ void ListenTogether::applySync(const sdk::ListenTogetherSync &sync)
 
 void ListenTogether::applyPlaylist(const sdk::ListenTogetherPlaylist &playlist)
 {
-    // trackIds 原样对应服务器的 displayList；非正数只用来占位，不参与取详情。
+    // changed=false 表示服务器这次没有给出新的队列；不能用旧列表覆盖本地刚同步的队列。
+    if (!playlist.replaced && !playlist.displayChanged && !playlist.randomChanged)
+        return;
+
+    // trackIds 原样对应服务器的 displayList；randomList 是随机模式下的另一份顺序，
+    // 只有服务器没给 displayList 时才拿它兜底，避免随机列表变化每分钟把队列翻一遍。
     QList<qint64> ids = playlist.displayList;
+    if (ids.isEmpty())
+        ids = playlist.randomList;
+    // replace=false 且没有列表时只是「这次没有变更」，不能把已经拿到的队列清空。
+    if (ids.isEmpty() && !playlist.replaced)
+        return;
+
     const bool same = sameIds(m_trackIds, ids);
     if (same && ids.isEmpty()) {
         if (!m_tracks.isEmpty()) {
@@ -674,6 +769,7 @@ void ListenTogether::updateQueue(const QList<qint64> &ids)
         if (orderedTracks == m_tracks)
             return;
         m_tracks = orderedTracks;
+        qCDebug(lcListen) << "sync queue ready" << m_tracks.size() << "tracks";
         emit tracksChanged();
     });
 }
@@ -709,7 +805,8 @@ void ListenTogether::applyCommand(const sdk::ListenTogetherCommand &command)
 
     const QString &type = command.commandType;
     if (!isCommandType(type, "GOTO") && !isCommandType(type, "PLAY")
-        && !isCommandType(type, "PAUSE") && !isCommandType(type, "seek")) {
+        && !isCommandType(type, "PAUSE") && !isCommandType(type, "seek")
+        && !isCommandType(type, "NEXT") && !isCommandType(type, "PREV")) {
         return;
     }
 
@@ -853,44 +950,94 @@ void ListenTogether::syncQueue(const QVariantList &songIds)
     const QList<qint64> ids = positiveIds(songIds);
     QJsonArray randomList;
     QJsonArray displayList;
-    for (qint64 id : ids) {
-        randomList.append(QString::number(id));
-        displayList.append(QString::number(id));
+    qint64 anchorPosition = -1;
+    const qint64 nowPlaying = currentSongId();
+    for (qsizetype i = 0; i < ids.size(); ++i) {
+        const QString id = QString::number(ids.at(i));
+        randomList.append(id);
+        displayList.append(id);
+        if (ids.at(i) == nowPlaying)
+            anchorPosition = i;
     }
 
-    const qint64 playlistVersion = ++m_playlistVersion;
-    QJsonObject versionEntry;
-    versionEntry.insert(QStringLiteral("userId"), static_cast<double>(m_myUid));
-    versionEntry.insert(QStringLiteral("version"), static_cast<double>(playlistVersion));
+    // 服务器用 version 合并多方对歌单的修改：把同步回来的其他成员版本原样带上，
+    // 自己的版本 +1；只带自己的版本时对方的列表不会发生变化。
+    const qint64 playlistVersion = m_versions.value(m_myUid) + 1;
+    m_playlistVersion = playlistVersion;
+    QHash<qint64, qint64> versions = m_versions;
+    versions.insert(m_myUid, playlistVersion);
     QJsonArray version;
-    version.append(versionEntry);
+    for (auto it = versions.cbegin(); it != versions.cend(); ++it) {
+        version.append(QJsonObject{
+            {QStringLiteral("userId"), static_cast<double>(it.key())},
+            {QStringLiteral("version"), static_cast<double>(it.value())},
+        });
+    }
 
+    const qint64 clientSeq = ++m_clientSeq;
+    const quint64 syncRequestSeq = ++m_syncRequestSeq;
     QJsonObject playlistParam;
     playlistParam.insert(QStringLiteral("commandType"), QStringLiteral("REPLACE"));
     playlistParam.insert(QStringLiteral("version"), version);
-    playlistParam.insert(QStringLiteral("anchorSongId"), QString());
-    playlistParam.insert(QStringLiteral("anchorPosition"), -1.0);
+    playlistParam.insert(QStringLiteral("anchorSongId"), QString::number(nowPlaying));
+    playlistParam.insert(QStringLiteral("anchorPosition"), static_cast<double>(anchorPosition));
     playlistParam.insert(QStringLiteral("randomList"), randomList);
     playlistParam.insert(QStringLiteral("displayList"), displayList);
+    playlistParam.insert(QStringLiteral("clientSeq"), static_cast<double>(clientSeq));
+    if (!m_playMode.isEmpty())
+        playlistParam.insert(QStringLiteral("playMode"), m_playMode);
 
     const quint64 generation = m_generation;
-    sdk::reportPlaylist(*m_client, m_roomId, playlistParam, this,
-                        [this, generation, playlistVersion,
-                         ids](sdk::Result<sdk::ListenTogetherResult> result) {
+    sdk::reportPlaylist(*m_client, m_roomId, playlistParam, clientSeq, this,
+                        [this, generation, playlistVersion, syncRequestSeq, ids](sdk::Result<sdk::ListenTogetherResult> result) {
         // 后一次 syncQueue 已经发出时，旧回包不能再覆盖新的队列。
-        if (generation != m_generation || playlistVersion != m_playlistVersion)
+        if (generation != m_generation || playlistVersion != m_playlistVersion
+            || syncRequestSeq != m_syncRequestSeq)
             return;
-        if (!result) {
-            setError(apiErrorText(result.error, QStringLiteral("同步歌单失败")));
-            return;
-        }
-        if (!result.value->success) {
-            setError(result.value->message.isEmpty() ? QStringLiteral("同步歌单失败")
-                                                     : result.value->message);
+        if (!result || !result.value->success) {
+            setError(!result ? apiErrorText(result.error, QStringLiteral("同步歌单失败"))
+                             : result.value->message.isEmpty() ? QStringLiteral("同步歌单失败")
+                                                               : result.value->message);
             return;
         }
+        m_versions.insert(m_myUid, playlistVersion);
         clearError();
         updateQueue(ids);
+    });
+}
+
+void ListenTogether::inviteUser(double userId)
+{
+    updateIdentity();
+    const qint64 uid = qRound64(userId);
+    if (!m_inRoom || m_roomId.isEmpty()) {
+        setError(QStringLiteral("先开始一起听，才能邀请好友"));
+        return;
+    }
+    if (uid <= 0) {
+        setError(QStringLiteral("好友信息无效"));
+        return;
+    }
+    if (m_busy)
+        return;
+
+    clearError();
+    const quint64 generation = m_generation;
+    const QString roomId = m_roomId;
+    setBusy(true);
+    sdk::inviteUsers(*m_client, roomId, QList<qint64>{uid}, this,
+                     [this, generation, roomId, uid](sdk::Result<sdk::ListenTogetherResult> result) {
+        if (generation != m_generation || roomId != m_roomId)
+            return;
+        setBusy(false);
+        if (!result || !result.value->success) {
+            setError(!result ? apiErrorText(result.error, QStringLiteral("邀请好友失败"))
+                             : result.value->message.isEmpty() ? QStringLiteral("邀请好友失败")
+                                                               : result.value->message);
+            return;
+        }
+        qCDebug(lcListen) << "invited user" << uid << "to room" << roomId;
+        emit userInvited(static_cast<double>(uid));
     });
 }
 

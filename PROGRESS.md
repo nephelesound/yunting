@@ -76,14 +76,15 @@
 
 状态以本表与 `docs/API-FRONTEND.md` 为准；`docs/API-FRONTEND.md` 的 P0 是历史建议，底部“已实现的新增数据槽”已落地。
 
-## 官方客户端分析
+## 公开功能面参考
 
-- [x] macOS dmg：`NeteaseMusic 3.1.8.3330`，CEF + 原生壳
-- [x] APK：`9.6.08.261015102648`，hybrid + RN 模块
-- [x] 确认官方功能面：下载、本地音乐、云盘上传、MV、桌面歌词、迷你播放器、全屏封面、音效 / EQ / 3D / 杜比、一起听、IM、听歌识曲、播客 / 长音频、皮肤、自动更新
-- [x] 确认 APK 资源里有 EQ 预设、混响、空间音频、`rn_rn-podcast-*`、`rn_rn-artist`、`rn_rn-audio-quality-layer`、评论社区、K 歌 / MV 等模块
+- [x] 功能面：下载、本地音乐、云盘上传、MV、桌面歌词、迷你播放器、全屏封面、音效 / EQ / 3D / 杜比、一起听、IM、听歌识曲、播客 / 长音频、皮肤、自动更新
+- [x] 资源与模块覆盖：EQ 预设、混响、空间音频、播客 / 歌手 / 音质、评论社区、K 歌 / MV
 
 ## 后端下一步（按用户可见价值排序）
+
+剩余端点的请求规格（一起听、私信、动态/话题、评论互动、歌单/云盘/账户）见
+[`docs/API-REMAINING.md`](docs/API-REMAINING.md)。社交部分优先。
 
 - [x] Store 按领域拆分：core / account / like / playlist / follow / on-demand
 - [x] 专辑 / 歌手关注状态与订阅写接口（写操作，需控频）
