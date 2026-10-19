@@ -20,6 +20,7 @@ Item {
     Component { id: nowPlayingComponent; NowPlayingPage { width: root.width; height: root.height } }
     Component { id: spyComponent; SignalSpy {} }
     Component { id: queueComponent; QueuePanel {} }
+    Component { id: roomComponent; SimListenTogether {} }
     // 定位按钮：与歌单页、歌手页同一种接法（LocateCurrent 挂在 ListView 上）
     Component {
         id: locateComponent
@@ -169,6 +170,57 @@ Item {
             panel.currentIndex = 1;                        // 切到下一首：B 离开「接下来」
             tryVerify(() => names() === "XD");
             verify(list.itemAtIndex(1) === rowD, "切歌后其余行原地保留");
+        }
+
+        // 一起听的「结束」：好友在时在原地问一句（不另开一层弹窗、下面的队列不跳），取消或关上抽屉都不结束；
+        // 还没人来、或好友自己退出，点了就走
+        function listenPanel(state, host) {
+            const room = createTemporaryObject(roomComponent, root, { state: state, host: host });
+            const panel = createTemporaryObject(queueComponent, root, { room: room, queue: [], currentIndex: -1 });
+            panel.listenEndRequested.connect(room.leaveRoom);
+            panel.open();
+            const end = findChild(panel, "listenEnd");
+            tryVerify(() => end.visible && end.width > 0);
+            return { room: room, panel: panel, end: end };
+        }
+
+        function test_hostEndAsksInPlaceWhileFriendIsThere() {
+            const p = listenPanel("together", true);
+            const slot = findChild(p.panel, "listenHintSlot");
+            const height = slot.height;
+            mouseClick(p.end);
+            verify(p.room.inRoom, "第一次点「结束」只是问一句");
+            compare(slot.height, height, "确认与说明共用一格，下面的队列不跳");
+            const cancel = findChild(p.panel, "listenEndCancel");
+            tryVerify(() => cancel.visible && cancel.opacity === 1);
+            mouseClick(cancel);
+            verify(!p.panel.confirmingEnd);
+            verify(p.room.inRoom);
+
+            tryVerify(() => p.end.enabled && p.end.opacity === 1);
+            mouseClick(p.end);
+            const confirm = findChild(p.panel, "listenEndConfirm");
+            tryVerify(() => confirm.visible && confirm.opacity === 1);
+            mouseClick(confirm);
+            verify(!p.room.inRoom);
+        }
+
+        function test_closingTheQueueCancelsTheEndQuestion() {
+            const p = listenPanel("together", true);
+            mouseClick(p.end);
+            verify(p.panel.confirmingEnd);
+            p.panel.close();
+            tryVerify(() => !p.panel.confirmingEnd);
+            verify(p.room.inRoom);
+        }
+
+        function test_endWithoutFriendOrAsGuestLeavesAtOnce() {
+            const waiting = listenPanel("waiting", true);
+            mouseClick(waiting.end);
+            verify(!waiting.room.inRoom, "还没人来：没人会被影响，不问");
+            const guest = listenPanel("together", false);
+            mouseClick(guest.end);
+            verify(!guest.room.inRoom, "好友退出只是自己离开，不问");
         }
 
         // 桌面歌词：当前句按进度填色；播放时在两次引擎进度之间也连续前进；位置夹在屏幕内

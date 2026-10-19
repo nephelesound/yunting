@@ -86,6 +86,7 @@ SHOTS = home:page=home home-anon:account=anonymous,page=home charts:page=charts 
         worst-radio:fixture=worst,listKey=radio:7,page=list \
         worst-search-users:fixture=worst,searchQuery=x,searchCollection=users,page=search worst-reorder:fixture=worst,page=playlists,startOverlay=reorder \
         listen-waiting:fixture=one,listenState=waiting,page=home,startOverlay=queue listen-together:fixture=one,listenState=together,page=home,startOverlay=queue \
+        listen-end:fixture=one,listenState=together,page=home,startOverlay=endlisten \
         worst-playlist-comments:fixture=worst,listKey=playlist:11,page=list,startPane=comments \
         worst-downloads:fixture=worst,listKey=downloads,page=list,downloadsFilled=true empty-downloads:fixture=empty,listKey=downloads,page=list \
         worst-mine-downloads:fixture=worst,page=mine,downloadsFilled=true worst-mv:fixture=worst,page=mv,mvId=1

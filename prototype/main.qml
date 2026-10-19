@@ -107,27 +107,6 @@ Kirigami.ApplicationWindow {
         }
     }
 
-    // 房主结束：房间散了，好友那边也会停；说清楚再结束
-    Kirigami.PromptDialog {
-        id: endListenDialog
-        title: "结束一起听？"
-        subtitle: "好友那边也会停止。"
-        standardButtons: Kirigami.Dialog.NoButton
-        customFooterActions: [
-            Kirigami.Action {
-                text: "结束"
-                icon.name: "system-log-out"
-                onTriggered: endListenDialog.accept()
-            },
-            Kirigami.Action {
-                text: "取消"
-                icon.name: "dialog-cancel"
-                onTriggered: endListenDialog.reject()
-            }
-        ]
-        onAccepted: root.listenRoom.leaveRoom()
-    }
-
     Playback {
         id: playback
         engine: root.backend ? root.backend.audio : simEngine
@@ -312,7 +291,7 @@ Kirigami.ApplicationWindow {
         onClearRequested: playback.clearUpcoming()
         onMoveRequested: (from, to) => playback.move(from, to)
         room: root.loggedIn ? root.listenRoom : null
-        onListenEndRequested: root.listenRoom.host ? endListenDialog.open() : root.listenRoom.leaveRoom()
+        onListenEndRequested: root.listenRoom.leaveRoom()
         onListenLinkCopied: root.notify("已复制邀请链接")
     }
 
@@ -579,6 +558,10 @@ Kirigami.ApplicationWindow {
             trackMenu.popup(root.width - Tokens.pageMargin - trackMenu.implicitWidth, Tokens.height12 * 3);
         } else if (root.startOverlay === "queue")
             queuePanel.open();
+        else if (root.startOverlay === "endlisten") {
+            queuePanel.open();
+            queuePanel.confirmingEnd = true;
+        }
         else if (root.startOverlay === "equalizer")
             playerBar.openEqualizer();
         else if (root.startOverlay === "quality")

@@ -18,6 +18,8 @@ Kirigami.OverlayDrawer {
     property bool vip
     property bool smartEnabled: false
     property var room: null   // 一起听（C++ ListenTogether 或原型替身）；未登录时为 null
+    property bool confirmingEnd: false   // 房主点了「结束」，在原地确认；关上抽屉就算取消
+    onClosed: panel.confirmingEnd = false
 
     signal activated(int index)
     signal listenEndRequested()
@@ -172,6 +174,12 @@ Kirigami.OverlayDrawer {
             readonly property var users: panel.room ? panel.room.users || [] : []
             readonly property bool waiting: users.length < 2
 
+            Connections {
+                target: panel.room
+                ignoreUnknownSignals: true
+                function onLeftRoom() { panel.confirmingEnd = false; }
+            }
+
             RowLayout {
                 Layout.fillWidth: true
                 spacing: Tokens.space3
@@ -205,13 +213,22 @@ Kirigami.OverlayDrawer {
                 }
                 Item { Layout.fillWidth: true }
                 Button {
+                    objectName: "listenEnd"
                     implicitHeight: Tokens.height8
                     flat: true
-                    enabled: !panel.room || !panel.room.busy
-                    // 房主走了房间就散了，好友那边也会停；好友退出只是自己离开
+                    // 确认出现时让位给下面那一格的「结束一起听」，同一处不放两个结束
+                    opacity: panel.confirmingEnd ? 0 : 1
+                    Behavior on opacity { NumberAnimation { duration: Tokens.motionBase; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut } }
+                    enabled: !panel.confirmingEnd && (!panel.room || !panel.room.busy)
+                    // 房主走了房间就散了，好友在时先在原地问一句；还没人来、或好友自己退出，直接走
                     text: panel.room && panel.room.host ? "结束" : "退出"
                     font.pixelSize: Tokens.textSm
-                    onClicked: panel.listenEndRequested()
+                    onClicked: {
+                        if (panel.room.host && !listenSection.waiting)
+                            panel.confirmingEnd = true;
+                        else
+                            panel.listenEndRequested();
+                    }
                 }
             }
 
@@ -257,13 +274,63 @@ Kirigami.OverlayDrawer {
                 }
             }
 
-            Label {
+            // 说明与「结束」的确认共用这一格，原地淡入淡出；格高取两者较高的，下面的队列不跳
+            Item {
+                objectName: "listenHintSlot"
                 Layout.fillWidth: true
-                text: panel.room && panel.room.host ? "你放的歌会同步给好友，两人都能切歌和暂停"
-                    : "歌单由房主决定，两人都能切歌和暂停"
-                font.pixelSize: Tokens.textSm
-                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
-                wrapMode: Text.Wrap
+                implicitHeight: Math.max(roomHint.implicitHeight, endConfirm.implicitHeight)
+
+                Label {
+                    id: roomHint
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    opacity: panel.confirmingEnd ? 0 : 1
+                    visible: opacity > 0
+                    Behavior on opacity { NumberAnimation { duration: Tokens.motionBase; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut } }
+                    text: panel.room && panel.room.host ? "你放的歌会同步给好友，两人都能切歌和暂停"
+                        : "歌单由房主决定，两人都能切歌和暂停"
+                    font.pixelSize: Tokens.textSm
+                    color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                    wrapMode: Text.Wrap
+                }
+
+                RowLayout {
+                    id: endConfirm
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Tokens.space2
+                    opacity: panel.confirmingEnd ? 1 : 0
+                    visible: opacity > 0
+                    Behavior on opacity { NumberAnimation { duration: Tokens.motionBase; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut } }
+                    Label {
+                        Layout.fillWidth: true
+                        text: "好友那边也会停止播放"
+                        font.pixelSize: Tokens.textSm
+                        wrapMode: Text.Wrap
+                    }
+                    Button {
+                        objectName: "listenEndConfirm"
+                        implicitHeight: Tokens.height8
+                        text: "结束一起听"
+                        font.pixelSize: Tokens.textSm
+                        enabled: panel.confirmingEnd && (!panel.room || !panel.room.busy)
+                        onClicked: {
+                            panel.confirmingEnd = false;
+                            panel.listenEndRequested();
+                        }
+                    }
+                    Button {
+                        objectName: "listenEndCancel"
+                        implicitHeight: Tokens.height8
+                        flat: true
+                        text: "取消"
+                        font.pixelSize: Tokens.textSm
+                        enabled: panel.confirmingEnd
+                        onClicked: panel.confirmingEnd = false
+                    }
+                }
             }
             Kirigami.InlineMessage {
                 Layout.fillWidth: true
