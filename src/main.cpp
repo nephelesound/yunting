@@ -7,6 +7,7 @@
 #include <KAboutData>
 #include <QApplication>
 #include <QDBusConnection>
+#include <QDBusConnectionInterface>
 #include <QDBusMessage>
 #include <QDir>
 #include <QIcon>
@@ -14,16 +15,27 @@
 #include <QSGRendererInterface>
 
 #include <cstdio>
+#include <optional>
 
 namespace {
 
-// 浏览器点「在客户端打开」时，链接经 xdg-desktop-portal 拉起云听；门户若比桌面先启动，
-// 它的环境里没有 WAYLAND_DISPLAY / DISPLAY，建 QApplication 就会崩。这个进程只是来送链接的：
-// 不建窗口，把参数交给已在运行的云听（KDBusService 的 CommandLine，与第二次启动走同一条路）。
-bool deliversLinkWithoutDisplay(int argc, char *argv[])
+// 桌面、浏览器、门户拉起云听都只带一个链接或什么也不带；带选项的是命令行用法，照常起
+bool plainLaunch(int argc, char *argv[])
 {
-    if (!qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY") || !qEnvironmentVariableIsEmpty("DISPLAY")
-        || !qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM"))
+    for (int i = 1; i < argc; ++i) {
+        if (argv[i][0] == '-')
+            return false;
+    }
+    return true;
+}
+
+// 浏览器点「在客户端打开」时，链接经 xdg-desktop-portal 拉起云听；门户若比桌面先启动，
+// 它的环境里没有 WAYLAND_DISPLAY / DISPLAY，建 QApplication 就会崩。离屏（offscreen / minimal）是有意为之，不算
+bool linkWithoutDisplay(int argc, char *argv[])
+{
+    const QByteArray platform = qgetenv("QT_QPA_PLATFORM");
+    if (platform.startsWith("offscreen") || platform.startsWith("minimal")
+        || !qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY") || !qEnvironmentVariableIsEmpty("DISPLAY"))
         return false;
     for (int i = 1; i < argc; ++i) {
         if (findLink(QString::fromLocal8Bit(argv[i])).found())
@@ -32,26 +44,41 @@ bool deliversLinkWithoutDisplay(int argc, char *argv[])
     return false;
 }
 
-int forwardToRunningInstance(int argc, char *argv[])
+// 已有云听在运行：把参数交给它（KDBusService 的 CommandLine，与第二次启动走同一条路），连同拉起这个进程的
+// 激活令牌，那边才能把窗口提到前面（Wayland 不许没有令牌的窗口抢焦点）。没在运行返回空。
+// 要在钥匙串、mpv 这些初始化之前问：第二次启动不该先等这些
+std::optional<int> forwardToRunningInstance()
 {
-    QCoreApplication app(argc, argv);
+    const QString service = QStringLiteral("io.github.nephelesound.Yunting");
+    QDBusConnection bus = QDBusConnection::sessionBus();
+    if (!bus.isConnected() || !bus.interface()->isServiceRegistered(service))
+        return std::nullopt;
+    QVariantMap platformData;
+    if (const QString token = qEnvironmentVariable("XDG_ACTIVATION_TOKEN"); !token.isEmpty())
+        platformData.insert(QStringLiteral("activation-token"), token);
+    if (const QString startup = qEnvironmentVariable("DESKTOP_STARTUP_ID"); !startup.isEmpty())
+        platformData.insert(QStringLiteral("desktop-startup-id"), startup);
     QDBusMessage call = QDBusMessage::createMethodCall(
-        QStringLiteral("io.github.nephelesound.Yunting"), QStringLiteral("/io/github/nephelesound/Yunting"),
+        service, QStringLiteral("/io/github/nephelesound/Yunting"),
         QStringLiteral("org.kde.KDBusService"), QStringLiteral("CommandLine"));
-    call << QCoreApplication::arguments() << QDir::currentPath() << QVariantMap();
-    const QDBusMessage reply = QDBusConnection::sessionBus().call(call);
-    if (reply.type() == QDBusMessage::ReplyMessage)
-        return reply.arguments().value(0).toInt();
-    std::fprintf(stderr, "没有图形环境，云听也没有在运行，链接没法打开：%s\n", qPrintable(reply.errorMessage()));
-    return 1;
+    call << QCoreApplication::arguments() << QDir::currentPath() << platformData;
+    const QDBusMessage reply = bus.call(call);
+    if (reply.type() != QDBusMessage::ReplyMessage)
+        return std::nullopt;
+    return reply.arguments().value(0).toInt();
 }
 
 } // namespace
 
 int main(int argc, char *argv[])
 {
-    if (deliversLinkWithoutDisplay(argc, argv))
-        return forwardToRunningInstance(argc, argv);
+    if (linkWithoutDisplay(argc, argv)) {
+        QCoreApplication app(argc, argv);
+        if (const auto rc = forwardToRunningInstance())
+            return *rc;
+        std::fprintf(stderr, "没有图形环境，云听也没有在运行，链接没法打开\n");
+        return 1;
+    }
 
     // 桌面歌词与迷你窗是透明的顶层窗口；没有 alpha buffer 时合成器会把透明区域画成黑色。
     // 必须在创建任何 QQuickWindow 之前设置。
@@ -59,6 +86,10 @@ int main(int argc, char *argv[])
     // MV 用 MpvQt 的 MpvAbstractItem 渲染，它只支持 OpenGL；必须在创建第一个窗口前定下
     QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
     QApplication app(argc, argv);
+    if (plainLaunch(argc, argv)) {
+        if (const auto rc = forwardToRunningInstance())
+            return *rc;
+    }
     // 应用的身份只在这里定义（KAboutData 同时写进 QCoreApplication / QGuiApplication，「关于」页也读它），
     // 其余地方都从 QCoreApplication / QGuiApplication 读：
     //   componentName（applicationName）：数据与缓存目录、MPRIS 总线名、钥匙串服务名（不设组织名，目录不多套一层）

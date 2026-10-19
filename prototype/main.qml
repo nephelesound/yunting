@@ -478,6 +478,12 @@ Kirigami.ApplicationWindow {
             if (key.startsWith("lyricsNew:"))
                 return;
             Source.markRequestFailed(key, message);
+            // 外部链接要打开的那首没取到：这是用户刚点的，要说出来（页面数据失败不弹，见下）
+            if (key === "song:" + root.linkedSongId) {
+                root.linkedSongId = 0;
+                root.fail("这首歌没打开：" + message);
+                return;
+            }
             // 页面数据失败由各页自己的占位/重试说明（离线状态另在 ScreenFrame 顶部）；
             // 这里不再把被动加载失败弹成全局「网络不可用」。
             console.warn(logUi, "request failed:", key.split(":")[0], message);
@@ -594,14 +600,17 @@ Kirigami.ApplicationWindow {
         }
     }
 
-    // 插到「下一首」并立刻放，原来的队列不动
+    // 插到「下一首」并立刻放，原来的队列不动。MV 页开着就先离开它：MV 自带声音，不能两路同时出声
     function playNow(track) {
+        if (root.page === "mv")
+            root.goBack();
         playback.playNext(track);
         playback.play(playback.queue, playback.queue.findIndex(t => t.id === track.id));
     }
     // 外部链接（网页「在客户端打开」、orpheus://、分享链接，见 links.h）：页面走上面同一套导航；
-    // 歌曲 playNow。只知道 id 的歌要先取详情，取到再放
+    // 歌曲 playNow。只知道 id 的歌要先取详情，取到再放；取了太久（用户可能已经放起了别的）就不打断，问一句
     property real linkedSongId: 0
+    property real linkedAt: 0
     readonly property var linkedSong: root.linkedSongId > 0 ? Source.song(root.linkedSongId) : null
     onLinkedSongChanged: if (root.linkedSong) Qt.callLater(root.playLinkedSong)
     function playLinkedSong() {
@@ -609,11 +618,21 @@ Kirigami.ApplicationWindow {
         if (!track)
             return;
         root.linkedSongId = 0;
+        if (Date.now() - root.linkedAt > 10000) {
+            root.notify("链接里的《" + track.name + "》取到了", "long", "播放", () => root.playNow(track));
+            return;
+        }
         root.playNow(track);
     }
     function openLink(kind, id) {
         switch (kind) {
-        case "song": root.linkedSongId = id; break;
+        case "song":
+            root.linkedAt = Date.now();
+            root.linkedSongId = id;
+            // 同一首上次没取到：冷却期里不会自己再要，用户又点了一次，就立刻再要
+            if (Source.failure("song:" + id))
+                Source.retryKey("song:" + id);
+            break;
         case "playlist": Actions.playlistRequested(id); break;
         case "album": Actions.albumRequested(id); break;
         case "artist": Actions.artistRequested(id); break;

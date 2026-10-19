@@ -162,6 +162,19 @@ private slots:
         QTest::newRow("no netease link")
             << QStringLiteral("周末一起去听音乐会吧 https://example.com/x")
             << QString() << qint64(0) << QString();
+        // 网页「在客户端打开」实际拉起时的参数（多一个 channel 字段）
+        QTest::newRow("web open-in-client")
+            << QStringLiteral("orpheus://eyJ0eXBlIjoicGxheWxpc3QiLCJpZCI6IjI4NjgwMzE5MzYiLCJjbWQiOiJwbGF5IiwiY2hhbm5lbCI6IndlYnNldCJ9")
+            << QStringLiteral("playlist") << qint64(2868031936) << QString();
+        QTest::newRow("standard base64 with slash and padding")
+            << QStringLiteral("orpheus://eyJ0eXBlIjoic29uZyIsImlkIjoiMTAiLCJjbWQiOiJwbGF5IiwibmFtZSI6Ing/In0=")
+            << QStringLiteral("song") << qint64(10) << QString();
+        QTest::newRow("in-page anchor keeps the query")
+            << QStringLiteral("https://music.163.com/song?id=186001#comments")
+            << QStringLiteral("song") << qint64(186001) << QString();
+        QTest::newRow("markdown brackets")
+            << QStringLiteral("[听这首](https://music.163.com/song?id=186001) 或 [https://music.163.com/album?id=32311]")
+            << QStringLiteral("song") << qint64(186001) << QString();
     }
     void findsLinksInsideShareText()
     {

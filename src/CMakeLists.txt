@@ -11,6 +11,7 @@ find_package(Qt6Keychain REQUIRED)
 find_package(KF6StatusNotifierItem REQUIRED)
 find_package(KF6CoreAddons REQUIRED)   # KAboutData（「关于」页）、KSignalHandler
 find_package(KF6DBusAddons REQUIRED)   # 单实例：KDBusService（cli.cpp 的 runGui）
+find_package(KF6WindowSystem REQUIRED) # 链接打开时用激活令牌把窗口提到前面（links.cpp）
 find_package(KF6ColorScheme REQUIRED)  # 中性配色下的应用色调（colortone.cpp）
 find_package(KF6Config REQUIRED)
 find_package(KF6I18n REQUIRED)         # kirigami-addons 的页面（「关于」）在 QML 里用 i18nd()
@@ -111,6 +112,7 @@ target_link_libraries(yunting PRIVATE
     Qt6Keychain::Qt6Keychain
     KF6::StatusNotifierItem
     KF6::DBusAddons
+    KF6::WindowSystem
     OpenSSL::Crypto
 )
 if (LayerShellQt_FOUND)

@@ -12,7 +12,7 @@ url='https://github.com/nephelesound/yunting'
 license=('GPL-3.0-or-later' 'MIT')   # MIT：应用图标（Microsoft Fluent Emoji），见 data/ICON-LICENSE
 depends=(
   qt6-base qt6-declarative mpvqt mpv
-  kirigami kirigami-addons kcoreaddons kdbusaddons ki18n kcolorscheme kconfig kstatusnotifieritem prison
+  kirigami kirigami-addons kcoreaddons kdbusaddons kwindowsystem ki18n kcolorscheme kconfig kstatusnotifieritem prison
   qtkeychain-qt6 openssl
   layer-shell-qt   # Wayland 下桌面歌词置顶
   zstd

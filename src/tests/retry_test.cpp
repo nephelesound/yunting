@@ -232,21 +232,23 @@ private slots:
     {
         FakeApi api;
         QVERIFY(api.listen(QHostAddress::LocalHost));
-        api.script = QQueue<int>({302, 500});
-        api.location = "https://music.163.com/song?id=186001";
+        // 跳转指回这个假服务器自己：要是跟过去了，会多吃掉一条脚本
+        api.script = QQueue<int>({302, 500, 200});
+        api.location = "/song?id=186001";
         NcmClient client;
         QUrl target;
         bool done = false;
         client.resolveRedirect(QUrl(baseUrl(&api) + "xLb2c3"), [&](const QUrl &t) { target = t; done = true; });
         QTRY_VERIFY(done);
-        QCOMPARE(target, QUrl("https://music.163.com/song?id=186001"));
+        QCOMPARE(target, QUrl(baseUrl(&api) + "song?id=186001"));
+        QCOMPARE(api.script.size(), 2);   // 只问了一次，没有跟着跳
 
         api.location.clear();
         done = false;
         client.resolveRedirect(QUrl(baseUrl(&api) + "gone"), [&](const QUrl &t) { target = t; done = true; });
         QTRY_VERIFY(done);
         QVERIFY(target.isEmpty());
-        QCOMPARE(api.script.size(), 0);   // 两次请求，两条脚本各用掉一条
+        QCOMPARE(api.script.size(), 1);   // 500 也只问一次，不重试
     }
 
     // 连接被拒（无 HTTP 状态）也按同一节奏重试，耗尽后按「网络原因」分类：Store 据此报离线

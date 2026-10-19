@@ -43,6 +43,7 @@
 #include <csignal>
 #include <cstdio>
 #include <functional>
+#include <memory>
 
 #ifdef YUNTING_KSIGNALHANDLER
 #include <KSignalHandler>
@@ -894,15 +895,19 @@ int runGui(const CommandLine &cli, QApplication &app, Backend &backend)
     // Flatpak 与 D-Bus 认的应用 id 是 io.github.nephelesound.Yunting。只在构造时临时换成 id
     // 的末段，构造完立即还原（KDBusService 只在构造时读 applicationName）。
     // 没有会话总线时（例如离屏截图）不让单实例失败拖垮界面。
+    // --screenshot 是工具用法：不登记单实例，否则应用开着时它会被转给已开的窗口，什么也不截却退出 0。
     Links links(&client);
-    const QString applicationName = QCoreApplication::applicationName();
-    QCoreApplication::setApplicationName(QStringLiteral("Yunting"));
-    KDBusService dbusService(KDBusService::Unique | KDBusService::NoExitOnFailure);
-    QCoreApplication::setApplicationName(applicationName);
-    QObject::connect(&dbusService, &KDBusService::activateRequested, &links,
-                     [&links](const QStringList &arguments, const QString &) {
-        links.activate(arguments);
-    });
+    std::unique_ptr<KDBusService> dbusService;
+    if (!cli.parser.isSet(cli.screenshot)) {
+        const QString applicationName = QCoreApplication::applicationName();
+        QCoreApplication::setApplicationName(QStringLiteral("Yunting"));
+        dbusService = std::make_unique<KDBusService>(KDBusService::Unique | KDBusService::NoExitOnFailure);
+        QCoreApplication::setApplicationName(applicationName);
+        QObject::connect(dbusService.get(), &KDBusService::activateRequested, &links,
+                         [&links](const QStringList &arguments, const QString &) {
+            links.activate(arguments);
+        });
+    }
 
     // 界面是完整客户端：用户点播放就是真实收听，默认允许上报（命令行 smoke 才需要 --allow-write）
     audio.setScrobblingAllowed(true);

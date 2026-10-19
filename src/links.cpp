@@ -3,6 +3,7 @@
 #include "link_parser.h"
 #include "ncmclient.h"
 
+#include <KWindowSystem>
 #include <QClipboard>
 #include <QGuiApplication>
 #include <QWindow>
@@ -62,6 +63,9 @@ void Links::open(const QString &text)
 void Links::start(const QStringList &arguments)
 {
     m_ready = true;
+    // 窗口可能在连上 activeChanged 之前就已经是活动的：那一次激活的剪贴板这里补看
+    if (m_window && m_window->isActive())
+        offerClipboard();
     // 激活请求可能比 QML 先到：它比冷启动参数新，优先处理。
     const QString text = m_pending.isEmpty() ? firstLink(arguments) : m_pending;
     m_pending.clear();
@@ -103,6 +107,7 @@ void Links::raiseWindow()
         m_window->showNormal();
     else if (!m_window->isVisible())
         m_window->show();
-    m_window->raise();
-    m_window->requestActivate();
+    // KDBusService 已把拉起第二个进程时的激活令牌放进环境；用它请求焦点（Wayland 不许无令牌抢焦点）
+    KWindowSystem::updateStartupId(m_window);
+    KWindowSystem::activateWindow(m_window);
 }

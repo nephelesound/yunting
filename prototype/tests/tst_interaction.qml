@@ -448,7 +448,7 @@ Item {
             compare(calls, [["playlist", 24381616, 9667509659, true]]);
         }
 
-        // 专辑页：没登录也能分享（专辑的 id 在 albumId）；长简介露 3 行，「展开全文」在对话框里给完整的一段
+        // 专辑页：没登录也能分享（专辑的 id 在 albumId）；长简介被截断时给「展开全文」，对话框里是完整的一段
         function test_albumPageSharesAndShowsTheFullDescription() {
             const description = "这张专辑收录了十首歌。".repeat(40);
             const page = createTemporaryObject(listPageComponent, root, {
@@ -472,7 +472,7 @@ Item {
             dialog.close();
         }
 
-        // 左窗格只有 280 宽：每种页面、每种状态下的动作排都放得下，不伸出窗格
+        // 左窗格只有 280 宽：歌单与专辑页各种登录 / 收藏 / 排序状态下，动作排都放得下，不伸出窗格
         function test_listActionsFitThePane() {
             const tracks = [root.track, Object.assign({}, root.track, { id: 900002 })];
             const cases = [

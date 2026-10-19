@@ -10,6 +10,8 @@
 #include <QUrl>
 #include <QUrlQuery>
 
+#include <optional>
+
 namespace {
 
 LinkKind kindFromName(const QString &name)
@@ -65,26 +67,36 @@ bool idFromQuery(const QString &query, qint64 &id)
         && positiveId(parsed.queryItemValue(QStringLiteral("id")), id);
 }
 
-// orpheus://<URL-safe base64(JSON)>：末尾的 / 与百分号编码都先还原。
+// base64 的 JSON 对象：URL 安全与标准两种字母表都认（先统一成标准的），缺的 = 不要紧。
+std::optional<QJsonObject> base64Json(QString payload)
+{
+    payload.replace(u'-', u'+').replace(u'_', u'/');
+    const auto decoded = QByteArray::fromBase64Encoding(payload.toLatin1(), QByteArray::AbortOnBase64DecodingErrors);
+    if (!decoded)
+        return std::nullopt;
+    QJsonParseError error;
+    const QJsonDocument document = QJsonDocument::fromJson(*decoded, &error);
+    if (error.error != QJsonParseError::NoError || !document.isObject())
+        return std::nullopt;
+    return document.object();
+}
+
+// orpheus://<base64(JSON)>：先还原百分号编码。末尾的 / 可能是浏览器补的，也可能就是标准 base64 的最后一个字：
+// 原样解不开再去掉它试一次
 OpenLink parseOrpheusPayload(const QString &text)
 {
     const QString prefix = QStringLiteral("orpheus://");
     if (!text.startsWith(prefix, Qt::CaseInsensitive))
         return {};
 
-    QString payload = text.mid(prefix.size());
-    if (payload.endsWith(u'/'))
-        payload.chop(1);
-    payload = QUrl::fromPercentEncoding(payload.toUtf8());
-
-    const QByteArray decoded = QByteArray::fromBase64(
-        payload.toLatin1(), QByteArray::Base64UrlEncoding | QByteArray::AbortOnBase64DecodingErrors);
-    QJsonParseError error;
-    const QJsonDocument document = QJsonDocument::fromJson(decoded, &error);
-    if (error.error != QJsonParseError::NoError || !document.isObject())
+    const QString payload = QUrl::fromPercentEncoding(text.mid(prefix.size()).toUtf8());
+    auto parsed = base64Json(payload);
+    if (!parsed && payload.endsWith(u'/'))
+        parsed = base64Json(payload.chopped(1));
+    if (!parsed)
         return {};
 
-    const QJsonObject object = document.object();
+    const QJsonObject object = *parsed;
     const LinkKind kind = kindFromName(object.value(QStringLiteral("type")).toString());
     if (kind == LinkKind::None)
         return {};
@@ -143,23 +155,18 @@ OpenLink parseShareUrl(const QString &text)
     if (!neteaseHost(url.host()))
         return {};
 
-    QString path = url.path();
-    QString query = url.query();
+    // 先看正常的路径与查询；解不出再看 #/ 片段里的（旧版网页把路由放在片段里）。
+    // 顺序不能反：song?id=1#comments 这类片段只是页内锚点
+    const auto linkFrom = [](const QString &path, const QString &query) {
+        const LinkKind kind = kindFromSegments(path.split(u'/', Qt::SkipEmptyParts));
+        qint64 id = 0;
+        return kind != LinkKind::None && idFromQuery(query, id) ? makeLink(kind, id) : OpenLink{};
+    };
+    if (const OpenLink link = linkFrom(url.path(), url.query()); link.valid())
+        return link;
     const QString fragment = url.fragment();
-    if (!fragment.isEmpty()) {
-        const qsizetype question = fragment.indexOf(u'?');
-        const QString fragmentPath = question < 0 ? fragment : fragment.left(question);
-        if (!fragmentPath.isEmpty()) {
-            path = fragmentPath;
-            query = question < 0 ? QString() : fragment.mid(question + 1);
-        }
-    }
-
-    const LinkKind kind = kindFromSegments(path.split(u'/', Qt::SkipEmptyParts));
-    qint64 id = 0;
-    if (kind == LinkKind::None || !idFromQuery(query, id))
-        return {};
-    return makeLink(kind, id);
+    const qsizetype question = fragment.indexOf(u'?');
+    return question < 0 ? OpenLink{} : linkFrom(fragment.left(question), fragment.mid(question + 1));
 }
 
 } // namespace
@@ -179,7 +186,7 @@ FoundLink findLink(const QString &text)
 {
     // 链接在空白、引号、中文标点或括号处结束；末尾的英文句读不算链接
     static const QRegularExpression candidate(
-        QStringLiteral("(?:orpheus|https?)://[^\\s<>\"'，。；、！？（）()「」『』【】]+"),
+        QStringLiteral("(?:orpheus|https?)://[^\\s<>\"'`\\[\\]{}，。；、！？（）()「」『』【】]+"),
         QRegularExpression::CaseInsensitiveOption);
     auto matches = candidate.globalMatch(text);
     while (matches.hasNext()) {

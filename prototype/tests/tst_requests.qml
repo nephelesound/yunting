@@ -175,7 +175,7 @@ Item {
             window.close();
         }
 
-        // 外部链接：专辑链接打开专辑页；歌曲链接先按 id 要详情，取到后插到下一首并开始放，原来的队列还在
+        // 外部链接：专辑链接打开专辑页；歌曲链接先按 id 要详情，取到后插到下一首、成为当前这首，原来的队列还在
         function test_linksOpenPagesAndPlaySongs() {
             store.failRequests = false;
             const window = Qt.createComponent("../main.qml").createObject(root, { backend: null, fixture: "worst" });
