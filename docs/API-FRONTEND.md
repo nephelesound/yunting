@@ -10,6 +10,7 @@
 - `sdk/song_wiki.h`：typed 模型，每个字段注明 raw JSON path；
 - `sdk/song_wiki.cpp`：唯一的 raw JSON 读取与校验点；
 - `sdk/song_wiki_service.*`：请求编排，返回 `Result<SongWiki>`；
+- `sdk/listen_data.h/.cpp`：听歌足迹（总时长、周/月实时报告、播放排行）的 typed 模型与纯解析；
 - `sdk/sdk_result.h`：`ErrorKind` / `Error` / `Result<T>`；
 - `samples/`：request、raw response、normalized response、JSON Schema。
 

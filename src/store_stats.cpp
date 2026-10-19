@@ -4,9 +4,9 @@
 #include "json_util.h"
 #include "ncmclient.h"
 #include "normalize.h"
+#include "sdk/listen_data.h"
 
 #include <QJsonDocument>
-#include <QJsonObject>
 
 using namespace ncm;
 
@@ -24,12 +24,13 @@ void Store::requestListenTotal()
             emit requestFailed(QStringLiteral("listen:total"), failure);
             return;
         }
-        const QJsonObject data = body(doc).value("data").toObject();
-        if (data.isEmpty()) {
+        const auto parsed = sdk::parseListenTotal(body(doc));
+        if (!parsed) {
             emit requestFailed(QStringLiteral("listen:total"), QStringLiteral("暂时取不到听歌统计"));
             return;
         }
-        put("listenTotal", QVariantMap{{"seconds", data.value("totalDuration").toDouble()}}, false);
+        put("listenTotal", QVariantMap{{"seconds", static_cast<double>(parsed.value->seconds)}},
+            false);
     });
 }
 
@@ -50,19 +51,20 @@ void Store::requestListenRealtime(const QString &type)
             emit requestFailed(QStringLiteral("listen:") + kind, failure);
             return;
         }
-        const QJsonObject data = body(doc).value("data").toObject();
-        if (data.isEmpty()) {
+        const auto parsed = sdk::parseListenRealtime(body(doc));
+        if (!parsed) {
             emit requestFailed(QStringLiteral("listen:") + kind, QStringLiteral("暂时取不到听歌统计"));
             return;
         }
+        const sdk::ListenRealtime &realtime = *parsed.value;
         put("listenRealtime", QVariantMap{
             {"type", kind},
-            {"startTime", data.value("startTime").toDouble()},
-            {"endTime", data.value("endTime").toDouble()},
-            {"userNickName", data.value("userNickName").toString()},
-            {"listenTimeDistribution", data.value("listenTimeDistributionBlock").toObject()},
-            {"weekFriends", data.value("weekFriendsListenBlock").toObject()},
-            {"weekToday", data.value("weekTodayListenBlock").toObject()},
+            {"startTime", static_cast<double>(realtime.startTime)},
+            {"endTime", static_cast<double>(realtime.endTime)},
+            {"userNickName", realtime.userNickName},
+            {"listenTimeDistribution", realtime.listenTimeDistribution},
+            {"weekFriends", realtime.weekFriends},
+            {"weekToday", realtime.weekToday},
         }, false);
     });
 }
@@ -85,34 +87,35 @@ void Store::requestListenRank(const QString &type)
             emit requestFailed(QStringLiteral("listenRank:") + kind, failure);
             return;
         }
-        const QJsonObject data = body(doc).value("data").toObject();
-        if (data.isEmpty()) {
-            emit requestFailed(QStringLiteral("listenRank:") + kind, QStringLiteral("暂时取不到播放排行"));
+        const auto parsed = sdk::parseListenRank(body(doc));
+        if (!parsed) {
+            emit requestFailed(QStringLiteral("listenRank:") + kind,
+                               QStringLiteral("暂时取不到播放排行"));
             return;
         }
+        const sdk::ListenRank &rank = *parsed.value;
         QVariantList items;
-        for (const QJsonValue &v : data.value("songItems").toArray()) {
-            const QJsonObject o = v.toObject();
+        items.reserve(rank.items.size());
+        for (const sdk::ListenRankSong &song : rank.items) {
             QVariantList artists;
-            for (const QJsonValue &a : o.value("artists").toArray()) {
-                const QJsonObject ao = a.toObject();
-                artists.append(QVariantMap{{"id", ao.value("artistId").toDouble()},
-                                           {"name", ao.value("artistName").toString()}});
-            }
+            artists.reserve(song.artists.size());
+            for (const sdk::ListenRankArtist &artist : song.artists)
+                artists.append(QVariantMap{{"id", static_cast<double>(artist.id)},
+                                           {"name", artist.name}});
             items.append(QVariantMap{
-                {"id", o.value("songId").toDouble()},
-                {"name", o.value("songName").toString()},
-                {"album", o.value("albumName").toString()},
-                {"cover", ncmSized(o.value("picUrl"), 120)},
-                {"playCount", o.value("playCount").toDouble()},
+                {"id", static_cast<double>(song.id)},
+                {"name", song.name},
+                {"album", song.album},
+                {"cover", ncmSized(QJsonValue(song.cover), 120)},
+                {"playCount", static_cast<double>(song.playCount)},
                 {"artists", artists},
             });
         }
         put("listenRank", QVariantMap{
             {"type", kind},
-            {"startTime", data.value("startTime").toDouble()},
-            {"endTime", data.value("endTime").toDouble()},
-            {"songCount", data.value("songCount").toDouble()},
+            {"startTime", static_cast<double>(rank.startTime)},
+            {"endTime", static_cast<double>(rank.endTime)},
+            {"songCount", static_cast<double>(rank.songCount)},
             {"items", items},
         }, false);
     });

@@ -1453,6 +1453,141 @@ private slots:
         QCOMPARE(reply.value("userId").toDouble(), 9.0);
     }
 
+    // 听歌足迹走 SDK typed 解析后，前端拿到的 map 形状与字段类型不变
+    void listenStatsKeepQmlShape()
+    {
+        const QJsonObject distribution{
+            {"timeDistribution", QJsonObject{{"morning", 60}, {"night", 40}}}};
+        const QJsonObject friends{{"friendCount", 3}, {"rank", 2}};
+        const QJsonObject today{{"playCount", 7}, {"songCount", 5}};
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/content/activity/listen/data/realtime/report") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"data", QJsonObject{
+                         {"startTime", 1750000000000.0},
+                         {"endTime", 1750604800000.0},
+                         {"userNickName", "Listener"},
+                         {"listenTimeDistributionBlock", distribution},
+                         {"weekFriendsListenBlock", friends},
+                         {"weekTodayListenBlock", today}}}}));
+                return;
+            }
+            if (req.path == "/api/content/activity/listen/data/song/play/rank") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"data", QJsonObject{
+                         {"startTime", 1750000000000.0},
+                         {"endTime", 1750604800000.0},
+                         {"songCount", 1},
+                         {"songItems", QJsonArray{QJsonObject{
+                              {"songId", 42},
+                              {"songName", "First"},
+                              {"albumName", "album"},
+                              {"picUrl", "http://p1.music.126.net/cover.jpg"},
+                              {"playCount", 17},
+                              {"artists", QJsonArray{
+                                   QJsonObject{{"artistId", 7}, {"artistName", "Alice"}},
+                                   QJsonObject{{"artistId", 8}, {"artistName", "Bob"}}}}}}}}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("listen:week"));
+        m_store->request(QStringLiteral("listenRank:month"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("listenRealtime").toMap().value("type").toString()
+                       == QStringLiteral("week")
+                && m_store->data().value("listenRank").toMap().value("type").toString()
+                       == QStringLiteral("month");
+        }));
+
+        const QVariantMap realtime = m_store->data().value("listenRealtime").toMap();
+        QCOMPARE(realtime.keys(), QStringList({QStringLiteral("endTime"),
+                                               QStringLiteral("listenTimeDistribution"),
+                                               QStringLiteral("startTime"),
+                                               QStringLiteral("type"),
+                                               QStringLiteral("userNickName"),
+                                               QStringLiteral("weekFriends"),
+                                               QStringLiteral("weekToday")}));
+        QCOMPARE(realtime.value("type").toString(), QStringLiteral("week"));
+        QCOMPARE(realtime.value("startTime").toDouble(), 1750000000000.0);
+        QCOMPARE(realtime.value("endTime").toDouble(), 1750604800000.0);
+        QCOMPARE(realtime.value("userNickName").toString(), QStringLiteral("Listener"));
+        QCOMPARE(realtime.value("listenTimeDistribution").toJsonObject(), distribution);
+        QCOMPARE(realtime.value("weekFriends").toJsonObject(), friends);
+        QCOMPARE(realtime.value("weekToday").toJsonObject(), today);
+
+        const QVariantMap rank = m_store->data().value("listenRank").toMap();
+        QCOMPARE(rank.keys(), QStringList({QStringLiteral("endTime"), QStringLiteral("items"),
+                                           QStringLiteral("songCount"),
+                                           QStringLiteral("startTime"),
+                                           QStringLiteral("type")}));
+        QCOMPARE(rank.value("type").toString(), QStringLiteral("month"));
+        QCOMPARE(rank.value("startTime").toDouble(), 1750000000000.0);
+        QCOMPARE(rank.value("endTime").toDouble(), 1750604800000.0);
+        QCOMPARE(rank.value("songCount").toDouble(), 1.0);
+        const QVariantList items = rank.value("items").toList();
+        QCOMPARE(items.size(), 1);
+        const QVariantMap song = items.first().toMap();
+        QCOMPARE(song.keys(), QStringList({QStringLiteral("album"), QStringLiteral("artists"),
+                                           QStringLiteral("cover"), QStringLiteral("id"),
+                                           QStringLiteral("name"),
+                                           QStringLiteral("playCount")}));
+        QCOMPARE(song.value("id").toDouble(), 42.0);
+        QCOMPARE(song.value("name").toString(), QStringLiteral("First"));
+        QCOMPARE(song.value("album").toString(), QStringLiteral("album"));
+        QCOMPARE(song.value("cover").toString(),
+                 QStringLiteral("http://p1.music.126.net/cover.jpg?param=120y120"));
+        QCOMPARE(song.value("playCount").toDouble(), 17.0);
+        const QVariantList artists = song.value("artists").toList();
+        QCOMPARE(artists.size(), 2);
+        QCOMPARE(artists.at(0).toMap(),
+                 QVariantMap({{"id", 7.0}, {"name", QStringLiteral("Alice")}}));
+        QCOMPARE(artists.at(1).toMap(),
+                 QVariantMap({{"id", 8.0}, {"name", QStringLiteral("Bob")}}));
+    }
+
+    // 结构不符的听歌足迹回包按对应请求 key 报一句用户能看懂的话，不写半份数据
+    void malformedListenStatsReportUserFacingFailures()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/content/activity/listen/data/total") {
+                respond(200, "{\"code\":200,\"data\":{}}");
+                return;
+            }
+            if (req.path == "/api/content/activity/listen/data/realtime/report") {
+                respond(200, "{\"code\":200,\"data\":{\"startTime\":\"yesterday\"}}");
+                return;
+            }
+            if (req.path == "/api/content/activity/listen/data/song/play/rank") {
+                respond(200, "{\"code\":200,\"data\":{\"songItems\":\"nope\"}}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        QSignalSpy failed(m_store, &Store::requestFailed);
+        m_store->request(QStringLiteral("listen:total"));
+        m_store->request(QStringLiteral("listen:month"));
+        m_store->request(QStringLiteral("listenRank:month"));
+        QVERIFY(waitUntil([&] { return failed.count() == 3; }));
+
+        QHash<QString, QString> messages;
+        for (const QList<QVariant> &signal : failed)
+            messages.insert(signal.at(0).toString(), signal.at(1).toString());
+        QCOMPARE(messages.value(QStringLiteral("listen:total")),
+                 QStringLiteral("暂时取不到听歌统计"));
+        QCOMPARE(messages.value(QStringLiteral("listen:month")),
+                 QStringLiteral("暂时取不到听歌统计"));
+        QCOMPARE(messages.value(QStringLiteral("listenRank:month")),
+                 QStringLiteral("暂时取不到播放排行"));
+        QVERIFY(m_store->data().value("listenTotal").isNull());
+        QVERIFY(m_store->data().value("listenRealtime").isNull());
+        QVERIFY(m_store->data().value("listenRank").isNull());
+    }
+
     // MV 播放地址是签名 URL，过期即失效：同一 MV 再次打开必须重新取地址；详情仍用缓存
     void reopenMvFetchesSignedUrlAgain()
     {
