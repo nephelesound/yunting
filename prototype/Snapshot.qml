@@ -8,6 +8,12 @@ import "Fixtures.js" as Fixtures
 
 QtObject {
     property string fixture: ""
+    // README 截图（account=stage）：推荐、歌单照常是个人快照里的，账号的名字、头像、挂件换成编造的，
+    // 截图里就没有本人的身份，不必事后打码
+    property bool stage: false
     readonly property var data: fixture === "" ? Data : Fixtures[fixture].data
-    readonly property var personal: fixture === "" ? Personal : Fixtures[fixture].personal
+    readonly property var personal: fixture !== "" ? Fixtures[fixture].personal
+        : stage && Personal.account ? Object.assign({}, Personal, {
+              account: Object.assign({}, Personal.account, { name: "云听用户", avatar: "", avatarPendant: "" }) })
+        : Personal
 }

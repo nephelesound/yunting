@@ -34,6 +34,8 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
     // 与应用一样：中性的系统配色给本应用染上强调色的色调（src/colortone.cpp），截图里才是用户真正看到的样子
     app.setApplicationName(QStringLiteral("yunting-qmlshot"));
+    // 不离屏时（README 用带窗框的截图）窗管按这个 id 找图标：标题栏里是云听的图标，不是通用图标
+    app.setDesktopFileName(QStringLiteral("io.github.nephelesound.Yunting"));
     ColorTone::apply();
     if (qEnvironmentVariableIsEmpty("QT_QUICK_CONTROLS_STYLE"))
         QQuickStyle::setStyle(QStringLiteral("org.kde.desktop"));

@@ -28,7 +28,7 @@ Kirigami.ApplicationWindow {
     property string listKey: "daily"
     property real mvId: 0
     property real userId: 0
-    property string account: "personal"   // anonymous：即使有个人快照也按未登录显示
+    property string account: "personal"   // anonymous：即使有个人快照也按未登录显示；stage：个人快照、身份换成编造的（README 截图）
     property string fixture: ""           // worst | empty | one：Fixtures.js 压力测试数据（截图用，必须在 page 之前设置）
     onFixtureChanged: root.applyFixture()
 
@@ -228,6 +228,7 @@ Kirigami.ApplicationWindow {
         if (!Source.snapshot)
             Source.snapshot = Qt.createComponent("Snapshot.qml").createObject(root);
         Source.snapshot.fixture = root.fixture;
+        Source.snapshot.stage = root.account === "stage";
         playback.restore(Source.hotChart.tracks, 2);
         simEngine.position = Math.min(83, Math.floor(simEngine.duration / 2));   // 短歌也停在中段，不会一启动就播完跳走
         simEngine.playing = true;
