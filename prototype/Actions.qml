@@ -15,6 +15,7 @@ QtObject {
     signal logoutRequested()
     signal playlistMenuRequested(var playlist)   // 「我的」里的歌单磁贴：{ id, name, owned }
     signal newPlaylistRequested()
+    signal importPlaylistRequested()
     signal likeToggleRequested(var track)        // 曲目行、播放条、曲目菜单的红心都走这一处（未登录时引向登录）
     signal playRequested(var tracks, int index)  // 不是曲目列表页的地方要放歌：听歌排行、私信里分享的歌
     signal playNowRequested(var track)           // 插到「下一首」并立刻放，队列不动：相似歌曲、外部链接

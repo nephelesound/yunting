@@ -109,6 +109,8 @@ Kirigami.ApplicationWindow {
         target: Source
         function onDownloadFinished(name) { root.notify("已下载" + Source.quoted(name)); }
         function onDownloadFailed(name, message) { root.fail("没能下载" + Source.quoted(name) + "：" + message); }
+        function onCloudUploaded(name) { root.notify("已上传到云盘" + Source.quoted(name)); }
+        function onCloudUploadFailed(name, message) { root.fail("没能上传" + Source.quoted(name) + "：" + message); }
     }
 
     // 用好友发来的链接加入：链接或房间号都行
@@ -418,6 +420,33 @@ Kirigami.ApplicationWindow {
         }
     }
 
+    // 导入歌单：从别处搬一个歌单进来。名字可以不填（网易云按时间起名）
+    AppDialog {
+        id: importDialog
+        function ask() {
+            importName.text = "";
+            importText.text = "";
+            importDialog.open();
+            importText.forceActiveFocus();
+        }
+        title: "导入歌单"
+        acceptText: "导入"
+        acceptEnabled: importText.text.trim().length > 0
+        onAccepted: Source.importPlaylist(importText.text, importName.text.trim())
+        FormCard.FormTextAreaDelegate {
+            id: importText
+            label: "歌曲"
+            // 示例行顺便把输入框撑到四行高（粘一整张清单时不至于挤在两行里），输入后随内容变高
+            placeholderText: "每行一首：歌名 - 歌手，例如\n晴天 - 周杰伦\n夜空中最亮的星 - 逃跑计划\n也可以每行粘贴一个其他平台的歌单链接"
+        }
+        FormCard.FormTextFieldDelegate {
+            id: importName
+            label: "歌单名称"
+            placeholderText: "不填时自动命名"
+            maximumLength: 40
+        }
+    }
+
     // 歌单简介：多行文字，可以清空（空简介也是合法的保存）
     AppDialog {
         id: playlistDescriptionDialog
@@ -481,6 +510,10 @@ Kirigami.ApplicationWindow {
     Connections {
         target: root.backend ? root.backend.store : null
         ignoreUnknownSignals: true
+        // 导入只是建好了任务：网易云在后台匹配，完成后歌单出现在「我的」
+        function onPlaylistImportStarted(taskId) {
+            root.notify("已开始导入，匹配完成后歌单会出现在「我的」", "long");
+        }
         function onPlaylistCreated(id, name) {
             if (root.trackForNewPlaylist) {
                 root.noteOnSuccess(id, "添加歌曲", "已创建歌单「" + name + "」，并加入「" + root.trackForNewPlaylist.name + "」");
@@ -566,6 +599,8 @@ Kirigami.ApplicationWindow {
             playerBar.openEqualizer();
         else if (root.startOverlay === "listen")
             Qt.callLater(() => playerBar.openListenPopup());
+        else if (root.startOverlay === "cloudupload")   // 截图：云盘页正在上传一首，传了将近一半
+            Source.cloudUpload = { name: "我想要两颗西柚（Live）- 2023 网易云音乐年度盛典现场版.flac", sent: 47, total: 100 };
         else if (root.startOverlay === "quality")
             Qt.callLater(() => playerBar.openQualityMenu());
         else if (root.startOverlay === "fullscreen")
@@ -578,6 +613,8 @@ Kirigami.ApplicationWindow {
             Qt.callLater(() => (root.pageStack.currentItem as SearchPage).showSuggestions())
         else if (root.startOverlay === "join")
             joinDialog.open();
+        else if (root.startOverlay === "import")
+            Qt.callLater(() => importDialog.ask());
         else if (root.startOverlay === "rename")
             Qt.callLater(() => playlistNameDialog.ask(shown().listId || 0, shown().heading || "", null));
         else if (root.startOverlay === "delete")
@@ -638,6 +675,7 @@ Kirigami.ApplicationWindow {
             playlistMenu.popup();
         }
         function onNewPlaylistRequested() { playlistNameDialog.ask(0, "", null); }
+        function onImportPlaylistRequested() { importDialog.ask(); }
         function onLikeToggleRequested(track) {
             if (!root.loggedIn) {
                 root.notify("红心会同步到你的网易云账号，登录后可用", "long", "扫码登录", () => root.requestLogin());

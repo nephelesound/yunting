@@ -5,6 +5,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import "Format.js" as Format
@@ -119,6 +120,25 @@ ScreenFrame {
                     text: page.reordering ? "完成" : "排序"
                     onClicked: page.reordering = !page.reordering
                 }
+                // 云盘：把本机的歌传上来（一次一首；在传时按钮让位给下面的进度）
+                Button {
+                    objectName: "cloudUpload"
+                    visible: page.list.uploadable || false
+                    implicitHeight: Tokens.height8
+                    flat: true
+                    enabled: Source.cloudUpload === null
+                    icon.name: "cloud-upload"
+                    icon.width: Tokens.iconSm
+                    icon.height: Tokens.iconSm
+                    text: "上传"
+                    onClicked: uploadDialog.open()
+                }
+                FileDialog {
+                    id: uploadDialog
+                    title: "上传到云盘"
+                    nameFilters: ["音频文件 (*.mp3 *.flac *.m4a *.aac *.ogg *.opus *.wav *.ape *.wma)"]
+                    onAccepted: Source.uploadToCloud(selectedFile)
+                }
                 // 本地下载：文件就在这个文件夹里，交给文件管理器（还没下过时文件夹可能还不存在）
                 Button {
                     visible: (page.list.folder || "") !== "" && page.list.tracks.length > 0
@@ -179,6 +199,45 @@ ScreenFrame {
                         icon.name: page.list.subscribed ? "bookmark-remove" : "bookmark-new"
                         text: page.list.subscribed ? "取消收藏" : "收藏歌单"
                         onTriggered: page.subscribeToggled(page.list.listId, page.list.heading, !page.list.subscribed)
+                    }
+                }
+            }
+
+            // 正在上传到云盘：哪一首、传了多少；可以取消
+            ColumnLayout {
+                id: uploadRow
+                objectName: "cloudUploadProgress"
+                readonly property var upload: Source.cloudUpload
+                readonly property real fraction: upload && upload.total > 0 ? upload.sent / upload.total : 0
+                visible: (page.list.uploadable || false) && upload !== null
+                Layout.fillWidth: true
+                Layout.topMargin: Tokens.space3
+                spacing: Tokens.space1
+                Label {
+                    Layout.fillWidth: true
+                    readonly property int percent: Math.floor(100 * uploadRow.fraction)
+                    text: uploadRow.upload ? "正在上传「" + uploadRow.upload.name + "」" + (percent > 0 ? "  " + percent + "%" : "") : ""
+                    font.pixelSize: Tokens.textSm
+                    font.features: { "tnum": 1 }
+                    elide: Text.ElideMiddle   // 文件名的不同多在末尾：中间省略，不把扩展名和百分比截掉
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Tokens.space2
+                    ProgressBar {
+                        Layout.fillWidth: true
+                        from: 0
+                        to: 1
+                        // 还没收到进度时是不确定的条，不是停在 0
+                        indeterminate: uploadRow.fraction <= 0
+                        value: uploadRow.fraction
+                    }
+                    Button {
+                        implicitHeight: Tokens.height8
+                        flat: true
+                        text: "取消"
+                        font.pixelSize: Tokens.textSm
+                        onClicked: Source.cancelCloudUpload()
                     }
                 }
             }

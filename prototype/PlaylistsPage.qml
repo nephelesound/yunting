@@ -68,6 +68,15 @@ ScreenFrame {
                 text: "新建歌单"
                 onClicked: Actions.newPlaylistRequested()
             }
+            Button {
+                implicitHeight: Tokens.height8
+                flat: true
+                icon.name: "document-import"
+                icon.width: Tokens.iconSm
+                icon.height: Tokens.iconSm
+                text: "导入歌单"
+                onClicked: Actions.importPlaylistRequested()
+            }
         }
 
         ListView {

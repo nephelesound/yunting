@@ -487,6 +487,63 @@ QtObject {
         function onFailed(songId, message) { source.downloadFailed(source.downloadNames[songId] || "", message); }
     }
 
+    // 导入歌单：每一行都是链接时按链接导入（其他平台的歌单分享链接），否则整段当歌曲清单（「歌名 - 歌手」）。
+    // 网易云在后台匹配，成功只说明任务建好了（Store 发 playlistImportStarted），歌单稍后出现在「我的」
+    function importPlaylist(text, name) {
+        if (!source.live)
+            return false;
+        const lines = String(text).split("\n").map(l => l.trim()).filter(l => l.length > 0);
+        if (lines.length === 0)
+            return false;
+        if (lines.every(l => /^https?:\/\//.test(l)))
+            source.live.importPlaylistFromLinks(lines, name || "");
+        else
+            source.live.importPlaylistFromText(lines.join("\n"), name || "");
+        return true;
+    }
+
+    // 上传到云盘：一次一首（网页上传，单文件 100 MB 以内）。在传时是 { name, sent, total }，否则 null
+    property var cloudUpload: null
+    property bool cloudCancelling: false   // 自己取消的：上传器会报「上传已取消」，那不是失败
+    signal cloudUploaded(string name)
+    signal cloudUploadFailed(string name, string message)
+    function uploadToCloud(fileUrl) {
+        if (!source.live || source.cloudUpload)
+            return false;
+        const path = decodeURIComponent(String(fileUrl).replace(/^file:\/\//, ""));
+        source.cloudUpload = { name: path.split("/").pop(), sent: 0, total: 0 };
+        source.live.uploadCloudSong(path);
+        return true;
+    }
+    function cancelCloudUpload() {
+        if (!source.live || !source.cloudUpload)
+            return;
+        source.cloudCancelling = true;
+        source.live.cancelCloudUpload();
+        source.cloudUpload = null;
+    }
+    readonly property Connections _cloudUpload: Connections {
+        target: source.live
+        ignoreUnknownSignals: true
+        function onCloudUploadProgress(sent, total) {
+            if (source.cloudUpload)
+                source.cloudUpload = Object.assign({}, source.cloudUpload, { sent: sent, total: total });
+        }
+        function onCloudUploadFinished(songId) {
+            const name = source.cloudUpload ? source.cloudUpload.name : "";
+            source.cloudUpload = null;
+            source.cloudUploaded(name);
+        }
+        function onCloudUploadFailed(message) {
+            const name = source.cloudUpload ? source.cloudUpload.name : "";
+            source.cloudUpload = null;
+            if (source.cloudCancelling)
+                source.cloudCancelling = false;
+            else
+                source.cloudUploadFailed(name, message);
+        }
+    }
+
     // 自己的累计听歌时长（秒）与升级进度；还没取到时为 0 / null
     readonly property real listenSeconds: source.d.listenTotal ? source.d.listenTotal.seconds : 0
     readonly property var level: source.d.userLevel || null
@@ -810,7 +867,7 @@ QtObject {
         case "cloud": return {
             heading: "音乐云盘", cover: source.sized(source.firstCover(source.cloud.tracks), 560), tracks: source.cloud.tracks,
             facts: [source.songs(source.cloud.count), { value: source.fileSize(source.cloud.size), label: "/ " + source.fileSize(source.cloud.maxSize) }],
-            description: "", emptyText: "云盘里还没有歌，可以在官方客户端上传" };
+            description: "", uploadable: true, emptyText: "云盘里还没有歌：点「上传」把本机的歌传上来" };
         default: {
             // 推荐歌单：key = "playlist:<序号>"，快照只带了前几个的曲目
             // 歌单：key = "playlist:<id>"，推荐歌单与「我的」歌单都可以。曲目先看卡片自带的（快照），
