@@ -4,6 +4,7 @@
 #include "normalize.h"
 #include "sdk/sdk_result.h"
 #include "sdk/track.h"
+#include "sdk/track_service.h"
 
 #include <QDate>
 #include <QEventLoop>
@@ -17,6 +18,7 @@
 #include <QJsonDocument>
 #include <QTimer>
 #include <QUrlQuery>
+#include <utility>
 
 using namespace ncm;
 
@@ -480,7 +482,7 @@ void Store::fetch(const QString &path, const QUrlQuery &q, bool personal, NcmCli
 }
 
 // 服务端 playlist.tracks 最多约 1000 条，但 trackIds 总是完整的。
-// 先把已有的曲目按 id 建表，再只为缺失的 id 分批取 /api/v3/song/detail，最后按 trackIds 顺序还原。
+// 先把已有的曲目按 id 建表，再只为缺失的 id 取歌曲详情，最后按 trackIds 顺序还原。
 void Store::fetchPlaylistTracks(double id, bool personal, TracksCallback callback)
 {
     fetchAlways("api/v6/playlist/detail", query({{"id", num(id)}, {"n", "1000"}, {"s", "8"}}), personal,
@@ -564,40 +566,29 @@ void Store::fetchSongDetails(const QList<double> &ids, bool personal,
         return;
     }
 
-    struct State {
-        QHash<double, QVariantMap> tracks;
-        int left = 0;
-        bool ok = true;
-    };
-    auto state = std::make_shared<State>();
+    QList<qint64> songIds;
+    songIds.reserve(ids.size());
+    for (double id : ids)
+        songIds.append(static_cast<qint64>(id));
 
-    // GET 的 URL 长度有限：300 个 id（约 6KB）稳定，350 会回 400。分批更小，失败也能收尾。
-    constexpr int Batch = 250;
-    for (qsizetype start = 0; start < ids.size(); start += Batch) {
-        QStringList fields;
-        const qsizetype end = std::min(ids.size(), start + Batch);
-        for (qsizetype i = start; i < end; ++i)
-            fields.append(QStringLiteral("{\"id\":%1}").arg(num(ids.at(i))));
-        const QString c = QLatin1Char('[') + fields.join(u',') + QLatin1Char(']');
-        ++state->left;
-        fetchAlways("api/v3/song/detail", query({{"c", c}}), personal,
-                    [state, callback](const QJsonDocument &doc, bool ok) {
-            const QJsonValue code = doc.object().value("code");
-            if (!ok || (!code.isUndefined() && code.toInt() != 200))
-                state->ok = false;
-            const auto parsed = sdk::parseTracks(arr(body(doc), "songs"),
-                                                 arr(body(doc), "privileges"));
-            if (!parsed) {
-                state->ok = false;
-            } else {
-                for (const sdk::Track &track : *parsed.value)
-                    state->tracks.insert(static_cast<double>(track.id),
-                                         sdk::trackToVariantMap(track));
+    // 与 fetchAlways 相同：计数用于首屏等待，epoch 保证退出登录后的回包不落地。
+    ++m_pending;
+    const quint64 epoch = m_epoch;
+    sdk::fetchSongDetails(*m_client, songIds, personal, this,
+        [this, epoch, callback = std::move(callback)](
+            sdk::Result<QList<sdk::Track>> result) {
+        if (epoch == m_epoch) {
+            QHash<double, QVariantMap> tracks;
+            if (result) {
+                for (const sdk::Track &track : *result.value)
+                    tracks.insert(static_cast<double>(track.id),
+                                  sdk::trackToVariantMap(track));
             }
-            if (--state->left == 0)
-                callback(state->tracks, state->ok);
-        });
-    }
+            callback(tracks, result.ok());
+        }
+        if (--m_pending == 0)
+            emit settled();
+    });
 }
 
 void Store::waitForInitial()

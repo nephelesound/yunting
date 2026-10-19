@@ -152,10 +152,10 @@ private:
     // 云盘分页的共享状态：递归回调只持有 state，不形成 shared_ptr 自环
     struct CloudState;
     void fetchCloudPage(const std::shared_ptr<CloudState> &state);
-    // 歌单 / 红心的完整曲目：playlist.tracks 最多约 1000 条，其余用 trackIds + /api/v3/song/detail 补齐
+    // 歌单 / 红心的完整曲目：playlist.tracks 最多约 1000 条，其余用 trackIds + SDK 歌曲详情补齐
     using TracksCallback = std::function<void(const QVariantList &, const QJsonObject &, bool)>;
     void fetchPlaylistTracks(double id, bool personal, TracksCallback callback);
-    // 分批取歌曲详情（每批 500），按请求顺序返回；供歌单补齐与搜索封面补全共用
+    // SDK 批量取歌曲详情（含失败分类与 epoch 过滤）；供歌单补齐与搜索封面补全共用
     void fetchSongDetails(const QList<double> &ids, bool personal,
                           std::function<void(const QHash<double, QVariantMap> &, bool)> callback);
     void resetPersonal();

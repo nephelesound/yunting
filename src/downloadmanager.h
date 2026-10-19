@@ -17,12 +17,14 @@ class QNetworkReply;
 class DownloadManager : public QObject {
     Q_OBJECT
     Q_PROPERTY(QVariantList downloads READ downloads NOTIFY downloadsChanged)
+    Q_PROPERTY(QVariantList active READ active NOTIFY activeChanged)
     Q_PROPERTY(QString directory READ directory CONSTANT)
 public:
     explicit DownloadManager(NcmClient *client, QObject *parent = nullptr);
     ~DownloadManager() override;
 
     QVariantList downloads() const { return m_downloads; }
+    QVariantList active() const;
     QString directory() const;
 
     // Start from an already-known track map (name/artist/album/cover are preserved).
@@ -35,6 +37,7 @@ public:
 
 signals:
     void downloadsChanged();
+    void activeChanged();
     void progress(double songId, qint64 received, qint64 total);
     void finished(double songId, const QString &path);
     void failed(double songId, const QString &message);
@@ -45,9 +48,12 @@ private:
         QFile *file = nullptr;
         QVariantMap meta;
         QString finalPath;
+        qint64 received = 0;
+        qint64 total = 0;
     };
 
     void start(const QVariantMap &track, const QString &level);
+    void begin(const QVariantMap &track, const QString &level);
     void load();
     void save();
     void setDownloads(QVariantList downloads);

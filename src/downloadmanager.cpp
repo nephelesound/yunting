@@ -3,6 +3,8 @@
 #include "downloadpaths.h"
 #include "ncmclient.h"
 #include "sdk/download.h"
+#include "sdk/track.h"
+#include "sdk/track_service.h"
 
 #include <QDateTime>
 #include <QDir>
@@ -36,6 +38,7 @@ QVariantMap normalizeTrack(const QVariantMap &track)
     meta.insert(QStringLiteral("artist"), track.value(QStringLiteral("artist")).toString());
     meta.insert(QStringLiteral("album"), track.value(QStringLiteral("album")).toString());
     meta.insert(QStringLiteral("cover"), track.value(QStringLiteral("cover")).toString());
+    meta.insert(QStringLiteral("dur"), track.value(QStringLiteral("dur")).toDouble());
     return meta;
 }
 } // namespace
@@ -59,6 +62,25 @@ DownloadManager::~DownloadManager()
         }
     }
     m_jobs.clear();
+}
+
+QVariantList DownloadManager::active() const
+{
+    QVariantList items;
+    items.reserve(m_jobs.size());
+    for (auto it = m_jobs.cbegin(); it != m_jobs.cend(); ++it) {
+        const Job &job = it.value();
+        items.append(QVariantMap{
+            {QStringLiteral("id"), static_cast<double>(it.key())},
+            {QStringLiteral("name"), job.meta.value(QStringLiteral("name")).toString()},
+            {QStringLiteral("artist"), job.meta.value(QStringLiteral("artist")).toString()},
+            {QStringLiteral("progress"), job.total > 0
+                 ? static_cast<double>(job.received) / static_cast<double>(job.total)
+                 : 0.0},
+            {QStringLiteral("level"), job.meta.value(QStringLiteral("level")).toString()},
+        });
+    }
+    return items;
 }
 
 QString DownloadManager::directory() const
@@ -108,10 +130,14 @@ void DownloadManager::load()
         return;
     QVariantList items;
     for (const QJsonValue &value : doc.array()) {
-        const QVariantMap item = value.toObject().toVariantMap();
+        QVariantMap item = value.toObject().toVariantMap();
         const qint64 id = variantId(item.value(QStringLiteral("id")));
-        if (id > 0)
+        if (id > 0) {
+            // 旧记录没有 dur：补 0，前端读 map 时不必区分缺失与 0
+            item.insert(QStringLiteral("dur"),
+                        item.value(QStringLiteral("dur")).toDouble());
             items.append(item);
+        }
     }
     m_downloads = items;
 }
@@ -143,7 +169,7 @@ void DownloadManager::download(double songId, const QString &level)
 
 void DownloadManager::downloadTrack(const QVariantMap &track, const QString &level)
 {
-    start(normalizeTrack(track), level);
+    start(track, level);
 }
 
 void DownloadManager::start(const QVariantMap &track, const QString &level)
@@ -157,6 +183,35 @@ void DownloadManager::start(const QVariantMap &track, const QString &level)
     }
     if (m_jobs.contains(songId))
         return;
+    if (track.value(QStringLiteral("dur")).toDouble() > 0) {
+        begin(track, level);
+        return;
+    }
+
+    // 只给了 id（下载菜单直接按 id 取地址）时先取歌曲详情，补时长与展示信息；
+    // 取不到也照常下载，记录里的 dur 落 0。
+    ncm::sdk::fetchSongDetails(*m_client, {songId}, false, this,
+        [this, track, level](ncm::sdk::Result<QList<ncm::sdk::Track>> result) {
+        QVariantMap resolved = track;
+        if (result && !result.value->isEmpty()) {
+            const QVariantMap details =
+                ncm::sdk::trackToVariantMap(result.value->first(), {}, 0);
+            resolved.insert(QStringLiteral("dur"), details.value(QStringLiteral("dur")));
+            for (const char *key : {"name", "artist", "album", "cover"}) {
+                const QString field = QString::fromLatin1(key);
+                if (resolved.value(field).toString().isEmpty())
+                    resolved.insert(field, details.value(field));
+            }
+        }
+        begin(resolved, level);
+    });
+}
+
+void DownloadManager::begin(const QVariantMap &rawTrack, const QString &level)
+{
+    // 参数、已下载与在途检查只在 start() 做一次；begin 只负责取地址并落盘。
+    const QVariantMap track = normalizeTrack(rawTrack);
+    const qint64 songId = variantId(track.value(QStringLiteral("id")));
 
     const QString requestedLevel = level.isEmpty() ? QStringLiteral("lossless") : level;
     ncm::sdk::fetchSongDownload(*m_client, songId, requestedLevel, this,
@@ -204,12 +259,19 @@ void DownloadManager::start(const QVariantMap &track, const QString &level)
         job.meta.insert(QStringLiteral("md5"), info.md5);
         job.meta.insert(QStringLiteral("path"), path);
         m_jobs.insert(songId, job);
+        emit activeChanged();
 
         QObject::connect(reply, &QNetworkReply::readyRead, this, [reply, file] {
             file->write(reply->readAll());
         });
         QObject::connect(reply, &QNetworkReply::downloadProgress, this,
                          [this, songId](qint64 received, qint64 total) {
+            auto it = m_jobs.find(songId);
+            if (it != m_jobs.end()) {
+                it->received = received;
+                it->total = total;
+                emit activeChanged();
+            }
             emit progress(songId, received, total);
         });
         QObject::connect(reply, &QNetworkReply::finished, this,
@@ -221,6 +283,7 @@ void DownloadManager::start(const QVariantMap &track, const QString &level)
             }
             Job job = it.value();
             m_jobs.erase(it);
+            emit activeChanged();
             job.file->write(reply->readAll());
             job.file->close();
             delete job.file;
@@ -264,6 +327,7 @@ void DownloadManager::cancel(double songId)
         return;
     Job job = it.value();
     m_jobs.erase(it);
+    emit activeChanged();
     if (job.reply)
         job.reply->abort();
     if (job.file) {

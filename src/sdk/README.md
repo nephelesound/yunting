@@ -34,6 +34,7 @@ NcmClient                 传输（cookie、weapi/明文、超时）
 - `sdk_result.h`：`Result<T>`、`ErrorKind`、`Error`。
 - `sdk_json.h/.cpp`：带 path 的 typed `JsonReader`。
 - `track.h/.cpp`：`Track` / `PlaylistCard` typed 模型、唯一的 `playability()`、legacy QML map 适配；新歌与节目各自转成一个 `Track`。
+- `track_service.h/.cpp`：按 id 列表批量取歌曲详情（每批 250，一次回调），返回 `Result<QList<Track>>`；Store、一起听与只给 id 的下载共用这一个实现。
 - `song_wiki.h/.cpp`：DTO、解析、归一化、legacy map 适配。
 - `song_wiki_service.h/.cpp`：三个请求的组合与回调。
 - `discovery.h/.cpp`：推荐新歌、新碟、精品歌单、精品标签、首页 banner 的 typed 模型与请求。

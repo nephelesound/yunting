@@ -142,7 +142,7 @@ private:
     quint64 m_generation = 0;
     // 用户动作代次：登出会作废在途的 create/join/leave 回包。
     quint64 m_actionGeneration = 0;
-    // 歌单详情代次：新的 displayList 让旧的 /song/detail 回包失效。
+    // 歌单详情代次：新的 displayList 让旧的歌曲详情回包失效。
     quint64 m_queueGeneration = 0;
 
     bool m_syncInFlight = false;

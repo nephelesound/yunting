@@ -4,21 +4,17 @@
 #include "json_util.h"
 #include "ncmclient.h"
 #include "sdk/listen_together.h"
-#include "sdk/sdk_json.h"
 #include "sdk/track.h"
+#include "sdk/track_service.h"
 #include "store.h"
 
 #include <QDateTime>
 #include <QJsonArray>
-#include <QJsonDocument>
 #include <QJsonObject>
-#include <QPointer>
 #include <QSet>
 #include <QTimer>
 #include <QUrl>
 #include <QUrlQuery>
-#include <algorithm>
-#include <memory>
 #include <utility>
 
 namespace {
@@ -29,7 +25,6 @@ constexpr int SyncPollMs = 1000;
 constexpr int StatusPollMs = 5000;
 constexpr int HeartbeatPollMs = 5000;
 constexpr int RemoteApplyHoldMs = 250;
-constexpr int DetailBatch = 250;
 
 QString apiErrorText(const sdk::Error &error, const QString &fallback)
 {
@@ -684,58 +679,19 @@ void ListenTogether::fetchSongDetails(
     const QList<qint64> &ids,
     std::function<void(bool, const QHash<qint64, QVariantMap> &)> callback)
 {
-    if (ids.isEmpty()) {
-        callback(true, {});
-        return;
-    }
-
-    struct State {
+    sdk::fetchSongDetails(*m_client, ids, true, this,
+        [callback = std::move(callback)](sdk::Result<QList<sdk::Track>> result) {
         QHash<qint64, QVariantMap> tracks;
-        int remaining = 0;
-        bool ok = true;
-    };
-    const auto state = std::make_shared<State>();
-    QPointer<ListenTogether> self(this);
-
-    // GET 的 URL 长度有限；与 Store 的补齐逻辑一致，每批最多 250 个 id。
-    for (qsizetype start = 0; start < ids.size(); start += DetailBatch) {
-        const qsizetype end = std::min<qsizetype>(ids.size(), start + DetailBatch);
-        QStringList fields;
-        fields.reserve(end - start);
-        for (qsizetype i = start; i < end; ++i)
-            fields.append(QStringLiteral("{\"id\":%1}").arg(ids.at(i)));
-        const QString c = QStringLiteral("[") + fields.join(u',') + QStringLiteral("]");
-
-        ++state->remaining;
-        m_client->get(QStringLiteral("api/v3/song/detail"), ncm::query({{"c", c}}), true,
-                      [self, state, callback](const QJsonDocument &doc, bool ok) {
-            if (!self)
-                return;
-
-            sdk::JsonReader reader(doc.object(), QStringLiteral("songDetail"));
-            const qint64 code = reader.integer("code", 200);
-            const QJsonArray songs = reader.array("songs");
-            const QJsonArray privileges = reader.array("privileges");
-            if (!ok || (reader.has("code") && code != 200) || !reader.has("songs")
-                || !reader.ok()) {
-                state->ok = false;
-            } else {
-                const auto parsed = sdk::parseTracks(songs, privileges);
-                if (parsed) {
-                    for (const QVariant &value : sdk::tracksToVariantList(*parsed.value)) {
-                        const QVariantMap track = value.toMap();
-                        const qint64 id = variantId(track.value(QStringLiteral("id")));
-                        if (id > 0)
-                            state->tracks.insert(id, track);
-                    }
-                } else {
-                    state->ok = false;
-                }
+        if (result) {
+            for (const QVariant &value : sdk::tracksToVariantList(*result.value)) {
+                const QVariantMap track = value.toMap();
+                const qint64 id = variantId(track.value(QStringLiteral("id")));
+                if (id > 0)
+                    tracks.insert(id, track);
             }
-            if (--state->remaining == 0)
-                callback(state->ok, state->tracks);
-        });
-    }
+        }
+        callback(result.ok(), tracks);
+    });
 }
 
 void ListenTogether::applyCommand(const sdk::ListenTogetherCommand &command)

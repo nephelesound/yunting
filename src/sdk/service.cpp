@@ -47,6 +47,32 @@ Result<QJsonObject> settled(const QJsonObject &root, const QString &endpoint)
 
 } // namespace
 
+void getJson(NcmClient &client, QObject *context, QString endpoint, QUrlQuery query,
+             bool personal, JsonObjectCallback callback)
+{
+    if (!callback)
+        return;
+    QPointer<QObject> guard(context);
+    const bool hasContext = context != nullptr;
+    client.get(endpoint, query, personal,
+               [guard, hasContext, endpoint, callback = std::move(callback)]
+               (const QJsonDocument &doc, bool ok) {
+        if (hasContext && guard.isNull())
+            return;
+        const QJsonObject root = doc.object();
+        const bool hasCode = root.contains(QStringLiteral("code"));
+        // 失败时有业务码 = 服务器回了话（HTTP 4xx 带 JSON）；没有就是连接层失败
+        if (!ok) {
+            callback(Result<QJsonObject>::failure(endpointError(
+                hasCode ? ErrorKind::Api : ErrorKind::Network, endpoint,
+                hasCode ? responseMessage(root) : QStringLiteral("request failed"), {},
+                responseCode(root))));
+            return;
+        }
+        callback(hasCode ? settled(root, endpoint) : Result<QJsonObject>::success(root));
+    });
+}
+
 void postFormJson(NcmClient &client, QObject *context, QString endpoint,
                   QUrlQuery form, JsonObjectCallback callback, bool personal,
                   QString cookieContext)

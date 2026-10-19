@@ -20,7 +20,7 @@ pkg_check_modules(ZSTD QUIET libzstd)
 
 set(YUNTING_SDK_SOURCES
     sdk/sdk_json.h sdk/sdk_json.cpp sdk/service.h sdk/service.cpp
-    sdk/track.h sdk/track.cpp
+    sdk/track.h sdk/track.cpp sdk/track_service.h sdk/track_service.cpp
     sdk/song_wiki.h sdk/song_wiki.cpp sdk/song_wiki_service.h sdk/song_wiki_service.cpp
     sdk/discovery.h sdk/discovery.cpp
     sdk/radio.h sdk/radio.cpp
@@ -195,7 +195,7 @@ qt_add_executable(store_test tests/store_test.cpp
     session.h session.cpp
     querycache.h querycache.cpp
     ncmclient.h ncmclient.cpp traffic.h traffic.cpp cookievault.h cookievault.cpp
-    sdk/track.h sdk/track.cpp
+    sdk/track.h sdk/track.cpp sdk/track_service.h sdk/track_service.cpp
     normalize.h normalize.cpp json_util.h crypto.h crypto.cpp perf.h perf.cpp)
 target_include_directories(store_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_options(store_test PRIVATE -Wall -Wextra)
@@ -215,6 +215,8 @@ add_test(NAME audioengine_seek COMMAND audioengine_seek_test)
 # SDK typed parser/service tests; the function owns transport and link flags.
 yunting_add_sdk_test(sdk_song_wiki sdk/song_wiki.h sdk/song_wiki.cpp)
 yunting_add_sdk_test(sdk_track sdk/track.h sdk/track.cpp)
+yunting_add_sdk_test(sdk_track_service sdk/track_service.h sdk/track_service.cpp
+    sdk/track.h sdk/track.cpp)
 yunting_add_sdk_test(sdk_discovery sdk/discovery.h sdk/discovery.cpp
     sdk/track.h sdk/track.cpp)
 yunting_add_sdk_test(sdk_radio sdk/radio.h sdk/radio.cpp
@@ -236,10 +238,12 @@ yunting_add_sdk_test(search_people sdk/search_people.h sdk/search_people.cpp)
 yunting_add_sdk_test(mv_page sdk/mv_page.h sdk/mv_page.cpp)
 yunting_add_sdk_test(account_feed sdk/account_feed.h sdk/account_feed.cpp)
 yunting_add_sdk_test(listen_together sdk/listen_together.h sdk/listen_together.cpp)
-yunting_add_sdk_test(download sdk/download.h sdk/download.cpp)
+yunting_add_sdk_test(download sdk/download.h sdk/download.cpp
+    sdk/track.h sdk/track.cpp sdk/track_service.h sdk/track_service.cpp
+    downloadmanager.h downloadmanager.cpp downloadpaths.h)
 
 # 任何测试都碰不到用户的真实凭据与缓存：会话总线不可达（钥匙串因此走后备文件），数据与缓存目录在构建目录里
-set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store sdk_song_wiki sdk_track sdk_discovery sdk_radio sdk_social sdk_feed sdk_video sdk_library sdk_notification sdk_dynamic_cover sdk_search_suggest sdk_service notify lyrics sdk_listen_data user_social comment search_people mv_page account_feed listen_together download PROPERTIES ENVIRONMENT
+set_tests_properties(querycache normalize form clientidentity audioengine audioengine_seek retry cookievault store sdk_song_wiki sdk_track sdk_track_service sdk_discovery sdk_radio sdk_social sdk_feed sdk_video sdk_library sdk_notification sdk_dynamic_cover sdk_search_suggest sdk_service notify lyrics sdk_listen_data user_social comment search_people mv_page account_feed listen_together download PROPERTIES ENVIRONMENT
     "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent;XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/data;XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-home/cache;YUNTING_KEYCHAIN_SERVICE=yunting-test")
 
 target_link_libraries(yunting PRIVATE
