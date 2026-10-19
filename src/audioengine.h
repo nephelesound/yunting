@@ -133,6 +133,8 @@ private:
     void handleProperty(const QString &name, const QVariant &value);
     void onFileLoaded();
     void onEndFile(const QString &reason);
+    void seekNow(double target);   // 文件已载入：发跳转，落地前进度报目标
+    bool seekInFlight() const;
     void setPaused(bool paused);
     // mpv 的音量 = 用户音量 × m_fade。mpv 的音量刻度本身按听感分布，匀速改它听起来就是匀速的淡入淡出。
     // 新的一次淡变接替正在进行的那次，被接替的那次不再执行它的 done
@@ -186,6 +188,8 @@ private:
     double m_bassBoost = 0;
     double m_stereoWidth = 1;
     double m_pendingSeek = -1;      // 秒；等文件加载完再应用
+    double m_seekTarget = -1;       // 秒；跳转还没落地时进度先报这里，最多等 kSeekLandMs
+    QElapsedTimer m_seekClock;
     // time-pos / duration 在停止或结束后会不可用，缓存最后一个值给 QML
     double m_position = 0;
     double m_duration = 0;

@@ -18,7 +18,9 @@
 #include <QUrlQuery>
 #include <QVariantAnimation>
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
+#include <utility>
 
 using namespace ncm;
 
@@ -28,6 +30,9 @@ constexpr int kEqFrequencies[10] = {31, 62, 125, 250, 500, 1000, 2000, 4000, 800
 // 淡出要快（按下去就该开始安静），淡入稍长（声音回来不突兀）
 constexpr int kFadeOutMs = 250;
 constexpr int kFadeInMs = 400;
+// 跳转落地：time-pos 到了目标这么近就算到了；等这么久还没到（跳转失败、目标超出文件）就不再等
+constexpr double kSeekNear = 0.5;
+constexpr int kSeekLandMs = 1500;
 
 QString number(double value)
 {
@@ -140,6 +145,8 @@ AudioEngine::~AudioEngine() = default;
 double AudioEngine::position() const
 {
     double value = 0;
+    if (seekInFlight())
+        return m_seekTarget;
     // 淡出中、以及 loadfile 之后新文件载入之前，time-pos 都还是上一首的；
     // 停止或播完后 mpv 不再提供 time-pos：这些时候都用保留的位置
     if (!m_switching && m_fileLoaded && readDouble(m_controller, "time-pos", &value))
@@ -179,6 +186,7 @@ void AudioEngine::setTrack(const QVariantMap &track)
     }
     m_track = track;
     m_pendingSeek = -1;   // 上一首的跳转只属于上一首，不能落到新曲目上
+    m_seekTarget = -1;
     m_urlReady = false;
     m_fileLoaded = false;
     m_atEof = false;
@@ -481,18 +489,31 @@ void AudioEngine::seek(double seconds)
     const double d = duration();
     const double target = std::max(0.0, std::min(d > 0 ? d : seconds, seconds));
     if (m_fileLoaded) {
-        const QVariant reply = m_controller->command({QStringLiteral("seek"),
-                                                      QString::number(target, 'f', 3),
-                                                      QStringLiteral("absolute"), QStringLiteral("exact")});
-        if (!isMpvError(reply)) {
-            m_position = target;
-            emit seeked();
-            emit positionChanged();
-        }
+        seekNow(target);
         return;
     }
     m_pendingSeek = target; // 地址未落地或文件还在加载，FILE_LOADED 前应用
     emit positionChanged();
+}
+
+void AudioEngine::seekNow(double target)
+{
+    const QVariant reply = m_controller->command({QStringLiteral("seek"), QString::number(target, 'f', 3),
+                                                  QStringLiteral("absolute"), QStringLiteral("exact")});
+    if (isMpvError(reply))
+        return;
+    // 跳转是异步的：落地前 time-pos 还在原处（刚载入时是 0），进度和歌词会先跳回去再跳过来。
+    // 到了目标附近再认 time-pos
+    m_seekTarget = target;
+    m_seekClock.start();
+    m_position = target;
+    emit seeked();
+    emit positionChanged();
+}
+
+bool AudioEngine::seekInFlight() const
+{
+    return m_seekTarget >= 0 && m_seekClock.isValid() && m_seekClock.elapsed() < kSeekLandMs;
 }
 
 // 播放地址有时效（接口给 expi 秒数，通常 20 分钟）：时效内重播、切回同一首都直接用缓存。
@@ -579,6 +600,7 @@ void AudioEngine::startSource(const QString &url, const QString &level, int bitr
     m_finishedEmitted = false;
     m_sourceUrl = url;
     m_position = 0;
+    m_seekTarget = -1;
     emit positionChanged();
 
     applyFilters();
@@ -633,6 +655,9 @@ void AudioEngine::handleProperty(const QString &name, const QVariant &value)
     if (!m_fileLoaded && (name == QLatin1String("time-pos") || name == QLatin1String("duration")))
         return;   // loadfile 之后、新文件载入之前，这两项还是上一首的
     if (name == QLatin1String("time-pos")) {
+        if (seekInFlight() && std::abs(value.toDouble() - m_seekTarget) > kSeekNear)
+            return;   // 跳转还没落地：这是跳之前的位置
+        m_seekTarget = -1;
         m_position = value.toDouble();
         if (m_playing && m_position > 0)
             notePlaybackStarted();
@@ -662,18 +687,8 @@ void AudioEngine::onFileLoaded()
     double value = 0;
     if (readDouble(m_controller, "duration", &value) && value > 0)
         m_duration = value;
-    if (m_pendingSeek >= 0) {
-        const double target = m_pendingSeek;
-        m_pendingSeek = -1;
-        const QVariant reply = m_controller->command({QStringLiteral("seek"),
-                                                      QString::number(target, 'f', 3),
-                                                      QStringLiteral("absolute"), QStringLiteral("exact")});
-        if (!isMpvError(reply)) {
-            m_position = target;
-            emit seeked();
-            emit positionChanged();
-        }
-    }
+    if (m_pendingSeek >= 0)
+        seekNow(std::exchange(m_pendingSeek, -1));
     if (m_playing) {
         setPaused(false);
         fadeTo(1, kFadeInMs);   // 切歌、暂停后淡出过才会淡入；自然接下一首时音量本来就在
@@ -686,6 +701,7 @@ void AudioEngine::onEndFile(const QString &reason)
     if (m_switching)
         return;   // 淡出中的上一首播完了：新曲目还没开始，不算它播完
     m_fileLoaded = false;
+    m_seekTarget = -1;
     if (reason == QLatin1String("eof")) {
         m_atEof = true;
         if (m_finishedEmitted)
