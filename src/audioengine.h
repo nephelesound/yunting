@@ -85,8 +85,10 @@ public:
     Q_INVOKABLE void resetEq();
     // flat / pop / rock / bass / vocal / live / spatial
     Q_INVOKABLE void applyEqPreset(const QString &preset);
-    // 输出设备：返回 [{id, description}]；id 传回 setOutputDevice（mpv 的 auto 项即「跟随系统默认」）
+    // 输出设备：返回 [{id, description}]；id 传回 setOutputDevice，空 id 是「跟随系统默认」
     Q_INVOKABLE QVariantList audioOutputs() const;
+    // mpv 的 audio-device-list 换成菜单项：mpv 自己的 auto 就是空 id，不再列一次
+    static QVariantList audioOutputsFrom(const QVariant &deviceList);
     Q_INVOKABLE void setOutputDevice(const QString &id);
 
     // --smoke-audio：无窗口地取地址并播放 seconds 秒，打印状态变化

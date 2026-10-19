@@ -30,6 +30,14 @@ QString number(double value)
     return QString::number(value, 'f', 4);
 }
 
+// 测试与打包构建（clean chroot）没有音频系统：只认显式设置的变量，正常启动永远不会走到这里。
+// ao=null 还不够：读 audio-device-list 时 mpv 会逐个探测真实的音频后端（不看 ao），
+// 连不上 PipeWire 时它的清理偶尔永久卡住，主线程随后的同步调用跟着卡死。
+bool systemAudioOff()
+{
+    return qEnvironmentVariableIsSet("YUNTING_TEST_AO_NULL");
+}
+
 // MpvController 的 QVariant 返回值：失败时是 ErrorReturn，成功时是结果（可能为空）
 bool isMpvError(const QVariant &reply)
 {
@@ -90,8 +98,7 @@ AudioEngine::AudioEngine(NcmClient *client, QObject *parent)
     option("cache", "yes");          // 网络流
     option("audio-device", "auto");  // 跟随 PipeWire/PulseAudio 的默认设备
     option("user-agent", ncm::client::userAgent());
-    // 测试没有声卡：只认显式设置的变量，正常启动永远不会走到这里。
-    if (qEnvironmentVariableIsSet("YUNTING_TEST_AO_NULL"))
+    if (systemAudioOff())
         option("ao", "null");
 
     // mpv 的 volume 已是三次曲线；再叠一层对数换算会让 50% 的滑条几乎听不见
@@ -107,7 +114,8 @@ AudioEngine::AudioEngine(NcmClient *client, QObject *parent)
     m_controller->observeProperty(QStringLiteral("pause"), MPV_FORMAT_FLAG);
     m_controller->observeProperty(QStringLiteral("idle-active"), MPV_FORMAT_FLAG);
     m_controller->observeProperty(QStringLiteral("eof-reached"), MPV_FORMAT_FLAG);
-    m_controller->observeProperty(QStringLiteral("audio-device-list"), MPV_FORMAT_NODE);
+    if (!systemAudioOff())
+        m_controller->observeProperty(QStringLiteral("audio-device-list"), MPV_FORMAT_NODE);
     m_audioDeviceDebounce = new QTimer(this);
     m_audioDeviceDebounce->setSingleShot(true);
     m_audioDeviceDebounce->setInterval(100);
@@ -330,13 +338,19 @@ void AudioEngine::applyEqPreset(const QString &preset)
 
 QVariantList AudioEngine::audioOutputs() const
 {
-    QVariantList out;
+    if (systemAudioOff())
+        return {};
     const QVariant value = m_controller->getProperty(QStringLiteral("audio-device-list"));
-    if (isMpvError(value) || !value.isValid())
-        return out;
-    for (const QVariant &item : value.toList()) {
+    if (isMpvError(value))
+        return {};
+    return audioOutputsFrom(value);
+}
+
+QVariantList AudioEngine::audioOutputsFrom(const QVariant &deviceList)
+{
+    QVariantList out;
+    for (const QVariant &item : deviceList.toList()) {
         const QVariantMap entry = item.toMap();
-        // mpv 自己的 auto 项不列出：菜单里的「系统默认」（空 id）就是它，列出来会有两个「默认」
         const QString id = entry.value("name").toString();
         if (!id.isEmpty() && id != QLatin1String("auto"))
             out.append(QVariantMap{{"id", id}, {"description", entry.value("description").toString()}});
@@ -346,8 +360,6 @@ QVariantList AudioEngine::audioOutputs() const
 
 void AudioEngine::reloadAudioOutput()
 {
-    if (qEnvironmentVariableIsSet("YUNTING_TEST_AO_NULL"))
-        return;
     const QVariantList outputs = audioOutputs();
     bool selectedPresent = m_outputDeviceId.isEmpty();
     for (const QVariant &entry : outputs) {

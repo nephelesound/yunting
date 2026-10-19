@@ -300,13 +300,17 @@ private slots:
     // 否则菜单里会有两个「默认」，选了 auto 时「系统默认」也不打勾
     void audioOutputsLeaveTheDefaultToTheMenu()
     {
+        const QVariantList mpvList{
+            QVariantMap{{"name", "auto"}, {"description", "Autoselect device"}},
+            QVariantMap{{"name", "pipewire/alsa_output.usb-headset"}, {"description", "USB Headset"}},
+        };
+        const QVariantList outputs = AudioEngine::audioOutputsFrom(mpvList);
+        QCOMPARE(outputs.size(), 1);
+        QCOMPARE(outputs.first().toMap().value("id").toString(), QStringLiteral("pipewire/alsa_output.usb-headset"));
+        QCOMPARE(outputs.first().toMap().value("description").toString(), QStringLiteral("USB Headset"));
+
         QTemporaryDir dir;
         AudioEngine *audio = engine(dir);
-        for (const QVariant &value : audio->audioOutputs()) {
-            const QVariantMap entry = value.toMap();
-            QVERIFY(!entry.value("id").toString().isEmpty());
-            QVERIFY(entry.value("id").toString() != QLatin1String("auto"));
-        }
         audio->setOutputDevice(QStringLiteral("auto"));
         QCOMPARE(audio->outputDevice(), QString());
         audio->setOutputDevice(QString());
