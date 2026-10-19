@@ -328,6 +328,8 @@ void Store::resetPersonal()
     m_requests.clear();
     m_refilling.clear();   // 旧账号的续取回包会被 epoch 丢掉，不会自己结束
     m_commentLikes.clear();
+    m_userPendants.clear();
+    m_userPendantInFlight.clear();
     // 私信与账号绑定：退出 / 换账号时不能留在内存里
     put("inbox", nullVariant(), false);
     put("inboxThread", nullVariant(), false);

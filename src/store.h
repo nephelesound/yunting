@@ -218,6 +218,7 @@ private:
     void requestDefaultSearch();
     // 当前登录用户正在佩戴的头像挂件；profile 接口不返回它。
     void requestAvatarPendant();
+    void requestUserPendant(double uid);
     void requestArtist(const QString &key, double artistId);
     void requestArtistSongs(const QString &key, double artistId, int offset);
     void requestAlbum(const QString &key, double albumId);
@@ -292,6 +293,8 @@ private:
     QVariantMap m_personal;
     QVariantMap m_emptyPersonal;     // 个人骨架（换账号时清回它）
     QHash<QString, QStringList> m_keyedOrder;   // 各按 id 存的槽里 id 的先后：超出上限时先丢最早的
+    QHash<double, QVariantMap> m_userPendants;   // 用户页挂件，独立于 QueryCache；失败不覆盖
+    QSet<double> m_userPendantInFlight;
     QSet<QString> m_refilling;       // 正在续取的流（fm / heart），见 beginRefill
     QVariantMap m_similarSeed;
     bool m_similarFired = false;

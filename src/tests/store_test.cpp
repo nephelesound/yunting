@@ -1621,6 +1621,104 @@ private slots:
         QCOMPARE(u.value("playlists").toList().first().toMap().value("name").toString(), QStringLiteral("Public"));
     }
 
+    // 用户页先出资料；挂件是独立请求，慢挂件不能拖住整页
+    void userPendantDoesNotDelayProfile()
+    {
+        QElapsedTimer elapsed;
+        elapsed.start();
+        FakeApi::Responder pendantRespond;
+        bool pendantCaptured = false;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/weapi/v1/user/detail/42") {
+                respond(200, json(QJsonObject{
+                    {"code", 200}, {"level", 1}, {"listenSongs", 2},
+                    {"profile", QJsonObject{{"userId", 42}, {"nickname", "Listener"},
+                                            {"avatarUrl", ""}}}}));
+                return;
+            }
+            if (req.path == "/weapi/user/playlist") {
+                respond(200, "{\"code\":200,\"playlist\":[]}");
+                return;
+            }
+            if (req.path == "/api/pendant/user/get") {
+                pendantCaptured = true;
+                pendantRespond = respond; // hold it: profile must not wait
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("user:42"));
+        QVERIFY(waitUntil([&] {
+            const QVariantMap u = m_store->data().value("user").toMap().value("42").toMap();
+            return u.value("name").toString() == "Listener";
+        }, 1000));
+        QVERIFY2(elapsed.elapsed() < 1000, "profile waited for pendant");
+        const QVariantMap before = m_store->data().value("user").toMap().value("42").toMap();
+        QVERIFY(before.value("avatarPendant").toString().isEmpty());
+        QVERIFY(waitUntil([&] { return pendantCaptured; }, 1000));
+
+        pendantRespond(200, json(QJsonObject{{"code", 200}, {"data", QJsonObject{
+            {"pendantData", QJsonObject{{"id", 7}, {"name", "P"},
+                                        {"imageUrl", "http://p1/p.png"}}}}}}));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("user").toMap().value("42").toMap()
+                       .value("avatarPendant").toString() == "http://p1/p.png";
+        }));
+    }
+
+    // 挂件失败不能污染用户页缓存；下一次用户页请求仍会重试并合并
+    void userPendantFailureIsNotCached()
+    {
+        int pendantRequests = 0;
+        bool pendantShouldFail = true;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/weapi/v1/user/detail/42") {
+                respond(200, json(QJsonObject{
+                    {"code", 200}, {"level", 1}, {"listenSongs", 2},
+                    {"profile", QJsonObject{{"userId", 42}, {"nickname", "Listener"},
+                                            {"avatarUrl", ""}}}}));
+                return;
+            }
+            if (req.path == "/weapi/user/playlist") {
+                respond(200, "{\"code\":200,\"playlist\":[]}");
+                return;
+            }
+            if (req.path == "/api/pendant/user/get") {
+                ++pendantRequests;
+                if (pendantShouldFail) {
+                    respond(500, "{}");
+                    return;
+                }
+                respond(200, json(QJsonObject{{"code", 200}, {"data", QJsonObject{
+                    {"pendantData", QJsonObject{{"id", 8}, {"name", "P2"},
+                                                {"imageUrl", "http://p1/p2.png"}}}}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("user:42"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("user").toMap().value("42").toMap()
+                       .value("name").toString() == "Listener";
+        }));
+        QVERIFY(waitUntil([&] { return pendantRequests >= 1; }));
+        QVERIFY(m_store->data().value("user").toMap().value("42").toMap()
+                    .value("avatarPendant").toString().isEmpty());
+        // Let the failed pendant callback clear the in-flight guard before the
+        // next page visit starts another request.
+        QTest::qWait(100);
+
+        pendantShouldFail = false;
+        m_store->request(QStringLiteral("user:42"));
+        QVERIFY(waitUntil([&] {
+            return m_store->data().value("user").toMap().value("42").toMap()
+                       .value("avatarPendant").toString() == "http://p1/p2.png";
+        }));
+        QVERIFY(pendantRequests >= 2);
+    }
+
     // 关注列表：第二页接在第一页后面；失败按请求时的 key 报，界面的重试才对得上
     void followsPageAndFailureKeys()
     {

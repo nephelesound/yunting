@@ -426,8 +426,45 @@ void Store::requestAvatarPendant()
         QVariantMap account = m_personal.value("account").toMap();
         if (account.isEmpty())
             return;
-        account.insert("avatarPendant", result.value->imageUrl);
+        account.insert("avatarPendant", result.value->preferredImage());
         put("account", account, true);
+    });
+}
+
+// 其他用户主页的挂件。独立请求：不参与 QueryCache，也不阻塞 user 页面。
+void Store::requestUserPendant(double uid)
+{
+    if (!(uid > 0) || !m_client->hasMusicU() || m_userPendantInFlight.contains(uid))
+        return;
+    const quint64 epoch = m_epoch;
+    m_userPendantInFlight.insert(uid);
+    sdk::fetchAvatarPendant(*m_client, static_cast<qint64>(uid), this,
+        [this, uid, epoch](sdk::Result<sdk::AvatarPendant> result) {
+        m_userPendantInFlight.remove(uid);
+        if (epoch != m_epoch || !result)
+            return;
+        const sdk::AvatarPendant &p = *result.value;
+        const QString image = p.preferredImage();
+        QVariantMap pending{
+            {"id", static_cast<double>(p.id)},
+            {"name", p.name},
+            {"imageUrl", image},
+            {"imagePCUrl", p.pcUrl},
+            {"imageAndroidUrl", p.androidUrl},
+            {"imageIosUrl", p.iosUrl},
+            {"previewImageUrl", p.previewUrl},
+            {"type", p.type},
+            {"status", p.status},
+        };
+        m_userPendants.insert(uid, pending);
+        // data.user is keyed by user id; patch that row only if it is still present.
+        QVariantMap all = m_data.value("user").toMap();
+        QVariantMap user = all.value(num(uid)).toMap();
+        if (!user.isEmpty() && user.value("id").toDouble() == uid) {
+            user.insert("avatarPendant", image);
+            all.insert(num(uid), user);
+            put("user", all, false);
+        }
     });
 }
 

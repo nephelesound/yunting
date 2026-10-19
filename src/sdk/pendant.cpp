@@ -28,9 +28,9 @@ Result<AvatarPendant> parseAvatarPendant(const QJsonObject &root)
         return parseFailure<AvatarPendant>(QString::fromLatin1(PendantPath), dataReader,
                                            rootPath + QStringLiteral(".data.pendantData"));
     if (pendantValue.isUndefined() || pendantValue.isNull()) {
-        return Result<AvatarPendant>::failure(endpointError(
-            ErrorKind::Api, QString::fromLatin1(PendantPath),
-            QStringLiteral("no avatar pendant"), rootPath + QStringLiteral(".data.pendantData")));
+        // A null pendant is a successful "not wearing one", not a request
+        // failure; callers must be able to clear a previously cached pendant.
+        return Result<AvatarPendant>::success(AvatarPendant{});
     }
     if (!pendantValue.isObject())
         return itemTypeFailure<AvatarPendant>(QString::fromLatin1(PendantPath),

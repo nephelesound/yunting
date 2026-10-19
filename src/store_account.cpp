@@ -118,8 +118,16 @@ void Store::fetchAccount()
         if (uid > 0) {
             m_accountUid = uid;
             m_cache.remember(QStringLiteral("screen:uid"), uid);
+            const QVariantMap oldAccount = m_personal.value("account").toMap();
+            const bool sameAccount = oldAccount.value("id").toDouble() == uid;
+            const QString oldPendant =
+                sameAccount ? oldAccount.value("avatarPendant").toString() : QString();
             QVariantMap account = ncmProfile(profile, 96, 1200);
             account.insert("vip", profile.value("vipType").toDouble() > 0);
+            // Keep the visible pendant across an account refresh; the async
+            // pendant request will replace or clear it a moment later.
+            if (!oldPendant.isEmpty() && account.value("avatarPendant").toString().isEmpty())
+                account.insert("avatarPendant", oldPendant);
             put("account", account, true);
             requestAvatarPendant();
             // 全部红心曲目 id（播放条与行内小红心）；没有红心时接口也可能回 null。

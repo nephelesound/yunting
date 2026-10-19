@@ -30,6 +30,16 @@ struct AvatarPendant {
     QString previewUrl;     // pendantData.previewImageUrl (raw)
     int type = 0;           // pendantData.type
     int status = 0;         // pendantData.status
+
+    // The universal image first; platform-specific assets only fill gaps.
+    QString preferredImage() const
+    {
+        if (!imageUrl.isEmpty()) return imageUrl;
+        if (!pcUrl.isEmpty()) return pcUrl;
+        if (!androidUrl.isEmpty()) return androidUrl;
+        if (!iosUrl.isEmpty()) return iosUrl;
+        return previewUrl;
+    }
 };
 
 using AvatarPendantCallback = std::function<void(Result<AvatarPendant>)>;

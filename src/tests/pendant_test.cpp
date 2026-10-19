@@ -28,12 +28,13 @@ private slots:
         QCOMPARE(parsed.value->previewUrl, QStringLiteral("http://p1.music.126.net/preview.png"));
     }
 
-    void nullPendantIsApiError()
+    void nullPendantIsEmptySuccess()
     {
         const auto parsed = parseAvatarPendant(
             QJsonObject{{"data", QJsonObject{{"pendantData", QJsonValue::Null}}}});
-        QVERIFY(!parsed.ok());
-        QCOMPARE(parsed.error.kind, ErrorKind::Api);
+        QVERIFY2(parsed.ok(), qPrintable(parsed.error.message));
+        QCOMPARE(parsed.value->id, qint64(0));
+        QVERIFY(parsed.value->preferredImage().isEmpty());
     }
 
     void wrongFieldIsParseError()

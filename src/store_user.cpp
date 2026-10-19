@@ -4,7 +4,6 @@
 #include "json_util.h"
 #include "ncmclient.h"
 #include "normalize.h"
-#include "sdk/pendant.h"
 #include "sdk/track.h"
 
 #include <QJsonDocument>
@@ -27,8 +26,7 @@ void Store::requestUser(const QString &key, double uid)
                 QVariantList playlists;
                 bool detailOk = false;
                 QString restricted;
-                QString pendant;
-                int left = 3;
+                int left = 2;
             };
             auto state = std::make_shared<State>();
             const auto finish = [state, done, uid] {
@@ -44,8 +42,6 @@ void Store::requestUser(const QString &key, double uid)
                     state->user.insert("message", state->restricted);
                 }
                 state->user.insert("playlists", state->playlists);
-                if (!state->pendant.isEmpty())
-                    state->user.insert("avatarPendant", state->pendant);
                 done(state->user, true);
             };
 
@@ -68,13 +64,6 @@ void Store::requestUser(const QString &key, double uid)
                     state->user.insert("playlists", QVariantList{});
                     state->detailOk = true;
                 }
-                finish();
-            });
-
-            sdk::fetchAvatarPendant(*m_client, static_cast<qint64>(uid), this,
-                [state, finish](sdk::Result<sdk::AvatarPendant> result) {
-                if (result)
-                    state->pendant = result.value->imageUrl;
                 finish();
             });
 
@@ -110,8 +99,16 @@ void Store::requestUser(const QString &key, double uid)
         [this, slot, token, uid](const QVariant &user) {
             if (!m_requests.current(slot, token))
                 return;
-            putKeyed("user", num(uid), user);
-            const QVariantMap map = user.toMap();
+            QVariantMap map = user.toMap();
+            // Pendant is intentionally outside the cached user value. A slow or
+            // failed pendant must not delay or poison the profile cache; when the
+            // page arrives, merge the last successful pendant if we have one and
+            // refresh it in the background.
+            const auto pendant = m_userPendants.constFind(uid);
+            if (pendant != m_userPendants.constEnd())
+                map.insert("avatarPendant", pendant.value().value("imageUrl"));
+            putKeyed("user", num(uid), map);
+            requestUserPendant(uid);
             if (map.value("restricted").toBool())
                 emit requestRestricted(QStringLiteral("user:") + num(uid),
                                        map.value("message").toString());
