@@ -58,6 +58,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.4" date="2026-10-19">
+      <description>
+        <p>修复分享不在播放的歌时应用卡死、请求失败后无限重试等问题，并加入请求流量的监测与告警。完整的更新日志见仓库里的 CHANGELOG.md。</p>
+      </description>
+    </release>
     <release version="0.6.3" date="2026-10-19">
       <description>
         <p>心动模式改为点了就放、越听越准的播放方式；暂停与切歌淡入淡出；修复拖动进度条时的噪音。完整的更新日志见仓库里的 CHANGELOG.md。</p>
