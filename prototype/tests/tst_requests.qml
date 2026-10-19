@@ -17,9 +17,11 @@ Item {
             property bool online: true
             property bool sessionExpired: false
             property var requested: []
+            property bool failRequests: true
             function request(key) {
                 requested = requested.concat([key]);
-                Qt.callLater(() => Source.markRequestFailed(key, "服务器拒绝"));
+                if (failRequests)
+                    Qt.callLater(() => Source.markRequestFailed(key, "服务器拒绝"));
             }
             function refresh() {}
         }
@@ -97,6 +99,23 @@ Item {
             wait(300);
             // 清掉失败标记会让读它的绑定重算、也去要：与 retryKey 自己要的合成一个请求
             compare(count("artist:4242"), before + 1, "重试只再要一次，失败后同样不循环");
+        }
+
+        // 离开列表页后，那张歌单不再被要：曾经 main 里还留着一个常驻的 openList 绑定，
+        // 数据一变就重算、又去要一次已经不在屏幕上的歌单
+        function test_leftListIsNotRequestedAgain() {
+            store.failRequests = false;   // 不让失败冷却掩盖重复的请求
+            const window = Qt.createComponent("../main.qml").createObject(root, { backend: null, fixture: "worst" });
+            Source.live = store;          // main 启动时按 backend 设过 live
+            window.open("list", "playlist:777");
+            tryVerify(() => count("playlist:777") >= 1);
+            window.open("user", "", { userId: 42 });   // 往前走到别的页：路由里的 listKey 还是这张歌单
+            wait(100);
+            const before = count("playlist:777");
+            store.data = Object.assign({}, store.data);   // 任何数据变化都会让常驻的绑定重算
+            wait(100);
+            compare(count("playlist:777"), before, "不在屏幕上的歌单不再要");
+            window.close();
         }
 
         // 下一页按 Store 给的 next 翻，不按已有条数：去重后条数可能比服务器的偏移少

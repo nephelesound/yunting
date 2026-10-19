@@ -46,7 +46,6 @@ Kirigami.ApplicationWindow {
     readonly property bool vip: root.loggedIn && Source.account.vip
     readonly property var pivots: [{ key: "home", text: "推荐" }, { key: "mine", text: "我的" }, { key: "search", text: "搜索" }]
 
-    readonly property var openList: Source.list(root.listKey)
 
     // 播放：队列与规则在 Playback，声音在 engine。队列为空时 currentTrack 为 null
     SimEngine { id: simEngine }
@@ -493,6 +492,8 @@ Kirigami.ApplicationWindow {
     }
 
     function openOverlay() {
+        // 截图要的列表：用到时取一次，不留一个常驻的绑定（列表页自己有 list）
+        const shown = () => Source.list(root.listKey);
         if (root.startOverlay === "flight") {
             // 截图：像点播放条封面那样打开正在播放页，记下转场两端的位置，最终帧应当是封面已落地显示
             // 等初始属性（page 等）都设完再触发，否则 page 的初始值会把刚打开的正在播放页切回去
@@ -502,7 +503,7 @@ Kirigami.ApplicationWindow {
             });
         } else if (root.startOverlay === "trackmenu") {
             // 截图：在列表第一行右侧打开曲目菜单（与点行尾「更多」的位置相同）
-            trackMenu.track = root.openList.tracks[0];
+            trackMenu.track = shown().tracks[0];
             trackMenu.context = {};
             trackMenu.popup(root.width - Tokens.pageMargin - trackMenu.implicitWidth, Tokens.height12 * 3);
         } else if (root.startOverlay === "queue")
@@ -518,7 +519,7 @@ Kirigami.ApplicationWindow {
         else if (root.startOverlay === "fullscreen")
             root.fullscreenShown = true;
         else if (root.startOverlay === "share")
-            Qt.callLater(() => root.shareTrack(root.currentTrack || root.openList.tracks[0]));
+            Qt.callLater(() => root.shareTrack(root.currentTrack || shown().tracks[0]));
         else if (root.startOverlay === "reorder")
             Qt.callLater(() => (root.pageStack.currentItem as PlaylistsPage).reordering = true)
         else if (root.startOverlay === "suggest")
@@ -526,13 +527,13 @@ Kirigami.ApplicationWindow {
         else if (root.startOverlay === "join")
             joinDialog.open();
         else if (root.startOverlay === "rename")
-            Qt.callLater(() => playlistNameDialog.ask(root.openList.listId || 0, root.openList.heading || "", null));
+            Qt.callLater(() => playlistNameDialog.ask(shown().listId || 0, shown().heading || "", null));
         else if (root.startOverlay === "delete")
-            Qt.callLater(() => deleteDialog.ask(root.openList.listId || 0, root.openList.heading || ""));
+            Qt.callLater(() => deleteDialog.ask(shown().listId || 0, shown().heading || ""));
         else if (root.startOverlay === "logout")
             logoutDialog.open();
         else if (root.startOverlay === "describe")
-            Qt.callLater(() => playlistDescriptionDialog.ask(root.openList.listId || 0, root.openList.description || ""));
+            Qt.callLater(() => playlistDescriptionDialog.ask(shown().listId || 0, shown().description || ""));
         else if (root.startOverlay === "login") {
             loginDialog.open();
             simSession.state = root.loginState;
@@ -1078,15 +1079,17 @@ Kirigami.ApplicationWindow {
     Component {
         id: listPage
         PlaylistPage {
+            id: playlistPage
             listKey: ""
             list: Source.list(listKey)
             loggedIn: root.loggedIn
             vip: root.vip
             parentText: root.parentName
             currentId: root.currentTrack ? root.currentTrack.id : 0
-            onActivated: index => root.play(root.openList.tracks, index)
-            onPlayAllRequested: root.play(root.openList.tracks, 0)
-            onShuffleRequested: root.play(root.openList.tracks, Math.floor(Math.random() * root.openList.tracks.length))
+            // 播放的就是这一页显示的那份列表
+            onActivated: index => root.play(playlistPage.list.tracks, index)
+            onPlayAllRequested: root.play(playlistPage.list.tracks, 0)
+            onShuffleRequested: root.play(playlistPage.list.tracks, Math.floor(Math.random() * playlistPage.list.tracks.length))
             onLeaveRequested: root.goBack()
             onLoginRequested: root.requestLogin()
             onRenameRequested: (id, name) => playlistNameDialog.ask(id, name, null)
