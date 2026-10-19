@@ -300,6 +300,7 @@ Kirigami.ApplicationWindow {
 
     ShareDialog {
         id: shareDialog
+        objectName: "shareDialog"
         qrAvailable: root.backend && root.backend.qr === true
     }
 

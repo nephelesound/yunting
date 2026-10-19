@@ -322,8 +322,7 @@ def anonymous():
                     for h in hot[:20]]
     write("Data.js", f"匿名接口快照（{time.strftime('%Y-%m-%d')}），由 scripts/snapshot.py 生成",
           [js("toplists", toplists), js("playlist", playlist), js("tracks", tracks),
-           js("lyricsTrackId", tracks[CURRENT]["id"]), js("lyrics", lyrics),
-           js("lyricsPureMusic", pure_music),
+           js("lyrics", {str(tracks[CURRENT]["id"]): {"lines": lyrics, "pureMusic": pure_music}}),
            js("comments", hot_comments(tracks[CURRENT]["id"])),
            js("commentPage", None), js("searchUsers", None), js("searchRadios", None),
            js("search", search), js("hotSearches", hot_searches),

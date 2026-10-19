@@ -227,12 +227,12 @@ void Store::request(const QString &key)
 }
 
 
-// 歌词：单槽（lyricsTrackId + lyrics + lyricsPureMusic），QML 只看当前这首；缓存按歌分开，切回来直接命中
+// 歌词按歌存：data.lyrics[<songId>] = { lines, pureMusic }，只留最近几首。正在播放页、桌面歌词与分享图
+// 可能同时要不同的歌：各取各的。单槽时它们会互相把对方的换掉、再各自重要，无限来回（应用卡死、请求成百上千）
 void Store::requestLyrics(const QString &key, double songId)
 {
     if (!(songId > 0))
         return;
-    const quint64 token = m_requests.begin(QStringLiteral("lyrics"));
     m_cache.query(key,
         [this, songId](QueryCache::Done done) {
             // lv / tv 是客户端手里已有的歌词版本，服务器只回更新的：-1 = 要最新的。
@@ -262,13 +262,16 @@ void Store::requestLyrics(const QString &key, double songId)
                      businessOk(resp));
             });
         },
-        [this, songId, token](const QVariant &lyrics) {
-            if (!m_requests.current(QStringLiteral("lyrics"), token))
-                return;
-            const QVariantMap fetched = lyrics.toMap();
-            put("lyricsTrackId", songId, false);
-            put("lyrics", fetched.value("lines"), false);
-            put("lyricsPureMusic", fetched.value("pureMusic"), false);
+        [this, songId](const QVariant &lyrics) {
+            constexpr qsizetype kept = 8;
+            const QString id = num(songId);
+            QVariantMap all = m_data.value("lyrics").toMap();
+            m_lyricsOrder.removeAll(id);
+            m_lyricsOrder.append(id);
+            while (m_lyricsOrder.size() > kept)
+                all.remove(m_lyricsOrder.takeFirst());
+            all.insert(id, lyrics.toMap());
+            put("lyrics", all, false);
         });
 }
 

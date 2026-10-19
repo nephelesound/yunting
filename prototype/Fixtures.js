@@ -127,9 +127,7 @@ var worst = {
         ],
         playlist: { id: 3778678, name: "网易云音乐 2026 年度听歌报告：你最常在深夜循环的 200 首歌", cover: "", description: "这是一段非常长的歌单简介，包含换行。\n第二段说明它是怎么生成的，以及更新频率、数据口径、收录规则和版权说明，足够把三行占满还溢出。", count: 12345, plays: 99999999999 },
         tracks: worstTracks.slice(0, 200),
-        lyricsTrackId: 903,   // 原型的「正在播放」是热歌榜第 3 首
-        lyrics: worstLyrics,
-        lyricsPureMusic: false,
+        lyrics: { "903": { lines: worstLyrics, pureMusic: false } },   // 原型的「正在播放」是热歌榜第 3 首
         comments: worstComments,
         artist: worstArtist,
         album: worstAlbum,
@@ -235,7 +233,7 @@ var worst = {
 };
 
 var empty = {
-    data: { toplists: [], playlist: { id: 0, name: "空歌单", cover: "", description: "", count: 0, plays: 0 }, tracks: [], lyricsTrackId: 0, lyrics: [], lyricsPureMusic: false,
+    data: { toplists: [], playlist: { id: 0, name: "空歌单", cover: "", description: "", count: 0, plays: 0 }, tracks: [], lyrics: {},
             hotSearches: [], search: { query: "没有结果的搜索词", songs: [], artists: [], playlists: [], albums: [] } },
     personal: {
         account: { id: 1002, name: "新用户", vip: false, avatar: "" },
@@ -279,9 +277,7 @@ var one = {
         toplists: [{ id: 1, name: "飙升榜", cover: C2, update: "每天更新", count: 1, preview: [{ name: "雨", artist: "A" }] }],
         playlist: { id: 1, name: "雨", cover: C2, description: "", count: 1, plays: 1 },
         tracks: oneTrack,
-        lyricsTrackId: 990,
-        lyrics: [{ t: 0, text: "只有一句" }],
-        lyricsPureMusic: false,
+        lyrics: { "990": { lines: [{ t: 0, text: "只有一句" }], pureMusic: false } },
         hotSearches: [{ word: "雨", note: "", score: 1 }],
         search: { query: "雨", songs: oneTrack, artists: [{ id: 1, name: "A", cover: C2, albums: 1 }], playlists: [{ id: 1, name: "雨", cover: C2, count: 1, creator: "Jo" }], albums: [] },
         wiki: oneWiki,

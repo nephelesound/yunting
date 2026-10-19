@@ -117,6 +117,12 @@ class StoreTest : public QObject {
         return done();
     }
 
+    // 一首歌的歌词条目 { lines, pureMusic }；还没取到时为空
+    QVariantMap lyricsOf(double songId) const
+    {
+        return m_store->data().value("lyrics").toMap().value(QString::number(qlonglong(songId))).toMap();
+    }
+
     static bool likedIdsContain(const Store *store, double songId)
     {
         for (const QVariant &v : store->personal().value("likedIds").toList())
@@ -195,11 +201,40 @@ private slots:
         m_store->request(QStringLiteral("lyrics:9"));
         QVERIFY(waitUntil([&] { return lyricRequests >= 1; }));
         QTest::qWait(100);
-        QVERIFY(m_store->data().value("lyrics").toList().isEmpty());
+        QVERIFY(lyricsOf(9).isEmpty());
 
         m_store->request(QStringLiteral("lyrics:9"));
         QVERIFY(waitUntil([&] { return lyricRequests >= 2; }));
-        QVERIFY(waitUntil([&] { return m_store->data().value("lyrics").toList().size() == 1; }));
+        QVERIFY(waitUntil([&] { return lyricsOf(9).value("lines").toList().size() == 1; }));
+    }
+
+    // 几处同时要不同歌的歌词（正在播放页要正在放的，分享图要被分享的）：各存各的，谁也不覆盖谁。
+    // 单槽时两边会互相换掉对方、再各自重要，无限来回，应用卡死、请求成百上千
+    void lyricsOfDifferentSongsCoexist()
+    {
+        QHash<QString, int> lyricRequests;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/song/lyric") {
+                const QString id = QUrlQuery(QString::fromLatin1(req.query)).queryItemValue(QStringLiteral("id"));
+                ++lyricRequests[id];
+                respond(200, "{\"code\":200,\"lrc\":{\"lyric\":\"[00:01.00]" + id.toLatin1() + "\"}}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("lyrics:21"));
+        m_store->request(QStringLiteral("lyrics:22"));
+        QVERIFY(waitUntil([&] { return !lyricsOf(21).isEmpty() && !lyricsOf(22).isEmpty(); }));
+        QCOMPARE(lyricsOf(21).value("lines").toList().first().toMap().value("text").toString(), QStringLiteral("21"));
+        QCOMPARE(lyricsOf(22).value("lines").toList().first().toMap().value("text").toString(), QStringLiteral("22"));
+
+        // 再要一次：两首都还在，不会再发请求
+        m_store->request(QStringLiteral("lyrics:21"));
+        m_store->request(QStringLiteral("lyrics:22"));
+        QTest::qWait(150);
+        QCOMPARE(lyricRequests.value(QStringLiteral("21")), 1);
+        QCOMPARE(lyricRequests.value(QStringLiteral("22")), 1);
     }
 
     // 没有 pureMusic/nolyric 标记的空歌词可能是瞬时空包：不能永久缓存成「暂无歌词」
@@ -224,12 +259,12 @@ private slots:
         m_store->request(QStringLiteral("lyrics:10"));
         QVERIFY(waitUntil([&] { return lyricRequests >= 1; }));
         QTest::qWait(100);
-        QVERIFY(m_store->data().value("lyrics").toList().isEmpty());
+        QVERIFY(lyricsOf(10).isEmpty());
 
         m_store->request(QStringLiteral("lyrics:10"));
         QVERIFY(waitUntil([&] { return lyricRequests >= 2; }));
-        QVERIFY(waitUntil([&] { return m_store->data().value("lyrics").toList().size() == 1; }));
-        QVERIFY(!m_store->data().value("lyricsPureMusic").toBool());
+        QVERIFY(waitUntil([&] { return lyricsOf(10).value("lines").toList().size() == 1; }));
+        QVERIFY(!lyricsOf(10).value("pureMusic").toBool());
     }
 
     // 明确的纯音乐：空歌词是正确结果，永久缓存后第二次不再请求
@@ -247,13 +282,13 @@ private slots:
 
         m_store->request(QStringLiteral("lyrics:11"));
         QVERIFY(waitUntil([&] { return lyricRequests >= 1; }));
-        QVERIFY(waitUntil([&] { return m_store->data().value("lyricsTrackId").toDouble() == 11; }));
-        QVERIFY(m_store->data().value("lyricsPureMusic").toBool());
+        QVERIFY(waitUntil([&] { return !lyricsOf(11).isEmpty(); }));
+        QVERIFY(lyricsOf(11).value("pureMusic").toBool());
         m_store->request(QStringLiteral("lyrics:11"));
         QTest::qWait(150);
         QCOMPARE(lyricRequests, 1);   // 命中的是永久缓存
-        QVERIFY(m_store->data().value("lyrics").toList().isEmpty());
-        QVERIFY(m_store->data().value("lyricsPureMusic").toBool());   // 标记也在缓存里
+        QVERIFY(lyricsOf(11).value("lines").toList().isEmpty());
+        QVERIFY(lyricsOf(11).value("pureMusic").toBool());   // 标记也在缓存里
     }
 
     // 旧接口用 nolyric 表示同一件事：歌曲本身没有歌词
@@ -268,11 +303,8 @@ private slots:
         };
 
         m_store->request(QStringLiteral("lyrics:12"));
-        QVERIFY(waitUntil([&] {
-            return m_store->data().value("lyricsTrackId").toDouble() == 12
-                && m_store->data().value("lyricsPureMusic").toBool();
-        }));
-        QVERIFY(m_store->data().value("lyrics").toList().isEmpty());
+        QVERIFY(waitUntil([&] { return lyricsOf(12).value("pureMusic").toBool(); }));
+        QVERIFY(lyricsOf(12).value("lines").toList().isEmpty());
     }
 
     // 对方设置隐私是预期状态：页面内显示，不发 requestFailed（否则会弹全局错误）

@@ -356,9 +356,9 @@ ScreenFrame {
         LinkText {
             objectName: "lyricsEmpty"
             readonly property bool failed: page.track !== null && Boolean(Source.failure("lyrics:" + page.track.id))
-            readonly property bool loading: page.track !== null && Source.live !== null && Source.d.lyricsTrackId !== page.track.id
-            readonly property bool pureMusic: page.track !== null
-                && Source.d.lyricsTrackId === page.track.id && Source.d.lyricsPureMusic === true
+            readonly property var entry: page.track ? Source.lyricsEntry(page.track.id) : null
+            readonly property bool loading: page.track !== null && Source.live !== null && entry === null
+            readonly property bool pureMusic: entry !== null && entry.pureMusic === true
             y: page.focusRow * page.pitch
             height: page.pitch
             visible: page.pane === "lyrics" && page.lines.length === 0

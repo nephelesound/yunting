@@ -242,8 +242,11 @@ Item {
         }
 
         // 桌面歌词：当前句按进度填色；播放时在两次引擎进度之间也连续前进；位置夹在屏幕内
+        // 快照里带歌词的那首（歌词按歌存：data.lyrics[<songId>]）
+        function lyricTrackId() { return Number(Object.keys(Source.d.lyrics)[0]); }
+
         function desktopLyrics(props) {
-            const track = { id: Source.d.lyricsTrackId, name: "歌", artist: "歌手", cover: "", dur: 300 };
+            const track = { id: lyricTrackId(), name: "歌", artist: "歌手", cover: "", dur: 300 };
             const w = createTemporaryObject(lyricsComponent, root, Object.assign({ track: track, layerShell: fakeLayerShell }, props));
             tryVerify(() => w.lines.length > 3);
             return w;
@@ -534,7 +537,7 @@ Item {
 
         function lyricsPage() {
             const page = createTemporaryObject(nowPlayingComponent, root, {
-                track: { id: Source.d.lyricsTrackId, name: "歌", artist: "歌手", cover: "", dur: 300 }, elapsed: 0 });
+                track: { id: lyricTrackId(), name: "歌", artist: "歌手", cover: "", dur: 300 }, elapsed: 0 });
             const view = findChild(page, "lyrics");
             tryVerify(() => view.count > 3 && view.height > 0);
             wait(50);   // 初次定位在 callLater 里
@@ -578,7 +581,7 @@ Item {
         function test_pureMusicSaysSoInsteadOfNoLyrics() {
             const saved = Source.snapshot;
             Source.snapshot = {
-                data: Object.assign({}, saved.data, { lyricsTrackId: 8080, lyrics: [], lyricsPureMusic: true }),
+                data: Object.assign({}, saved.data, { lyrics: { "8080": { lines: [], pureMusic: true } } }),
                 personal: saved.personal,
             };
             try {

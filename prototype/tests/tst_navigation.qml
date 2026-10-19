@@ -89,6 +89,40 @@ Item {
             window.close();
         }
 
+        // 对话框右上角的关闭与 Esc 都能关上（分享对话框曾经关不掉）
+        function closeButton(dialog) {
+            const stack = [dialog.header];
+            while (stack.length > 0) {
+                const item = stack.pop();
+                if (item.icon && String(item.icon.name).indexOf("window-close") === 0)
+                    return item;
+                for (let i = 0; i < item.children.length; i++)
+                    stack.push(item.children[i]);
+            }
+            return null;
+        }
+
+        function test_shareDialogCloses() {
+            const component = Qt.createComponent("../main.qml");
+            const window = component.createObject(root, { backend: null, fixture: "worst" });
+            window.show();
+            const dialog = findChild(window, "shareDialog");
+            verify(dialog !== null);
+            window.shareTrack(Source.heartTracks[0]);
+            tryVerify(() => dialog.opened);
+            const close = closeButton(dialog);
+            verify(close !== null && close.visible && close.enabled, "header has a usable close button");
+            mouseClick(close);
+            tryVerify(() => !dialog.visible, 2000, "× closes the share dialog");
+
+            window.shareTrack(Source.heartTracks[0]);
+            tryVerify(() => dialog.opened);
+            keyClick(Qt.Key_Escape);
+            tryVerify(() => !dialog.visible, 2000, "Esc closes the share dialog");
+            window.close();
+            Source.snapshot.fixture = "";
+        }
+
         // 心动模式与私人漫游一样是流：点入口就从头播放并去正在播放页，不打开列表页、不压历史里的列表
         function test_heartEntryStartsTheStream() {
             const component = Qt.createComponent("../main.qml");

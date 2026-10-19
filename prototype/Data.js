@@ -4517,9 +4517,7 @@ var tracks = [
  }
 ]
 
-var lyricsTrackId = 1456890009
-
-var lyrics = [
+var lyrics = {"1456890009": {"pureMusic": false, "lines": [
  {
   "t": 0.0,
   "text": "作词 : 梨冻紧/Wiz_H张子豪",
@@ -5015,9 +5013,7 @@ var lyrics = [
   "text": "本歌曲来自【青云 LAB】",
   "tr": ""
  }
-]
-
-var lyricsPureMusic = false
+]}}
 
 var comments = {
  "songId": 1456890009,

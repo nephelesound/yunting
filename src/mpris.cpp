@@ -1,5 +1,6 @@
 #include "mpris.h"
 #include "audioengine.h"
+#include "json_util.h"
 #include "normalize.h"
 #include "store.h"
 
@@ -191,13 +192,13 @@ void Mpris::emitChanged(const QStringList &properties)
     QDBusConnection::sessionBus().send(msg);
 }
 
-// Store 只放当前请求过的那一首歌词（lyricsTrackId + lyrics）：是正在放的这首才用，否则清空
+// Store 按歌存歌词：取正在放的这首；还没取到时清空
 void Mpris::refreshLyrics()
 {
-    const QVariantMap data = m_store->data();
     const double current = m_audio->track().value("id").toDouble();
-    const QString text = current > 0 && data.value("lyricsTrackId").toDouble() == current
-        ? ncmLyricsToLrc(data.value("lyrics").toList())
+    const QVariantMap lyrics = m_store->data().value("lyrics").toMap();
+    const QString text = current > 0
+        ? ncmLyricsToLrc(lyrics.value(ncm::num(current)).toMap().value("lines").toList())
         : QString();
     if (text == m_lyricsText)
         return;

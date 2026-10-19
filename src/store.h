@@ -271,6 +271,7 @@ private:
     QVariantMap m_data;
     QVariantMap m_personal;
     QVariantMap m_emptyPersonal;     // 个人骨架（换账号时清回它）
+    QStringList m_lyricsOrder;       // data.lyrics 里各首歌的先后：超出上限时先丢最早的
     QVariantMap m_similarSeed;
     bool m_similarFired = false;
     double m_heartSeedId = 0;        // 心动模式当前（或在途）的种子：红心第一首

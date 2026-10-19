@@ -278,7 +278,7 @@ int runDump(const CommandLine &cli, Backend &backend)
         const QVariantMap d = store.data();
         return d.value("search").toMap().value("query").toString() == probeQuery
             && !d.value("search").toMap().value("songs").toList().isEmpty()
-            && (probeSong == 0 || d.value("lyricsTrackId").toDouble() == probeSong)
+            && (probeSong == 0 || d.value("lyrics").toMap().contains(QString::number(qlonglong(probeSong))))
             && (probeSong == 0 || d.value("comments").toMap().value("songId").toDouble() == probeSong);
     };
     store.request(QStringLiteral("search:") + probeQuery);

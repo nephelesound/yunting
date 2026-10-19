@@ -608,11 +608,15 @@ QtObject {
         const timed = source.d.lyricsNew;
         if (timed && timed.songId === trackId && timed.lines.length > 0 && timed.lines[0].words !== undefined)
             return timed.lines;
-        if (trackId === source.d.lyricsTrackId)
-            return source.d.lyrics || [];
+        const entry = source.lyricsEntry(trackId);
+        if (entry)
+            return entry.lines || [];
         source.need("lyrics:" + trackId);
         return [];
     }
+    // 一首歌的歌词 { lines, pureMusic }；还没取到时为 null。只读、不发请求。
+    // Store 按歌存（最近几首），几处同时要不同的歌也互不覆盖
+    function lyricsEntry(trackId) { return (source.d.lyrics || {})[String(trackId)] || null; }
     // 当前句唱到了哪（0–1）。有逐字时间：唱完的字 + 正在唱的那个字唱了多少，按字数计；
     // 没有：按本句开始到下一句开始（最后一句到歌曲结束）之间的时间比例
     function lineFill(line, next, songEnd, time) {
