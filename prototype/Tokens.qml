@@ -25,6 +25,12 @@ QtObject {
     readonly property int radiusMd: 6
     readonly property int radiusLg: 8  // 浮层
 
+    // 接触阴影：像一张封套放在桌上，只有薄薄的厚度，不是浮起来。模糊小、几乎不偏、颜色偏浓，
+    // 光从上方来所以略向下。全应用只有正在播放页的大封面用
+    readonly property int contactShadowSize: 4
+    readonly property int contactShadowY: 2
+    readonly property real contactShadowOpacity: 0.3
+
     // 不透明度：只用 5% 档。同一语义全应用只有一个值
     readonly property real muted: 0.65        // 次要文字 = 正文色 × 0.65（三套配色下对比度都 ≥ 4.5:1；disabledTextColor 只给真正禁用的东西）
     readonly property real tintHover: 0.1     // 可点行/卡悬停的强调色淡色调（静止时为 0）

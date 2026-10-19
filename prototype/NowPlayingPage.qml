@@ -76,10 +76,9 @@ ScreenFrame {
             pixelSize: 800
             // 共享封面转场飞行时隐藏，落地后再显示：屏上永远只有一张封面
             opacity: page.coverHidden ? 0 : 1
-            // 微圆角、微投影：投影向下偏，像光从上方来。不随播放 / 暂停动：状态播放条已经说了
+            // 微圆角、接触阴影（见 Tokens.contactShadow*）。不随播放 / 暂停动：状态播放条已经说了
             radius: Tokens.radiusLg
-            shadowSize: Tokens.space4
-            shadowYOffset: Tokens.space2
+            shadowed: true
 
             // 动态封面（登录后，少数歌有的循环小视频）：盖在封面上，不出声。只在这一页、正在放歌时才转，
             // 暂停、换歌或离开就把播放器拆掉（不在后台解码）；没有动态封面时就是普通封面。
