@@ -16,8 +16,9 @@ AbstractButton {
     property bool locked        // 需要登录：图标换成锁，点击触发登录
     property bool round         // 人物（歌手）用圆形，这是通行约定；其余都是方形
     // 用户的头像挂件：头像缩到方块的三分之二居中，挂件（头像的 1.5 倍）正好铺满方块，不伸到旁边的磁贴上
+    // 挂件图真的取到了才缩（坏链接时头像照常铺满）
     property string pendant
-    readonly property real inset: tile.pendant.length > 0 ? tile.size / 6 : 0
+    readonly property real inset: pendantImage.status === Image.Ready ? tile.size / 6 : 0
 
     readonly property real corner: tile.round ? tile.size / 2 : Tokens.radius
 
@@ -83,6 +84,7 @@ AbstractButton {
                 Behavior on color { ColorAnimation { duration: Tokens.motionFast } }
             }
             Image {
+                id: pendantImage
                 anchors.fill: parent
                 visible: tile.pendant.length > 0 && status === Image.Ready
                 source: tile.pendant

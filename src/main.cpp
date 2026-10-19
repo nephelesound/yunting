@@ -62,9 +62,12 @@ std::optional<int> forwardToRunningInstance()
         service, QStringLiteral("/io/github/nephelesound/Yunting"),
         QStringLiteral("org.kde.KDBusService"), QStringLiteral("CommandLine"));
     call << QCoreApplication::arguments() << QDir::currentPath() << platformData;
-    const QDBusMessage reply = bus.call(call);
-    if (reply.type() != QDBusMessage::ReplyMessage)
+    // 那边卡住时不能陪着等（D-Bus 默认 25 秒）：3 秒没回话就当它不在，自己照常起
+    const QDBusMessage reply = bus.call(call, QDBus::Block, 3000);
+    if (reply.type() != QDBusMessage::ReplyMessage) {
+        std::fprintf(stderr, "已在运行的云听没有回应：%s\n", qPrintable(reply.errorMessage()));
         return std::nullopt;
+    }
     return reply.arguments().value(0).toInt();
 }
 
@@ -76,9 +79,11 @@ int main(int argc, char *argv[])
         QCoreApplication app(argc, argv);
         if (const auto rc = forwardToRunningInstance())
             return *rc;
-        std::fprintf(stderr, "没有图形环境，云听也没有在运行，链接没法打开\n");
+        std::fprintf(stderr, "没有图形环境，链接没能交给正在运行的云听，没法打开\n");
         return 1;
     }
+    // 在 QApplication 之前判断：它会把 -platform、-style 这些 Qt 自己的选项从 argv 里拿掉
+    const bool plain = plainLaunch(argc, argv);
 
     // 桌面歌词与迷你窗是透明的顶层窗口；没有 alpha buffer 时合成器会把透明区域画成黑色。
     // 必须在创建任何 QQuickWindow 之前设置。
@@ -86,7 +91,7 @@ int main(int argc, char *argv[])
     // MV 用 MpvQt 的 MpvAbstractItem 渲染，它只支持 OpenGL；必须在创建第一个窗口前定下
     QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
     QApplication app(argc, argv);
-    if (plainLaunch(argc, argv)) {
+    if (plain) {
         if (const auto rc = forwardToRunningInstance())
             return *rc;
     }

@@ -172,8 +172,11 @@ private slots:
         QTest::newRow("in-page anchor keeps the query")
             << QStringLiteral("https://music.163.com/song?id=186001#comments")
             << QStringLiteral("song") << qint64(186001) << QString();
-        QTest::newRow("markdown brackets")
-            << QStringLiteral("[听这首](https://music.163.com/song?id=186001) 或 [https://music.163.com/album?id=32311]")
+        QTest::newRow("square brackets")
+            << QStringLiteral("[https://music.163.com/album?id=32311]")
+            << QStringLiteral("album") << qint64(32311) << QString();
+        QTest::newRow("backticks")
+            << QStringLiteral("`https://music.163.com/song?id=186001`")
             << QStringLiteral("song") << qint64(186001) << QString();
     }
     void findsLinksInsideShareText()

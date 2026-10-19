@@ -618,16 +618,20 @@ Kirigami.ApplicationWindow {
         if (!track)
             return;
         root.linkedSongId = 0;
-        if (Date.now() - root.linkedAt > 10000) {
+        // 点了之后这边已经换了歌（用户放起了别的）或取了太久：不打断，问一句
+        const playingId = root.currentTrack ? root.currentTrack.id : 0;
+        if (Date.now() - root.linkedAt > 10000 || playingId !== root.linkedOver) {
             root.notify("链接里的《" + track.name + "》取到了", "long", "播放", () => root.playNow(track));
             return;
         }
         root.playNow(track);
     }
+    property real linkedOver: 0   // 点链接时正在放的那首
     function openLink(kind, id) {
         switch (kind) {
         case "song":
             root.linkedAt = Date.now();
+            root.linkedOver = root.currentTrack ? root.currentTrack.id : 0;
             root.linkedSongId = id;
             // 同一首上次没取到：冷却期里不会自己再要，用户又点了一次，就立刻再要
             if (Source.failure("song:" + id))

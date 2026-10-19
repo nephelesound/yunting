@@ -102,18 +102,27 @@ ScreenFrame {
             Layout.maximumWidth: Tokens.trackColumn
             spacing: 0
 
-            // 有挂件时头像缩到这一格的三分之二，挂件（头像的 1.5 倍）正好铺满这一格，不伸出左栏
+            // 有挂件时头像缩到这一格的三分之二，挂件（头像的 1.5 倍）正好铺满这一格，不伸出左栏。
+            // 挂件图真的取到了才缩（坏链接时头像照常铺满）；挂件按这一格画，尺寸不随头像变，不会来回重取
             Item {
                 Layout.preferredWidth: Tokens.trackColumn
                 Layout.preferredHeight: Tokens.trackColumn
                 PersonAvatar {
-                    readonly property bool framed: (page.user.avatarPendant || "").length > 0
                     anchors.centerIn: parent
-                    width: framed ? parent.width / 1.5 : parent.width
+                    width: profilePendant.status === Image.Ready ? parent.width / 1.5 : parent.width
                     height: width
                     name: page.user.name
                     source: page.user.avatar
-                    pendant: page.user.avatarPendant || ""
+                }
+                Image {
+                    id: profilePendant
+                    anchors.fill: parent
+                    visible: status === Image.Ready
+                    source: page.user.avatarPendant || ""
+                    sourceSize.width: 2 * Tokens.trackColumn
+                    sourceSize.height: 2 * Tokens.trackColumn
+                    fillMode: Image.PreserveAspectFit
+                    asynchronous: true
                 }
             }
 
@@ -461,7 +470,9 @@ ScreenFrame {
                     Component.onCompleted: if (visible) page.peopleView = people
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    readonly property int usable: width - Tokens.pageMargin
+                    Layout.leftMargin: -Tokens.pendantRoom   // 给头像挂件留的那一圈
+                    leftMargin: Tokens.pendantRoom
+                    readonly property int usable: width - Tokens.pendantRoom - Tokens.pageMargin
                     readonly property int columns: Math.max(1, Math.floor((usable + Tokens.space4) / (Tokens.measureMax + Tokens.space4)))
                     cellWidth: (usable + Tokens.space4) / columns
                     cellHeight: Tokens.trackRow + Tokens.space2

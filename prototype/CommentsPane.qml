@@ -65,9 +65,8 @@ ListView {
     }
 
     clip: true
-    // 头像挂件比头像宽出一圈（PersonAvatar）：左边留出这一圈，不然挂件左半被裁掉。
-    // 放评论区的地方把它往左挪同样的距离，正文仍与上面的枢轴对齐
-    readonly property int pendantRoom: Tokens.space2
+    // 头像挂件比头像宽出一圈（Tokens.pendantRoom）：左边留出这一圈，放评论区的地方把它往左挪同样多
+    readonly property int pendantRoom: Tokens.pendantRoom
     leftMargin: pane.pendantRoom
     spacing: Tokens.space6   // 评论之间 24：每条是一段独立的话，间距比行内大一档才分得开
     topMargin: Tokens.space3
@@ -83,7 +82,7 @@ ListView {
     onAtYEndChanged: if (atYEnd && pane.thread && pane.active) Source.moreComments(pane.thread)
 
     footer: PagingFooter {
-        width: ListView.view.width - Tokens.space4
+        width: ListView.view.width - pane.pendantRoom - Tokens.space4
         paging: pane.latest
         loadingText: "正在取回更多评论…"
         doneText: "没有更多评论了"
@@ -97,7 +96,7 @@ ListView {
         readonly property var modelData: pane.rows[entry.index]
             || ({ id: 0, group: "", user: "", userId: 0, avatar: "", content: "", time: 0,
                   likes: 0, liked: false, replyCount: 0, beReplied: null })
-        width: ListView.view.width - Tokens.space4
+        width: ListView.view.width - pane.pendantRoom - Tokens.space4
         spacing: Tokens.space3
 
         // 分组标题：每组第一条之前，与队列的「正在播放 / 接下来播放」同一种小节标题

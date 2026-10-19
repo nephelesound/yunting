@@ -24,6 +24,9 @@ QtObject {
     readonly property int radius: 4    // 磁贴、按钮、封面
     readonly property int radiusMd: 6
     readonly property int radiusLg: 8  // 浮层
+    // 头像挂件伸出头像的那一圈（挂件是头像的 1.5 倍：40 的头像伸出 10）。放人物行的列表在左边留出这一圈、
+    // 自己往左挪同样多，挂件不被裁、内容仍对齐
+    readonly property int pendantRoom: space3
 
     // 接触阴影：像一张封套放在桌上，只有薄薄的厚度，不是浮起来。模糊小、几乎不偏、颜色偏浓，
     // 光从上方来所以略向下。全应用只有正在播放页的大封面用

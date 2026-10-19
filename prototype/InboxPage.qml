@@ -106,8 +106,10 @@ ScreenFrame {
         ListView {
             id: list
             // 会话列宽一栏（400）：名字与最后一句都要看得出；右边留出滚动条的位置，不压在时间与未读数上
-            Layout.preferredWidth: Tokens.measureMax
+            Layout.preferredWidth: Tokens.measureMax + Tokens.pendantRoom
+            Layout.leftMargin: -Tokens.pendantRoom   // 给头像挂件留的那一圈（Tokens.pendantRoom）
             Layout.fillHeight: true
+            leftMargin: Tokens.pendantRoom
             rightMargin: Tokens.space3
             spacing: Tokens.space1
             clip: true
@@ -134,7 +136,7 @@ ScreenFrame {
                 // 越界时（列表重建前的一瞬）给完整的空会话，不给 {}
                 readonly property var conversation: page.conversations.items[index]
                     || ({ userId: 0, name: "", avatar: "", lastText: "", lastTime: 0, unread: 0 })
-                width: ListView.view.width - ListView.view.rightMargin
+                width: ListView.view.width - ListView.view.leftMargin - ListView.view.rightMargin
                 avatar: conversation.avatar
                 pendant: conversation.avatarPendant || ""
                 name: conversation.name
@@ -182,6 +184,8 @@ ScreenFrame {
                 id: messages
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.leftMargin: -Tokens.pendantRoom   // 给头像挂件留的那一圈
+                leftMargin: Tokens.pendantRoom
                 rightMargin: Tokens.pageMargin
                 spacing: Tokens.space6
                 clip: true
@@ -213,7 +217,7 @@ ScreenFrame {
                     // 给一条完整的空消息，不给 {}（各处读 fromName、message.kind 会报错）
                     readonly property var messageData: page.thread.items[index]
                         || ({ fromName: "", fromAvatar: "", mine: false, time: 0, message: { kind: "", text: "" } })
-                    width: ListView.view.width - ListView.view.rightMargin
+                    width: ListView.view.width - ListView.view.leftMargin - ListView.view.rightMargin
                     spacing: Tokens.space3
 
                     PersonAvatar {
@@ -329,10 +333,11 @@ ScreenFrame {
     ListView {
         id: noticeList
         visible: page.loggedIn && page.pane !== "messages"
-        x: Tokens.pageMargin
+        x: Tokens.pageMargin - Tokens.pendantRoom   // 给头像挂件留的那一圈
         y: Tokens.height10 + Tokens.space3
-        width: Math.min(parent.width - 2 * Tokens.pageMargin, Tokens.measureMax + Tokens.space6 + Tokens.wideRow)
+        width: Math.min(parent.width - 2 * Tokens.pageMargin, Tokens.measureMax + Tokens.space6 + Tokens.wideRow) + Tokens.pendantRoom
         height: parent.height - y - Tokens.space6
+        leftMargin: Tokens.pendantRoom
         rightMargin: Tokens.space3
         spacing: Tokens.space6
         clip: true
@@ -349,7 +354,7 @@ ScreenFrame {
             id: notice
             required property int index
             readonly property var entry: page.notices ? page.notices.items[notice.index] || ({}) : ({})
-            width: noticeList.width - noticeList.rightMargin
+            width: noticeList.width - noticeList.leftMargin - noticeList.rightMargin
             user: notice.entry.user || ({})
             time: notice.entry.time || 0
             text: notice.entry.content || notice.entry.message || notice.entry.text || ""
@@ -358,7 +363,7 @@ ScreenFrame {
         }
 
         footer: PagingFooter {
-            width: noticeList.width - noticeList.rightMargin
+            width: noticeList.width - noticeList.leftMargin - noticeList.rightMargin
             paging: page.notices ? { items: page.notices.items, more: page.notices.more, loading: false, failed: page.notices.moreFailed } : null
             doneText: "没有更早的了"
             onRetryRequested: Source.morePaged(page.notices)

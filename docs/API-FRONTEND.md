@@ -19,9 +19,9 @@
 ## 已有
 | 能力 | Store key / 触发 | 主要字段 |
 |---|---|---|
-| 账户 | `account` | `name` `vip` `vipType` `vipLevel` `level` `listenSongs` `avatar` `background` |
-| 用户主页 | `user:<id>` | `id` `name` `avatar` `signature` `followed` `follows` `followeds` `playlistCount` `vipType` `vipLevel` `level` `listenSongs` `playlists[]` |
-| 热门评论 | `comments:<songId>` | `userId` `id` `user` `avatar` `vipLevel` `content` `likes` `liked` `time` |
+| 账户 | `account` | `name` `vip` `vipType` `vipLevel` `level` `listenSongs` `avatar` `avatarPendant` `identityIcon` `background` |
+| 用户主页 | `user:<id>` | `id` `name` `avatar` `avatarPendant` `identityIcon` `signature` `followed` `follows` `followeds` `playlistCount` `vipType` `vipLevel` `level` `listenSongs` `playlists[]` |
+| 热门评论 | `comments:<songId>` | `userId` `id` `user` `avatar` `avatarPendant` `identityIcon` `vipLevel` `content` `likes` `liked` `time` |
 | 评论分页 | `comments:<songId>:<offset>` → `data.commentPage` | 同上 + `parentId` |
 | 评论点赞 | `setCommentLiked(kind, ownerId, commentId, liked)` | `kind` 为 `song` / `playlist`（`ownerId` 是歌曲或歌单 id）；乐观更新该线程热评与分页槽的 `liked` / `likes`，失败回滚 |
 | 只读信箱 | `inbox` / `inbox:<offset>` | 会话：`userId` `name` `avatar` `vipType` `lastText` `kind` `lastTime` `lastMsgId` `unread` `messageCount` |
@@ -82,6 +82,9 @@
 | `data.user` | `user:<id>` | 按 id 存：`{ "<uid>": { id,name,avatar,signature,followed,follows,followeds,playlistCount,vipType,vipLevel,level,listenSongs,playlists[] } }`，只留最近 8 个 id；隐私拒绝时该项带 `restricted` / `message` |
 | `data.mv` | `mv:<id>` | 按 id 存：`{ "<mvId>": { id,name,cover,artist,artistId,duration,playCount,subCount,shareCount,commentCount,publishTime,description,subscribed,url,br,size,expires,urlPending } }`，只留最近 8 个 id；每次打开都重新取签名地址 |
 | `data.wiki` | `wiki:<songId>` | 按 id 存：`{ "<songId>": { songId,loaded,songName,description,memory,chorus,basic[],creators[],mvs[],reviews[],sheets[],entertainments[],awards[] } }`，只留最近 8 个 id |
+| `data.similarSongs` | `similarSongs:<songId>` | `{ songId,tracks:[Track] }`：一首歌的相似歌曲（正在播放页「相似」栏）；槽里只放最近要的那首 |
+| `data.similarPlaylists` | `similarPlaylists:<songId>` | `{ songId,items:[{id,name,cover,count,…}] }`：同上，相似歌单 |
+| `data.defaultSearch` | `defaultSearch` | `{ showKeyword,realKeyword,searchType,action,alg,imageUrl }`：搜索框空着时显示 `showKeyword`，回车搜 `realKeyword` |
 | `data.song` | `song:<id>` | 按 id 存：`{ "<songId>": Track }`，只留最近 8 个 id；只知道 id 时（打开链接、下载）用它取曲目 |
 | `data.lyrics` | `lyrics:<songId>` | 按歌存：`{ "<songId>": { lines:[{t,text,tr}], pureMusic } }`，只留最近 8 首；`pureMusic` 为 true 表示纯音乐（空歌词是正确结果，界面说「纯音乐，请欣赏」）。几处同时要不同歌的歌词各取各的 |
 | `data.lyricsNew` | `lyricsNew:<songId>` | `{ songId,lrc,tlyric,yrc,klyric,romalrc,lines:[{t,text,tr}] }` |

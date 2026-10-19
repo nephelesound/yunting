@@ -272,6 +272,10 @@ def hot_comments(song_id):
             "items": [{"user": (c.get("user") or {}).get("nickname") or "",
                        "userId": (c.get("user") or {}).get("userId") or 0,
                        "avatar": sized((c.get("user") or {}).get("avatarUrl"), 96),
+                       # 挂件挂在评论上，身份图标与会员档在用户上（与 src/sdk/comment.cpp 一致）
+                       "avatarPendant": (c.get("pendantData") or {}).get("imageUrl") or "",
+                       "identityIcon": ((c.get("user") or {}).get("avatarDetail") or {}).get("identityIconUrl") or "",
+                       "vipLevel": vip_level(c.get("user") or {}),
                        "content": c.get("content") or "",
                        "likes": c.get("likedCount") or 0,
                        "time": c.get("time") or 0,

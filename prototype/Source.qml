@@ -591,8 +591,10 @@ QtObject {
             source.need("similarSongs:" + songId);
         if (songId > 0 && lists === null)
             source.need("similarPlaylists:" + songId);
+        // 失败只看还没取到的那一半：后来取到了（哪怕是空的），旧的失败标记不算数
         return { songs: songs || [], playlists: lists || [], pending: songs === null || lists === null,
-                 failed: Boolean(source.failure("similarSongs:" + songId) || source.failure("similarPlaylists:" + songId)) };
+                 failed: Boolean((songs === null && source.failure("similarSongs:" + songId))
+                                 || (lists === null && source.failure("similarPlaylists:" + songId))) };
     }
     // 只知道 id 的一首歌（外部链接打开的）：取到前是 null
     function song(id) {
