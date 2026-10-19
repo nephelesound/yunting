@@ -418,7 +418,7 @@ void Store::requestAvatarPendant()
         return;
     const quint64 token = m_requests.begin(QStringLiteral("avatarPendant"));
     const quint64 epoch = m_epoch;
-    sdk::fetchAvatarPendant(*m_client, this,
+    sdk::fetchAvatarPendant(*m_client, 0, this,
         [this, token, epoch](sdk::Result<sdk::AvatarPendant> result) {
         if (epoch != m_epoch || !m_requests.current(QStringLiteral("avatarPendant"), token))
             return;
@@ -427,7 +427,7 @@ void Store::requestAvatarPendant()
             return;
         }
         const sdk::AvatarPendant &p = *result.value;
-        put("avatarPendant", QVariantMap{
+        QVariantMap pendant{
             {"id", static_cast<double>(p.id)},
             {"name", p.name},
             {"imageUrl", p.imageUrl},
@@ -437,7 +437,13 @@ void Store::requestAvatarPendant()
             {"previewImageUrl", p.previewUrl},
             {"type", p.type},
             {"status", p.status},
-        }, false);
+        };
+        put("avatarPendant", pendant, false);
+        QVariantMap account = m_personal.value("account").toMap();
+        if (!account.isEmpty()) {
+            account.insert("avatarPendant", p.imageUrl);
+            put("account", account, true);
+        }
     });
 }
 

@@ -4,6 +4,7 @@
 #include "json_util.h"
 #include "ncmclient.h"
 #include "normalize.h"
+#include "sdk/pendant.h"
 #include "sdk/track.h"
 
 #include <QJsonDocument>
@@ -26,7 +27,8 @@ void Store::requestUser(const QString &key, double uid)
                 QVariantList playlists;
                 bool detailOk = false;
                 QString restricted;
-                int left = 2;
+                QString pendant;
+                int left = 3;
             };
             auto state = std::make_shared<State>();
             const auto finish = [state, done, uid] {
@@ -42,6 +44,8 @@ void Store::requestUser(const QString &key, double uid)
                     state->user.insert("message", state->restricted);
                 }
                 state->user.insert("playlists", state->playlists);
+                if (!state->pendant.isEmpty())
+                    state->user.insert("avatarPendant", state->pendant);
                 done(state->user, true);
             };
 
@@ -64,6 +68,13 @@ void Store::requestUser(const QString &key, double uid)
                     state->user.insert("playlists", QVariantList{});
                     state->detailOk = true;
                 }
+                finish();
+            });
+
+            sdk::fetchAvatarPendant(*m_client, static_cast<qint64>(uid), this,
+                [state, finish](sdk::Result<sdk::AvatarPendant> result) {
+                if (result)
+                    state->pendant = result.value->imageUrl;
                 finish();
             });
 

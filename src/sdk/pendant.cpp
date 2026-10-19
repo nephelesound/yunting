@@ -3,6 +3,8 @@
 #include "sdk/sdk_json.h"
 #include "sdk/service.h"
 
+#include <QUrlQuery>
+
 #include <QJsonObject>
 #include <utility>
 
@@ -51,11 +53,15 @@ Result<AvatarPendant> parseAvatarPendant(const QJsonObject &root)
     return Result<AvatarPendant>::success(std::move(pendant));
 }
 
-void fetchAvatarPendant(NcmClient &client, QObject *context, AvatarPendantCallback callback)
+void fetchAvatarPendant(NcmClient &client, qint64 userId, QObject *context,
+                        AvatarPendantCallback callback)
 {
     if (!callback)
         return;
-    postFormJson(client, context, QString::fromLatin1(PendantPath), {},
+    QUrlQuery form;
+    if (userId > 0)
+        form.addQueryItem(QStringLiteral("userId"), QString::number(userId));
+    postFormJson(client, context, QString::fromLatin1(PendantPath), std::move(form),
                  [callback = std::move(callback)](Result<QJsonObject> root) {
         if (!root) {
             callback(Result<AvatarPendant>::failure(root.error));

@@ -34,7 +34,9 @@ struct AvatarPendant {
 
 using AvatarPendantCallback = std::function<void(Result<AvatarPendant>)>;
 
-void fetchAvatarPendant(NcmClient &client, QObject *context, AvatarPendantCallback callback);
+// userId <= 0 asks for the signed-in account; a positive id asks for that user.
+void fetchAvatarPendant(NcmClient &client, qint64 userId, QObject *context,
+                        AvatarPendantCallback callback);
 Result<AvatarPendant> parseAvatarPendant(const QJsonObject &root);
 
 } // namespace ncm::sdk
