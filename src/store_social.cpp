@@ -91,7 +91,9 @@ void Store::requestPeople(const char *slot, const QString &path,
         for (const sdk::SocialUser &user : parsed.value->items)
             items.append(socialUser(user));
         const bool samePerson = m_data.value(kind).toMap().value("userId").toDouble() == uid;
+        // next：服务器上的下一页从哪开始。去重后的条数可能比它少（两页之间名单变了），不能拿条数翻页
         putPage(slot, QVariantMap{{"userId", uid}, {"offset", offset},
+                                  {"next", offset + int(parsed.value->items.size())},
                                   {"more", parsed.value->more}, {"items", items}},
                 offset > 0 && samePerson, false);
     });

@@ -162,6 +162,7 @@ void Store::requestInbox(int offset)
         const QVariant old = m_data.value("inbox");
         putPage("inbox", QVariantMap{
             {"offset", offset},
+            {"next", offset + int(arr(resp, "msgs").size())},   // 下一页的起点：不拿去重后的条数翻页
             {"unread", resp.value("newMsgCount").toDouble()},
             {"more", resp.value("more").toBool()},
             {"items", items},

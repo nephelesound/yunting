@@ -370,8 +370,8 @@ QtObject {
         const key = kind + ":" + uid;
         const restricted = source.restriction(key);
         const l = source.d[kind];
-        if (l && l.userId === uid)   // moreFailed：下一页（按已有条数翻）没取到，可重试
-            return Object.assign({ failed: false, moreFailed: Boolean(source.failure(kind + ":" + uid + ":" + l.items.length)),
+        if (l && l.userId === uid)   // moreFailed：下一页（从 Store 给的 next 翻）没取到，可重试
+            return Object.assign({ failed: false, moreFailed: Boolean(source.failure(kind + ":" + uid + ":" + l.next)),
                                    restricted: l.restricted === true || restricted.length > 0,
                                    restrictedMessage: l.message || restricted }, l);
         return { userId: uid, items: [], more: false, pending: restricted.length === 0,
@@ -380,8 +380,9 @@ QtObject {
                  failed: restricted.length === 0 && Boolean(source.failure(key)) };
     }
     function morePeople(kind, list) {
+        // 按 Store 给的 next 翻，不按条数：去重后的条数可能比服务器的偏移少，那样会重取、甚至卡住
         if (list.more && !list.pending)
-            source.retryKey(kind + ":" + list.userId + ":" + list.items.length);
+            source.retryKey(kind + ":" + list.userId + ":" + list.next);
     }
     // 听歌排行（只有自己的）：type 是 week | month。排行条目不是完整的曲目，补成曲目行能用的形状
     function listenRank(type) {
@@ -413,11 +414,11 @@ QtObject {
     // 私信（只读）：会话列表与当前打开的一段对话；对话在 data 里只放最近取回的一段
     // moreFailed：下一页没取到（失败按请求时的 key 记），可重试
     readonly property var inbox: source.d.inbox
-        ? Object.assign({ pending: false, moreFailed: Boolean(source.failure("inbox:" + source.d.inbox.items.length)) }, source.d.inbox)
+        ? Object.assign({ pending: false, moreFailed: Boolean(source.failure("inbox:" + source.d.inbox.next)) }, source.d.inbox)
         : { unread: 0, more: false, items: [], pending: true, moreFailed: false }
     function moreInbox() {
         if (source.d.inbox && source.d.inbox.more)
-            source.retryKey("inbox:" + source.d.inbox.items.length);
+            source.retryKey("inbox:" + source.d.inbox.next);   // Store 给的下一页起点，不是去重后的条数
     }
     function thread(uid) {
         const t = source.d.inboxThread;

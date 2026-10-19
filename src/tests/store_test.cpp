@@ -1298,6 +1298,30 @@ private slots:
         QCOMPARE(failed.first().at(0).toString(), QStringLiteral("userFollows:42:30"));
     }
 
+    // 两页之间名单变了（有人挪到了前面）：下一页里有已经显示的人。去重后条数比服务器的偏移少，
+    // 但下一页的起点仍按服务器算（next），不按条数——否则会重取同一段、甚至一直卡在那里
+    void shiftedPageStillAdvances()
+    {
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/user/getfollows/42") {
+                const int offset = QUrlQuery(QString::fromLatin1(req.query)).queryItemValue(QStringLiteral("offset")).toInt();
+                const int id = offset == 2 ? 2 : 1;   // 第 0、1 页都是 A（挪动），第 2 页是 B
+                respond(200, json(QJsonObject{{"code", 200}, {"more", offset < 2},
+                    {"follow", QJsonArray{QJsonObject{{"userId", id}, {"nickname", id == 1 ? "A" : "B"}}}}}));
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        const auto follows = [&] { return m_store->data().value("userFollows").toMap(); };
+        m_store->request(QStringLiteral("userFollows:42"));
+        QVERIFY(waitUntil([&] { return follows().value("next").toInt() == 1; }));
+        m_store->request(QStringLiteral("userFollows:42:1"));
+        QVERIFY(waitUntil([&] { return follows().value("next").toInt() == 2; }));
+        QCOMPARE(follows().value("items").toList().size(), 1);   // A 没有重复
+        m_store->request(QStringLiteral("userFollows:42:2"));
+        QVERIFY(waitUntil([&] { return follows().value("items").toList().size() == 2; }));
+    }
+
     // 只读信箱：会话与历史都归一化到 data.inbox / data.inboxThread
     void readsInboxAndThread()
     {

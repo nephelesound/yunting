@@ -99,6 +99,14 @@ Item {
             compare(count("artist:4242"), before + 1, "重试只再要一次，失败后同样不循环");
         }
 
+        // 下一页按 Store 给的 next 翻，不按已有条数：去重后条数可能比服务器的偏移少
+        function test_morePagesFollowTheCursor() {
+            Source.morePeople("userFollows", { more: true, pending: false, userId: 5, next: 7, items: [{ id: 1 }, { id: 2 }] });
+            store.data = Object.assign({}, store.data, { inbox: { more: true, next: 9, unread: 0, items: [{ key: "1" }] } });
+            Source.moreInbox();
+            tryVerify(() => count("userFollows:5:7") === 1 && count("inbox:9") === 1);
+        }
+
         // 滚到底要下一页、点「重试」是用户的动作：这一页上次失败、还在冷却，也要立刻再要
         function test_loadingMoreIgnoresTheCooldown() {
             Source.failedAt["artistSongs:9:2"] = Date.now();
