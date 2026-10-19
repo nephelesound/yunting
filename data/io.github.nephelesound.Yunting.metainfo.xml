@@ -58,6 +58,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.5" date="2026-10-19">
+      <description>
+        <p>分享对话框改成两栏，所有对话框不超出窗口；修复私人漫游与心动模式续取失败后停住、重试无反应与翻页重复等问题。完整的更新日志见仓库里的 CHANGELOG.md。</p>
+      </description>
+    </release>
     <release version="0.6.4" date="2026-10-19">
       <description>
         <p>修复分享不在播放的歌时应用卡死、请求失败后无限重试等问题，并加入请求流量的监测与告警。完整的更新日志见仓库里的 CHANGELOG.md。</p>
