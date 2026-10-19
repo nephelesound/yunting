@@ -60,8 +60,9 @@ private slots:
 
         const QVariantMap commentMap = commentToVariantMap(comment);
         QCOMPARE(commentMap.keys(),
-                 (QStringList{QStringLiteral("avatar"), QStringLiteral("beReplied"),
-                              QStringLiteral("content"), QStringLiteral("id"),
+                 (QStringList{QStringLiteral("avatar"), QStringLiteral("avatarPendant"),
+                              QStringLiteral("beReplied"), QStringLiteral("content"),
+                              QStringLiteral("id"), QStringLiteral("identityIcon"),
                               QStringLiteral("liked"), QStringLiteral("likes"),
                               QStringLiteral("parentId"), QStringLiteral("replyCount"),
                               QStringLiteral("time"), QStringLiteral("user"),

@@ -39,6 +39,8 @@ struct ListenTogetherUser {
     qint64 userId = 0; // userId
     QString nickname;  // nickname
     QString avatar;    // avatarUrl (raw URL)
+    QString pendant;   // pendantData.imageUrl (raw)
+    QString identityIcon; // identityIcon / avatarDetail.identityIconUrl (raw)
     QString identity;  // identityName
 };
 

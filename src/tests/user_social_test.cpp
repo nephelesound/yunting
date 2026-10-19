@@ -16,6 +16,8 @@ class UserSocialTest : public QObject {
         return QJsonObject{{"userId", id},
                            {"nickname", name},
                            {"avatarUrl", "http://p1.music.126.net/avatar.jpg"},
+                           {"pendantData", QJsonObject{{"imageUrl", "http://p1.music.126.net/p.png"}}},
+                           {"avatarDetail", QJsonObject{{"identityIconUrl", "http://p1.music.126.net/i.png"}}},
                            {"signature", "signature"},
                            {"gender", 1},
                            {"followed", true},
@@ -43,6 +45,8 @@ private slots:
         QCOMPARE(user.id, qint64(42));
         QCOMPARE(user.name, QStringLiteral("Alice"));
         QCOMPARE(user.avatar, QStringLiteral("http://p1.music.126.net/avatar.jpg"));
+        QCOMPARE(user.pendant, QStringLiteral("http://p1.music.126.net/p.png"));
+        QCOMPARE(user.identityIcon, QStringLiteral("http://p1.music.126.net/i.png"));
         QCOMPARE(user.signature, QStringLiteral("signature"));
         QCOMPARE(user.gender, 1);
         QCOMPARE(user.followed, true);

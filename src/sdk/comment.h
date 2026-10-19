@@ -52,6 +52,8 @@ struct Comment {
     QString user;                    // user.nickname
     qint64 userId = 0;               // user.userId
     QString avatar;                  // user.avatarUrl (raw URL)
+    QString pendant;                 // pendantData.imageUrl (raw avatar pendant)
+    QString identityIcon;            // user.avatarDetail.identityIconUrl (raw)
     QString content;                 // content
     qint64 likes = 0;                // likedCount
     qint64 time = 0;                 // time (milliseconds; cursor value for the next page)

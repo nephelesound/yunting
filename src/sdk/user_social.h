@@ -30,6 +30,8 @@ struct SocialUser {
     qint64 id = 0;          // userId
     QString name;           // nickname
     QString avatar;         // avatarUrl (raw URL)
+    QString pendant;        // pendantData.imageUrl (raw)
+    QString identityIcon;   // avatarDetail.identityIconUrl (raw)
     QString signature;      // signature
     int gender = 0;         // gender
     bool followed = false;  // followed

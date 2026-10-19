@@ -89,6 +89,8 @@ QVariantList roomUsers(const QList<sdk::ListenTogetherUser> &users)
             {"userId", static_cast<double>(user.userId)},
             {"name", user.nickname},
             {"avatar", user.avatar},
+            {"avatarPendant", user.pendant},
+            {"identityIcon", user.identityIcon},
             {"identity", user.identity},
         });
     }

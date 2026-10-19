@@ -134,6 +134,14 @@ Result<ListenTogetherRoom> roomFrom(const QJsonObject &object, const QString &pa
         user.avatar = userReader.string("avatarUrl");
         if (!userReader.ok() && userBadPath.isEmpty())
             userBadPath = fieldPath(userPath, "avatarUrl");
+        // Upstream sends pendantData as an object on room members; identityIcon is
+        // sometimes a direct URL field and sometimes inside avatarDetail.
+        const QJsonObject pendant = userReader.object("pendantData");
+        user.pendant = pendant.value(QStringLiteral("imageUrl")).toString();
+        const QJsonObject avatarDetail = userReader.object("avatarDetail");
+        user.identityIcon = userReader.string("identityIcon");
+        if (user.identityIcon.isEmpty())
+            user.identityIcon = avatarDetail.value(QStringLiteral("identityIconUrl")).toString();
         user.identity = userReader.string("identityName");
         if (!userReader.ok() && userBadPath.isEmpty())
             userBadPath = fieldPath(userPath, "identityName");

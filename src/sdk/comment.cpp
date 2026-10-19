@@ -79,6 +79,10 @@ Result<Comment> commentFrom(const QJsonValue &value, const QString &path,
     comment.user = userReader.string("nickname");
     comment.userId = userReader.integer("userId");
     comment.avatar = userReader.string("avatarUrl");
+    const QJsonObject pendant = reader.object("pendantData");
+    comment.pendant = pendant.value(QStringLiteral("imageUrl")).toString();
+    const QJsonObject avatarDetail = userReader.object("avatarDetail");
+    comment.identityIcon = avatarDetail.value(QStringLiteral("identityIconUrl")).toString();
     comment.content = reader.string("content");
     comment.likes = reader.integer("likedCount");
     comment.time = reader.integer("time");

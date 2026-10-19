@@ -21,6 +21,8 @@ QVariantMap socialUser(const sdk::SocialUser &u)
         {"id", static_cast<double>(u.id)},
         {"name", u.name},
         {"avatar", ncmSized(QJsonValue(u.avatar), 96)},
+        {"avatarPendant", u.pendant},
+        {"identityIcon", u.identityIcon},
         {"signature", u.signature},
         {"gender", u.gender},
         {"followed", u.followed},

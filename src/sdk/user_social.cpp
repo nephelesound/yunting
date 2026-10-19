@@ -59,6 +59,8 @@ Result<SocialUser> userFrom(const QJsonObject &object, const QString &path,
     user.id = reader.integer("userId");
     user.name = reader.string("nickname");
     user.avatar = reader.string("avatarUrl");
+    user.pendant = reader.object("pendantData").value(QStringLiteral("imageUrl")).toString();
+    user.identityIcon = reader.object("avatarDetail").value(QStringLiteral("identityIconUrl")).toString();
     user.signature = reader.string("signature");
     user.gender = static_cast<int>(reader.integer("gender"));
     user.followed = reader.boolean("followed");
