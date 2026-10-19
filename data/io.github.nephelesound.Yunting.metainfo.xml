@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.12" date="2026-10-19">
+      <description>
+        <p>The "Last month" listening-rank tab no longer stays on "Loading...". Switching tabs now requests the selected range, and a late response for the previous tab cannot overwrite it. Tile titles containing a line break stay on one line.</p>
+        <p xml:lang="zh_CN">「最近一月」听歌排行不再一直显示「正在取回」；切换周/月会请求当前选择，旧标签页的迟到回包不会覆盖新数据。标题里带换行的磁贴标题保持单行。</p>
+      </description>
+    </release>
     <release version="0.6.11" date="2026-10-19">
       <description>
         <p>Avatar pendants that fail to load are retried with a fresh cache-busting URL, so a transient image failure no longer hides the pendant until the app restarts.</p>

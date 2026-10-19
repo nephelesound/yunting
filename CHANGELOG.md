@@ -2,6 +2,12 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.12] - 2026-10-19
+
+### Fixed
+- The "Last month" listening-rank tab could stay on "Loading..." forever because switching tabs could read the previous tab's stale pending state and skip the request. Week and month now request the selected tab and keep latest-tab semantics, so a late response for the old tab cannot overwrite the new one.
+- Tile titles containing a line break stay on one line instead of breaking the tile layout.
+
 ## [0.6.11] - 2026-10-19
 
 ### Fixed
