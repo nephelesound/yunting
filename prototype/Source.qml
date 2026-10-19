@@ -573,6 +573,20 @@ QtObject {
         return { id: id, name: "", cover: "", artist: "", artistId: 0, duration: 0, url: "",
                  playCount: 0, subscribed: false, description: "", failed: failed };
     }
+    // 一首歌的相似歌曲与相似歌单（正在播放页的「相似」栏）：两个槽各放一首歌的结果、带 songId，
+    // 只有这一栏读，所以不按 id 分开存
+    function similarTo(songId) {
+        const s = source.d.similarSongs;
+        const p = source.d.similarPlaylists;
+        const songs = s && s.songId === songId ? s.tracks : null;
+        const lists = p && p.songId === songId ? p.items : null;
+        if (songId > 0 && songs === null)
+            source.need("similarSongs:" + songId);
+        if (songId > 0 && lists === null)
+            source.need("similarPlaylists:" + songId);
+        return { songs: songs || [], playlists: lists || [], pending: songs === null || lists === null,
+                 failed: Boolean(source.failure("similarSongs:" + songId) || source.failure("similarPlaylists:" + songId)) };
+    }
     // 只知道 id 的一首歌（外部链接打开的）：取到前是 null
     function song(id) {
         const s = (source.d.song || {})[String(id)];

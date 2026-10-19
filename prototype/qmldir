@@ -58,6 +58,7 @@ TrackTile TrackTile.qml
 Toast Toast.qml
 SmartQueue SmartQueue.qml
 WikiPane WikiPane.qml
+SimilarPane SimilarPane.qml
 TileGrid TileGrid.qml
 SavedPage SavedPage.qml
 ResourceRow ResourceRow.qml

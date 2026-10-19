@@ -132,6 +132,13 @@ var worst = {
         artist: worstArtist,
         album: worstAlbum,
         wiki: worstWiki,
+        similarSongs: { songId: 903, tracks: worstTracks.slice(0, 8) },
+        similarPlaylists: { songId: 903, items: [
+            { id: 11, name: "【温柔女声】在深夜被治愈：适合一个人听的 100 首华语民谣与独立音乐", cover: C2, count: 100 },
+            { id: 12, name: "x", cover: "", count: 0 },
+            { id: 13, name: "雨天", cover: BROKEN, count: 1 },
+            { id: 14, name: "通勤路上", cover: C1, count: 58 },
+            { id: 15, name: "Lo-fi", cover: C2, count: 3000 }] },
         userSubcount: { artistCount: 1284, mvCount: 99999, createdPlaylistCount: 2, subPlaylistCount: 1, djRadioCount: 12 },
         newSongs: worstTracks.slice(0, 20),
         newAlbums: [{ id: 1, name: "我想要两颗西柚（Live）- 2023 网易云音乐年度盛典现场版 豪华纪念版（含未公开 Demo 与现场返场）", cover: BROKEN, artist: "茄子蛋 / 告五人 / 草东没有派对 / 落日飞车", artistId: 2, publishTime: 1700000000000, size: 128 },

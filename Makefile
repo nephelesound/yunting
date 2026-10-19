@@ -78,6 +78,7 @@ SHOTS = home:page=home home-anon:account=anonymous,page=home charts:page=charts 
         worst-artist:fixture=worst,listKey=artist:1,page=artist worst-artist-albums:fixture=worst,listKey=artist:1,artistPane=albums,page=artist \
         worst-album:fixture=worst,listKey=album:1,page=list worst-trackmenu:fixture=worst,listKey=daily,page=list,startOverlay=trackmenu \
         one-wiki:fixture=one,nowPlayingPane=wiki,page=nowplaying worst-wiki:fixture=worst,nowPlayingPane=wiki,page=nowplaying \
+        worst-similar:fixture=worst,nowPlayingPane=similar,page=nowplaying \
         worst-describe:fixture=worst,listKey=playlist:11,page=list,startOverlay=describe \
         worst-rename:fixture=worst,listKey=playlist:11,page=list,startOverlay=rename \
         worst-delete:fixture=worst,listKey=playlist:11,page=list,startOverlay=delete \

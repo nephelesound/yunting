@@ -555,6 +555,7 @@ Kirigami.ApplicationWindow {
     Connections {
         target: Actions
         function onPlayRequested(tracks, index) { root.play(tracks, index); }
+        function onPlayNowRequested(track) { root.playNow(track); }
         function onInboxRequested() { root.open("inbox"); }
         function onAboutRequested() {
             aboutLoader.active = true;
@@ -593,8 +594,13 @@ Kirigami.ApplicationWindow {
         }
     }
 
+    // 插到「下一首」并立刻放，原来的队列不动
+    function playNow(track) {
+        playback.playNext(track);
+        playback.play(playback.queue, playback.queue.findIndex(t => t.id === track.id));
+    }
     // 外部链接（网页「在客户端打开」、orpheus://、分享链接，见 links.h）：页面走上面同一套导航；
-    // 歌曲插到「下一首」并立刻放，原来的队列不动。只知道 id 的歌要先取详情，取到再放
+    // 歌曲 playNow。只知道 id 的歌要先取详情，取到再放
     property real linkedSongId: 0
     readonly property var linkedSong: root.linkedSongId > 0 ? Source.song(root.linkedSongId) : null
     onLinkedSongChanged: if (root.linkedSong) Qt.callLater(root.playLinkedSong)
@@ -603,8 +609,7 @@ Kirigami.ApplicationWindow {
         if (!track)
             return;
         root.linkedSongId = 0;
-        playback.playNext(track);
-        playback.play(playback.queue, playback.queue.findIndex(t => t.id === track.id));
+        root.playNow(track);
     }
     function openLink(kind, id) {
         switch (kind) {

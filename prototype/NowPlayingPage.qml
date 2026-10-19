@@ -12,13 +12,14 @@ import "Format.js" as Format
 
 ScreenFrame {
     id: page
-    scroller: page.pane === "comments" ? commentList : page.pane === "wiki" ? wikiPane : null
+    scroller: page.pane === "comments" ? commentList : page.pane === "wiki" ? wikiPane
+        : page.pane === "similar" ? similarPane : null
     kept: ["pane"]
 
     property var track
     property real elapsed
     property bool playing
-    property string pane: "lyrics"   // lyrics | comments | wiki
+    property string pane: "lyrics"   // lyrics | comments | wiki | similar
 
     // 逐字填色要逐帧走（引擎的进度更新得没那么勤）：播放时每帧前进，与引擎偏差大或暂停时对齐（与桌面歌词同一做法）
     property real clock: 0
@@ -57,6 +58,8 @@ ScreenFrame {
     readonly property var lines: page.track ? Source.lyrics(page.track.id) : []
     // 百科只在打开这一栏时取
     readonly property var wiki: page.track && page.pane === "wiki" ? Source.wiki(page.track.id) : null
+    // 相似也只在打开这一栏时取
+    readonly property var similar: page.track && page.pane === "similar" ? Source.similarTo(page.track.id) : null
     readonly property int lyricIndex: Source.lyricIndex(page.lines, page.elapsed)
 
 
@@ -150,7 +153,8 @@ ScreenFrame {
         // 第 0 行：枢轴，与页头枢轴同一种语言（淡出的可点）
         Pivot {
             rowHeight: page.pitch
-            items: [{ key: "lyrics", text: "歌词" }, { key: "comments", text: "评论" }, { key: "wiki", text: "百科" }]
+            items: [{ key: "lyrics", text: "歌词" }, { key: "comments", text: "评论" }, { key: "wiki", text: "百科" },
+                    { key: "similar", text: "相似" }]
             current: page.pane
             onActivated: key => page.pane = key
         }
@@ -412,6 +416,43 @@ ScreenFrame {
             topMargin: Tokens.space3
             wiki: page.wiki || ({})
             onSeekRequested: seconds => page.seekRequested(seconds)
+        }
+
+        SimilarPane {
+            id: similarPane
+            readonly property bool filled: page.similar !== null
+                && (page.similar.songs.length > 0 || page.similar.playlists.length > 0)
+            visible: page.pane === "similar" && similarPane.filled
+            y: page.pitch
+            width: parent.width
+            height: (page.rows - 1) * page.pitch
+            topMargin: Tokens.space3
+            similar: page.similar || ({ songs: [], playlists: [] })
+            currentId: page.track ? page.track.id : 0
+        }
+
+        // 相似空着时：在取 / 没取到（可点重试）/ 没找到 / 原型数据里没有
+        Label {
+            id: similarEmpty
+            readonly property bool failed: page.similar !== null && page.similar.failed
+            y: page.focusRow * page.pitch
+            height: page.pitch
+            visible: page.pane === "similar" && !similarPane.filled
+            verticalAlignment: Text.AlignVCenter
+            text: !page.track ? "还没有在播放的歌" : similarEmpty.failed ? "相似的歌没取到，点此重试"
+                : !Source.live ? "原型数据里没有相似的歌" : page.similar && page.similar.pending ? "正在找相似的歌…"
+                : "没找到和这首相似的歌"
+            font.pixelSize: Tokens.text2xl
+            font.underline: similarEmpty.failed && similarRetryHover.hovered
+            color: similarEmpty.failed ? Kirigami.Theme.textColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+            HoverHandler { id: similarRetryHover; enabled: similarEmpty.failed; cursorShape: Qt.PointingHandCursor }
+            TapHandler {
+                enabled: similarEmpty.failed
+                onTapped: {
+                    Source.retryKey("similarSongs:" + page.track.id);
+                    Source.retryKey("similarPlaylists:" + page.track.id);
+                }
+            }
         }
 
         // 百科空着时：在取 / 没取到（可点重试）/ 这首没有百科 / 原型数据里没有
