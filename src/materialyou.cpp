@@ -99,8 +99,9 @@ QString writeKdeScheme(const Scheme &c, bool dark, const QString &path)
 
     // 底色与 kde-material-you-colors 的映射一致：View 是整窗的底色（浅色 surfaceBright、深色 surfaceDim），
     // Window/Header 取 surfaceContainer，Button 取 surfaceContainerHigh。
-    // 文字比它高一档：正文 onSurface、次要文字 onSurfaceVariant。它用的 onSurfaceVariant / outline
-    // 在 surfaceContainer 上只有 3:1 上下，读不清（materialyou_test 守着 4.5:1）
+    // 文字比它高一档：正文 onSurface、次要文字 onSurfaceVariant。它的次要文字用 outline，在浅色的
+    // surfaceContainer 上只有 3.85:1；它的窗口正文用 onSurfaceVariant，界面再乘 Tokens.muted 的次要文字
+    // 只剩 3.3:1。materialyou_test 守着每组正文、次要文字 4.5:1
     writeSet(out, "Colors:View", dark ? c.surfaceDim : c.surfaceBright, c.surfaceContainer, c.onSurface,
              c.onSurfaceVariant, c.inverseSurface, c.link, c.visited, c.negative, c.neutral, c.positive, c.primary,
              dark ? c.inversePrimary : c.secondaryFixed);
@@ -152,16 +153,16 @@ QString writeKdeScheme(const Scheme &c, bool dark, const QString &path)
     kde.writeEntry("contrast", 4);
     kde.writeEntry("frameContrast", 0.2);
 
+    // 标题栏（只认旧式 [WM] 的窗口装饰用它）与页头 Colors:Header 同一层，标题栏与页面顶边不差一档
     KConfigGroup wm(&out, QStringLiteral("WM"));
-    wm.writeEntry("activeBackground", c.surfaceContainerHighest);
+    wm.writeEntry("activeBackground", c.surfaceContainer);
     wm.writeEntry("activeBlend", dark ? QColor(252, 252, 252) : QColor(227, 229, 231));
     wm.writeEntry("activeForeground", c.onSurface);
     wm.writeEntry("inactiveBackground", c.secondaryContainer);
     wm.writeEntry("inactiveBlend", dark ? QColor(161, 169, 177) : QColor(239, 240, 241));
     wm.writeEntry("inactiveForeground", dark ? c.onSecondaryContainer : c.onSurfaceVariant);
 
-    out.sync();
-    return path;
+    return out.sync() ? path : QString();
 }
 
 bool schemeNameIsMaterialYou(const QString &name)

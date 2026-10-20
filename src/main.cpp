@@ -124,7 +124,7 @@ int main(int argc, char *argv[])
     about.addAuthor(QStringLiteral("Nephele Sound"), QStringLiteral("维护"), QString(),
                     QStringLiteral("https://github.com/nephelesound"));
     KAboutData::setApplicationData(about);
-    // 系统配色是中性灰时给本应用染上强调色的色调（要在任何窗口之前，缓存目录要用到上面的应用名）
+    // 系统配色是中性灰时换成以强调色为种子的 Material You 配色（要在任何窗口之前，缓存目录要用到上面的应用名）
     ColorTone::apply();
     // 中日文落在同一款字上，Flatpak 里也与系统一致
     UiFont::unifyCjk();

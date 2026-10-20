@@ -8,14 +8,10 @@
 #include <QTemporaryDir>
 #include <QTest>
 
+#include <algorithm>
 #include <cmath>
 
 namespace {
-QColor color(const QByteArray &value)
-{
-    return QColor(QString::fromLatin1(value));
-}
-
 // WCAG 对比度
 double luminance(const QColor &c)
 {

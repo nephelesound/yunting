@@ -179,7 +179,7 @@ make shots      # 离屏截取各个页面（亮色、暗色、窄窗口）
 
 Copyright © 2026 sudoskys。云听是自由软件，以 [GNU 通用公共许可证](LICENSE)第 3 版或（由你选择）任何更高版本发布，不提供任何担保。如需 GPL 以外的授权（例如闭源的商业版本），请联系版权所有者。
 
-应用图标来自 Microsoft Fluent Emoji 的 `musical-note`（MIT 许可），详见 [data/ICON-LICENSE](data/ICON-LICENSE)；界面中其他图标的来源和许可见 [prototype/icons/LICENSES.txt](prototype/icons/LICENSES.txt)。
+应用图标来自 Microsoft Fluent Emoji 的 `musical-note`（MIT 许可），详见 [data/ICON-LICENSE](data/ICON-LICENSE)；界面中其他图标的来源和许可见 [prototype/icons/LICENSES.txt](prototype/icons/LICENSES.txt)。生成 Material You 配色用的是 Google 的 [Material Color Utilities](https://github.com/material-foundation/material-color-utilities)（Apache-2.0），所用的部分和许可证在 [src/third_party/material-color-utilities](src/third_party/material-color-utilities)。
 
 ## 免责声明
 

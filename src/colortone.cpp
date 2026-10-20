@@ -65,10 +65,14 @@ bool shouldSynthesize()
 
 QString schemePath(const MaterialYou::Scheme &scheme, bool dark)
 {
+    // 缓存目录是几个进程共用的：并行截图的 qmlshot、--screenshot 与正在运行的应用。所以临时文件带进程号，
+    // 方案文件按内容命名（同样的方案写出同样的名字，谁先写成都行），也不删任何 tone-*.colors：
+    // 别的进程可能正引用着它。一份约 4 KB，只按「强调色 × 深浅」区分，攒不了几份
     const QString dir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
     QDir().mkpath(dir);
-    const QString temporary = dir + QStringLiteral("/tone.tmp");
-    MaterialYou::writeKdeScheme(scheme, dark, temporary);
+    const QString temporary = dir + QStringLiteral("/tone-%1.tmp").arg(QCoreApplication::applicationPid());
+    if (MaterialYou::writeKdeScheme(scheme, dark, temporary).isEmpty())
+        return {};
 
     QFile file(temporary);
     if (!file.open(QIODevice::ReadOnly))
@@ -76,24 +80,13 @@ QString schemePath(const MaterialYou::Scheme &scheme, bool dark)
     const QByteArray content = file.readAll();
     file.close();
 
-    QCryptographicHash hash(QCryptographicHash::Sha1);
-    hash.addData(content);
     const QString path = dir + QStringLiteral("/tone-")
-        + QString::fromLatin1(hash.result().toHex().left(12)) + QStringLiteral(".colors");
-    if (QFile::exists(path))
+        + QString::fromLatin1(QCryptographicHash::hash(content, QCryptographicHash::Sha1).toHex().left(12))
+        + QStringLiteral(".colors");
+    // 改名不成功时多半是另一个进程刚写好同一份：在就用它，不在就算失败
+    if (QFile::exists(path) || !QFile::rename(temporary, path))
         QFile::remove(temporary);
-    else
-        QFile::rename(temporary, path);
-
-    // 只留当前与上一份：旧文件可能还被上一次的平台主题 / 窗口属性引用
-    const QString previous = state().path;
-    const QFileInfoList stale = QDir(dir).entryInfoList({QStringLiteral("tone-*.colors")}, QDir::Files);
-    for (const QFileInfo &entry : stale) {
-        const QString absolute = entry.absoluteFilePath();
-        if (absolute != path && absolute != previous)
-            QFile::remove(absolute);
-    }
-    return path;
+    return QFile::exists(path) ? path : QString();
 }
 
 QString synthesize()

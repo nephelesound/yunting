@@ -49,7 +49,7 @@ struct Scheme {
 // 由强调色生成浅色或深色方案（Material 3 Tonal Spot，对比度 0）
 Scheme schemeFor(const QColor &seed, bool dark);
 
-// 写一份 KDE 配色方案文件（.colors）；返回写入的路径
+// 写一份 KDE 配色方案文件（.colors）；返回写入的路径，写不成返回空
 QString writeKdeScheme(const Scheme &scheme, bool dark, const QString &path);
 
 // 配色方案名是否由 kde-material-you-colors 生成（MaterialYouLight/Dark、Material You Light/Dark 等）

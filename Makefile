@@ -45,7 +45,8 @@ SHOT_SIZE ?= 1280 800
 
 build/qmlshot/qmlshot: scripts/qmlshot/main.cpp scripts/qmlshot/CMakeLists.txt src/colortone.h src/colortone.cpp \
                        src/materialyou.h src/materialyou.cpp src/uifont.h src/uifont.cpp \
-                       src/third_party/material-color-utilities/mcu.cmake
+                       src/third_party/material-color-utilities/mcu.cmake \
+                       $(wildcard src/third_party/material-color-utilities/cpp/*/*)
 	cmake -S scripts/qmlshot -B build/qmlshot -G Ninja -DCMAKE_BUILD_TYPE=Release >/dev/null
 	ninja -C build/qmlshot >/dev/null
 

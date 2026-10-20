@@ -180,3 +180,7 @@ install(FILES ../data/ICON-LICENSE
 install(FILES ../prototype/icons/LICENSES.txt
         DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/yunting
         RENAME UI-ICONS-LICENSES)
+# 编进程序的 Material Color Utilities（Apache-2.0）：许可证随包发
+install(FILES third_party/material-color-utilities/LICENSE
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/yunting
+        RENAME MATERIAL-COLOR-UTILITIES-LICENSE)
