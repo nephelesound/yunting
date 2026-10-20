@@ -57,7 +57,7 @@ ScreenFrame {
         clip: true
         boundsBehavior: Flickable.StopAtBounds
         model: page.songs ? page.songs.items : []
-        ScrollBar.vertical: ScrollBar {}
+        ScrollBar.vertical: AppScrollBar {}
         WheelScroll { flickable: songList }
 
         delegate: TrackTile {

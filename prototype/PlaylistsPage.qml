@@ -90,7 +90,7 @@ ScreenFrame {
             clip: true
             boundsBehavior: Flickable.StopAtBounds
             model: page.sorting ? page.owned : []
-            ScrollBar.vertical: ScrollBar {}
+            ScrollBar.vertical: AppScrollBar {}
             WheelScroll { flickable: sortList }
 
             delegate: RowLayout {

@@ -316,7 +316,7 @@ ScreenFrame {
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
                 model: page.user.playlists || []
-                ScrollBar.vertical: ScrollBar {}
+                ScrollBar.vertical: AppScrollBar {}
                 WheelScroll { flickable: playlists }
 
                 delegate: MediaTile {
@@ -356,7 +356,7 @@ ScreenFrame {
                     values: page.events ? page.events.items : []
                     keyOf: e => e.id
                 }
-                ScrollBar.vertical: ScrollBar {}
+                ScrollBar.vertical: AppScrollBar {}
                 WheelScroll { flickable: eventList }
                 onAtYEndChanged: if (atYEnd && page.events && count > 0) Source.morePaged(page.events)
 
@@ -521,7 +521,7 @@ ScreenFrame {
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
                     model: page.rank.tracks
-                    ScrollBar.vertical: ScrollBar {}
+                    ScrollBar.vertical: AppScrollBar {}
                     WheelScroll { flickable: rankList }
 
                     delegate: TrackTile {
@@ -566,7 +566,7 @@ ScreenFrame {
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
                     model: people.list.items
-                    ScrollBar.vertical: ScrollBar {}
+                    ScrollBar.vertical: AppScrollBar {}
                     WheelScroll { flickable: people }
                     onAtYEndChanged: if (atYEnd && visible) Source.morePeople(people.modelData.kind, people.list)
                     footer: LinkText {

@@ -299,7 +299,7 @@ ScreenFrame {
                 // 与歌手页 / 评论区同一种模型：列表更新只增量追加，滚回顶部不会发生
                 model: GrowingModel { values: page.list.tracks }
                 currentIndex: -1
-                ScrollBar.vertical: ScrollBar {}
+                ScrollBar.vertical: AppScrollBar {}
                 WheelScroll { flickable: tracks }
                 // 分页的列表（电台的节目）：滚到底接着取
                 onAtYEndChanged: if (atYEnd && page.list.paging && count > 0) Source.morePaged(page.list.paging)

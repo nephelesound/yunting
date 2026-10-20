@@ -43,6 +43,8 @@ QtObject {
     readonly property real tonalStrong: 0.35  // 浓一档的淡色调：SVIP 会员标渐变的起点（正文色字在上面仍 ≥ 4.5:1）
     readonly property real placeholder: 0.05  // 封面加载前的占位底
     readonly property real track: 0.15        // 进度线未播放段
+    readonly property real scrollHandle: 0.3        // 滚动条把手（AppScrollBar）：正文色 × 0.3
+    readonly property real scrollHandleActive: 0.5  // 悬停或拖动时
     readonly property real faded: 0.25        // 压暗：过期的二维码、封面占位图标
     readonly property real fadedHover: 0.5    // 禁用的强调色按钮
     // 排版导航（枢轴、面包屑上级）的非当前项：Metro 式「当前实、其余虚」，但 0.5 才让 36/24 的细体

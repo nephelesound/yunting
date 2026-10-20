@@ -69,4 +69,5 @@ SimDownloads SimDownloads.qml
 ListenTogetherLink ListenTogetherLink.qml
 ListenPopup ListenPopup.qml
 QrCode QrCode.qml
+AppScrollBar AppScrollBar.qml
 CommentsPane CommentsPane.qml

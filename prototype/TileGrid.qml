@@ -29,7 +29,7 @@ GridView {
     clip: true
     boundsBehavior: Flickable.StopAtBounds
     model: grid.list ? grid.list.items : []
-    ScrollBar.vertical: ScrollBar {}
+    ScrollBar.vertical: AppScrollBar {}
     WheelScroll { flickable: grid }
     onAtYEndChanged: if (atYEnd && grid.list && grid.count > 0) Source.morePaged(grid.list)
 

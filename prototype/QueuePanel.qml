@@ -421,7 +421,7 @@ Kirigami.OverlayDrawer {
             clip: true
             boundsBehavior: Flickable.StopAtBounds
             model: order
-            ScrollBar.vertical: ScrollBar {}
+            ScrollBar.vertical: AppScrollBar {}
             WheelScroll { flickable: list }
             // 过渡：拖动换位快（跟手）；移出 / 加入的那一行淡出 / 淡入，其余行平移补位，不跳。
             // 补位动画里把 opacity 也拉回 1：被打断的淡入不会把行留在半透明

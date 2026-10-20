@@ -131,7 +131,7 @@ ScreenFrame {
                 // 续取只追加新的行，滚动位置不变（见 GrowingModel）
                 model: GrowingModel { values: page.songs }
                 currentIndex: -1
-                ScrollBar.vertical: ScrollBar {}
+                ScrollBar.vertical: AppScrollBar {}
                 WheelScroll { flickable: tracks }
                 LocateCurrent {
                     parent: tracks
@@ -187,7 +187,7 @@ ScreenFrame {
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
                 model: page.artist.albums
-                ScrollBar.vertical: ScrollBar {}
+                ScrollBar.vertical: AppScrollBar {}
                 WheelScroll { flickable: albums }
 
                 delegate: MediaTile {

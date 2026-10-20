@@ -353,7 +353,7 @@ ScreenFrame {
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
                     model: page.collectionItems
-                    ScrollBar.vertical: ScrollBar {}
+                    ScrollBar.vertical: AppScrollBar {}
                     WheelScroll { flickable: collections }
                     delegate: MediaTile {
                         required property var modelData

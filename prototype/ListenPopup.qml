@@ -93,7 +93,7 @@ Popup {
             clip: true
             boundsBehavior: Flickable.StopAtBounds
             model: Source.friendsListening
-            ScrollBar.vertical: ScrollBar {}
+            ScrollBar.vertical: AppScrollBar {}
             delegate: PersonRow {
                 required property var modelData
                 width: ListView.view.width

@@ -84,7 +84,7 @@ ListView {
         values: pane.rows
         keyOf: c => c.group + "\n" + pane.key(c)
     }
-    ScrollBar.vertical: ScrollBar {}
+    ScrollBar.vertical: AppScrollBar {}
     WheelScroll { flickable: pane }
     onAtYEndChanged: if (atYEnd && pane.thread && pane.active) Source.moreComments(pane.thread)
 

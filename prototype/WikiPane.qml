@@ -33,7 +33,7 @@ Flickable {
     contentHeight: column.implicitHeight + Tokens.space6
     clip: true
     boundsBehavior: Flickable.StopAtBounds
-    ScrollBar.vertical: ScrollBar {}
+    ScrollBar.vertical: AppScrollBar {}
     WheelScroll { flickable: pane }
 
     component GroupLabel: Label {

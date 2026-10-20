@@ -29,6 +29,7 @@ FormCard.FormCardDialog {
     default property alias body: body.data
     contentItem: ScrollView {
         contentWidth: availableWidth
+        ScrollBar.vertical: AppScrollBar {}
         ColumnLayout {
             id: body
             width: parent.width

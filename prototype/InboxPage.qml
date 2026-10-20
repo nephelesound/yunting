@@ -157,7 +157,7 @@ ScreenFrame {
                 values: page.conversations.items
                 keyOf: c => c.key   // Store 给每一行的 key（与它续页去重用的同一个）
             }
-            ScrollBar.vertical: ScrollBar {}
+            ScrollBar.vertical: AppScrollBar {}
             WheelScroll { flickable: list }
             onAtYEndChanged: if (atYEnd) Source.moreInbox()
             footer: LinkText {
@@ -235,7 +235,7 @@ ScreenFrame {
                     values: page.thread.items
                     keyOf: m => m.key   // Store 给每条消息的 key（没有 id 的消息用发送人、时间与批次）
                 }
-                ScrollBar.vertical: ScrollBar {}
+                ScrollBar.vertical: AppScrollBar {}
                 WheelScroll { flickable: messages }
                 onAtYBeginningChanged: if (atYBeginning && count > 0) Source.moreThread(page.thread)
                 // 从下往上排时 footer 在最上面：更早的消息没取到时在那里重试
@@ -470,7 +470,7 @@ ScreenFrame {
             values: page.notices ? page.notices.items : []
             keyOf: n => String(n.id)
         }
-        ScrollBar.vertical: ScrollBar {}
+        ScrollBar.vertical: AppScrollBar {}
         WheelScroll { flickable: noticeList }
         onAtYEndChanged: if (atYEnd && page.notices && count > 0) Source.morePaged(page.notices)
 
