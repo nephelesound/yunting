@@ -262,6 +262,67 @@ private slots:
         QVERIFY2(waitFor([&] { return audio.position() > resumedAt + 0.1; }), "the retry did not play");
     }
 
+    // 换音质没取到地址：旧文件还在，按播放接着放它（不重试那个取不到的音质）；那次失败作废，
+    // 放完再按播放是从头重播，不是从换音质时的位置
+    void failedQualitySwitchKeepsTheOldFile()
+    {
+        MediaServer server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        const QString base = QStringLiteral("http://127.0.0.1:%1/").arg(server.serverPort());
+        const QByteArray wav = silentWav();
+        const QByteArray goodJson = QJsonDocument(QJsonObject{
+            {"code", 200},
+            {"data", QJsonArray{QJsonObject{{"url", base + QStringLiteral("audio.wav")}, {"expi", 1200}}}}})
+            .toJson(QJsonDocument::Compact);
+        const QByteArray emptyJson = QJsonDocument(QJsonObject{
+            {"code", 200}, {"data", QJsonArray{QJsonObject{{"url", QJsonValue::Null}}}}})
+            .toJson(QJsonDocument::Compact);
+        int urlRequests = 0;
+        server.handler = [&urlRequests, wav, goodJson, emptyJson](const QByteArray &path) {
+            if (path.startsWith("/weapi/song/enhance/player/url"))
+                return qMakePair(QByteArray("application/json"), ++urlRequests == 2 ? emptyJson : goodJson);
+            return qMakePair(QByteArray("audio/wav"), wav);
+        };
+
+        NcmClient client(nullptr, false);
+        client.setApiBase(base);
+        AudioEngine audio(&client);
+        QSignalSpy failedSpy(&audio, &AudioEngine::failed);
+        QSignalSpy finishedSpy(&audio, &AudioEngine::finished);
+        auto waitFor = [](auto condition) {
+            QDeadlineTimer deadline(8 * 1000);
+            while (!condition() && !deadline.hasExpired())
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+            return condition();
+        };
+
+        audio.setTrack(QVariantMap{{"id", 1.0}, {"dur", 3.0}});
+        audio.setPlaying(true);
+        QVERIFY(waitFor([&] { return audio.position() > 0.5; }));
+        audio.setQuality(QStringLiteral("lossless"));
+        QVERIFY(waitFor([&] { return !failedSpy.isEmpty(); }));
+        const double at = audio.position();
+
+        audio.setPlaying(true);
+        QVERIFY2(waitFor([&] { return audio.position() > at + 0.2; }), "the old file did not resume");
+        QCOMPARE(urlRequests, 2);
+
+        // 重播先回到开头（载入前位置还是上一遍的结尾），再往前走；从旧位置开始的话不会先回到开头
+        QVERIFY(waitFor([&] { return !finishedSpy.isEmpty(); }));
+        audio.setPlaying(true);
+        QVERIFY2(waitFor([&] { return audio.position() < 0.05; }), "the replay did not start from the beginning");
+        QVERIFY(waitFor([&] { return audio.position() > 0.05; }));
+        QVERIFY2(audio.position() < 0.5, "the replay started from the old switch position");
+        QCOMPARE(urlRequests, 3);
+    }
+
+    void sleepPausesAndWakeReloadsFromThePosition_data()
+    {
+        QTest::addColumn<bool>("logind");
+        QTest::newRow("logind") << true;
+        QTest::newRow("clock only") << false;
+    }
+
     // 睡前立刻暂停（logind 不等淡出）；醒来后按播放重新载入、从原位置接上（睡前的网络流已经断了）
     void sleepPausesAndWakeReloadsFromThePosition()
     {
@@ -294,14 +355,19 @@ private slots:
         audio.setPlaying(true);
         QVERIFY(waitFor([&] { return audio.position() > 0.8; }));
 
-        audio.pauseForSleep();
+        // 收得到 logind 时睡前已经暂停；收不到时（Flatpak）醒来才发现，由 recoverAfterSleep 自己暂停
+        QFETCH(bool, logind);
+        if (logind) {
+            audio.pauseForSleep();
+            QCOMPARE(audio.playing(), false);
+        }
+        const int before = audioRequests;
+        audio.recoverAfterSleep();
         QCOMPARE(audio.playing(), false);
         const double at = audio.position();
         QTest::qWait(500);
-        QVERIFY2(audio.position() - at < 0.1, "still playing after pauseForSleep");
+        QVERIFY2(audio.position() - at < 0.1, "still playing after the wake");
 
-        const int before = audioRequests;
-        audio.recoverAfterSleep();
         audio.setPlaying(true);
         QVERIFY2(waitFor([&] { return audioRequests > before && audio.position() > 0.05; }),
                  "play after wake did not reload the stream");

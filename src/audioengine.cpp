@@ -237,6 +237,10 @@ void AudioEngine::setPlaying(bool playing)
             // 停在结尾的这段时间（例如睡了一觉）里地址可能已经过期
             resolveUrl(m_track.value("id").toDouble());
         } else if (m_fileLoaded) {
+            // 换音质没取到地址、旧文件还在：接着放旧文件，那次失败与它挂起的跳转都作废，
+            // 否则之后重播会被当成失败重试、从那个旧位置开始。换音质还在取址时不动：跳转等新文件用
+            if (std::exchange(m_failed, false))
+                m_pendingSeek = -1;
             setPaused(false);
             fadeTo(1, kFadeInMs);
         }
@@ -270,8 +274,11 @@ void AudioEngine::pauseForSleep()
 
 void AudioEngine::recoverAfterSleep()
 {
+    // 收不到 logind（Flatpak 没有那条权限）时睡前没暂停：醒来先停下，与收得到时一样，
+    // 不让一条睡眠中断掉的流接着「放」
+    pauseForSleep();
     // 停在一首歌中间睡的：网络流在睡眠中断了，地址也可能过期，下次按播放时重新载入
-    if (m_fileLoaded && !m_playing && !m_atEof)
+    if (m_fileLoaded && !m_atEof)
         m_reloadOnPlay = true;
     if (systemAudioOff())
         return;
@@ -456,12 +463,9 @@ void AudioEngine::applyEqPreset(const QString &preset)
 
 QVariantList AudioEngine::audioOutputs() const
 {
-    if (systemAudioOff())
-        return {};
-    const QVariant value = m_controller->getProperty(QStringLiteral("audio-device-list"));
-    if (isMpvError(value))
-        return {};
-    return audioOutputsFrom(value);
+    // 用观察到的列表，不同步读 audio-device-list：读的时候 mpv 会去探测音频后端，音频服务没起来
+    //（刚睡醒、测试环境）时可能卡住主线程（见 systemAudioOff）
+    return audioOutputsFrom(m_deviceList);
 }
 
 QVariantList AudioEngine::audioOutputsFrom(const QVariant &deviceList)
@@ -486,7 +490,8 @@ void AudioEngine::reloadAudioOutput()
             break;
         }
     }
-    if (!selectedPresent) {
+    // 列表是空的：设备还没回来（例如刚睡醒），不是用户选的那个被拔掉了，选择留着
+    if (!selectedPresent && !outputs.isEmpty()) {
         m_outputDeviceId.clear();
         emit outputDeviceChanged();
     }
@@ -698,6 +703,7 @@ void AudioEngine::handleProperty(const QString &name, const QVariant &value)
     if (!value.isValid())
         return;
     if (name == QLatin1String("audio-device-list")) {
+        m_deviceList = value;
         m_audioDeviceDebounce->start();
         return;
     }

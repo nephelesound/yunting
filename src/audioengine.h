@@ -185,6 +185,7 @@ private:
     QString m_quality = QStringLiteral("auto");
     QString m_outputDeviceId;
     QTimer *m_audioDeviceDebounce = nullptr;
+    QVariant m_deviceList;   // 观察到的 audio-device-list（测试与打包构建里不观察，保持空）
     // 这次播放实际拿到的档位与码率；NCBL 上报用，不是曲目的最高可用档位
     QString m_playedLevel;
     int m_playedBitrate = 320000;
