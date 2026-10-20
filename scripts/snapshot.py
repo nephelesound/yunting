@@ -266,18 +266,22 @@ VOICE_PLACEHOLDER = "[发布了语音，请前往最新移动端版本查看]"
 
 
 def comment_voice(c):
-    """语音评论（contentResource.resourceType 1014，与 src/sdk/comment.cpp 一致）：url、整秒时长、语音转文字。"""
+    """语音评论（与 src/sdk/comment.cpp 同一定义：resourceType 1014 且有地址）：url、四舍五入的整秒、语音转文字。
+    不是语音时 url 为空，形状不变。"""
     res = c.get("contentResource") or {}
-    if res.get("resourceType") != 1014:
-        return {}
-    ms = c.get("voiceDurationMillSecond") or (res.get("duration") or 0) * 1000
-    return {"url": res.get("url") or "", "seconds": (ms + 500) // 1000,
+    url = (res.get("url") or "") if res.get("resourceType") == 1014 else ""
+    if not url:
+        return {"url": "", "seconds": 0, "text": ""}
+    ms = c.get("voiceDurationMillSecond") or 0
+    if ms <= 0:
+        ms = round((res.get("duration") or 0) * 1000)
+    return {"url": url, "seconds": (ms + 500) // 1000,
             "text": (c.get("voiceExt") or {}).get("asrText") or ""}
 
 
 def comment_content(c):
     text = c.get("content") or ""
-    return text.replace(VOICE_PLACEHOLDER, "").strip() if comment_voice(c) else text
+    return text.replace(VOICE_PLACEHOLDER, "").strip() if comment_voice(c)["url"] else text
 
 
 def hot_comments(song_id):

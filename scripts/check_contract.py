@@ -43,9 +43,9 @@ FIRST_SCREEN = ("toplists", "tracks", "hotSearches")
 # 所以单独点一次名，避免可播性字段悄悄从某一边消失。
 TRACK_FIELDS = ("playable", "blockedBy")
 
-# 每条归一化评论（有 likes 与 beReplied）都必须带 replyCount。两侧同时漏掉时通用 walk 比不出来，
+# 每条归一化评论（有 likes 与 beReplied）都必须带 replyCount 与 voice。两侧同时漏掉时通用 walk 比不出来，
 # 所以像 TRACK_FIELDS 一样单独点名，避免回复数悄悄从某一边消失。
-COMMENT_FIELDS = ("replyCount",)
+COMMENT_FIELDS = ("replyCount", "voice")
 
 
 def kind(value):

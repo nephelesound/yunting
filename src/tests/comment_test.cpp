@@ -79,7 +79,7 @@ private slots:
     }
 
     // 语音评论（resourceType 1014）：带出地址、时长与转写，正文里的占位行去掉、用户自己写的字保留；
-    // 没有毫秒时长时退回 contentResource.duration（秒）；别的资源类型不算语音
+    // 没有毫秒时长时退回 contentResource.duration（秒，可带小数）；别的资源类型、没有地址的都不算语音
     void parsesVoiceComments()
     {
         QJsonObject voice = commentObject();
@@ -92,11 +92,17 @@ private slots:
         voice["voiceExt"] = QJsonObject{{"asrText", "唱的那句"}};
         QJsonObject secondsOnly = voice;
         secondsOnly.remove("voiceDurationMillSecond");
+        secondsOnly["contentResource"] = QJsonObject{{"resourceType", 1014},
+                                                     {"url", "http://audio/v.m4a"},
+                                                     {"duration", 25.6}};
         QJsonObject song = commentObject();
         song["contentResource"] = QJsonObject{{"resourceType", 4}, {"url", "http://song"}};
+        // 没有地址的语音放不了：不算语音，占位行留着
+        QJsonObject noUrl = voice;
+        noUrl["contentResource"] = QJsonObject{{"resourceType", 1014}, {"url", QJsonValue::Null}};
 
         const auto result = parseCommentPage(dataRoot(QJsonObject{
-            {"comments", QJsonArray{voice, secondsOnly, song}},
+            {"comments", QJsonArray{voice, secondsOnly, song, noUrl}},
         }));
         QVERIFY2(result.ok(), qPrintable(result.error.message));
         const Comment &clip = result.value->comments.at(0);
@@ -104,9 +110,11 @@ private slots:
         QCOMPARE(clip.voiceUrl, QStringLiteral("http://audio/v.m4a"));
         QCOMPARE(clip.voiceMs, qint64(25495));
         QCOMPARE(clip.voiceText, QStringLiteral("唱的那句"));
-        QCOMPARE(result.value->comments.at(1).voiceMs, qint64(26000));
+        QCOMPARE(result.value->comments.at(1).voiceMs, qint64(25600));
         QCOMPARE(result.value->comments.at(2).voiceUrl, QString());
         QCOMPARE(result.value->comments.at(2).content, QStringLiteral("hello"));
+        QCOMPARE(result.value->comments.at(3).voiceUrl, QString());
+        QVERIFY(result.value->comments.at(3).content.contains(QStringLiteral("[发布了语音")));
     }
 
     // 缺失或 null 的可选字段有确定默认值；user/beReplied/showFloorComment 都是可选的

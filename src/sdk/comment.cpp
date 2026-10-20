@@ -113,11 +113,15 @@ Result<Comment> commentFrom(const QJsonValue &value, const QString &path,
     comment.replyCount = floorReader.integer("replyCount");
     const QJsonObject resource = reader.object("contentResource");
     JsonReader resourceReader(resource, path + QStringLiteral(".contentResource"));
-    if (resourceReader.integer("resourceType") == VoiceResourceType) {
-        comment.voiceUrl = resourceReader.string("url");
+    // 语音 = resourceType 1014 且有地址（scripts/snapshot.py 的 comment_voice 同一定义）；
+    // 没有地址就放不了，占位行留着，好歹说明这里有过一段语音
+    const QString voiceUrl = resourceReader.integer("resourceType") == VoiceResourceType
+        ? resourceReader.string("url") : QString();
+    if (!voiceUrl.isEmpty()) {
+        comment.voiceUrl = voiceUrl;
         comment.voiceMs = reader.integer("voiceDurationMillSecond");
         if (comment.voiceMs <= 0)
-            comment.voiceMs = resourceReader.integer("duration") * 1000;
+            comment.voiceMs = qRound64(resourceReader.number("duration") * 1000);
         comment.voiceText = reader.object("voiceExt").value(QStringLiteral("asrText")).toString();
         comment.content = withoutVoicePlaceholder(comment.content);
     }

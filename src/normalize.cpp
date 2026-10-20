@@ -111,8 +111,9 @@ QVariantMap commentToVariantMap(const sdk::Comment &c)
         {"beReplied", replied},
         // 楼中楼回复数只在新版接口的 showFloorComment 里；没有这个对象（旧接口、无回复）归 0
         {"replyCount", static_cast<double>(c.replyCount)},
-        // 语音评论：url 为空就不是语音；seconds 取整到秒，text 是服务器的语音转文字
-        {"voice", c.voiceUrl.isEmpty() ? QVariantMap{} : QVariantMap{
+        // 语音评论：url 为空就不是语音（形状不变，契约检查才比得了）；seconds 四舍五入到秒，
+        // text 是服务器的语音转文字
+        {"voice", QVariantMap{
             {"url", c.voiceUrl},
             {"seconds", static_cast<double>((c.voiceMs + 500) / 1000)},
             {"text", c.voiceText},

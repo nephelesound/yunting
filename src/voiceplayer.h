@@ -35,6 +35,7 @@ signals:
 private:
     void handleProperty(const QString &name, const QVariant &value);
     void setSource(const QString &source);
+    void discardEvents();
 
     MpvController *m_controller = nullptr;
     QString m_source;

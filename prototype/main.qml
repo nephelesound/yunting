@@ -108,8 +108,8 @@ Kirigami.ApplicationWindow {
     SimDownloads { id: simDownloads; filled: root.downloadsFilled }
 
     // 评论语音：一个独立的小播放器（Voice.player）。放语音时歌先停下，语音放完或停下后，
-    // 如果歌是因此停的、还停着、还是那一首，就接着放；放语音时按了播放，语音让路。
-    // 一起听的房间里不停歌：停下会作为暂停指令发给好友
+    // 如果歌是因此停的、还停着、还是那一首，就接着放；放语音时按了播放，语音让路；打开 MV 时语音停、
+    // 歌也不接。一起听的房间里不停也不接：停下、接着放都会作为指令发给好友
     SimVoice { id: simVoice }
     property string voiceAt: ""   // 截图用："<url>@<秒>"：原型开场就放着这条、停在这一秒
     onVoiceAtChanged: root.applyVoiceAt()
@@ -140,7 +140,8 @@ Kirigami.ApplicationWindow {
             }
             const paused = root.voicePausedTrack;
             root.voicePausedTrack = null;
-            if (paused && paused === root.currentTrack && !engine.playing)
+            // 语音放着时进了一起听的房间：接着放会作为播放指令发给好友，不接
+            if (paused && paused === root.currentTrack && !engine.playing && !root.listenRoom.inRoom)
                 engine.playing = true;
         }
     }
@@ -838,7 +839,10 @@ Kirigami.ApplicationWindow {
         function onAlbumRequested(id) { root.open("list", "album:" + id); }
         function onRadioRequested(id) { root.open("list", "radio:" + id); }
         function onMvRequested(id) {
-            playback.engine.playing = false;   // MV 自带音轨：不要和主播放器同时出声
+            // MV 自带音轨：不要和主播放器、评论语音同时出声；语音停下后也不再把歌接着放
+            root.voicePausedTrack = null;
+            Voice.stop();
+            playback.engine.playing = false;
             root.open("mv", "", { mvId: id });
         }
         function onUserRequested(id) {

@@ -16,6 +16,9 @@ VoicePlayer::VoicePlayer(QObject *parent)
     m_controller->setProperty(QStringLiteral("ytdl"), QStringLiteral("no"));
     m_controller->setProperty(QStringLiteral("idle"), true);
     m_controller->setProperty(QStringLiteral("user-agent"), ncm::client::userAgent());
+    // mpv 默认不限网络等待：卡住的下载既不载入也不报错，这条会一直「在放」、歌一直停着。
+    // 超时后按加载失败处理（end-file error），回到空闲
+    m_controller->setProperty(QStringLiteral("network-timeout"), 10);
     if (qEnvironmentVariableIsSet("YUNTING_TEST_AO_NULL"))
         m_controller->setProperty(QStringLiteral("ao"), QStringLiteral("null"));
 
@@ -54,6 +57,8 @@ void VoicePlayer::toggle(const QString &url)
     }
     m_position = 0;
     emit positionChanged();
+    // 上一条挂起的事件（加载失败的 end-file、最后几个 time-pos）丢掉，不能落到这一条上
+    discardEvents();
     m_starting = true;
     setSource(url);
     m_controller->command({QStringLiteral("loadfile"), url, QStringLiteral("replace")});
@@ -66,11 +71,18 @@ void VoicePlayer::stop()
     setSource({});
 }
 
+void VoicePlayer::discardEvents()
+{
+    // 与 AudioEngine::discardEvents 同理：MpvController 在同一线程消费这个队列
+    while (mpv_wait_event(m_controller->mpv(), 0)->event_id != MPV_EVENT_NONE) {
+    }
+}
+
 void VoicePlayer::handleProperty(const QString &name, const QVariant &value)
 {
     if (name == QLatin1String("time-pos")) {
-        if (!value.isValid() || m_source.isEmpty())
-            return;
+        if (!value.isValid() || m_source.isEmpty() || m_starting)
+            return;   // 新的一条载入之前，time-pos 还是上一条的
         m_position = value.toDouble();
         emit positionChanged();
     } else if (name == QLatin1String("idle-active") && value.toBool() && !m_starting) {

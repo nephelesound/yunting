@@ -96,7 +96,7 @@ private slots:
         QCOMPARE(empty.value("avatar").toString(), QString());
         QCOMPARE(empty.value("replyCount").toDouble(), 0.0);
         QVERIFY(empty.value("beReplied").toList().isEmpty());
-        QVERIFY(empty.value("voice").toMap().isEmpty());
+        QCOMPARE(empty.value("voice").toMap().value("url").toString(), QString());
 
         // 语音：毫秒四舍五入到整秒
         ncm::sdk::Comment voice;
