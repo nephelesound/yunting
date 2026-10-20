@@ -44,7 +44,8 @@ SHOT_ENV = QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME=kde QT_QUICK_BACKEND=r
 SHOT_SIZE ?= 1280 800
 
 build/qmlshot/qmlshot: scripts/qmlshot/main.cpp scripts/qmlshot/CMakeLists.txt src/colortone.h src/colortone.cpp \
-                       src/uifont.h src/uifont.cpp
+                       src/materialyou.h src/materialyou.cpp src/uifont.h src/uifont.cpp \
+                       src/third_party/material-color-utilities/mcu.cmake
 	cmake -S scripts/qmlshot -B build/qmlshot -G Ninja -DCMAKE_BUILD_TYPE=Release >/dev/null
 	ninja -C build/qmlshot >/dev/null
 

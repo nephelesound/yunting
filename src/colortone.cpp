@@ -1,53 +1,174 @@
 #include "colortone.h"
 
+#include "materialyou.h"
+
 #include <KColorScheme>
-#include <KConfig>
-#include <KConfigGroup>
 #include <KSharedConfig>
+#include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QDir>
-#include <QGuiApplication>
 #include <QFile>
+#include <QFileInfo>
+#include <QFileSystemWatcher>
+#include <QGuiApplication>
 #include <QStandardPaths>
+#include <QTimer>
+#include <QVariant>
 
 namespace {
 
-// 方案文件里每个颜色集的组名，与 KColorScheme::ColorSet 同序
-const char *const setGroups[] = {"Colors:View", "Colors:Window", "Colors:Button", "Colors:Selection",
-                                 "Colors:Tooltip", "Colors:Complementary", "Colors:Header"};
+constexpr auto kSchemeProperty = "KDE_COLOR_SCHEME_PATH";
 
-// 各颜色集的背景向强调色混合多少：窗口与页头最明显，列表与按钮淡一些；选中与反色区不动。
-// 深色方案的背景本身暗，同样的比例看不出来，多一些
-qreal amountFor(KColorScheme::ColorSet set, bool dark)
+struct State {
+    bool applied = false;
+    bool refreshing = false;
+    QString path;
+    QFileSystemWatcher *watcher = nullptr;
+    QTimer *timer = nullptr;
+};
+
+State &state()
 {
-    switch (set) {
-    case KColorScheme::Window: return dark ? 0.09 : 0.07;
-    case KColorScheme::Header: return dark ? 0.10 : 0.08;
-    case KColorScheme::Button: return dark ? 0.08 : 0.06;
-    case KColorScheme::View: return dark ? 0.06 : 0.04;
-    case KColorScheme::Tooltip: return dark ? 0.08 : 0.06;
-    default: return 0;
-    }
+    static State s;
+    return s;
 }
 
-// 一个颜色集的全部颜色写进方案文件（系统里多半没有显式写出来，读 KColorScheme 算出的实际值）
-void writeSet(KConfig &out, KColorScheme::ColorSet set, const QColor &accent, bool dark)
+QString kdeglobalsPath()
 {
-    const KColorScheme scheme(QPalette::Active, set);
-    const qreal amount = amountFor(set, dark);
-    KConfigGroup group(&out, QString::fromLatin1(setGroups[set]));
-    group.writeEntry("BackgroundNormal", ColorTone::tint(scheme.background().color(), accent, amount));
-    group.writeEntry("BackgroundAlternate",
-                     ColorTone::tint(scheme.background(KColorScheme::AlternateBackground).color(), accent, amount));
-    const std::pair<const char *, KColorScheme::ForegroundRole> foregrounds[] = {
-        {"ForegroundNormal", KColorScheme::NormalText},     {"ForegroundInactive", KColorScheme::InactiveText},
-        {"ForegroundActive", KColorScheme::ActiveText},     {"ForegroundLink", KColorScheme::LinkText},
-        {"ForegroundVisited", KColorScheme::VisitedText},   {"ForegroundNegative", KColorScheme::NegativeText},
-        {"ForegroundNeutral", KColorScheme::NeutralText},   {"ForegroundPositive", KColorScheme::PositiveText},
+    return QStandardPaths::writableLocation(QStandardPaths::ConfigLocation)
+        + QStringLiteral("/kdeglobals");
+}
+
+KSharedConfigPtr systemConfig()
+{
+    KSharedConfigPtr config = KSharedConfig::openConfig();
+    config->reparseConfiguration();
+    return config;
+}
+
+QColor systemColor(KColorScheme::ColorSet set)
+{
+    return KColorScheme(QPalette::Active, set, systemConfig()).background().color();
+}
+
+bool shouldSynthesize()
+{
+    if (qEnvironmentVariable("YUNTING_TONE") == QLatin1String("0"))
+        return false;
+    // kde-material-you-colors 在用（当前生效的是它的方案）：由它决定配色。看的是生效的方案而不是装没装：
+    // 装了却选回 Breeze 时它并没有接管什么；它的深色方案背景彩度很低，按颜色看也像中性，只能认方案名
+    if (MaterialYou::activeSchemeIsMaterialYou())
+        return false;
+    // 有色调的自定义方案保持原样，只给中性方案（Breeze 默认）生成
+    return ColorTone::isNeutral(systemColor(KColorScheme::Window));
+}
+
+QString schemePath(const MaterialYou::Scheme &scheme, bool dark)
+{
+    const QString dir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    QDir().mkpath(dir);
+    const QString temporary = dir + QStringLiteral("/tone.tmp");
+    MaterialYou::writeKdeScheme(scheme, dark, temporary);
+
+    QFile file(temporary);
+    if (!file.open(QIODevice::ReadOnly))
+        return {};
+    const QByteArray content = file.readAll();
+    file.close();
+
+    QCryptographicHash hash(QCryptographicHash::Sha1);
+    hash.addData(content);
+    const QString path = dir + QStringLiteral("/tone-")
+        + QString::fromLatin1(hash.result().toHex().left(12)) + QStringLiteral(".colors");
+    if (QFile::exists(path))
+        QFile::remove(temporary);
+    else
+        QFile::rename(temporary, path);
+
+    // 只留当前与上一份：旧文件可能还被上一次的平台主题 / 窗口属性引用
+    const QString previous = state().path;
+    const QFileInfoList stale = QDir(dir).entryInfoList({QStringLiteral("tone-*.colors")}, QDir::Files);
+    for (const QFileInfo &entry : stale) {
+        const QString absolute = entry.absoluteFilePath();
+        if (absolute != path && absolute != previous)
+            QFile::remove(absolute);
+    }
+    return path;
+}
+
+QString synthesize()
+{
+    const KSharedConfigPtr config = systemConfig();
+    const QColor seed = KColorScheme(QPalette::Active, KColorScheme::Selection, config).background().color();
+    const QColor window = KColorScheme(QPalette::Active, KColorScheme::Window, config).background().color();
+    const bool dark = window.lightnessF() < 0.5;
+
+    const MaterialYou::Scheme scheme = MaterialYou::schemeFor(seed, dark);
+    const QString path = schemePath(scheme, dark);
+    if (path.isEmpty())
+        return {};
+
+    if (state().applied && state().path == path)
+        return path;
+
+    QCoreApplication::instance()->setProperty(kSchemeProperty, path);
+    QGuiApplication::setPalette(
+        KColorScheme::createApplicationPalette(KSharedConfig::openConfig(path, KConfig::SimpleConfig)));
+    state().applied = true;
+    state().path = path;
+    return path;
+}
+
+void clearOverride()
+{
+    if (!state().applied)
+        return;
+    QCoreApplication::instance()->setProperty(kSchemeProperty, QVariant());
+    QGuiApplication::setPalette(KColorScheme::createApplicationPalette(systemConfig()));
+    state().applied = false;
+    state().path.clear();
+}
+
+void refresh()
+{
+    if (state().refreshing)
+        return;
+    state().refreshing = true;
+    if (shouldSynthesize())
+        synthesize();
+    else
+        clearOverride();
+    state().refreshing = false;
+}
+
+void installWatcher()
+{
+    if (state().watcher)
+        return;
+    QFileSystemWatcher *watcher = new QFileSystemWatcher(QCoreApplication::instance());
+    QTimer *timer = new QTimer(watcher);
+    timer->setSingleShot(true);
+    timer->setInterval(200);
+    state().watcher = watcher;
+    state().timer = timer;
+
+    const QString path = kdeglobalsPath();
+    const auto addPath = [watcher, path] {
+        if (QFileInfo::exists(path) && !watcher->files().contains(path))
+            watcher->addPath(path);
     };
-    for (const auto &[key, role] : foregrounds)
-        group.writeEntry(key, scheme.foreground(role).color());
-    group.writeEntry("DecorationFocus", scheme.decoration(KColorScheme::FocusColor).color());
-    group.writeEntry("DecorationHover", scheme.decoration(KColorScheme::HoverColor).color());
+    addPath();
+    const QString directory = QFileInfo(path).absolutePath();
+    if (QFileInfo::exists(directory) && !watcher->directories().contains(directory))
+        watcher->addPath(directory);
+
+    const auto changed = [addPath, timer] {
+        addPath();
+        timer->start();
+    };
+    QObject::connect(watcher, &QFileSystemWatcher::fileChanged, watcher, changed);
+    QObject::connect(watcher, &QFileSystemWatcher::directoryChanged, watcher, changed);
+    QObject::connect(timer, &QTimer::timeout, watcher, [] { refresh(); });
 }
 
 } // namespace
@@ -59,48 +180,14 @@ bool isNeutral(const QColor &background)
     return background.hslSaturationF() < 0.15;
 }
 
-QColor tint(const QColor &base, const QColor &accent, qreal amount)
-{
-    const auto mix = [amount](qreal a, qreal b) { return a + (b - a) * amount; };
-    return QColor::fromRgbF(mix(base.redF(), accent.redF()), mix(base.greenF(), accent.greenF()),
-                            mix(base.blueF(), accent.blueF()), base.alphaF());
-}
-
 QString apply()
 {
-    if (qEnvironmentVariable("YUNTING_TONE") == QLatin1String("0"))
+    installWatcher();
+    if (!shouldSynthesize()) {
+        clearOverride();
         return {};
-    const QColor window = KColorScheme(QPalette::Active, KColorScheme::Window).background().color();
-    if (!isNeutral(window))
-        return {};
-    const QColor accent = KColorScheme(QPalette::Active, KColorScheme::Selection).background().color();
-    const bool dark = window.lightnessF() < 0.5;
-
-    const QString dir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
-    QDir().mkpath(dir);
-    const QString path = dir + QStringLiteral("/tone.colors");
-    QFile::remove(path);
-    {
-        KConfig out(path, KConfig::SimpleConfig);
-        for (int set = 0; set < KColorScheme::NColorSets; ++set)
-            writeSet(out, KColorScheme::ColorSet(set), accent, dark);
-        // 停用 / 失焦时的颜色效果、对比度、旧式标题栏颜色沿用系统的
-        const KSharedConfigPtr system = KSharedConfig::openConfig();
-        for (const char *name : {"ColorEffects:Disabled", "ColorEffects:Inactive", "KDE", "WM"}) {
-            KConfigGroup source(system, QString::fromLatin1(name));
-            if (source.exists()) {
-                KConfigGroup target(&out, QString::fromLatin1(name));
-                source.copyTo(&target);
-            }
-        }
-        KConfigGroup general(&out, QStringLiteral("General"));
-        general.writeEntry("Name", QStringLiteral("云听"));
-        out.sync();
     }
-    // 只用 QGuiApplication 的接口：截图工具（scripts/qmlshot）也调这里，它不是 QApplication
-    QCoreApplication::instance()->setProperty("KDE_COLOR_SCHEME_PATH", path);
-    QGuiApplication::setPalette(KColorScheme::createApplicationPalette(KSharedConfig::openConfig(path)));
-    return path;
+    return synthesize();
 }
 
 } // namespace ColorTone

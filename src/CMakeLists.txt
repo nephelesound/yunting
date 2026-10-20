@@ -20,6 +20,7 @@ find_package(Fontconfig REQUIRED)        # 中日文回退落在同一款字（u
 find_package(LayerShellQt QUIET)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(ZSTD QUIET libzstd)
+include(${CMAKE_CURRENT_SOURCE_DIR}/third_party/material-color-utilities/mcu.cmake)   # 中性配色下的 Material You 配色（materialyou.cpp）
 
 set(YUNTING_SDK_SOURCES
     sdk/sdk_json.h sdk/sdk_json.cpp sdk/service.h sdk/service.cpp
@@ -50,6 +51,13 @@ set(YUNTING_SDK_SOURCES
     sdk/download.h sdk/download.cpp
 )
 
+add_library(yunting_color STATIC
+    materialyou.h materialyou.cpp
+    colortone.h colortone.cpp)
+target_include_directories(yunting_color PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_options(yunting_color PRIVATE -Wall -Wextra)
+target_link_libraries(yunting_color PUBLIC Qt6::Gui KF6::ColorScheme KF6::ConfigCore material_color_utilities)
+
 qt_add_executable(yunting
     main.cpp cli.h cli.cpp
     link_parser.h link_parser.cpp links.h links.cpp
@@ -76,7 +84,6 @@ qt_add_executable(yunting
     tray.h tray.cpp
     clipboardhelper.h
     diagnostics.h diagnostics.cpp
-    colortone.h colortone.cpp
     uifont.h uifont.cpp
     powerinhibitor.h powerinhibitor.cpp
     crypto.h crypto.cpp
@@ -121,6 +128,7 @@ target_link_libraries(yunting PRIVATE
     KF6::StatusNotifierItem
     KF6::DBusAddons
     KF6::WindowSystem
+    yunting_color
     OpenSSL::Crypto
     Fontconfig::Fontconfig
 )
