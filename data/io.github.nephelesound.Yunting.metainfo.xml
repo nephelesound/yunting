@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.26" date="2026-10-21">
+      <description>
+        <p>The window background now uses the same colours as the title bar, so the title bar and the page read as one surface without a seam.</p>
+        <p xml:lang="zh_CN">窗口底色与标题栏同色，标题栏和页面连成一片，不再有接缝。</p>
+      </description>
+    </release>
     <release version="0.6.25" date="2026-10-21">
       <description>
         <p>With Breeze's plain grey colours, the app now uses a Material You scheme generated from your accent colour and follows changes live; when a kde-material-you-colors scheme or another tinted scheme is active, the app follows the system. Login keeps the QR code and adds "Sign in with a cookie" for when scanning is not possible. The whole window uses the View colour set, so secondary text is easier to read, and the equalizer runs on a single thread.</p>
