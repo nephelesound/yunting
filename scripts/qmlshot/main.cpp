@@ -4,6 +4,7 @@
 #include "uifont.h"
 
 #include <KLocalizedQmlContext>
+#include <QElapsedTimer>
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QMetaProperty>
@@ -101,14 +102,36 @@ int main(int argc, char *argv[])
     window->show();
     window->requestActivate();   // 带窗框截图时 Spectacle 抓的是活动窗口
 
-    // 给异步图片和布局一点时间
-    const int delay = qEnvironmentVariableIntValue("QMLSHOT_DELAY_MS");
-    QTimer::singleShot(delay > 0 ? delay : 2500, &app, [&] {
+    // 等画面安定下来再拍：至少等 minDelay（异步图片、布局），之后要连续 quietMs 没有新帧
+    //（页面创建、转场动画、图片淡入都画完了）。只按固定时长等时，几十个截图并行跑、机器忙的时候
+    // 页面还没建出来就拍了，得到一张空白页而门禁照样通过。一直有动画的画面最多等 maxDelay
+    const int minDelay = qEnvironmentVariableIntValue("QMLSHOT_DELAY_MS") > 0
+        ? qEnvironmentVariableIntValue("QMLSHOT_DELAY_MS") : 2500;
+    constexpr int quietMs = 400;
+    constexpr int maxDelay = 20000;
+    QElapsedTimer sinceShow;
+    sinceShow.start();
+    qint64 lastFrame = 0;
+    int frames = 0;
+    QObject::connect(window, &QQuickWindow::frameSwapped, &app, [&] {
+        lastFrame = sinceShow.elapsed();
+        ++frames;
+    });
+    QTimer poll;
+    poll.setInterval(50);
+    QObject::connect(&poll, &QTimer::timeout, &app, [&] {
+        const qint64 now = sinceShow.elapsed();
+        const bool settled = now >= minDelay && frames > 0 && now - lastFrame >= quietMs;
+        if (!settled && now < maxDelay)
+            return;
+        poll.stop();
         // 设属性、加载数据之后才冒出来的错误（绑定求值、类型不符）同样算失败
         if (!ourErrors.isEmpty()) {
             app.exit(1);
             return;
         }
+        if (!settled)
+            qWarning("qmlshot: still animating after %d ms, capturing anyway", maxDelay);
         const QImage img = window->grabWindow();
         if (img.isNull() || !img.save(outFile)) {
             qCritical("grab failed");
@@ -117,5 +140,6 @@ int main(int argc, char *argv[])
         }
         app.exit(0);
     });
+    poll.start();
     return app.exec();
 }
