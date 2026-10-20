@@ -16,9 +16,18 @@
 #include <QSGRendererInterface>
 
 #include <cstdio>
+#include <malloc.h>
 #include <optional>
 
 namespace {
+
+// 53 个线程时 glibc 会给每个线程各留一个 64 MB 的分配 arena（约 20 个、常驻上百 MB），
+// 大半是碎片页还不还给系统。4 个 arena 够所有日常分配争用；必须在任何线程启动前调用。
+void boundMallocArenas()
+{
+    mallopt(M_ARENA_MAX, 4);
+    mallopt(M_TRIM_THRESHOLD, 256 * 1024);
+}
 
 // 桌面、浏览器、门户拉起云听都只带一个链接或什么也不带；带选项的是命令行用法，照常起
 bool plainLaunch(int argc, char *argv[])
@@ -78,6 +87,7 @@ std::optional<int> forwardToRunningInstance()
 
 int main(int argc, char *argv[])
 {
+    boundMallocArenas();
     if (linkWithoutDisplay(argc, argv)) {
         QCoreApplication app(argc, argv);
         if (const auto rc = forwardToRunningInstance())

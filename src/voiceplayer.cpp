@@ -14,6 +14,16 @@ VoicePlayer::VoicePlayer(QObject *parent)
     m_controller->setProperty(QStringLiteral("vid"), QStringLiteral("no"));
     m_controller->setProperty(QStringLiteral("audio-display"), QStringLiteral("no"));
     m_controller->setProperty(QStringLiteral("ytdl"), QStringLiteral("no"));
+    // 与 AudioEngine 相同：不用内置 Lua 脚本
+    m_controller->setProperty(QStringLiteral("load-scripts"), false);
+    m_controller->setProperty(QStringLiteral("osc"), false);
+    m_controller->setProperty(QStringLiteral("load-stats-overlay"), false);
+    m_controller->setProperty(QStringLiteral("load-console"), false);
+    m_controller->setProperty(QStringLiteral("load-auto-profiles"), false);
+    // 语音评论只有几十秒：4 MiB 预读绰绰有余（默认 150 MiB）
+    m_controller->setProperty(QStringLiteral("cache"), QStringLiteral("yes"));
+    m_controller->setProperty(QStringLiteral("demuxer-max-bytes"), 4 * 1024 * 1024);
+    m_controller->setProperty(QStringLiteral("demuxer-max-back-bytes"), 1024 * 1024);
     m_controller->setProperty(QStringLiteral("idle"), true);
     m_controller->setProperty(QStringLiteral("user-agent"), ncm::client::userAgent());
     // mpv 默认不限网络等待：卡住的下载既不载入也不报错，这条会一直「在放」、歌一直停着。

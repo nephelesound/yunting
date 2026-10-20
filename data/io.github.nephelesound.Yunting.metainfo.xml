@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.21" date="2026-10-20">
+      <description>
+        <p>Memory use is noticeably lower: mpv stream buffers no longer default to 150 MiB (32 MiB for songs, 64 MiB for MVs, 4 MiB for voice comments), the builtin Lua scripts of all three players are off (about 12 fewer threads), the equalizer filter runs on a single thread, the allocator is limited to four arenas, and freed pages return to the system when an MV closes.</p>
+        <p xml:lang="zh_CN">内存占用明显下降：mpv 的流缓冲不再用默认的 150 MiB 上限（歌 32 MiB、MV 64 MiB、语音评论 4 MiB），三个播放器都关掉内置 Lua 脚本（少约 12 个线程），均衡器滤镜只开一个线程，分配器限制在 4 个内存池，MV 关闭时把碎片页还给系统。</p>
+      </description>
+    </release>
     <release version="0.6.20" date="2026-10-20">
       <description>
         <p>Playback works again after the computer wakes from sleep: music pauses before sleep, the audio output is rebuilt after waking, and a song stopped halfway reloads from the same position. Pressing play after a song failed to load now fetches a fresh address instead of doing nothing.</p>

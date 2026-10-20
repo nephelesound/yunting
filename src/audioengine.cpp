@@ -83,7 +83,8 @@ QString filterSpec(const QVariantList &gains, double bassBoost, double stereoWid
     graph += QStringLiteral(",bass@bass=f=120:width_type=q:width=0.70710678:gain=%1")
                  .arg(number(bassBoost));
     graph += QStringLiteral(",extrastereo@width=m=%1:c=0").arg(number(stereoWidth));
-    return QStringLiteral("@eq:lavfi=[%1]").arg(graph);
+    // 几十毫秒的音频帧用不着多线程；lavfi 默认按核数开线程（本机 15 个）
+    return QStringLiteral("@eq:lavfi=[%1]:threads=1").arg(graph);
 }
 } // namespace
 
@@ -105,9 +106,19 @@ AudioEngine::AudioEngine(NcmClient *client, QObject *parent)
     option("vid", "no");
     option("audio-display", "no");
     option("ytdl", "no");
+    // libmpv 的内置脚本（osc/stats/console//autoload 等）我们一概不用，
+    // 少 12 个 Lua 虚拟机与线程，也少一份内存池
+    option("load-scripts", false);
+    option("osc", false);
+    option("load-stats-overlay", false);
+    option("load-console", false);
+    option("load-auto-profiles", false);
     option("idle", true);
     option("gapless-audio", "weak");
     option("cache", "yes");          // 网络流
+    // 默认 150 MiB 是按整部视频设计的；歌单连播只需要接得上下一首
+    option("demuxer-max-bytes", 32 * 1024 * 1024);
+    option("demuxer-max-back-bytes", 8 * 1024 * 1024);
     option("audio-device", "auto");  // 跟随 PipeWire/PulseAudio 的默认设备
     option("user-agent", ncm::client::userAgent());
     if (systemAudioOff())

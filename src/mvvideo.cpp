@@ -4,6 +4,7 @@
 #include <MpvController>
 
 #include <QDebug>
+#include <malloc.h>
 #include <algorithm>
 
 namespace {
@@ -27,7 +28,16 @@ MvVideo::MvVideo(QQuickItem *parent)
     option("terminal", false);
     option("audio-display", "no");
     option("ytdl", "no");
+    // 与 AudioEngine 相同：不用内置 Lua 脚本
+    option("load-scripts", false);
+    option("osc", false);
+    option("load-stats-overlay", false);
+    option("load-console", false);
+    option("load-auto-profiles", false);
     option("cache", "yes");
+    // 默认 150 MiB 是按边下边播整部视频设计的；MV 码率下 64 MiB 足够预读
+    option("demuxer-max-bytes", 64 * 1024 * 1024);
+    option("demuxer-max-back-bytes", 8 * 1024 * 1024);
     option("gapless-audio", "weak");
     option("audio-device", "auto");
     option("user-agent", ncm::client::userAgent());
@@ -143,6 +153,8 @@ void MvVideo::stop()
         m_position = 0;
         emit positionChanged();
     }
+    // demuxer 缓存刚整块释放：把碎片页还给系统，别等下一次分配才合并
+    malloc_trim(0);
 }
 
 void MvVideo::load()
