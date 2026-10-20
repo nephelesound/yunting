@@ -164,6 +164,87 @@ private slots:
         QCOMPARE(urlRequests, 2);
     }
 
+    // 地址坏了（睡醒后过期、网络断过）：报一次失败；再按播放要重新取址，不能再用缓存里那个坏地址
+    void playAfterFailureFetchesAFreshUrl()
+    {
+        MediaServer server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        const QString base = QStringLiteral("http://127.0.0.1:%1/").arg(server.serverPort());
+        const QByteArray wav = silentWav();
+        const auto urlJson = [&base](const QString &file) {
+            return QJsonDocument(QJsonObject{
+                {"code", 200},
+                {"data", QJsonArray{QJsonObject{{"url", base + file}, {"expi", 1200}}}}})
+                .toJson(QJsonDocument::Compact);
+        };
+
+        int urlRequests = 0;
+        server.handler = [&urlRequests, &urlJson, wav](const QByteArray &path) {
+            if (path.startsWith("/weapi/song/enhance/player/url"))
+                return qMakePair(QByteArray("application/json"),
+                                 urlJson(++urlRequests == 1 ? QStringLiteral("broken.wav")
+                                                            : QStringLiteral("audio.wav")));
+            if (path.startsWith("/broken.wav"))
+                return qMakePair(QByteArray("audio/wav"), QByteArray("not audio"));
+            return qMakePair(QByteArray("audio/wav"), wav);
+        };
+
+        NcmClient client(nullptr, false);
+        client.setApiBase(base);
+        AudioEngine audio(&client);
+        QSignalSpy failedSpy(&audio, &AudioEngine::failed);
+        auto waitFor = [](auto condition) {
+            QDeadlineTimer deadline(8 * 1000);
+            while (!condition() && !deadline.hasExpired())
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+            return condition();
+        };
+
+        audio.setTrack(QVariantMap{{"id", 1.0}, {"dur", 3.0}});
+        audio.setPlaying(true);
+        QVERIFY(waitFor([&] { return !failedSpy.isEmpty(); }));
+        QCOMPARE(audio.playing(), false);
+
+        audio.setPlaying(true);
+        QVERIFY2(waitFor([&] { return audio.position() > 0.05; }), "play after a failure did nothing");
+        QCOMPARE(urlRequests, 2);
+        QCOMPARE(failedSpy.count(), 1);
+    }
+
+    // 睡前暂停是立刻的：logind 不等淡出
+    void pauseForSleepIsImmediate()
+    {
+        MediaServer server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        const QString base = QStringLiteral("http://127.0.0.1:%1/").arg(server.serverPort());
+        const QByteArray wav = silentWav();
+        const QByteArray urlJson = QJsonDocument(QJsonObject{
+            {"code", 200},
+            {"data", QJsonArray{QJsonObject{{"url", base + QStringLiteral("audio.wav")}, {"expi", 1200}}}}})
+            .toJson(QJsonDocument::Compact);
+        server.handler = [wav, urlJson](const QByteArray &path) {
+            if (path.startsWith("/weapi/song/enhance/player/url"))
+                return qMakePair(QByteArray("application/json"), urlJson);
+            return qMakePair(QByteArray("audio/wav"), wav);
+        };
+
+        NcmClient client(nullptr, false);
+        client.setApiBase(base);
+        AudioEngine audio(&client);
+        audio.setTrack(QVariantMap{{"id", 1.0}, {"dur", 3.0}});
+        audio.setPlaying(true);
+        QDeadlineTimer deadline(8 * 1000);
+        while (audio.position() <= 0.05 && !deadline.hasExpired())
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+        QVERIFY(audio.position() > 0.05);
+
+        audio.pauseForSleep();
+        QCOMPARE(audio.playing(), false);
+        const double at = audio.position();
+        QTest::qWait(500);
+        QVERIFY2(audio.position() - at < 0.1, "still playing after pauseForSleep");
+    }
+
 private:
     QTemporaryDir m_dir;
 };

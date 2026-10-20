@@ -26,6 +26,8 @@ public:
 
     Q_INVOKABLE void toggle(const QString &url);
     Q_INVOKABLE void stop();
+    // 系统睡眠（SystemSleep）：睡前停下；醒来后重建输出，理由同 AudioEngine::recoverAfterSleep
+    void recoverAfterSleep();
 
 signals:
     void sourceChanged();

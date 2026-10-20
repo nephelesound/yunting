@@ -33,6 +33,9 @@ constexpr int kFadeInMs = 400;
 // 跳转落地：time-pos 到了目标这么近就算到了；等这么久还没到（跳转失败、目标超出文件）就不再等
 constexpr double kSeekNear = 0.5;
 constexpr int kSeekLandMs = 1500;
+// 睡醒后重建音频输出：PipeWire 刚醒时还在恢复设备，等一会儿再重建；有时第一次仍不出声，再补一次
+constexpr int kWakeReloadMs = 1500;
+constexpr int kWakeRetryMs = 6000;
 
 QString number(double value)
 {
@@ -216,7 +219,15 @@ void AudioEngine::setPlaying(bool playing)
     if (m_switching) {
         // 上一首正在淡出：新的一首加载完再按 m_playing 决定出不出声
     } else if (playing) {
-        if (m_atEof && m_urlReady && !m_sourceUrl.isEmpty()) {
+        if (m_failed && !m_track.isEmpty()) {
+            // 上次没放成（取址失败、睡醒后网络断了或地址过期）：按播放就重新取址、从原来的位置接上，
+            // 不必切歌或重开应用。缓存的地址可能正是坏的那个，不再用
+            const double songId = m_track.value("id").toDouble();
+            m_failed = false;
+            m_pendingSeek = m_position;
+            m_urls.remove(QStringLiteral("%1:%2").arg(num(songId), effectiveLevel()));
+            resolveUrl(songId);
+        } else if (m_atEof && m_urlReady && !m_sourceUrl.isEmpty()) {
             // 播完后 mpv 已回到 idle，再次按播放要重新加载同一地址
             startSource(m_sourceUrl, m_playedLevel, m_playedBitrate);
         } else if (m_fileLoaded) {
@@ -233,6 +244,30 @@ void AudioEngine::setPlaying(bool playing)
         scrobbleFinish();
     }
     emit playingChanged();
+}
+
+void AudioEngine::pauseForSleep()
+{
+    if (!m_playing)
+        return;
+    if (!m_switching) {
+        m_fadeAnimation->stop();
+        m_afterFade = {};
+        m_fade = 0;
+        applyVolume();
+        setPaused(true);
+    }
+    m_playing = false;
+    scrobbleFinish();
+    emit playingChanged();
+}
+
+void AudioEngine::recoverAfterSleep()
+{
+    if (systemAudioOff())
+        return;   // 没有输出可重建；读设备列表反而可能卡住（见 systemAudioOff）
+    QTimer::singleShot(kWakeReloadMs, this, &AudioEngine::reloadAudioOutput);
+    QTimer::singleShot(kWakeRetryMs, this, &AudioEngine::reloadAudioOutput);
 }
 
 void AudioEngine::fadeTo(double target, int ms, std::function<void()> done)

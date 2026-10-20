@@ -18,6 +18,7 @@
 #include "sdk/listen_together.h"
 #include "session.h"
 #include "store.h"
+#include "systemsleep.h"
 #include "tray.h"
 #include "voiceplayer.h"
 
@@ -944,6 +945,17 @@ int runGui(const CommandLine &cli, QApplication &app, Backend &backend)
     LayerShellHelper layerShell;
     ClipboardHelper clipboard;
     VoicePlayer voice;
+    // 系统睡眠：睡前暂停（醒来保持暂停）；醒来重建两个播放器的音频输出，否则睡前开着的流可能
+    // 一直不出声、换歌也不行，只能重开应用（issue #1）
+    SystemSleep sleep;
+    QObject::connect(&sleep, &SystemSleep::aboutToSleep, &audio, [&audio, &voice] {
+        audio.pauseForSleep();
+        voice.stop();
+    });
+    QObject::connect(&sleep, &SystemSleep::resumed, &audio, [&audio, &voice] {
+        audio.recoverAfterSleep();
+        voice.recoverAfterSleep();
+    });
     Diagnostics diagnostics;
     diagnostics.traffic = [&client] { return client.trafficSummary(); };
     QVariantMap backendMap{{"links", QVariant::fromValue<QObject *>(&links)},

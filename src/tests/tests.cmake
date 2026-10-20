@@ -68,6 +68,13 @@ target_compile_options(audioengine_test PRIVATE -Wall -Wextra)
 target_link_libraries(audioengine_test PRIVATE Qt6::Core Qt6::Test Qt6::Network MpvQt::MpvQt Qt6Keychain::Qt6Keychain OpenSSL::Crypto)
 add_test(NAME audioengine COMMAND audioengine_test)
 
+# 系统睡眠：时钟换成可控的计数，logind 信号直接调槽
+qt_add_executable(systemsleep_test tests/systemsleep_test.cpp systemsleep.h systemsleep.cpp)
+target_include_directories(systemsleep_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_options(systemsleep_test PRIVATE -Wall -Wextra)
+target_link_libraries(systemsleep_test PRIVATE Qt6::Core Qt6::DBus Qt6::Test)
+add_test(NAME systemsleep COMMAND systemsleep_test)
+
 # 评论语音的播放器：同样是真实 libmpv（ao=null）与本地 WAV
 qt_add_executable(voiceplayer_test tests/voiceplayer_test.cpp voiceplayer.h voiceplayer.cpp)
 target_include_directories(voiceplayer_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

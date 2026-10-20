@@ -71,6 +71,13 @@ void VoicePlayer::stop()
     setSource({});
 }
 
+void VoicePlayer::recoverAfterSleep()
+{
+    stop();
+    if (!qEnvironmentVariableIsSet("YUNTING_TEST_AO_NULL"))
+        m_controller->command({QStringLiteral("ao-reload")});
+}
+
 void VoicePlayer::discardEvents()
 {
     // 与 AudioEngine::discardEvents 同理：MpvController 在同一线程消费这个队列
