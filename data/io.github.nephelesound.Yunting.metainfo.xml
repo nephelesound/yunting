@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.17" date="2026-10-20">
+      <description>
+        <p>Scroll bars are a single rounded handle: no groove and no separator line beside lists. They appear while scrolling, fade out afterwards, and widen on hover.</p>
+        <p xml:lang="zh_CN">滚动条只剩一条圆角把手，列表旁不再有滚动槽和分隔竖线；滚动时出现，停下后淡出，悬停时变宽。</p>
+      </description>
+    </release>
     <release version="0.6.16" date="2026-10-20">
       <description>
         <p>Upload songs to your cloud and import playlists from a song list or other platforms' links. Make your own playlists private and give them up to three tags. Hug and copy comments, and forward events; your own events can change visibility or be deleted. Listen together no longer skips two songs when one change arrives twice.</p>
