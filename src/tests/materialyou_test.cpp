@@ -12,6 +12,14 @@
 #include <cmath>
 
 namespace {
+// 方案文件里的 r,g,b。不用 readEntry 的 QColor 重载：它要 KConfigGui 在加载时注册的转换，
+// Arch 打包（--as-needed）链出来的测试程序里没有它，读出来全是黑
+QColor colorAt(const KConfigGroup &group, const char *key)
+{
+    const QStringList rgb = group.readEntry(key, QString()).split(u',');
+    return rgb.size() == 3 ? QColor(rgb[0].toInt(), rgb[1].toInt(), rgb[2].toInt()) : QColor();
+}
+
 // WCAG 对比度
 double luminance(const QColor &c)
 {
@@ -83,46 +91,24 @@ private slots:
         QCOMPARE(MaterialYou::writeKdeScheme(light, false, path), path);
 
         KConfig config(path, KConfig::SimpleConfig);
-        QCOMPARE(config.group(QStringLiteral("Colors:View"))
-                     .readEntry(QStringLiteral("BackgroundNormal"), QColor())
-                     .name(),
-                 light.surfaceBright.name());
-        QCOMPARE(config.group(QStringLiteral("Colors:Window"))
-                     .readEntry(QStringLiteral("BackgroundNormal"), QColor())
-                     .name(),
-                 light.surfaceContainer.name());
-        QCOMPARE(config.group(QStringLiteral("Colors:Button"))
-                     .readEntry(QStringLiteral("BackgroundNormal"), QColor())
-                     .name(),
-                 light.surfaceContainerHigh.name());
-        QCOMPARE(config.group(QStringLiteral("Colors:Header"))
-                     .readEntry(QStringLiteral("BackgroundNormal"), QColor())
-                     .name(),
-                 light.surfaceContainer.name());
-        QCOMPARE(config.group(QStringLiteral("Colors:Selection"))
-                     .readEntry(QStringLiteral("BackgroundNormal"), QColor())
-                     .name(),
-                 light.primary.name());
-        QCOMPARE(config.group(QStringLiteral("Colors:Selection"))
-                     .readEntry(QStringLiteral("ForegroundNormal"), QColor())
-                     .name(),
-                 light.onPrimary.name());
-        QCOMPARE(config.group(QStringLiteral("Colors:View"))
-                     .readEntry(QStringLiteral("ForegroundNormal"), QColor())
-                     .name(),
-                 light.onSurface.name());
+        const auto at = [&config](const char *group, const char *key) {
+            return colorAt(config.group(QString::fromLatin1(group)), key).name();
+        };
+        QCOMPARE(at("Colors:View", "BackgroundNormal"), light.surfaceBright.name());
+        QCOMPARE(at("Colors:Window", "BackgroundNormal"), light.surfaceContainer.name());
+        QCOMPARE(at("Colors:Button", "BackgroundNormal"), light.surfaceContainerHigh.name());
+        QCOMPARE(at("Colors:Header", "BackgroundNormal"), light.surfaceContainer.name());
+        QCOMPARE(at("Colors:Selection", "BackgroundNormal"), light.primary.name());
+        QCOMPARE(at("Colors:Selection", "ForegroundNormal"), light.onPrimary.name());
+        QCOMPARE(at("Colors:View", "ForegroundNormal"), light.onSurface.name());
 
         const MaterialYou::Scheme dark = MaterialYou::schemeFor(QColor("#3daee9"), true);
         const QString darkPath = directory.filePath(QStringLiteral("dark.colors"));
         QCOMPARE(MaterialYou::writeKdeScheme(dark, true, darkPath), darkPath);
         KConfig darkConfig(darkPath, KConfig::SimpleConfig);
-        QCOMPARE(darkConfig.group(QStringLiteral("Colors:View"))
-                     .readEntry(QStringLiteral("BackgroundNormal"), QColor())
-                     .name(),
+        QCOMPARE(colorAt(darkConfig.group(QStringLiteral("Colors:View")), "BackgroundNormal").name(),
                  dark.surfaceDim.name());
-        QCOMPARE(darkConfig.group(QStringLiteral("Colors:Window"))
-                     .readEntry(QStringLiteral("BackgroundNormal"), QColor())
-                     .name(),
+        QCOMPARE(colorAt(darkConfig.group(QStringLiteral("Colors:Window")), "BackgroundNormal").name(),
                  dark.surfaceContainer.name());
     }
 
@@ -156,13 +142,14 @@ private slots:
                                  "Colors:Button", "Colors:Tooltip", "Colors:Selection", "Colors:Complementary"}) {
             const KConfigGroup group = config.group(QString::fromLatin1(name));
             QVERIFY2(group.exists(), name);
-            const QColor background = group.readEntry("BackgroundNormal", QColor());
+            const QColor background = colorAt(group, "BackgroundNormal");
+            QVERIFY2(background.isValid(), name);
             for (const char *key : {"ForegroundNormal", "ForegroundInactive", "ForegroundNegative", "ForegroundLink"}) {
-                const double ratio = contrast(group.readEntry(key, QColor()), background);
+                const double ratio = contrast(colorAt(group, key), background);
                 QVERIFY2(ratio >= 4.5, qPrintable(QStringLiteral("%1 %2 %3:1").arg(QLatin1String(name), QLatin1String(key)).arg(ratio)));
             }
         }
-        const double window = config.group(QStringLiteral("Colors:Window")).readEntry("BackgroundNormal", QColor()).lightnessF();
+        const double window = colorAt(config.group(QStringLiteral("Colors:Window")), "BackgroundNormal").lightnessF();
         QVERIFY(dark ? window < 0.2 : window > 0.85);
     }
 

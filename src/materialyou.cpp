@@ -21,24 +21,31 @@ QColor colorOf(mcu::DynamicColor role, const mcu::DynamicScheme &scheme)
     return QColor::fromRgba(role.GetArgb(scheme)).toRgb();
 }
 
+// 配色方案文件里的颜色是 r,g,b。按字符串写，不经 KConfigGroup 的 QColor 重载：那个转换由 KConfigGui
+// 在加载时注册，进程没把它带进来时写出的是空值。Arch 打包用 --as-needed，没直接用到它的程序就不带
+QString rgb(const QColor &color)
+{
+    return QStringLiteral("%1,%2,%3").arg(color.red()).arg(color.green()).arg(color.blue());
+}
+
 void writeSet(KConfig &out, const char *group, const QColor &background, const QColor &alternate,
               const QColor &foreground, const QColor &inactive, const QColor &active, const QColor &link,
               const QColor &visited, const QColor &negative, const QColor &neutral, const QColor &positive,
               const QColor &focus, const QColor &hover)
 {
     KConfigGroup set(&out, QString::fromLatin1(group));
-    set.writeEntry("BackgroundNormal", background);
-    set.writeEntry("BackgroundAlternate", alternate);
-    set.writeEntry("ForegroundNormal", foreground);
-    set.writeEntry("ForegroundInactive", inactive);
-    set.writeEntry("ForegroundActive", active);
-    set.writeEntry("ForegroundLink", link);
-    set.writeEntry("ForegroundVisited", visited);
-    set.writeEntry("ForegroundNegative", negative);
-    set.writeEntry("ForegroundNeutral", neutral);
-    set.writeEntry("ForegroundPositive", positive);
-    set.writeEntry("DecorationFocus", focus);
-    set.writeEntry("DecorationHover", hover);
+    set.writeEntry("BackgroundNormal", rgb(background));
+    set.writeEntry("BackgroundAlternate", rgb(alternate));
+    set.writeEntry("ForegroundNormal", rgb(foreground));
+    set.writeEntry("ForegroundInactive", rgb(inactive));
+    set.writeEntry("ForegroundActive", rgb(active));
+    set.writeEntry("ForegroundLink", rgb(link));
+    set.writeEntry("ForegroundVisited", rgb(visited));
+    set.writeEntry("ForegroundNegative", rgb(negative));
+    set.writeEntry("ForegroundNeutral", rgb(neutral));
+    set.writeEntry("ForegroundPositive", rgb(positive));
+    set.writeEntry("DecorationFocus", rgb(focus));
+    set.writeEntry("DecorationHover", rgb(hover));
 }
 
 } // namespace
@@ -123,7 +130,7 @@ QString writeKdeScheme(const Scheme &c, bool dark, const QString &path)
              c.secondary);
 
     KConfigGroup disabled(&out, QStringLiteral("ColorEffects:Disabled"));
-    disabled.writeEntry("Color", c.surfaceContainer);
+    disabled.writeEntry("Color", rgb(c.surfaceContainer));
     disabled.writeEntry("ColorAmount", 0.5);
     disabled.writeEntry("ColorEffect", 3);
     disabled.writeEntry("ContrastAmount", 0);
@@ -133,7 +140,7 @@ QString writeKdeScheme(const Scheme &c, bool dark, const QString &path)
 
     KConfigGroup inactive(&out, QStringLiteral("ColorEffects:Inactive"));
     inactive.writeEntry("ChangeSelectionColor", true);
-    inactive.writeEntry("Color", c.surfaceContainerLowest);
+    inactive.writeEntry("Color", rgb(c.surfaceContainerLowest));
     inactive.writeEntry("ColorAmount", 0.025);
     inactive.writeEntry("ColorEffect", 0);
     inactive.writeEntry("ContrastAmount", 0.1);
@@ -155,12 +162,12 @@ QString writeKdeScheme(const Scheme &c, bool dark, const QString &path)
 
     // 标题栏（只认旧式 [WM] 的窗口装饰用它）与页头 Colors:Header 同一层，标题栏与页面顶边不差一档
     KConfigGroup wm(&out, QStringLiteral("WM"));
-    wm.writeEntry("activeBackground", c.surfaceContainer);
-    wm.writeEntry("activeBlend", dark ? QColor(252, 252, 252) : QColor(227, 229, 231));
-    wm.writeEntry("activeForeground", c.onSurface);
-    wm.writeEntry("inactiveBackground", c.secondaryContainer);
-    wm.writeEntry("inactiveBlend", dark ? QColor(161, 169, 177) : QColor(239, 240, 241));
-    wm.writeEntry("inactiveForeground", dark ? c.onSecondaryContainer : c.onSurfaceVariant);
+    wm.writeEntry("activeBackground", rgb(c.surfaceContainer));
+    wm.writeEntry("activeBlend", rgb(dark ? QColor(252, 252, 252) : QColor(227, 229, 231)));
+    wm.writeEntry("activeForeground", rgb(c.onSurface));
+    wm.writeEntry("inactiveBackground", rgb(c.secondaryContainer));
+    wm.writeEntry("inactiveBlend", rgb(dark ? QColor(161, 169, 177) : QColor(239, 240, 241)));
+    wm.writeEntry("inactiveForeground", rgb(dark ? c.onSecondaryContainer : c.onSurfaceVariant));
 
     return out.sync() ? path : QString();
 }

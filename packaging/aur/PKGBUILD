@@ -33,7 +33,9 @@ build() {
 }
 
 check() {
-  ctest --test-dir build --output-on-failure
+  # 打包检查不连构建者的桌面：断开会话总线，要对着真实 Plasma 测的（抑制睡眠）自己跳过。
+  # 否则桌面门户一时异常（例如后端没起来）就装不上
+  DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent ctest --test-dir build --output-on-failure
 }
 
 package() {
