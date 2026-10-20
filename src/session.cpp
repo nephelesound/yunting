@@ -26,6 +26,25 @@ void appendCookies(QJsonArray &jar, const QString &raw)
         }
     }
 }
+
+// 网页端复制的 Cookie：整段 Cookie 头，或只粘 MUSIC_U 的值（浏览器里叫 MUSIC_U 的那一格）。
+// 认不出 MUSIC_U 时返回空表。
+QJsonArray cookieJarFrom(const QString &raw)
+{
+    QJsonArray jar;
+    if (!raw.contains(u'=')) {
+        const QString token = raw.trimmed();
+        if (!token.isEmpty())
+            jar.append(QJsonObject{{QStringLiteral("MUSIC_U"), token}});
+        return jar;
+    }
+    appendCookies(jar, raw);
+    for (const QJsonValue &c : jar) {
+        if (c.toObject().contains(QStringLiteral("MUSIC_U")))
+            return jar;
+    }
+    return {};
+}
 } // namespace
 
 Session::Session(NcmClient *client, Store *store, QObject *parent)
@@ -62,9 +81,9 @@ void Session::start()
     emit qrContentChanged();
     setState(QStringLiteral("waiting"));
 
-    // type=3 是 PC 客户端会话（SPlayer 与我们的默认），type=1 是网页会话（YesPlayMusic）；
-    // 缺了这个参数会回 HTTP 200 + code 400「参数错误」。
-    m_client->get("api/login/qrcode/unikey", QUrlQuery{{QStringLiteral("type"), qrType()}}, false,
+    // 网易当前要求 type=3（NeteaseCloudMusicApi 维护分支、SPlayer、YesPlayMusic 用的 @neteaseapireborn/api
+    // 都是这一个）；缺了这个参数会回 HTTP 200 + code 400「参数错误」。
+    m_client->get("api/login/qrcode/unikey", QUrlQuery{{QStringLiteral("type"), QStringLiteral("3")}}, false,
                   [this, generation](const QJsonDocument &doc, bool ok) {
         if (generation != m_generation)
             return;   // 期间 cancel() 或重新 start()：这份 unikey 已经过时
@@ -90,19 +109,6 @@ void Session::cancel()
     m_timer->stop();
     m_unikey.clear();
     setState(QStringLiteral("idle"));
-}
-
-void Session::setLoginMode(const QString &mode)
-{
-    if (mode != QLatin1String("client") && mode != QLatin1String("web"))
-        return;
-    if (mode == m_loginMode)
-        return;
-    m_loginMode = mode;
-    emit loginModeChanged();
-    // 正在等一张码：它的轮询带着取码时的 type，换模式就得换一张码，否则 803 给的会话类型对不上
-    if (m_state == QLatin1String("waiting") || m_state == QLatin1String("scanned"))
-        start();
 }
 
 void Session::refreshSession()
@@ -133,6 +139,45 @@ void Session::refreshSession()
     });
 }
 
+void Session::loginWithCookie(const QString &raw)
+{
+    const QJsonArray jar = cookieJarFrom(raw);
+    if (jar.isEmpty()) {
+        emit loginFailed(QStringLiteral("没有识别到 MUSIC_U：请粘贴整段 Cookie，或 MUSIC_U 的值"));
+        return;
+    }
+    // 正在等扫码时用 Cookie 登录：那张二维码已经无关，停止轮询
+    ++m_generation;
+    m_polling = false;
+    m_timer->stop();
+    m_unikey.clear();
+    if (!m_qrContent.isEmpty()) {
+        m_qrContent.clear();
+        emit qrContentChanged();
+    }
+
+    m_client->adoptCookies(QJsonDocument(jar));
+    // 与 refreshSession 用同一个接口校验：能换到新 cookie 才算这个 MUSIC_U 有效。
+    // 失败时清掉它，否则它留在钥匙串里，下次启动就成了「会话过期」。
+    const quint64 generation = ++m_cookieGeneration;
+    m_client->postWeapi(QStringLiteral("login/token/refresh"), {}, true,
+                        [this, generation](const QJsonDocument &doc, bool ok) {
+        if (generation != m_cookieGeneration)
+            return;
+        const int code = ok ? doc.object().value(QStringLiteral("code")).toInt() : 0;
+        if (!ok || code != 200) {
+            m_client->clearAuthCookies();
+            emit loginFailed(ok ? QStringLiteral("Cookie 无效或已过期，请从浏览器重新复制")
+                                : QStringLiteral("连不上服务器，请稍后再试"));
+            // 这张二维码的轮询已经停了：回到扫码流程，对话框不至于停在空二维码上
+            start();
+            return;
+        }
+        setState(QStringLiteral("done"));
+        m_store->refresh();
+    });
+}
+
 void Session::poll()
 {
     if (m_polling)
@@ -145,7 +190,7 @@ void Session::poll()
     const QString unikey = m_unikey;
     m_polling = true;
     m_client->get("api/login/qrcode/client/login",
-                  QUrlQuery{{QStringLiteral("key"), unikey}, {QStringLiteral("type"), qrType()}},
+                  QUrlQuery{{QStringLiteral("key"), unikey}, {QStringLiteral("type"), QStringLiteral("3")}},
                   false, [this, generation, unikey](const QJsonDocument &doc, bool ok) {
         m_polling = false;
         // 取消/重开过，或回包属于上一张二维码：不能改状态，更不能在 cancel 后把用户登进去

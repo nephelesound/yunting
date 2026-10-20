@@ -14,16 +14,11 @@ class Session : public QObject {
     Q_PROPERTY(QString state READ state NOTIFY stateChanged)
     // 二维码内容 https://music.163.com/login?codekey=<unikey>；没有时为空串
     Q_PROPERTY(QString qrContent READ qrContent NOTIFY qrContentChanged)
-    // 扫码登录的两套会话：client = PC 客户端（type=3，本应用与 SPlayer 默认），web = 网页（type=1，YesPlayMusic）。
-    // 两种 MUSIC_U 接口都认，用户按手里要用的那套选；切换后重新取码。
-    Q_PROPERTY(QString loginMode READ loginMode WRITE setLoginMode NOTIFY loginModeChanged)
 public:
     explicit Session(NcmClient *client, Store *store, QObject *parent = nullptr);
 
     QString state() const { return m_state; }
     QString qrContent() const { return m_qrContent; }
-    QString loginMode() const { return m_loginMode; }
-    void setLoginMode(const QString &mode);
 
     // 取 unikey 进入 waiting，并开始每 2 秒轮询
     Q_INVOKABLE void start();
@@ -31,19 +26,20 @@ public:
     Q_INVOKABLE void cancel();
     // 用现有 MUSIC_U 刷新登录 cookie；成功后重拉首屏。会话过期时自动尝试一次。
     Q_INVOKABLE void refreshSession();
+    // 网页端 Cookie 登录：粘贴整段 Cookie（MUSIC_U=…; __csrf=…）或只粘贴 MUSIC_U 的值。
+    // 经 login/token/refresh 校验：成功发 done 并重拉首屏，失败清掉无效凭据并发 loginFailed。
+    Q_INVOKABLE void loginWithCookie(const QString &raw);
 
 signals:
     void stateChanged();
     void qrContentChanged();
     void refreshed();
     void refreshFailed(const QString &message);
-    void loginModeChanged();
+    void loginFailed(const QString &message);
 
 private:
     void poll();
     void setState(const QString &state);
-    // 取码与轮询共用的 type：client=3（PC 客户端），web=1（网页）
-    QString qrType() const { return m_loginMode == QLatin1String("web") ? QStringLiteral("1") : QStringLiteral("3"); }
 
     NcmClient *m_client;
     Store *m_store;
@@ -55,5 +51,5 @@ private:
     bool m_polling = false;     // 同一时间只允许一个轮询请求在途
     bool m_refreshing = false;
     quint64 m_refreshGeneration = 0;
-    QString m_loginMode = QStringLiteral("client");   // client | web
+    quint64 m_cookieGeneration = 0;   // loginWithCookie 递增；旧校验的回包不能改状态
 };
