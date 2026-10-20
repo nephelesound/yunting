@@ -2,6 +2,19 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.25] - 2026-10-21
+
+### 新增
+- 系统配色是 Breeze 默认的中性灰时，应用改用以系统强调色为种子生成的 Material You 配色（Google Material Color Utilities 的 Tonal Spot 方案，角色映射参照 kde-material-you-colors），深浅跟随系统；改强调色或配色方案后立即跟着变。正在用 kde-material-you-colors 的方案或其他有色调的方案时，原样跟随系统。
+
+### 变更
+- 登录：扫码只保留 `type=3`（NeteaseCloudMusicApi 维护分支、SPlayer、YesPlayMusic 都用这一种），去掉 0.6.23 的「客户端 / 网页扫码」选择；扫不了码时可在二维码下方「用 Cookie 登录」（[#3](https://github.com/nephelesound/yunting/issues/3)）。输入框遮住内容，关掉对话框即清空。
+- 整个窗口改用 View 配色组（原来设在窗口上没有生效，实际一直是 Window 组）：在 kde-material-you-colors 的浅色方案下，次要文字的对比度从 3.3:1 提到 5.3:1。
+
+### 修复
+- 均衡器的滤镜图改为单线程（`lavfi` 的 `o=[threads=1]`；0.6.21 写成 `:threads=1` 才导致解析失败），播放中的线程再少 15 个。
+- 关掉登录对话框时，在途的 Cookie 校验一并作废，不再在后台重开扫码；Cookie 登录成功后不再轮询二维码。
+
 ## [0.6.24] - 2026-10-20
 
 ### 修复

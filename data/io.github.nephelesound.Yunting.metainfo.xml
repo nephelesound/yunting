@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.25" date="2026-10-21">
+      <description>
+        <p>With Breeze's plain grey colours, the app now uses a Material You scheme generated from your accent colour and follows changes live; when a kde-material-you-colors scheme or another tinted scheme is active, the app follows the system. Login keeps the QR code and adds "Sign in with a cookie" for when scanning is not possible. The whole window uses the View colour set, so secondary text is easier to read, and the equalizer runs on a single thread.</p>
+        <p xml:lang="zh_CN">系统是 Breeze 默认的中性灰时，应用改用按强调色生成的 Material You 配色，并随系统改动实时变化；正在用 kde-material-you-colors 或其他有色调的方案时原样跟随系统。登录保留扫码，扫不了时可以用 Cookie 登录。整个窗口改用 View 配色组，次要文字更清楚；均衡器改为单线程。</p>
+      </description>
+    </release>
     <release version="0.6.24" date="2026-10-20">
       <description>
         <p>The equalizer, bass boost and stereo width work again (they had been broken since 0.6.21): mpv's lavfi filter has no threads option, and passing it made the whole af chain fail to parse. The parameter is gone; filter-graph threading cannot be limited in mpv 0.41. The builtin Lua scripts are now really disabled: load-scripts only matters before mpv initialization, so the remaining load-select/load-positioning/load-commands/load-context-menu options are set as well (thread count during playback: 53 → 27).</p>
