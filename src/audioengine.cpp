@@ -198,6 +198,7 @@ void AudioEngine::setTrack(const QVariantMap &track)
     m_position = 0;
     m_duration = 0;
     m_failed = false;
+    m_reloadOnPlay = false;
     m_scrobbleStarted = false;
     m_scrobbleFinished = false;
     m_playedMs = 0;
@@ -219,17 +220,22 @@ void AudioEngine::setPlaying(bool playing)
     if (m_switching) {
         // 上一首正在淡出：新的一首加载完再按 m_playing 决定出不出声
     } else if (playing) {
-        if (m_failed && !m_track.isEmpty()) {
-            // 上次没放成（取址失败、睡醒后网络断了或地址过期）：按播放就重新取址、从原来的位置接上，
-            // 不必切歌或重开应用。缓存的地址可能正是坏的那个，不再用
+        const bool failedWithNothingLoaded = m_failed && !m_fileLoaded;
+        if (!m_track.isEmpty() && (failedWithNothingLoaded || m_reloadOnPlay)) {
+            // 上次没放成（取址失败、网络断了、地址过期），或者刚睡醒（睡前的网络流已经断了）：
+            // 重新载入，从原来的位置接上，不必切歌或重开应用。没放成时缓存的地址可能正是坏的那个，不再用。
+            // 换音质失败但旧文件还在时不走这里：接着放旧文件
             const double songId = m_track.value("id").toDouble();
+            if (failedWithNothingLoaded)
+                m_urls.remove(QStringLiteral("%1:%2").arg(num(songId), effectiveLevel()));
             m_failed = false;
-            m_pendingSeek = m_position;
-            m_urls.remove(QStringLiteral("%1:%2").arg(num(songId), effectiveLevel()));
+            m_reloadOnPlay = false;
+            m_pendingSeek = position();
             resolveUrl(songId);
         } else if (m_atEof && m_urlReady && !m_sourceUrl.isEmpty()) {
-            // 播完后 mpv 已回到 idle，再次按播放要重新加载同一地址
-            startSource(m_sourceUrl, m_playedLevel, m_playedBitrate);
+            // 播完后 mpv 已回到 idle，再次按播放要重新加载；走取址而不是直接用上次的地址：
+            // 停在结尾的这段时间（例如睡了一觉）里地址可能已经过期
+            resolveUrl(m_track.value("id").toDouble());
         } else if (m_fileLoaded) {
             setPaused(false);
             fadeTo(1, kFadeInMs);
@@ -264,10 +270,16 @@ void AudioEngine::pauseForSleep()
 
 void AudioEngine::recoverAfterSleep()
 {
+    // 停在一首歌中间睡的：网络流在睡眠中断了，地址也可能过期，下次按播放时重新载入
+    if (m_fileLoaded && !m_playing && !m_atEof)
+        m_reloadOnPlay = true;
     if (systemAudioOff())
-        return;   // 没有输出可重建；读设备列表反而可能卡住（见 systemAudioOff）
-    QTimer::singleShot(kWakeReloadMs, this, &AudioEngine::reloadAudioOutput);
-    QTimer::singleShot(kWakeRetryMs, this, &AudioEngine::reloadAudioOutput);
+        return;
+    // 只重建输出，不读设备列表：刚醒时音频服务可能还没起来，读 audio-device-list 会去探测后端，
+    // 连不上时可能永久卡住（见 systemAudioOff）。audio-device 本身不变，用户选的设备照旧
+    const auto reload = [this] { m_controller->command({QStringLiteral("ao-reload")}); };
+    QTimer::singleShot(kWakeReloadMs, this, reload);
+    QTimer::singleShot(kWakeRetryMs, this, reload);
 }
 
 void AudioEngine::fadeTo(double target, int ms, std::function<void()> done)

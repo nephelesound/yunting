@@ -100,7 +100,8 @@ public:
     // 系统睡眠（SystemSleep）：睡前立即暂停，不淡出（logind 不等）；醒来后保持暂停，由用户继续
     void pauseForSleep();
     // 醒来后重建音频输出：睡前开着的流在 PipeWire/PulseAudio 里可能再也不出声（pipewire#2707），
-    // 换歌也复用它，只有重开应用才好。音频服务醒来要一点时间：先等一会儿重建，再补一次（plezy 的做法）
+    // 换歌也复用它，只有重开应用才好。音频服务醒来要一点时间：先等一会儿重建，再补一次（plezy 的做法）。
+    // 停在一首歌中间的，下次按播放从原位置重新载入
     void recoverAfterSleep();
 
     // --smoke-audio：无窗口地取地址并播放 seconds 秒，打印状态变化
@@ -172,6 +173,7 @@ private:
     QVariantMap m_track;
     bool m_playing = false;
     bool m_failed = false;
+    bool m_reloadOnPlay = false;   // 停在歌中间睡醒了：下次按播放重新载入（睡前的网络流已断）
     bool m_urlReady = false;
     bool m_fileLoaded = false;
     bool m_atEof = false;

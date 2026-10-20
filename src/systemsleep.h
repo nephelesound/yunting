@@ -28,5 +28,6 @@ private slots:
 private:
     std::function<qint64()> m_suspendedMs;
     qint64 m_seenSuspendedMs = 0;
+    bool m_awaitingWake = false;   // logind 报过要睡、这次醒来还没报
     QTimer *m_clock = nullptr;
 };

@@ -38,6 +38,20 @@ private slots:
         QMetaObject::invokeMethod(&sleep, "checkClock");
         QCOMPARE(resumed.count(), 1);
     }
+
+    // 反过来：时钟先发现、logind 的醒来信号后到
+    void clockWakeIsNotReportedAgainByLogind()
+    {
+        qint64 suspended = 0;
+        SystemSleep sleep(nullptr, [&suspended] { return suspended; });
+        QSignalSpy resumed(&sleep, &SystemSleep::resumed);
+
+        QMetaObject::invokeMethod(&sleep, "onPrepareForSleep", Q_ARG(bool, true));
+        suspended += 60 * 1000;
+        QMetaObject::invokeMethod(&sleep, "checkClock");
+        QMetaObject::invokeMethod(&sleep, "onPrepareForSleep", Q_ARG(bool, false));
+        QCOMPARE(resumed.count(), 1);
+    }
 };
 
 QTEST_GUILESS_MAIN(SystemSleepTest)

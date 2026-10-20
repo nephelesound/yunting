@@ -4,6 +4,7 @@
 #include <QTimer>
 
 #include <ctime>
+#include <utility>
 
 namespace {
 // 睡眠之外两个时钟之差也会有毫秒级的漂移：超过这个值才算睡过
@@ -44,12 +45,14 @@ SystemSleep::SystemSleep(QObject *parent, std::function<qint64()> suspendedMs)
 void SystemSleep::onPrepareForSleep(bool sleeping)
 {
     if (sleeping) {
+        m_awaitingWake = true;
         emit aboutToSleep();
         return;
     }
-    // 这次睡眠已经由 logind 报告：时钟不再为它报一次
+    // 醒来时 logind 与时钟谁先到都有可能：先到的报，后到的只把这次睡眠记为已报
     m_seenSuspendedMs = m_suspendedMs();
-    emit resumed();
+    if (std::exchange(m_awaitingWake, false))
+        emit resumed();
 }
 
 void SystemSleep::checkClock()
@@ -58,5 +61,6 @@ void SystemSleep::checkClock()
     if (suspended - m_seenSuspendedMs < kSleptMs)
         return;
     m_seenSuspendedMs = suspended;
+    m_awaitingWake = false;
     emit resumed();
 }

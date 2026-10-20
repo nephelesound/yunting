@@ -211,8 +211,59 @@ private slots:
         QCOMPARE(failedSpy.count(), 1);
     }
 
-    // 睡前暂停是立刻的：logind 不等淡出
-    void pauseForSleepIsImmediate()
+    // 放到一半换音质、新地址坏了：再按播放从刚才的位置接上，不是从头
+    void retryAfterFailureKeepsThePosition()
+    {
+        MediaServer server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        const QString base = QStringLiteral("http://127.0.0.1:%1/").arg(server.serverPort());
+        const QByteArray wav = silentWav();
+        const auto urlJson = [&base](const QString &file) {
+            return QJsonDocument(QJsonObject{
+                {"code", 200},
+                {"data", QJsonArray{QJsonObject{{"url", base + file}, {"expi", 1200}}}}})
+                .toJson(QJsonDocument::Compact);
+        };
+        int urlRequests = 0;
+        server.handler = [&urlRequests, &urlJson, wav](const QByteArray &path) {
+            if (path.startsWith("/weapi/song/enhance/player/url"))
+                return qMakePair(QByteArray("application/json"),
+                                 urlJson(++urlRequests == 2 ? QStringLiteral("broken.wav")
+                                                            : QStringLiteral("audio.wav")));
+            if (path.startsWith("/broken.wav"))
+                return qMakePair(QByteArray("audio/wav"), QByteArray("not audio"));
+            return qMakePair(QByteArray("audio/wav"), wav);
+        };
+
+        NcmClient client(nullptr, false);
+        client.setApiBase(base);
+        AudioEngine audio(&client);
+        QSignalSpy failedSpy(&audio, &AudioEngine::failed);
+        auto waitFor = [](auto condition) {
+            QDeadlineTimer deadline(8 * 1000);
+            while (!condition() && !deadline.hasExpired())
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+            return condition();
+        };
+
+        audio.setTrack(QVariantMap{{"id", 1.0}, {"dur", 3.0}});
+        audio.setPlaying(true);
+        QVERIFY(waitFor([&] { return audio.position() > 1.0; }));
+        audio.setQuality(QStringLiteral("lossless"));
+        QVERIFY(waitFor([&] { return !failedSpy.isEmpty(); }));
+        const double at = audio.position();
+        QVERIFY2(at > 0.9, "the position was lost when the reload failed");
+
+        // 第一个位置就在原处（从头放的话要放上一秒多才到，那时已经晚了），然后接着往前走
+        audio.setPlaying(true);
+        QVERIFY(waitFor([&] { return urlRequests == 3 && audio.position() > 0.05; }));
+        const double resumedAt = audio.position();
+        QVERIFY2(resumedAt > at - 0.3, "the retry did not continue from the same position");
+        QVERIFY2(waitFor([&] { return audio.position() > resumedAt + 0.1; }), "the retry did not play");
+    }
+
+    // 睡前立刻暂停（logind 不等淡出）；醒来后按播放重新载入、从原位置接上（睡前的网络流已经断了）
+    void sleepPausesAndWakeReloadsFromThePosition()
     {
         MediaServer server;
         QVERIFY(server.listen(QHostAddress::LocalHost));
@@ -222,27 +273,41 @@ private slots:
             {"code", 200},
             {"data", QJsonArray{QJsonObject{{"url", base + QStringLiteral("audio.wav")}, {"expi", 1200}}}}})
             .toJson(QJsonDocument::Compact);
-        server.handler = [wav, urlJson](const QByteArray &path) {
+        int audioRequests = 0;
+        server.handler = [&audioRequests, wav, urlJson](const QByteArray &path) {
             if (path.startsWith("/weapi/song/enhance/player/url"))
                 return qMakePair(QByteArray("application/json"), urlJson);
+            ++audioRequests;
             return qMakePair(QByteArray("audio/wav"), wav);
         };
 
         NcmClient client(nullptr, false);
         client.setApiBase(base);
         AudioEngine audio(&client);
+        auto waitFor = [](auto condition) {
+            QDeadlineTimer deadline(8 * 1000);
+            while (!condition() && !deadline.hasExpired())
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+            return condition();
+        };
         audio.setTrack(QVariantMap{{"id", 1.0}, {"dur", 3.0}});
         audio.setPlaying(true);
-        QDeadlineTimer deadline(8 * 1000);
-        while (audio.position() <= 0.05 && !deadline.hasExpired())
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
-        QVERIFY(audio.position() > 0.05);
+        QVERIFY(waitFor([&] { return audio.position() > 0.8; }));
 
         audio.pauseForSleep();
         QCOMPARE(audio.playing(), false);
         const double at = audio.position();
         QTest::qWait(500);
         QVERIFY2(audio.position() - at < 0.1, "still playing after pauseForSleep");
+
+        const int before = audioRequests;
+        audio.recoverAfterSleep();
+        audio.setPlaying(true);
+        QVERIFY2(waitFor([&] { return audioRequests > before && audio.position() > 0.05; }),
+                 "play after wake did not reload the stream");
+        const double resumedAt = audio.position();
+        QVERIFY2(resumedAt > at - 0.3, "the reload did not continue from the same position");
+        QVERIFY2(waitFor([&] { return audio.position() > resumedAt + 0.1; }), "the reload did not play");
     }
 
 private:
