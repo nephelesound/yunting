@@ -122,7 +122,8 @@ AppDialog {
                 }
             }
         }
-        FormCard.FormTextAreaDelegate {
+        // 遮住输入（可点眼睛查看）：Cookie 等同于账号密码，屏幕共享、截图里不该露出来。整段 Cookie 也只有一行
+        FormCard.FormPasswordFieldDelegate {
             id: cookieText
             objectName: "cookieLoginField"
             visible: dialog.cookieOpen

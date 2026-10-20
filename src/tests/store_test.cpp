@@ -677,6 +677,65 @@ private slots:
         QVERIFY(!failed.first().at(0).toString().isEmpty());
     }
 
+    // 校验还在路上时关掉对话框：迟到的失败回包不能报错，也不能在没有界面时重开扫码
+    void cancelledCookieLoginStaysCancelled()
+    {
+        FakeApi::Responder pending;
+        int unikeyRequests = 0;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/weapi/login/token/refresh") {
+                pending = respond;
+                return;
+            }
+            if (req.path == "/api/login/qrcode/unikey")
+                ++unikeyRequests;
+            respond(200, "{\"code\":200}");
+        };
+        Session session(m_client, m_store);
+        QSignalSpy failed(&session, &Session::loginFailed);
+        session.loginWithCookie(QStringLiteral("MUSIC_U=expired"));
+        QVERIFY(waitUntil([&] { return bool(pending); }, 5000));
+        session.cancel();
+        pending(200, "{\"code\":301}");
+        QTest::qWait(300);
+        QCOMPARE(session.state(), QStringLiteral("idle"));
+        QCOMPARE(failed.count(), 0);
+        QCOMPARE(unikeyRequests, 0);
+    }
+
+    // 校验期间又开了一张码（关掉再打开对话框）：Cookie 登录成了，那张码就不再轮询
+    void cookieLoginStopsQrPolling()
+    {
+        FakeApi::Responder pending;
+        int polls = 0;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/weapi/login/token/refresh") {
+                pending = respond;
+                return;
+            }
+            if (req.path == "/api/login/qrcode/unikey") {
+                respond(200, "{\"code\":200,\"unikey\":\"qr-key\"}");
+                return;
+            }
+            if (req.path == "/api/login/qrcode/client/login") {
+                ++polls;
+                respond(200, "{\"code\":801}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        Session session(m_client, m_store);
+        session.loginWithCookie(QStringLiteral("MUSIC_U=good"));
+        QVERIFY(waitUntil([&] { return bool(pending); }, 5000));
+        session.start();
+        QVERIFY(waitUntil([&] { return polls > 0; }, 5000));
+        pending(200, "{\"code\":200}");
+        QVERIFY(waitUntil([&] { return session.state() == "done"; }, 5000));
+        const int after = polls;
+        QTest::qWait(2500);   // 轮询间隔 2 秒
+        QCOMPARE(polls, after);
+    }
+
     // 没有 MUSIC_U 的输入当场拒绝，不发请求
     void cookieLoginRejectsInputWithoutMusicU()
     {

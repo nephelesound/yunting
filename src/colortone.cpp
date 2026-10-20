@@ -6,6 +6,7 @@
 #include <KSharedConfig>
 #include <QCoreApplication>
 #include <QCryptographicHash>
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -67,9 +68,15 @@ QString schemePath(const MaterialYou::Scheme &scheme, bool dark)
 {
     // 缓存目录是几个进程共用的：并行截图的 qmlshot、--screenshot 与正在运行的应用。所以临时文件带进程号，
     // 方案文件按内容命名（同样的方案写出同样的名字，谁先写成都行），也不删任何 tone-*.colors：
-    // 别的进程可能正引用着它。一份约 4 KB，只按「强调色 × 深浅」区分，攒不了几份
+    // 别的进程可能正引用着它。每换一种强调色或深浅多一份，一份约 4 KB
     const QString dir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
     QDir().mkpath(dir);
+    // 写到一半崩溃的进程留下的临时文件：活着的进程几毫秒就写完改名，放了一小时的都没人要了
+    const QDateTime orphaned = QDateTime::currentDateTime().addSecs(-3600);
+    for (const QFileInfo &stale : QDir(dir).entryInfoList({QStringLiteral("tone-*.tmp")}, QDir::Files)) {
+        if (stale.lastModified() < orphaned)
+            QFile::remove(stale.absoluteFilePath());
+    }
     const QString temporary = dir + QStringLiteral("/tone-%1.tmp").arg(QCoreApplication::applicationPid());
     if (MaterialYou::writeKdeScheme(scheme, dark, temporary).isEmpty())
         return {};

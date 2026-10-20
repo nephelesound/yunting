@@ -105,6 +105,7 @@ void Session::start()
 void Session::cancel()
 {
     ++m_generation;
+    ++m_cookieGeneration;   // 关掉对话框时在途的 Cookie 校验也作废：回包不能再登录、报错或重开扫码
     m_polling = false;
     m_timer->stop();
     m_unikey.clear();
@@ -173,6 +174,11 @@ void Session::loginWithCookie(const QString &raw)
             start();
             return;
         }
+        // 校验期间可能又开了一张码（关掉再打开对话框）：登录成了就不再轮询它
+        ++m_generation;
+        m_polling = false;
+        m_timer->stop();
+        m_unikey.clear();
         setState(QStringLiteral("done"));
         m_store->refresh();
     });
