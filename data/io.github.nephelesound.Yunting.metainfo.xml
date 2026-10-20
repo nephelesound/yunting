@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.23" date="2026-10-20">
+      <description>
+        <p>Signing in now lets you pick the QR session to use: the PC client session (type=3, as SPlayer) or the web session (type=1, as YesPlayMusic). Both kinds of MUSIC_U are accepted by the API. The cookie-paste box from 0.6.22 is gone: scanning already yields that web cookie, so choosing the right session is all that is needed.</p>
+        <p xml:lang="zh_CN">登录可以选扫码会话了：客户端（type=3，与 SPlayer 相同的 PC 客户端会话）或网页（type=1，与 YesPlayMusic 相同的网页会话），两种 MUSIC_U 接口都认。0.6.22 的 Cookie 粘贴框移除——扫码拿到的本来就是这份网页 Cookie。</p>
+      </description>
+    </release>
     <release version="0.6.22" date="2026-10-20">
       <description>
         <p>Cookies from the web player can now be used to sign in: below the QR code, "Sign in with a cookie" accepts a pasted cookie header or just the MUSIC_U value, and validates it with the server before keeping it.</p>

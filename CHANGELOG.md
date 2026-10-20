@@ -2,6 +2,12 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.23] - 2026-10-20
+
+### 变更
+- 登录可以选扫码会话了：客户端（`type=3`，与 SPlayer 相同的 PC 客户端会话）或网页（`type=1`，与 YesPlayMusic 相同的网页会话）。两种 `MUSIC_U` 接口都认，按要登的那套选。
+- 0.6.22 的 Cookie 粘贴框移除：扫码拿到的本来就是这个网页 Cookie，选对会话即可，不必再复制粘贴。
+
 ## [0.6.22] - 2026-10-20
 
 ### 新增

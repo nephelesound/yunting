@@ -635,61 +635,57 @@ private slots:
         QCOMPARE(m_client->cookieJar().value("__csrf"), QStringLiteral("session-csrf"));
     }
 
-    // 网页端 Cookie：整段 Cookie 头或只粘 MUSIC_U 的值都能登进来；校验走 login/token/refresh
-    void cookieLoginAcceptsHeaderAndBareToken()
+    // 两套扫码会话：客户端 type=3（默认），网页 type=1。切换后重新取码，取码与轮询的类型一致
+    void qrLoginModeSelectsType()
     {
-        QByteArray seenCookie;
+        QStringList unikeyQueries;
+        QStringList pollQueries;
         m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
-            if (req.path == "/weapi/login/token/refresh")
-                seenCookie = req.headers;
-            respond(200, "{\"code\":200}");
-        };
-
-        Session session(m_client, m_store);
-        session.loginWithCookie(QStringLiteral("MUSIC_U=web-cookie; __csrf=web-csrf; NMTID=web-nmtid"));
-        QVERIFY(waitUntil([&] { return session.state() == "done"; }, 5000));
-        QCOMPARE(m_client->cookieJar().value("MUSIC_U"), QStringLiteral("web-cookie"));
-        QCOMPARE(m_client->cookieJar().value("__csrf"), QStringLiteral("web-csrf"));
-        QVERIFY(seenCookie.contains("MUSIC_U=web-cookie"));
-
-        Session bare(m_client, m_store);
-        bare.loginWithCookie(QStringLiteral("  bare-token-value  "));
-        QVERIFY(waitUntil([&] { return bare.state() == "done"; }, 5000));
-        QCOMPARE(m_client->cookieJar().value("MUSIC_U"), QStringLiteral("bare-token-value"));
-    }
-
-    // 无效的 Cookie 不能留在钥匙串里：否则下次启动就是「会话过期」
-    void cookieLoginRejectsInvalidCookie()
-    {
-        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
-            if (req.path == "/weapi/login/token/refresh") {
-                respond(200, "{\"code\":301}");
+            if (req.path == "/api/login/qrcode/unikey") {
+                unikeyQueries.append(QString::fromUtf8(req.query));
+                respond(200, "{\"code\":200,\"unikey\":\"qr-key\"}");
+                return;
+            }
+            if (req.path == "/api/login/qrcode/client/login") {
+                pollQueries.append(QString::fromUtf8(req.query));
+                respond(200, "{\"code\":801}");
                 return;
             }
             respond(200, "{\"code\":200}");
         };
         Session session(m_client, m_store);
-        QSignalSpy failed(&session, &Session::loginFailed);
-        session.loginWithCookie(QStringLiteral("MUSIC_U=bad-cookie"));
-        QVERIFY(waitUntil([&] { return failed.count() == 1; }, 5000));
-        QVERIFY(session.state() != QLatin1String("done"));
-        QVERIFY(!m_client->hasMusicU());
-        QVERIFY(!failed.first().at(0).toString().isEmpty());
+        session.start();
+        QVERIFY(waitUntil([&] { return !unikeyQueries.isEmpty(); }, 5000));
+        QVERIFY(unikeyQueries.last().contains("type=3"));
+
+        session.setLoginMode(QStringLiteral("web"));
+        QVERIFY(waitUntil([&] { return unikeyQueries.size() == 2; }, 5000));
+        QVERIFY(unikeyQueries.last().contains("type=1"));
+        QVERIFY(waitUntil([&] { return !pollQueries.isEmpty(); }, 5000));
+        QVERIFY(pollQueries.last().contains("type=1"));
+        session.cancel();
     }
 
-    // 没有 MUSIC_U 的输入当场拒绝，不发请求
-    void cookieLoginRejectsInputWithoutMusicU()
+    // 网页会话的 803 一样落进 jar：两种 MUSIC_U 接口都认，登录逻辑只认 cookie 本身
+    void qrLoginModeWebAcceptsCookie()
     {
-        int requests = 0;
-        m_api->handler = [&](const FakeApi::Request &, const FakeApi::Responder &respond) {
-            ++requests;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/login/qrcode/unikey") {
+                respond(200, "{\"code\":200,\"unikey\":\"web-key\"}");
+                return;
+            }
+            if (req.path == "/api/login/qrcode/client/login") {
+                respond(200, "{\"code\":803,\"cookie\":\"MUSIC_U=web-session; __csrf=web-csrf\"}");
+                return;
+            }
             respond(200, "{\"code\":200}");
         };
         Session session(m_client, m_store);
-        QSignalSpy failed(&session, &Session::loginFailed);
-        session.loginWithCookie(QStringLiteral("__csrf=only"));
-        QCOMPARE(failed.count(), 1);
-        QCOMPARE(requests, 0);
+        session.setLoginMode(QStringLiteral("web"));
+        session.start();
+        QVERIFY(waitUntil([&] { return session.state() == "done"; }, 5000));
+        QCOMPARE(m_client->cookieJar().value("MUSIC_U"), QStringLiteral("web-session"));
+        QCOMPARE(m_client->cookieJar().value("__csrf"), QStringLiteral("web-csrf"));
     }
 
     // 页面退栈时 id 会短暂归零：这些 key 不能发网络请求，也不能报失败。
