@@ -67,7 +67,8 @@ private slots:
                               QStringLiteral("liked"), QStringLiteral("likes"),
                               QStringLiteral("parentId"), QStringLiteral("replyCount"),
                               QStringLiteral("time"), QStringLiteral("user"),
-                              QStringLiteral("userId"), QStringLiteral("vipLevel")}));
+                              QStringLiteral("userId"), QStringLiteral("vipLevel"),
+                              QStringLiteral("voice")}));
         QCOMPARE(commentMap.value("user").toString(), QStringLiteral("u"));
         QCOMPARE(commentMap.value("userId").toDouble(), 7.0);
         QCOMPARE(commentMap.value("avatar").toString(),
@@ -95,6 +96,17 @@ private slots:
         QCOMPARE(empty.value("avatar").toString(), QString());
         QCOMPARE(empty.value("replyCount").toDouble(), 0.0);
         QVERIFY(empty.value("beReplied").toList().isEmpty());
+        QVERIFY(empty.value("voice").toMap().isEmpty());
+
+        // 语音：毫秒四舍五入到整秒
+        ncm::sdk::Comment voice;
+        voice.voiceUrl = QStringLiteral("http://audio/v.m4a");
+        voice.voiceMs = 25495;
+        voice.voiceText = QStringLiteral("唱的那句");
+        const QVariantMap clip = commentToVariantMap(voice).value("voice").toMap();
+        QCOMPARE(clip.value("url").toString(), QStringLiteral("http://audio/v.m4a"));
+        QCOMPARE(clip.value("seconds").toDouble(), 25.0);
+        QCOMPARE(clip.value("text").toString(), QStringLiteral("唱的那句"));
     }
 
     // profile 统一给 vipLevel；vipType 仍给还在读它的旧页面，vipRights 不再进 map

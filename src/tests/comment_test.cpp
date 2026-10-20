@@ -78,6 +78,37 @@ private slots:
         QCOMPARE(result.value->hasMore, false);
     }
 
+    // 语音评论（resourceType 1014）：带出地址、时长与转写，正文里的占位行去掉、用户自己写的字保留；
+    // 没有毫秒时长时退回 contentResource.duration（秒）；别的资源类型不算语音
+    void parsesVoiceComments()
+    {
+        QJsonObject voice = commentObject();
+        voice["content"] = QStringLiteral("快点打赏\n[发布了语音，请前往最新移动端版本查看]");
+        voice["contentResource"] = QJsonObject{{"resourceType", 1014},
+                                               {"url", "http://audio/v.m4a"},
+                                               {"duration", 26},
+                                               {"contentUrl", QJsonValue::Null}};
+        voice["voiceDurationMillSecond"] = 25495;
+        voice["voiceExt"] = QJsonObject{{"asrText", "唱的那句"}};
+        QJsonObject secondsOnly = voice;
+        secondsOnly.remove("voiceDurationMillSecond");
+        QJsonObject song = commentObject();
+        song["contentResource"] = QJsonObject{{"resourceType", 4}, {"url", "http://song"}};
+
+        const auto result = parseCommentPage(dataRoot(QJsonObject{
+            {"comments", QJsonArray{voice, secondsOnly, song}},
+        }));
+        QVERIFY2(result.ok(), qPrintable(result.error.message));
+        const Comment &clip = result.value->comments.at(0);
+        QCOMPARE(clip.content, QStringLiteral("快点打赏"));
+        QCOMPARE(clip.voiceUrl, QStringLiteral("http://audio/v.m4a"));
+        QCOMPARE(clip.voiceMs, qint64(25495));
+        QCOMPARE(clip.voiceText, QStringLiteral("唱的那句"));
+        QCOMPARE(result.value->comments.at(1).voiceMs, qint64(26000));
+        QCOMPARE(result.value->comments.at(2).voiceUrl, QString());
+        QCOMPARE(result.value->comments.at(2).content, QStringLiteral("hello"));
+    }
+
     // 缺失或 null 的可选字段有确定默认值；user/beReplied/showFloorComment 都是可选的
     void commentMissingOptionalFieldsUseDefaults()
     {

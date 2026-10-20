@@ -106,6 +106,53 @@ Kirigami.ApplicationWindow {
     // 下载：应用里是 C++ DownloadManager，原型里是替身（截图 harness 用 downloadsFilled 放几首已下载的）
     property bool downloadsFilled: false
     SimDownloads { id: simDownloads; filled: root.downloadsFilled }
+
+    // 评论语音：一个独立的小播放器（Voice.player）。放语音时歌先停下，语音放完或停下后，
+    // 如果歌是因此停的、还停着、还是那一首，就接着放；放语音时按了播放，语音让路。
+    // 一起听的房间里不停歌：停下会作为暂停指令发给好友
+    SimVoice { id: simVoice }
+    property string voiceAt: ""   // 截图用："<url>@<秒>"：原型开场就放着这条、停在这一秒
+    onVoiceAtChanged: root.applyVoiceAt()
+    // 换数据源（applyFixture）会让原型的歌重新放起来，语音随之停下：换完再放一次
+    function applyVoiceAt() {
+        const at = root.voiceAt.lastIndexOf("@");
+        if (root.backend || at < 0)
+            return;
+        const url = root.voiceAt.slice(0, at);
+        if (simVoice.source !== url)
+            simVoice.toggle(url);
+        simVoice.position = Number(root.voiceAt.slice(at + 1));
+        simVoice.frozen = true;
+    }
+    property var voicePausedTrack: null
+    Binding { target: Voice.player; when: Voice.player !== null; property: "volume"; value: playback.engine.volume }
+    Connections {
+        target: Voice.player
+        // 读 player 自己的 source：Voice.source 是挂在同一个信号上的绑定，这里可能还没更新
+        function onSourceChanged() {
+            const engine = playback.engine;
+            if (Voice.player.source !== "") {
+                if (engine.playing && !root.listenRoom.inRoom) {
+                    root.voicePausedTrack = root.currentTrack;
+                    engine.playing = false;
+                }
+                return;
+            }
+            const paused = root.voicePausedTrack;
+            root.voicePausedTrack = null;
+            if (paused && paused === root.currentTrack && !engine.playing)
+                engine.playing = true;
+        }
+    }
+    Connections {
+        target: playback.engine
+        function onPlayingChanged() {
+            if (playback.engine.playing && Voice.player && Voice.player.source !== "") {
+                root.voicePausedTrack = null;
+                Voice.stop();
+            }
+        }
+    }
     Connections {
         target: Source
         function onDownloadFinished(name) { root.notify("已下载" + Source.quoted(name)); }
@@ -260,6 +307,7 @@ Kirigami.ApplicationWindow {
     function applyFixture() {
         Source.live = root.backend ? root.backend.store : null;
         Source.downloads = root.backend ? root.backend.downloads : simDownloads;
+        Voice.player = root.backend ? root.backend.voice : simVoice;
         if (root.backend)
             return;
         // 按路径创建：Snapshot 不在 qmldir 里，打包的应用不带它与快照数据
@@ -270,6 +318,7 @@ Kirigami.ApplicationWindow {
         playback.restore(Source.hotChart.tracks, 2);
         simEngine.position = Math.min(83, Math.floor(simEngine.duration / 2));   // 短歌也停在中段，不会一启动就播完跳走
         simEngine.playing = true;
+        root.applyVoiceAt();
     }
 
     function play(tracks, i) { playback.play(tracks, i); }

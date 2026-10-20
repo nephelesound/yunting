@@ -22,6 +22,17 @@ constexpr auto UnlikePath = "v1/comment/unlike";
 constexpr auto HugPath = "api/v2/resource/comments/hug/listener";
 constexpr auto ReportPath = "api/report/reportcomment";
 constexpr qsizetype HotLimit = 10;
+constexpr qint64 VoiceResourceType = 1014;
+
+// Older endpoints stand a placeholder line in for the voice clip; the clip
+// itself is shown, so the line goes. Text the user typed around it stays.
+QString withoutVoicePlaceholder(const QString &content)
+{
+    static const QString placeholder = QStringLiteral("[发布了语音，请前往最新移动端版本查看]");
+    QString text = content;
+    text.remove(placeholder);
+    return text.trimmed();
+}
 
 QString indexedPath(const QString &arrayPath, qsizetype index)
 {
@@ -100,6 +111,19 @@ Result<Comment> commentFrom(const QJsonValue &value, const QString &path,
     const QJsonObject floor = reader.object("showFloorComment");
     JsonReader floorReader(floor, path + QStringLiteral(".showFloorComment"));
     comment.replyCount = floorReader.integer("replyCount");
+    const QJsonObject resource = reader.object("contentResource");
+    JsonReader resourceReader(resource, path + QStringLiteral(".contentResource"));
+    if (resourceReader.integer("resourceType") == VoiceResourceType) {
+        comment.voiceUrl = resourceReader.string("url");
+        comment.voiceMs = reader.integer("voiceDurationMillSecond");
+        if (comment.voiceMs <= 0)
+            comment.voiceMs = resourceReader.integer("duration") * 1000;
+        comment.voiceText = reader.object("voiceExt").value(QStringLiteral("asrText")).toString();
+        comment.content = withoutVoicePlaceholder(comment.content);
+    }
+    if (!resourceReader.ok())
+        return parseFailure<Comment>(endpoint, resourceReader,
+                                     path + QStringLiteral(".contentResource"));
     if (!reader.ok())
         return parseFailure<Comment>(endpoint, reader, path);
     if (!userReader.ok())

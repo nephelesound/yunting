@@ -2,6 +2,7 @@ singleton Tokens Tokens.qml
 singleton Source Source.qml
 singleton Actions Actions.qml
 singleton Clipboard Clipboard.qml
+singleton Voice Voice.qml
 Pivot Pivot.qml
 TrackMenu TrackMenu.qml
 ArtistPage ArtistPage.qml
@@ -70,4 +71,6 @@ ListenTogetherLink ListenTogetherLink.qml
 ListenPopup ListenPopup.qml
 QrCode QrCode.qml
 AppScrollBar AppScrollBar.qml
+VoiceClip VoiceClip.qml
+SimVoice SimVoice.qml
 CommentsPane CommentsPane.qml

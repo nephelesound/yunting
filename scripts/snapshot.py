@@ -262,6 +262,24 @@ def write(name, header, parts):
     print("wrote", os.path.relpath(path, ROOT))
 
 
+VOICE_PLACEHOLDER = "[发布了语音，请前往最新移动端版本查看]"
+
+
+def comment_voice(c):
+    """语音评论（contentResource.resourceType 1014，与 src/sdk/comment.cpp 一致）：url、整秒时长、语音转文字。"""
+    res = c.get("contentResource") or {}
+    if res.get("resourceType") != 1014:
+        return {}
+    ms = c.get("voiceDurationMillSecond") or (res.get("duration") or 0) * 1000
+    return {"url": res.get("url") or "", "seconds": (ms + 500) // 1000,
+            "text": (c.get("voiceExt") or {}).get("asrText") or ""}
+
+
+def comment_content(c):
+    text = c.get("content") or ""
+    return text.replace(VOICE_PLACEHOLDER, "").strip() if comment_voice(c) else text
+
+
 def hot_comments(song_id):
     """热门评论：v2 接口按热度排序，最多 10 条；avatar 是用户头像（96 方图），replyCount 是楼中楼回复数；
     total 是这首歌的评论总数（播放条评论按钮上的数字）。"""
@@ -276,7 +294,7 @@ def hot_comments(song_id):
                        "avatarPendant": (c.get("pendantData") or {}).get("imageUrl") or "",
                        "identityIcon": ((c.get("user") or {}).get("avatarDetail") or {}).get("identityIconUrl") or "",
                        "vipLevel": vip_level(c.get("user") or {}),
-                       "content": c.get("content") or "",
+                       "content": comment_content(c),
                        "likes": c.get("likedCount") or 0,
                        "time": c.get("time") or 0,
                        "id": c.get("commentId") or 0,
@@ -287,7 +305,8 @@ def hot_comments(song_id):
                                       "userId": ((r.get("user") or {}).get("userId") or 0),
                                       "user": ((r.get("user") or {}).get("nickname") or "")}
                                      for r in (c.get("beReplied") or [])],
-                       "replyCount": (c.get("showFloorComment") or {}).get("replyCount") or 0}
+                       "replyCount": (c.get("showFloorComment") or {}).get("replyCount") or 0,
+                       "voice": comment_voice(c)}
                       for c in ((resp.get("data") or {}).get("comments") or [])[:10]]}
 
 

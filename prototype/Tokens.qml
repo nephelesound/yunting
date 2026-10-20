@@ -132,6 +132,9 @@ QtObject {
     readonly property int measureMax: 400                     // 正在播放封面的最大边长（50 × 8）
     readonly property int wideRow: 480                        // 曲目行宽于此时显示专辑列（60 × 8）
     readonly property int albumColumn: 160                    // 专辑列宽（20 × 8）
+    // 评论语音胶囊的宽度随时长从 min 长到 max（60 秒封顶）：一眼看出长短，放的时候的进度也看得清
+    readonly property int voiceClipMin: 96                    // 12 × 8
+    readonly property int voiceClipMax: 208                   // 26 × 8
 
     // 封面磁贴边长
     readonly property int tileSm: 104   // 2 行曲目的高度（2 × 56 − 8）：榜单卡片的封面与右侧两行对齐

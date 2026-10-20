@@ -19,6 +19,7 @@
 #include "session.h"
 #include "store.h"
 #include "tray.h"
+#include "voiceplayer.h"
 
 #include <KDBusService>
 #include <KLocalizedQmlContext>
@@ -939,9 +940,10 @@ int runGui(const CommandLine &cli, QApplication &app, Backend &backend)
     KLocalization::setupLocalizedContext(&engine);
     ImageCacheFactory imageCache(imageCacheDir);
     engine.setNetworkAccessManagerFactory(&imageCache);
-    // main.qml 用 root.backend.{store,audio,session,mpris,tray,layerShell,power,clipboard,diagnostics} 取后端；QVariantMap 的 key 就是属性名
+    // main.qml 用 root.backend.{store,audio,voice,session,mpris,tray,layerShell,power,clipboard,diagnostics} 取后端；QVariantMap 的 key 就是属性名
     LayerShellHelper layerShell;
     ClipboardHelper clipboard;
+    VoicePlayer voice;
     Diagnostics diagnostics;
     diagnostics.traffic = [&client] { return client.trafficSummary(); };
     QVariantMap backendMap{{"links", QVariant::fromValue<QObject *>(&links)},
@@ -954,6 +956,7 @@ int runGui(const CommandLine &cli, QApplication &app, Backend &backend)
                            {"clipboard", QVariant::fromValue<QObject *>(&clipboard)},
                            {"diagnostics", QVariant::fromValue<QObject *>(&diagnostics)},
                            {"listenTogether", QVariant::fromValue<QObject *>(&listenTogether)},
+                           {"voice", QVariant::fromValue<QObject *>(&voice)},
                            {"downloads", QVariant::fromValue<QObject *>(&downloads)}};
     engine.setInitialProperties({{"backend", backendMap}});
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,

@@ -63,6 +63,12 @@ struct Comment {
     qint64 parentId = 0;             // parentCommentId
     QList<RepliedComment> beReplied; // beReplied[]
     qint64 replyCount = 0;           // showFloorComment.replyCount
+    // Voice comment: contentResource with resourceType 1014 is an m4a clip.
+    // content is then empty, or (older endpoints) only the placeholder line
+    // "[发布了语音，请前往最新移动端版本查看]", which is dropped.
+    QString voiceUrl;                // contentResource.url
+    qint64 voiceMs = 0;              // voiceDurationMillSecond (fallback contentResource.duration s)
+    QString voiceText;               // voiceExt.asrText (server speech-to-text)
 };
 
 // data of api/v2/resource/comments. Hot and cursor-paged responses share this

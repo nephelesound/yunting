@@ -1,5 +1,6 @@
 // 一条评论：头像 | 作者与时间挨在一起（都是关于「谁、何时」），赞在右；
-// 回复别人时先引一行被回复的那条；正文放宽行距，超过 6 行折起（可展开）；有楼中楼时给「N 条回复」。
+// 回复别人时先引一行被回复的那条；正文放宽行距，超过 6 行折起（可展开）；语音评论在正文下放一个
+// 播放胶囊（VoiceClip）；有楼中楼时给「N 条回复」。
 // 歌曲的评论区与楼中楼的回复共用这一个。
 pragma ComponentBehavior: Bound
 
@@ -40,13 +41,18 @@ RowLayout {
             onTriggered: row.hugRequested()
         }
         MenuItem {
+            // 只有语音的评论复制的是语音转文字
+            readonly property string copyText: row.comment.content || (row.voice ? row.voice.text || "" : "")
+            visible: copyText !== ""
+            height: visible ? implicitHeight : 0
             icon.name: "edit-copy"
             text: "复制评论"
-            onTriggered: Clipboard.copy(row.comment.content || "")
+            onTriggered: Clipboard.copy(copyText)
         }
     }
 
-    readonly property var quoted: row.comment.beReplied && row.comment.beReplied.length > 0
+    readonly property var voice: row.comment.voice && row.comment.voice.url ? row.comment.voice : null
+    readonly property var quoted:row.comment.beReplied && row.comment.beReplied.length > 0
                                   && row.comment.beReplied[0].id !== row.threadOf ? row.comment.beReplied[0] : null
 
     spacing: Tokens.space3
@@ -152,6 +158,7 @@ RowLayout {
         Label {
             id: content
             Layout.fillWidth: true
+            visible: text !== ""   // 只有一段语音的评论没有正文
             text: row.comment.content || ""
             font.pixelSize: Tokens.textBase
             lineHeightMode: Text.FixedHeight
@@ -159,6 +166,23 @@ RowLayout {
             wrapMode: Text.Wrap
             maximumLineCount: row.expanded ? 1000 : 6
             elide: Text.ElideRight
+        }
+
+        // 语音评论：胶囊放在正文下面；服务器的语音转文字弱化跟在后面，不点开也知道说（唱）了什么
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.topMargin: content.visible ? Tokens.space1 : 0
+            visible: row.voice !== null
+            spacing: Tokens.space3
+            VoiceClip { voice: row.voice || {} }
+            Label {
+                Layout.fillWidth: true
+                visible: text !== ""
+                text: row.voice ? row.voice.text || "" : ""
+                font.pixelSize: Tokens.textSm
+                color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
+                elide: Text.ElideRight
+            }
         }
 
         // 折起的正文与楼中楼：两个文字链接排在一行
