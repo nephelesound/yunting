@@ -1,6 +1,6 @@
 #include "voiceplayer.h"
 
-#include "clientidentity.h"
+#include "mpvoptions.h"
 
 #include <MpvController>
 
@@ -8,33 +8,18 @@ VoicePlayer::VoicePlayer(QObject *parent)
     : QObject(parent), m_controller(new MpvController(this))
 {
     m_controller->init();
-    // 与 AudioEngine 相同的只出声设置（见那里的说明）；测试里同样不出声
-    m_controller->setProperty(QStringLiteral("terminal"), false);
+    for (const auto &[name, value] : sharedMpvOptions())
+        m_controller->setProperty(name, value);
+    // 只出声，与 AudioEngine 相同
     m_controller->setProperty(QStringLiteral("vo"), QStringLiteral("null"));
     m_controller->setProperty(QStringLiteral("vid"), QStringLiteral("no"));
-    m_controller->setProperty(QStringLiteral("audio-display"), QStringLiteral("no"));
-    m_controller->setProperty(QStringLiteral("ytdl"), QStringLiteral("no"));
-    // 与 AudioEngine 相同：init 后 load-scripts 停不掉已加载的脚本，逐个 load-* 关
-    m_controller->setProperty(QStringLiteral("load-scripts"), false);
-    m_controller->setProperty(QStringLiteral("osc"), false);
-    m_controller->setProperty(QStringLiteral("load-stats-overlay"), false);
-    m_controller->setProperty(QStringLiteral("load-console"), false);
-    m_controller->setProperty(QStringLiteral("load-auto-profiles"), false);
-    m_controller->setProperty(QStringLiteral("load-select"), false);
-    m_controller->setProperty(QStringLiteral("load-positioning"), false);
-    m_controller->setProperty(QStringLiteral("load-commands"), false);
-    m_controller->setProperty(QStringLiteral("load-context-menu"), false);
     // 语音评论只有几十秒：4 MiB 预读绰绰有余（默认 150 MiB）
-    m_controller->setProperty(QStringLiteral("cache"), QStringLiteral("yes"));
     m_controller->setProperty(QStringLiteral("demuxer-max-bytes"), 4 * 1024 * 1024);
     m_controller->setProperty(QStringLiteral("demuxer-max-back-bytes"), 1024 * 1024);
     m_controller->setProperty(QStringLiteral("idle"), true);
-    m_controller->setProperty(QStringLiteral("user-agent"), ncm::client::userAgent());
     // mpv 默认不限网络等待：卡住的下载既不载入也不报错，这条会一直「在放」、歌一直停着。
     // 超时后按加载失败处理（end-file error），回到空闲
     m_controller->setProperty(QStringLiteral("network-timeout"), 10);
-    if (qEnvironmentVariableIsSet("YUNTING_TEST_AO_NULL"))
-        m_controller->setProperty(QStringLiteral("ao"), QStringLiteral("null"));
 
     connect(m_controller, &MpvController::propertyChanged, this, &VoicePlayer::handleProperty);
     // 「没有在放」以 idle-active 为准：换一条时旧的那条会报 end-file（reason stop），那时新的一条

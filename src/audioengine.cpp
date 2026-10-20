@@ -1,7 +1,7 @@
 #include "audioengine.h"
 #include "downloadpaths.h"
-#include "clientidentity.h"
 #include "json_util.h"
+#include "mpvoptions.h"
 #include "ncmclient.h"
 #include "normalize.h"
 #include "perf.h"
@@ -83,9 +83,9 @@ QString filterSpec(const QVariantList &gains, double bassBoost, double stereoWid
     graph += QStringLiteral(",bass@bass=f=120:width_type=q:width=0.70710678:gain=%1")
                  .arg(number(bassBoost));
     graph += QStringLiteral(",extrastereo@width=m=%1:c=0").arg(number(stereoWidth));
-    // mpv 0.41 的 lavfi 没有 threads 选项（写了整条 af 会解析失败，均衡器整个失效），
-    // 滤镜图的线程数只能在 mpv 之外控制；这里以可用为先。
-    return QStringLiteral("@eq:lavfi=[%1]").arg(graph);
+    // 滤镜图默认按核数开线程（本机 15 个），几十毫秒的音频帧用不着。线程数是滤镜图自己的 AVOption，
+    // 要经 lavfi 的 o=[…] 交给它；直接写 :threads=1 是 mpv 不认的选项，整条 af 会解析失败、均衡器失效
+    return QStringLiteral("@eq:lavfi=[%1]:o=[threads=1]").arg(graph);
 }
 } // namespace
 
@@ -97,37 +97,20 @@ AudioEngine::AudioEngine(NcmClient *client, QObject *parent)
     // libmpv 默认不读用户的 mpv.conf 与脚本，不用另设。
     m_controller->init();
 
-    const auto option = [this](const char *name, const QVariant &value) {
-        const int err = m_controller->setProperty(QString::fromLatin1(name), value);
+    const auto option = [this](const QString &name, const QVariant &value) {
+        const int err = m_controller->setProperty(name, value);
         if (err < 0)
             qWarning() << "mpv option" << name << "failed:" << MpvController::getError(err);
     };
-    option("terminal", false);
-    option("vo", "null");            // 只出声，不建视频输出
-    option("vid", "no");
-    option("audio-display", "no");
-    option("ytdl", "no");
-    // libmpv 在 init 时就加载了内置脚本，之后设 load-scripts 停不掉它们；
-    // 逐个 load-* 关（运行时可停）：osc / stats / console / auto-profiles / select / positioning / commands / context-menu
-    option("load-scripts", false);
-    option("osc", false);
-    option("load-stats-overlay", false);
-    option("load-console", false);
-    option("load-auto-profiles", false);
-    option("load-select", false);
-    option("load-positioning", false);
-    option("load-commands", false);
-    option("load-context-menu", false);
-    option("idle", true);
-    option("gapless-audio", "weak");
-    option("cache", "yes");          // 网络流
+    for (const auto &[name, value] : sharedMpvOptions())
+        option(name, value);
+    option(QStringLiteral("vo"), QStringLiteral("null"));   // 只出声，不建视频输出
+    option(QStringLiteral("vid"), QStringLiteral("no"));
+    option(QStringLiteral("idle"), true);
+    option(QStringLiteral("gapless-audio"), QStringLiteral("weak"));
     // 默认 150 MiB 是按整部视频设计的；歌单连播只需要接得上下一首
-    option("demuxer-max-bytes", 32 * 1024 * 1024);
-    option("demuxer-max-back-bytes", 8 * 1024 * 1024);
-    option("audio-device", "auto");  // 跟随 PipeWire/PulseAudio 的默认设备
-    option("user-agent", ncm::client::userAgent());
-    if (systemAudioOff())
-        option("ao", "null");
+    option(QStringLiteral("demuxer-max-bytes"), 32 * 1024 * 1024);
+    option(QStringLiteral("demuxer-max-back-bytes"), 8 * 1024 * 1024);
 
     applyVolume();
     m_controller->setProperty(QStringLiteral("mute"), m_muted);

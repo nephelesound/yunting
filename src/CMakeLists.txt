@@ -68,6 +68,7 @@ qt_add_executable(yunting
     normalize.h normalize.cpp
     audioengine.h audioengine.cpp
     voiceplayer.h voiceplayer.cpp
+    mpvoptions.h
     systemsleep.h systemsleep.cpp
     mvvideo.h mvvideo.cpp
     session.h session.cpp

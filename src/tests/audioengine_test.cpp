@@ -10,6 +10,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QRegularExpression>
 #include <QSignalSpy>
 #include <QTcpServer>
 #include <QTcpSocket>
@@ -331,8 +332,11 @@ private slots:
         QVERIFY(!audio.playing());   // 失败后界面不能停在「播放中」
     }
 
+    // 滤镜链 mpv 不认时播放照常、只打一条警告：0.6.21 的均衡器就这样整个失效而测试全绿。
+    // 警告即失败，滤镜链写错了这里就红
     void eqChangeDuringPlaybackKeepsPlaying()
     {
+        QTest::failOnWarning(QRegularExpression(QStringLiteral("mpv af failed")));
         QVERIFY(writeSilentWav(m_dir.filePath("long.wav"), 3));
         ApiServer api;
         QVERIFY(api.listen(QHostAddress::LocalHost));

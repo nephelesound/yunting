@@ -1,10 +1,9 @@
 #include "mvvideo.h"
-#include "clientidentity.h"
+#include "mpvoptions.h"
 
 #include <MpvController>
 
 #include <QDebug>
-#include <malloc.h>
 #include <algorithm>
 
 namespace {
@@ -20,35 +19,18 @@ MvVideo::MvVideo(QQuickItem *parent)
 {
     // MpvAbstractItem 已在工作线程初始化 mpv，所以这些选项按运行时属性写入。
     // libmpv 默认不读用户的 mpv.conf 与脚本，不用另设
-    const auto option = [this](const char *name, const QVariant &value) {
-        const int err = setPropertyBlocking(QString::fromLatin1(name), value);
+    const auto option = [this](const QString &name, const QVariant &value) {
+        const int err = setPropertyBlocking(name, value);
         if (err < 0)
             qWarning() << "MvVideo option" << name << "failed:" << MpvController::getError(err);
     };
-    option("terminal", false);
-    option("audio-display", "no");
-    option("ytdl", "no");
-    // 与 AudioEngine 相同：init 后 load-scripts 停不掉已加载的脚本，逐个 load-* 关
-    option("load-scripts", false);
-    option("osc", false);
-    option("load-stats-overlay", false);
-    option("load-console", false);
-    option("load-auto-profiles", false);
-    option("load-select", false);
-    option("load-positioning", false);
-    option("load-commands", false);
-    option("load-context-menu", false);
-    option("cache", "yes");
+    for (const auto &[name, value] : sharedMpvOptions())
+        option(name, value);
     // 默认 150 MiB 是按边下边播整部视频设计的；MV 码率下 64 MiB 足够预读
-    option("demuxer-max-bytes", 64 * 1024 * 1024);
-    option("demuxer-max-back-bytes", 8 * 1024 * 1024);
-    option("gapless-audio", "weak");
-    option("audio-device", "auto");
-    option("user-agent", ncm::client::userAgent());
-    // 测试没有声卡：只认显式设置的变量
-    if (qEnvironmentVariableIsSet("YUNTING_TEST_AO_NULL"))
-        option("ao", "null");
-    option("volume", 80);
+    option(QStringLiteral("demuxer-max-bytes"), 64 * 1024 * 1024);
+    option(QStringLiteral("demuxer-max-back-bytes"), 8 * 1024 * 1024);
+    option(QStringLiteral("gapless-audio"), QStringLiteral("weak"));
+    option(QStringLiteral("volume"), 80);
 
     observeProperty(QStringLiteral("time-pos"), MPV_FORMAT_DOUBLE);
     observeProperty(QStringLiteral("duration"), MPV_FORMAT_DOUBLE);
@@ -157,8 +139,6 @@ void MvVideo::stop()
         m_position = 0;
         emit positionChanged();
     }
-    // demuxer 缓存刚整块释放：把碎片页还给系统，别等下一次分配才合并
-    malloc_trim(0);
 }
 
 void MvVideo::load()
