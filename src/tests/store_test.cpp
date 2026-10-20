@@ -987,32 +987,26 @@ private slots:
         QCOMPARE(m_store->data().value("searchUsers").toMap().value("query").toString(), QStringLiteral("ab"));
     }
 
-    // 从排行榜收藏：卡片不在 personal/搜索结果里，也要用排行榜已有的名字与封面
-    void subscribingChartKeepsItsName()
+    // 收藏：「收藏的歌单」里放的就是用户点的那张卡片（不论它来自排行榜、相似歌单还是别人的主页）；
+    // 取消收藏把它拿掉
+    void subscribingKeepsTheCardTheUserActedOn()
     {
-        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
-            if (req.path == "/api/toplist/detail") {
-                respond(200, json(QJsonObject{
-                    {"code", 200},
-                    {"list", QJsonArray{QJsonObject{
-                        {"id", 777}, {"name", "Chart"}, {"coverImgUrl", "http://cover"},
-                        {"trackCount", 5}, {"updateFrequency", "weekly"},
-                        {"tracks", QJsonArray{}}}}}}));
-                return;
-            }
+        m_api->handler = [](const FakeApi::Request &, const FakeApi::Responder &respond) {
             respond(200, "{\"code\":200}");
         };
-
-        m_store->waitForInitial();
-        QVERIFY(!m_store->data().value("toplists").toList().isEmpty());
+        const QVariantMap card{{"id", 888.0}, {"name", QStringLiteral("Similar")},
+                               {"cover", QStringLiteral("http://cover/s.jpg")}, {"count", 12.0}};
 
         QSignalSpy changed(m_store, &Store::playlistChanged);
-        m_store->setPlaylistSubscribed(777, true);
-        QVERIFY(waitUntil([&] { return changed.count() > 0; }));
-
+        m_store->setPlaylistSubscribed(card, true);
+        QVERIFY(waitUntil([&] { return changed.count() == 1; }));
         const QVariantList subscribed = m_store->personal().value("subscribed").toList();
         QCOMPARE(subscribed.size(), 1);
-        QCOMPARE(subscribed.first().toMap().value("name").toString(), QStringLiteral("Chart"));
+        QCOMPARE(subscribed.first().toMap(), card);
+
+        m_store->setPlaylistSubscribed(card, false);
+        QVERIFY(waitUntil([&] { return changed.count() == 2; }));
+        QVERIFY(m_store->personal().value("subscribed").toList().isEmpty());
     }
 
     // 已存在的歌再加一次：列表与计数都不能变（服务器的幂等请求不代表本地新增）

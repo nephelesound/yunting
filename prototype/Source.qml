@@ -721,7 +721,7 @@ QtObject {
                                                  tags: (c.tags || []).filter(t => t.category === category).map(t => t.name) }))
             .filter(group => group.tags.length > 0);
     }
-    function setPlaylistSubscribed(id, subscribed) { if (source.live) source.live.setPlaylistSubscribed(id, subscribed); }
+    function setPlaylistSubscribed(playlist, subscribed) { if (source.live) source.live.setPlaylistSubscribed(playlist, subscribed); }
     // 自己创建的歌单的顺序：ids 是完整的新顺序
     function reorderPlaylists(ids) { if (source.live) source.live.reorderPlaylists(ids); }
     // 歌单内曲目排序：ids 是完整的新顺序；原型只读，不写
@@ -917,6 +917,7 @@ QtObject {
                 // 隐私与标签：歌单卡片带的（我的歌单）优先，其次是按需取回的详情；privacy 10 = 私密
                 const privacy = card.privacy !== undefined ? card.privacy : detail.privacy || 0;
                 return { heading: card.name, cover: source.sized(card.cover, 560), tracks: tracks,
+                         card: card,   // 收藏时原样交给 Store，放进「收藏的歌单」
                          ranked: source.toplists.some(t => t.id === id),
                          facts: card.count > 0 ? [source.songs(card.count)] : [],
                          privateList: Number(privacy) === 10,

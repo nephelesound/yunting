@@ -67,55 +67,22 @@ void Store::createPlaylist(const QString &name, bool privatePlaylist)
     });
 }
 
-void Store::setPlaylistSubscribed(double id, bool subscribed)
+void Store::setPlaylistSubscribed(const QVariantMap &playlist, bool subscribed)
 {
+    const double id = playlist.value("id").toDouble();
+    if (!(id > 0))
+        return;
     const QString action = subscribed ? QStringLiteral("收藏歌单") : QStringLiteral("取消收藏歌单");
-    debounceWrite(QStringLiteral("subscribe:playlist:") + num(id), [this, id, subscribed, action] {
+    debounceWrite(QStringLiteral("subscribe:playlist:") + num(id), [this, id, playlist, subscribed, action] {
         playlistWrite(subscribed ? QStringLiteral("playlist/subscribe") : QStringLiteral("playlist/unsubscribe"),
                   QJsonObject{{"id", num(id)}}, action,
-                  [this, id, subscribed](const QJsonObject &) {
-        const auto findCard = [this, id]() -> QVariantMap {
-            const char *keys[] = {"playlists", "mine", "subscribed"};
-            for (const char *key : keys) {
-                for (const QVariant &v : m_personal.value(QLatin1String(key)).toList()) {
-                    QVariantMap card = v.toMap();
-                    if (card.value("id").toDouble() == id)
-                        return card;
-                }
-            }
-            for (const QVariant &v : m_data.value("search").toMap().value("playlists").toList()) {
-                QVariantMap card = v.toMap();
-                if (card.value("id").toDouble() == id)
-                    return card;
-            }
-            // 从排行榜/当前歌单页收藏的曲目不在 personal 或搜索结果里：用已有的卡片字段补全，
-            // 否则「我的」页会出现无名卡片
-            for (const QVariant &v : m_data.value("toplists").toList()) {
-                const QVariantMap chart = v.toMap();
-                if (chart.value("id").toDouble() == id)
-                    return QVariantMap{{"id", id}, {"name", chart.value("name")},
-                                       {"cover", chart.value("cover")},
-                                       {"count", chart.value("count")}, {"reason", QString{}}};
-            }
-            const QVariantMap current = m_data.value("playlist").toMap();
-            if (current.value("id").toDouble() == id)
-                return QVariantMap{{"id", id}, {"name", current.value("name")},
-                                   {"cover", current.value("cover")},
-                                   {"count", current.value("count")}, {"reason", QString{}}};
-            return {};
-        };
-
+                  [this, id, playlist, subscribed](const QJsonObject &) {
         QVariantList lists = m_personal.value("subscribed").toList();
         for (qsizetype i = lists.size() - 1; i >= 0; --i)
             if (lists.at(i).toMap().value("id").toDouble() == id)
                 lists.removeAt(i);
-        if (subscribed) {
-            QVariantMap card = findCard();
-            if (card.isEmpty())
-                card = QVariantMap{{"id", id}, {"name", QString{}}, {"cover", QString{}},
-                                   {"count", 0.0}, {"reason", QString{}}};
-            lists.prepend(card);
-        }
+        if (subscribed)
+            lists.prepend(playlist);
         put("subscribed", lists, true);
         m_cache.forget(QStringLiteral("playlist:") + num(id));
         emit playlistChanged(id);

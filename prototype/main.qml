@@ -965,7 +965,7 @@ Kirigami.ApplicationWindow {
                 const subscribe = !playlistMenu.subscribed;
                 root.noteOnSuccess(playlistMenu.playlist.id, subscribe ? "收藏歌单" : "取消收藏歌单",
                                    (subscribe ? "已收藏「" : "已取消收藏「") + playlistMenu.playlist.name + "」");
-                Source.setPlaylistSubscribed(playlistMenu.playlist.id, subscribe);
+                Source.setPlaylistSubscribed(playlistMenu.playlist, subscribe);
             }
         }
     }
@@ -1432,9 +1432,9 @@ Kirigami.ApplicationWindow {
                 Source.setPlaylistPrivacy(id, makePrivate);
             }
             onTagsRequested: (id, tags) => tagsDialog.ask(id, tags)
-            onSubscribeToggled: (id, name, subscribed) => {
-                root.noteOnSuccess(id, subscribed ? "收藏歌单" : "取消收藏歌单", (subscribed ? "已收藏「" : "已取消收藏「") + name + "」");
-                Source.setPlaylistSubscribed(id, subscribed);
+            onSubscribeToggled: (playlist, subscribed) => {
+                root.noteOnSuccess(playlist.id, subscribed ? "收藏歌单" : "取消收藏歌单", (subscribed ? "已收藏「" : "已取消收藏「") + playlist.name + "」");
+                Source.setPlaylistSubscribed(playlist, subscribed);
             }
             onShareRequested: (kind, id, title, cover) => root.shareList(kind, id, title, cover)
             onAlbumSubscriptionToggled: (id, subscribed) => {

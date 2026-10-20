@@ -37,7 +37,7 @@ ScreenFrame {
     signal deleteRequested(real id, string name)
     signal privacyToggled(real id, bool makePrivate)
     signal tagsRequested(real id, var tags)
-    signal subscribeToggled(real id, string name, bool subscribed)
+    signal subscribeToggled(var playlist, bool subscribed)   // playlist：这一页的歌单卡片（list.card）
     signal albumSubscriptionToggled(real id, bool subscribed)
     signal shareRequested(string kind, real id, string title, string cover)
 
@@ -226,7 +226,7 @@ ScreenFrame {
                         height: visible ? implicitHeight : 0
                         icon.name: page.list.subscribed ? "bookmark-remove" : "bookmark-new"
                         text: page.list.subscribed ? "取消收藏" : "收藏歌单"
-                        onTriggered: page.subscribeToggled(page.list.listId, page.list.heading, !page.list.subscribed)
+                        onTriggered: page.subscribeToggled(page.list.card, !page.list.subscribed)
                     }
                 }
             }

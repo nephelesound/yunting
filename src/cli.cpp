@@ -494,11 +494,13 @@ int runSubscribeSelfTest(const CommandLine &cli, Backend &backend)
     for (const QVariant &v : store.personal().value("subscribed").toList())
         subscribed.insert(v.toMap().value("id").toDouble());
     double pid = 0;
+    QVariantMap playlist;
     for (const QVariant &v : store.personal().value("playlists").toList()) {
         const QVariantMap card = v.toMap();
         const double id = card.value("id").toDouble();
         if (id > 0 && !subscribed.contains(id)) {
             pid = id;
+            playlist = card;
             std::printf("candidate %lld %s\n", qlonglong(pid), qPrintable(card.value("name").toString()));
             break;
         }
@@ -527,7 +529,7 @@ int runSubscribeSelfTest(const CommandLine &cli, Backend &backend)
             }
             step = 1;
             std::printf("subscribed\n");
-            store.setPlaylistSubscribed(pid, false);
+            store.setPlaylistSubscribed(playlist, false);
         } else if (step == 1) {
             if (has()) {
                 std::fprintf(stderr, "unsubscribe landed but local subscribed still has it\n");
@@ -545,7 +547,7 @@ int runSubscribeSelfTest(const CommandLine &cli, Backend &backend)
         loop.quit();
     });
     QTimer::singleShot(30 * 1000, &loop, &QEventLoop::quit);
-    store.setPlaylistSubscribed(pid, true);
+    store.setPlaylistSubscribed(playlist, true);
     loop.exec();
     if (rc != 0 && has()) {
         // 失败也尽量取消订阅，账号回到原状
@@ -555,7 +557,7 @@ int runSubscribeSelfTest(const CommandLine &cli, Backend &backend)
                 cleanup.quit();
         });
         QTimer::singleShot(5 * 1000, &cleanup, &QEventLoop::quit);
-        store.setPlaylistSubscribed(pid, false);
+        store.setPlaylistSubscribed(playlist, false);
         cleanup.exec();
     }
     return rc;

@@ -77,7 +77,8 @@ public:
 
     // 歌单写操作：创建 / 收藏 / 加歌 / 移歌 / 改名 / 删除 / 排序。成功后同步本地 personal。
     Q_INVOKABLE void createPlaylist(const QString &name, bool privatePlaylist = false);
-    Q_INVOKABLE void setPlaylistSubscribed(double id, bool subscribed);
+    // playlist：用户点的那张歌单卡片（{id, name, cover, count}，界面上正显示着）；收藏后原样放进「收藏的歌单」
+    Q_INVOKABLE void setPlaylistSubscribed(const QVariantMap &playlist, bool subscribed);
     Q_INVOKABLE void addSongToPlaylist(double playlistId, double songId);
     Q_INVOKABLE void removeSongFromPlaylist(double playlistId, double songId);
     Q_INVOKABLE void renamePlaylist(double id, const QString &name);
