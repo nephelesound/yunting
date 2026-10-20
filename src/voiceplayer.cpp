@@ -14,12 +14,16 @@ VoicePlayer::VoicePlayer(QObject *parent)
     m_controller->setProperty(QStringLiteral("vid"), QStringLiteral("no"));
     m_controller->setProperty(QStringLiteral("audio-display"), QStringLiteral("no"));
     m_controller->setProperty(QStringLiteral("ytdl"), QStringLiteral("no"));
-    // 与 AudioEngine 相同：不用内置 Lua 脚本
+    // 与 AudioEngine 相同：init 后 load-scripts 停不掉已加载的脚本，逐个 load-* 关
     m_controller->setProperty(QStringLiteral("load-scripts"), false);
     m_controller->setProperty(QStringLiteral("osc"), false);
     m_controller->setProperty(QStringLiteral("load-stats-overlay"), false);
     m_controller->setProperty(QStringLiteral("load-console"), false);
     m_controller->setProperty(QStringLiteral("load-auto-profiles"), false);
+    m_controller->setProperty(QStringLiteral("load-select"), false);
+    m_controller->setProperty(QStringLiteral("load-positioning"), false);
+    m_controller->setProperty(QStringLiteral("load-commands"), false);
+    m_controller->setProperty(QStringLiteral("load-context-menu"), false);
     // 语音评论只有几十秒：4 MiB 预读绰绰有余（默认 150 MiB）
     m_controller->setProperty(QStringLiteral("cache"), QStringLiteral("yes"));
     m_controller->setProperty(QStringLiteral("demuxer-max-bytes"), 4 * 1024 * 1024);

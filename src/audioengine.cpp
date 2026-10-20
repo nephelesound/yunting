@@ -83,8 +83,9 @@ QString filterSpec(const QVariantList &gains, double bassBoost, double stereoWid
     graph += QStringLiteral(",bass@bass=f=120:width_type=q:width=0.70710678:gain=%1")
                  .arg(number(bassBoost));
     graph += QStringLiteral(",extrastereo@width=m=%1:c=0").arg(number(stereoWidth));
-    // 几十毫秒的音频帧用不着多线程；lavfi 默认按核数开线程（本机 15 个）
-    return QStringLiteral("@eq:lavfi=[%1]:threads=1").arg(graph);
+    // mpv 0.41 的 lavfi 没有 threads 选项（写了整条 af 会解析失败，均衡器整个失效），
+    // 滤镜图的线程数只能在 mpv 之外控制；这里以可用为先。
+    return QStringLiteral("@eq:lavfi=[%1]").arg(graph);
 }
 } // namespace
 
@@ -106,13 +107,17 @@ AudioEngine::AudioEngine(NcmClient *client, QObject *parent)
     option("vid", "no");
     option("audio-display", "no");
     option("ytdl", "no");
-    // libmpv 的内置脚本（osc/stats/console//autoload 等）我们一概不用，
-    // 少 12 个 Lua 虚拟机与线程，也少一份内存池
+    // libmpv 在 init 时就加载了内置脚本，之后设 load-scripts 停不掉它们；
+    // 逐个 load-* 关（运行时可停）：osc / stats / console / auto-profiles / select / positioning / commands / context-menu
     option("load-scripts", false);
     option("osc", false);
     option("load-stats-overlay", false);
     option("load-console", false);
     option("load-auto-profiles", false);
+    option("load-select", false);
+    option("load-positioning", false);
+    option("load-commands", false);
+    option("load-context-menu", false);
     option("idle", true);
     option("gapless-audio", "weak");
     option("cache", "yes");          // 网络流

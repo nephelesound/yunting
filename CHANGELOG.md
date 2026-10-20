@@ -2,6 +2,12 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.24] - 2026-10-20
+
+### 修复
+- 均衡器、低音增强与声场宽度恢复（0.6.21 起失效）：mpv 的 lavfi 没有 `threads` 选项，写上它会让整条 `af` 解析失败，后续 `af-command` 与回退重设随之失效。该参数已移除；滤镜图的线程数在 mpv 0.41 无法限制。
+- 内置 Lua 脚本真正停掉：`load-scripts` 只在 mpv 初始化前有效，init 之后再设不会卸载已加载的脚本。补上 `load-select` / `load-positioning` / `load-commands` / `load-context-menu`（osc / stats / console / auto-profiles / ytdl 原本已关）。播放中的线程数从 53 降到 27。
+
 ## [0.6.23] - 2026-10-20
 
 ### 变更
