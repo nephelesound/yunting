@@ -22,6 +22,9 @@ finish-args:
   - --talk-name=org.kde.StatusNotifierWatcher
   - --talk-name=org.freedesktop.Notifications
   # 放歌时不自动睡眠、看 MV 时屏幕常亮：走 org.freedesktop.portal.Inhibit，不需要电源服务的直连权限
+  # 系统睡眠前暂停（src/systemsleep.cpp）：收 logind 的 PrepareForSleep 信号。没有这条也能在醒来后
+  # 恢复（由时钟发现），只是睡前不会先停下
+  - --system-talk-name=org.freedesktop.login1
 cleanup:
   - '*.a'
   - '*.la'
