@@ -1329,9 +1329,13 @@ Kirigami.ApplicationWindow {
             apply("startOverlay", deferred.startOverlay);
     }
 
-    Kirigami.Theme.colorSet: Kirigami.Theme.View
-    Kirigami.Theme.inherit: false
-    background: Rectangle { color: Kirigami.Theme.backgroundColor }
+    // 整窗用 View 那一组（底色与正文对比最高）。设在 ApplicationWindow 上不生效：Kirigami 沿 parentItem
+    // 找继承源，窗口不是 item，页面与播放条拿到的仍是 Window 组。所以设在底、页面（ScreenFrame）、播放条上
+    background: Rectangle {
+        Kirigami.Theme.colorSet: Kirigami.Theme.View
+        Kirigami.Theme.inherit: false
+        color: Kirigami.Theme.backgroundColor
+    }
 
     pageStack.globalToolBar.style: Kirigami.ApplicationHeaderStyle.None
     pageStack.columnView.columnResizeMode: Kirigami.ColumnView.SingleColumn

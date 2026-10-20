@@ -8,6 +8,10 @@ import org.kde.kirigami as Kirigami
 Kirigami.Page {
     id: screen
 
+    // 每一页都用 View 那一组（见 main.qml 的 background）
+    Kirigami.Theme.colorSet: Kirigami.Theme.View
+    Kirigami.Theme.inherit: false
+
     property alias heading: title.text
     property alias pivots: title.pivots
     property alias currentPivot: title.current

@@ -16,6 +16,10 @@ import "Format.js" as Format
 Item {
     id: bar
 
+    // 与页面同一组（见 main.qml 的 background）
+    Kirigami.Theme.colorSet: Kirigami.Theme.View
+    Kirigami.Theme.inherit: false
+
     property var track
     property bool playing
     property real elapsed
