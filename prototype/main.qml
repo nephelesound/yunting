@@ -1329,10 +1329,12 @@ Kirigami.ApplicationWindow {
             apply("startOverlay", deferred.startOverlay);
     }
 
-    // 整窗用 View 那一组（底色与正文对比最高）。设在 ApplicationWindow 上不生效：Kirigami 沿 parentItem
-    // 找继承源，窗口不是 item，页面与播放条拿到的仍是 Window 组。所以设在底、页面（ScreenFrame）、播放条上
+    // 底色取 Header 组：窗口装饰（Breeze）画标题栏用的就是它，标题栏与页面连成一片，不在顶上露一道接缝。
+    // 文字取 View 组（页面 ScreenFrame 与播放条上设，它们不画自己的底）：View 的正文对比最高，
+    // 次要文字 ×0.65 在 Header 底上也过 4.5:1。colorSet 设在 ApplicationWindow 上不生效：Kirigami 沿
+    // parentItem 找继承源，窗口不是 item
     background: Rectangle {
-        Kirigami.Theme.colorSet: Kirigami.Theme.View
+        Kirigami.Theme.colorSet: Kirigami.Theme.Header
         Kirigami.Theme.inherit: false
         color: Kirigami.Theme.backgroundColor
     }

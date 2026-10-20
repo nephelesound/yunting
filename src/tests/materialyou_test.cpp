@@ -149,6 +149,17 @@ private slots:
                 QVERIFY2(ratio >= 4.5, qPrintable(QStringLiteral("%1 %2 %3:1").arg(QLatin1String(name), QLatin1String(key)).arg(ratio)));
             }
         }
+        // 应用的底是 Header（与标题栏同色），文字是 View 的正文；次要文字 ×0.65、导航非当前 ×0.5（Tokens）
+        const QColor base = colorAt(config.group(QStringLiteral("Colors:Header")), "BackgroundNormal");
+        const QColor text = colorAt(config.group(QStringLiteral("Colors:View")), "ForegroundNormal");
+        const auto over = [&base, &text](double alpha) {
+            return QColor::fromRgbF(text.redF() * alpha + base.redF() * (1 - alpha),
+                                    text.greenF() * alpha + base.greenF() * (1 - alpha),
+                                    text.blueF() * alpha + base.blueF() * (1 - alpha));
+        };
+        QVERIFY2(contrast(over(0.65), base) >= 4.5, qPrintable(QString::number(contrast(over(0.65), base))));
+        QVERIFY2(contrast(over(0.5), base) >= 3.0, qPrintable(QString::number(contrast(over(0.5), base))));
+
         const double window = colorAt(config.group(QStringLiteral("Colors:Window")), "BackgroundNormal").lightnessF();
         QVERIFY(dark ? window < 0.2 : window > 0.85);
     }

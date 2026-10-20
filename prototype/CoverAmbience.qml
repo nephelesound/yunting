@@ -11,6 +11,10 @@ Item {
 
     property string cover   // 曲目封面地址（任意尺寸参数，这里统一换成 8px）
 
+    // 遮罩取窗口底色那一组（Header，与标题栏同色，见 main.qml 的 background），不取页面文字用的 View
+    Kirigami.Theme.colorSet: Kirigami.Theme.Header
+    Kirigami.Theme.inherit: false
+
     readonly property string tinySource: ambience.cover ? Source.sized(ambience.cover, 8) : ""
 
     // 交叉淡化：新图加载好后在另一层淡入，旧层淡出

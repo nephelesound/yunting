@@ -9,6 +9,10 @@ Item {
 
     property string cover
 
+    // 底与渐变取窗口底色那一组（Header，与标题栏同色，见 main.qml 的 background），不取页面文字用的 View
+    Kirigami.Theme.colorSet: Kirigami.Theme.Header
+    Kirigami.Theme.inherit: false
+
     Rectangle {
         anchors.fill: parent
         color: Kirigami.Theme.backgroundColor

@@ -16,7 +16,7 @@ import "Format.js" as Format
 Item {
     id: bar
 
-    // 与页面同一组（见 main.qml 的 background）
+    // 文字与页面同一组，底透出窗口的（见 main.qml 的 background）
     Kirigami.Theme.colorSet: Kirigami.Theme.View
     Kirigami.Theme.inherit: false
 

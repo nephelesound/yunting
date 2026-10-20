@@ -8,7 +8,7 @@ import org.kde.kirigami as Kirigami
 Kirigami.Page {
     id: screen
 
-    // 每一页都用 View 那一组（见 main.qml 的 background）
+    // 文字用 View 那一组；底不画（见下面的 background: null），透出窗口与标题栏同色的底（见 main.qml）
     Kirigami.Theme.colorSet: Kirigami.Theme.View
     Kirigami.Theme.inherit: false
 
