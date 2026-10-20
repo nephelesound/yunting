@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.18" date="2026-10-20">
+      <description>
+        <p>Scroll bars take the Breeze shape: an 8 px rounded handle that stays visible while the content overflows and turns the accent colour on hover, still without a groove or separator line. Icon buttons such as like and share no longer look doubled at fractional scales like 1.15.</p>
+        <p xml:lang="zh_CN">滚动条改成 Breeze 原生的样子：8 像素宽的圆角把手，内容超出时一直显示，悬停时变成强调色，仍然没有滚动槽和分隔竖线。喜欢、分享等图标按钮在 1.15 这类小数缩放下不再有重影。</p>
+      </description>
+    </release>
     <release version="0.6.17" date="2026-10-20">
       <description>
         <p>Scroll bars are a single rounded handle: no groove and no separator line beside lists. They appear while scrolling, fade out afterwards, and widen on hover.</p>
