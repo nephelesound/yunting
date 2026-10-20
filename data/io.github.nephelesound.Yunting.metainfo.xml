@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.19" date="2026-10-20">
+      <description>
+        <p>Voice comments can be played: a capsule under the comment shows the clip's length and progress, with the server's transcript beside it. The song pauses while a clip plays and resumes afterwards, except in a listen together room.</p>
+        <p xml:lang="zh_CN">语音评论可以播放了：评论下面的胶囊显示语音长短和播放进度，旁边是语音转文字。放语音时歌先暂停，放完接着放；一起听的房间里歌不暂停。</p>
+      </description>
+    </release>
     <release version="0.6.18" date="2026-10-20">
       <description>
         <p>Scroll bars take the Breeze shape: an 8 px rounded handle that stays visible while the content overflows and turns the accent colour on hover, still without a groove or separator line. Icon buttons such as like and share no longer look doubled at fractional scales like 1.15.</p>
