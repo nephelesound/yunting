@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.20" date="2026-10-20">
+      <description>
+        <p>Playback works again after the computer wakes from sleep: music pauses before sleep, the audio output is rebuilt after waking, and a song stopped halfway reloads from the same position. Pressing play after a song failed to load now fetches a fresh address instead of doing nothing.</p>
+        <p xml:lang="zh_CN">电脑睡眠唤醒后又能放歌了：睡前暂停，醒来重建音频输出，停在歌中间的从原位置重新载入。一首歌没放成后再按播放会重新取址，不再没反应。</p>
+      </description>
+    </release>
     <release version="0.6.19" date="2026-10-20">
       <description>
         <p>Voice comments can be played: a capsule under the comment shows the clip's length and progress, with the server's transcript beside it. The song pauses while a clip plays and resumes afterwards, except in a listen together room.</p>
