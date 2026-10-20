@@ -119,7 +119,10 @@ ScreenFrame {
                     return;
                 }
                 suggestions.dismissed = true;
-                if (field.text.trim() === "" && field.suggestedQuery.length > 0)
+                // 清除按钮先清空输入再发 accepted()：此时 page.query 还留着被清掉的词。
+                // 空着回车时 page.query 本来就是空的——只有那种情况才搜推荐词。
+                const cleared = field.text.trim() === "" && page.query.length > 0;
+                if (!cleared && field.text.trim() === "" && field.suggestedQuery.length > 0)
                     field.text = field.suggestedQuery;
                 page.query = field.text.trim();
             }
