@@ -3,8 +3,8 @@
 // 图标自己画：主题图标交给主题着色；补充图标集的文件图标（icon.source）按蒙版用 icon.color 着色，
 // 深浅配色下都对（样式自带的按钮不给文件图标上色，深色配色下会是黑的）。
 // glyph：用一个字代替图标（桌面歌词的「词」：网易云的习惯，比任何图形都直白）。
-// 注意：Breeze 的按钮底也会按 icon 画一遍原生图标，这里的图标正好盖在它上面；
-// 所以按钮保持方形、内容居中，不要往按钮里加别的东西（加了会错位、露出两个图标）
+// 底也自己画（与资源行、账号按钮同一种悬停底）：Breeze 的按钮底会按 icon 再画一遍原生图标，
+// 在 1.15 这类小数缩放下两份图标对不齐像素，看起来像重影
 import QtQuick
 import QtQuick.Controls
 import org.kde.kirigami as Kirigami
@@ -20,6 +20,15 @@ ToolButton {
     icon.width: Tokens.iconSm
     icon.height: Tokens.iconSm
     display: AbstractButton.IconOnly
+
+    background: Rectangle {
+        radius: Tokens.radius
+        color: Qt.alpha(Kirigami.Theme.highlightColor,
+                        button.down ? Tokens.tintPressed : button.hovered ? Tokens.tintHover : 0)
+        border.width: button.visualFocus ? Tokens.lineStrong : 0
+        border.color: Kirigami.Theme.highlightColor
+        Behavior on color { ColorAnimation { duration: Tokens.motionFast } }
+    }
 
     contentItem: Item {
         implicitWidth: Tokens.iconSm
