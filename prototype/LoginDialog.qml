@@ -6,6 +6,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
+import org.kde.kirigamiaddons.formcard as FormCard
 import org.kde.prison as Prison
 
 AppDialog {
@@ -14,13 +15,29 @@ AppDialog {
     required property var session   // 鸭子类型：SimSession 或 C++ Session
 
     readonly property string state: dialog.session.state
+    // 「用 Cookie 登录」：拿不到手机时，用浏览器里已登录的那份 Cookie
+    property bool cookieOpen: false
+    property string cookieError: ""
+    property bool cookiePending: false
 
     title: "扫码登录"
 
-    onOpened: if (dialog.state === "idle" || dialog.state === "done" || dialog.state === "error")
-        dialog.session.start()
+    onOpened: {
+        dialog.cookieError = "";
+        dialog.cookiePending = false;
+        if (dialog.state === "idle" || dialog.state === "done" || dialog.state === "error")
+            dialog.session.start();
+    }
     onClosed: if (dialog.state !== "done") dialog.session.cancel()
     onStateChanged: if (dialog.state === "done") dialog.close()
+
+    Connections {
+        target: dialog.session
+        function onLoginFailed(message) {
+            dialog.cookiePending = false;
+            dialog.cookieError = message;
+        }
+    }
 
     ColumnLayout {
         Layout.fillWidth: true
@@ -81,6 +98,54 @@ AppDialog {
             font.pixelSize: Tokens.textSm
             color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             wrapMode: Text.Wrap
+        }
+
+        // 手机不在手边时：浏览器里已登录的 Cookie 也能登进来
+        Button {
+            objectName: "cookieLoginToggle"
+            Layout.alignment: Qt.AlignHCenter
+            flat: true
+            text: dialog.cookieOpen ? "收起 Cookie 登录" : "用 Cookie 登录"
+            onClicked: {
+                dialog.cookieOpen = !dialog.cookieOpen;
+                dialog.cookieError = "";
+                if (dialog.cookieOpen) {
+                    // 扫码在等也没关系：提交时 Session 会停掉轮询
+                    cookieText.forceActiveFocus();
+                }
+            }
+        }
+        FormCard.FormTextAreaDelegate {
+            id: cookieText
+            objectName: "cookieLoginField"
+            visible: dialog.cookieOpen
+            label: "Cookie"
+            placeholderText: "粘贴浏览器里的 Cookie（MUSIC_U=…; __csrf=…），或只粘贴 MUSIC_U 的值"
+        }
+        RowLayout {
+            visible: dialog.cookieOpen
+            Layout.fillWidth: true
+            spacing: Tokens.space2
+            Label {
+                objectName: "cookieLoginError"
+                Layout.fillWidth: true
+                visible: dialog.cookieError.length > 0
+                text: dialog.cookieError
+                color: Kirigami.Theme.negativeTextColor
+                font.pixelSize: Tokens.textSm
+                wrapMode: Text.Wrap
+            }
+            Button {
+                objectName: "cookieLoginButton"
+                Layout.alignment: Qt.AlignRight
+                text: dialog.cookiePending ? "登录中…" : "登录"
+                enabled: cookieText.text.trim().length > 0 && !dialog.cookiePending
+                onClicked: {
+                    dialog.cookieError = "";
+                    dialog.cookiePending = true;
+                    dialog.session.loginWithCookie(cookieText.text);
+                }
+            }
         }
     }
 }

@@ -635,6 +635,63 @@ private slots:
         QCOMPARE(m_client->cookieJar().value("__csrf"), QStringLiteral("session-csrf"));
     }
 
+    // 网页端 Cookie：整段 Cookie 头或只粘 MUSIC_U 的值都能登进来；校验走 login/token/refresh
+    void cookieLoginAcceptsHeaderAndBareToken()
+    {
+        QByteArray seenCookie;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/weapi/login/token/refresh")
+                seenCookie = req.headers;
+            respond(200, "{\"code\":200}");
+        };
+
+        Session session(m_client, m_store);
+        session.loginWithCookie(QStringLiteral("MUSIC_U=web-cookie; __csrf=web-csrf; NMTID=web-nmtid"));
+        QVERIFY(waitUntil([&] { return session.state() == "done"; }, 5000));
+        QCOMPARE(m_client->cookieJar().value("MUSIC_U"), QStringLiteral("web-cookie"));
+        QCOMPARE(m_client->cookieJar().value("__csrf"), QStringLiteral("web-csrf"));
+        QVERIFY(seenCookie.contains("MUSIC_U=web-cookie"));
+
+        Session bare(m_client, m_store);
+        bare.loginWithCookie(QStringLiteral("  bare-token-value  "));
+        QVERIFY(waitUntil([&] { return bare.state() == "done"; }, 5000));
+        QCOMPARE(m_client->cookieJar().value("MUSIC_U"), QStringLiteral("bare-token-value"));
+    }
+
+    // 无效的 Cookie 不能留在钥匙串里：否则下次启动就是「会话过期」
+    void cookieLoginRejectsInvalidCookie()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/weapi/login/token/refresh") {
+                respond(200, "{\"code\":301}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        Session session(m_client, m_store);
+        QSignalSpy failed(&session, &Session::loginFailed);
+        session.loginWithCookie(QStringLiteral("MUSIC_U=bad-cookie"));
+        QVERIFY(waitUntil([&] { return failed.count() == 1; }, 5000));
+        QVERIFY(session.state() != QLatin1String("done"));
+        QVERIFY(!m_client->hasMusicU());
+        QVERIFY(!failed.first().at(0).toString().isEmpty());
+    }
+
+    // 没有 MUSIC_U 的输入当场拒绝，不发请求
+    void cookieLoginRejectsInputWithoutMusicU()
+    {
+        int requests = 0;
+        m_api->handler = [&](const FakeApi::Request &, const FakeApi::Responder &respond) {
+            ++requests;
+            respond(200, "{\"code\":200}");
+        };
+        Session session(m_client, m_store);
+        QSignalSpy failed(&session, &Session::loginFailed);
+        session.loginWithCookie(QStringLiteral("__csrf=only"));
+        QCOMPARE(failed.count(), 1);
+        QCOMPARE(requests, 0);
+    }
+
     // 页面退栈时 id 会短暂归零：这些 key 不能发网络请求，也不能报失败。
     void zeroIdsNeverHitNetwork()
     {

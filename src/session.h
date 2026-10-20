@@ -26,12 +26,16 @@ public:
     Q_INVOKABLE void cancel();
     // 用现有 MUSIC_U 刷新登录 cookie；成功后重拉首屏。会话过期时自动尝试一次。
     Q_INVOKABLE void refreshSession();
+    // 网页端 Cookie 登录：粘贴整段 Cookie（MUSIC_U=…; __csrf=…）或只粘贴 MUSIC_U 的值。
+    // 经 login/token/refresh 校验：成功发 done 并重拉首屏，失败清掉无效凭据并发 loginFailed。
+    Q_INVOKABLE void loginWithCookie(const QString &raw);
 
 signals:
     void stateChanged();
     void qrContentChanged();
     void refreshed();
     void refreshFailed(const QString &message);
+    void loginFailed(const QString &message);
 
 private:
     void poll();
@@ -47,4 +51,5 @@ private:
     bool m_polling = false;     // 同一时间只允许一个轮询请求在途
     bool m_refreshing = false;
     quint64 m_refreshGeneration = 0;
+    quint64 m_cookieGeneration = 0;   // loginWithCookie 递增；旧校验的回包不能改状态
 };

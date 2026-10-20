@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.22" date="2026-10-20">
+      <description>
+        <p>Cookies from the web player can now be used to sign in: below the QR code, "Sign in with a cookie" accepts a pasted cookie header or just the MUSIC_U value, and validates it with the server before keeping it.</p>
+        <p xml:lang="zh_CN">可以用网页端的 Cookie 登录了：扫码框下方的「用 Cookie 登录」接受粘贴的整段 Cookie 或 MUSIC_U 的值，提交前先向服务器校验，无效的 Cookie 不留在本地。另外修复了搜索框的清除按钮会把输入内容换成热搜词并立刻搜索的问题。</p>
+      </description>
+    </release>
     <release version="0.6.21" date="2026-10-20">
       <description>
         <p>Memory use is noticeably lower: mpv stream buffers no longer default to 150 MiB (32 MiB for songs, 64 MiB for MVs, 4 MiB for voice comments), the builtin Lua scripts of all three players are off (about 12 fewer threads), the equalizer filter runs on a single thread, the allocator is limited to four arenas, and freed pages return to the system when an MV closes.</p>

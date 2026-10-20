@@ -2,6 +2,14 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.22] - 2026-10-20
+
+### 新增
+- 网页端 Cookie 登录（[#3](https://github.com/nephelesound/yunting/issues/3)）：扫码框下方多了「用 Cookie 登录」，粘贴浏览器里的整段 Cookie 或 `MUSIC_U` 的值即可。提交前会向服务器校验，无效的 Cookie 不留在本地。
+
+### 修复
+- 搜索框的清除按钮把输入内容换成热搜词并立刻发起搜索（[#2](https://github.com/nephelesound/yunting/issues/2)）：清除现在只清输入、回到热门搜索；空着回车搜推荐词的行为不变。
+
 ## [0.6.21] - 2026-10-20
 
 ### 修复

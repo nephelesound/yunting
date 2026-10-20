@@ -26,6 +26,25 @@ void appendCookies(QJsonArray &jar, const QString &raw)
         }
     }
 }
+
+// 网页端复制的 Cookie：整段 Cookie 头，或只粘 MUSIC_U 的值（浏览器里叫 MUSIC_U 的那一格）。
+// 认不出 MUSIC_U 时返回空表。
+QJsonArray cookieJarFrom(const QString &raw)
+{
+    QJsonArray jar;
+    if (!raw.contains(u'=')) {
+        const QString token = raw.trimmed();
+        if (!token.isEmpty())
+            jar.append(QJsonObject{{QStringLiteral("MUSIC_U"), token}});
+        return jar;
+    }
+    appendCookies(jar, raw);
+    for (const QJsonValue &c : jar) {
+        if (c.toObject().contains(QStringLiteral("MUSIC_U")))
+            return jar;
+    }
+    return {};
+}
 } // namespace
 
 Session::Session(NcmClient *client, Store *store, QObject *parent)
@@ -116,6 +135,45 @@ void Session::refreshSession()
         }
         m_store->refresh();
         emit refreshed();
+    });
+}
+
+void Session::loginWithCookie(const QString &raw)
+{
+    const QJsonArray jar = cookieJarFrom(raw);
+    if (jar.isEmpty()) {
+        emit loginFailed(QStringLiteral("没有识别到 MUSIC_U：请粘贴整段 Cookie，或 MUSIC_U 的值"));
+        return;
+    }
+    // 正在等扫码时用 Cookie 登录：那张二维码已经无关，停止轮询
+    ++m_generation;
+    m_polling = false;
+    m_timer->stop();
+    m_unikey.clear();
+    if (!m_qrContent.isEmpty()) {
+        m_qrContent.clear();
+        emit qrContentChanged();
+    }
+
+    m_client->adoptCookies(QJsonDocument(jar));
+    // 与 refreshSession 用同一个接口校验：能换到新 cookie 才算这个 MUSIC_U 有效。
+    // 失败时清掉它，否则它留在钥匙串里，下次启动就成了「会话过期」。
+    const quint64 generation = ++m_cookieGeneration;
+    m_client->postWeapi(QStringLiteral("login/token/refresh"), {}, true,
+                        [this, generation](const QJsonDocument &doc, bool ok) {
+        if (generation != m_cookieGeneration)
+            return;
+        const int code = ok ? doc.object().value(QStringLiteral("code")).toInt() : 0;
+        if (!ok || code != 200) {
+            m_client->clearAuthCookies();
+            emit loginFailed(ok ? QStringLiteral("Cookie 无效或已过期，请从浏览器重新复制")
+                                : QStringLiteral("连不上服务器，请稍后再试"));
+            // 这张二维码的轮询已经停了：回到扫码流程，对话框不至于停在空二维码上
+            start();
+            return;
+        }
+        setState(QStringLiteral("done"));
+        m_store->refresh();
     });
 }
 
