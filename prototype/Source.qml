@@ -811,14 +811,14 @@ QtObject {
     function firstCover(tracks) { return tracks.length > 0 ? tracks[0].cover : ""; }
     function songs(n) { return { value: String(n), label: "首" }; }
 
-    // 历史日推：{ dates（新的在前）, noHistoryMessage, byDate }；登录后第一次读时要一次，没取到是 null
+    // 历史日推：{ dates（新的在前）, noHistoryMessage, byDate }；什么都没取到是 null。
+    // 日期表没取过（先打开了某一天，只有 byDate）也要一次，否则日期切换一直出不来
     function dailyHistory() {
         const h = source.p.dailyHistory;
-        if (!h) {
-            if (source.account)
-                source.need("dailyHistory");
+        if ((!h || h.dates === undefined) && source.account)
+            source.need("dailyHistory");
+        if (!h)
             return null;
-        }
         return { dates: h.dates || [], noHistoryMessage: h.noHistoryMessage || "", byDate: h.byDate || {} };
     }
     // 每日推荐页的日期切换：今天，然后是服务器给的历史日子。没有历史时只有今天一项
@@ -964,7 +964,7 @@ QtObject {
                 const date = key.slice(13);
                 const history = source.dailyHistory();
                 const day = history ? history.byDate[date] : undefined;
-                if (day === undefined)   // 取到过（哪怕是空的）就不再要
+                if (day === undefined)   // Store 只放取到了歌的日子；取到就不再要
                     source.need(key);
                 const tracks = day ? day.tracks : [];
                 return { heading: "每日推荐", cover: source.sized(source.firstCover(tracks), 560), tracks: tracks,
@@ -972,7 +972,7 @@ QtObject {
                          facts: [{ label: source.dayLabel(date) }].concat(day ? [source.songs(tracks.length)] : []),
                          description: "",
                          failed: day === undefined && Boolean(source.failure(key)),
-                         emptyText: day === undefined ? "正在取回这一天的推荐…" : "这一天没有推荐" };
+                         emptyText: "正在取回这一天的推荐…" };
             }
             if (key === "searchSongs") {
                 const r = source.searchResult;

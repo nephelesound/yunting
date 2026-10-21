@@ -214,17 +214,19 @@ QDate Store::dailyServiceDay(const QDateTime &now)
     return now.time().hour() < 6 ? date.addDays(-1) : date;
 }
 
-// 每分钟对墙钟：跨过换日点就重取一次。睡眠或改时区后醒来，最多一分钟就能补上。
+// 每分钟对墙钟：手里的列表不是这个服务日的就重取。睡眠或改时区后醒来，最多一分钟就能补上；
+// 这一天已经试过却没取到（服务器出错、限流），隔 10 分钟再试，不每分钟打一次
 void Store::checkDailyRollover()
 {
-    if (!m_client->hasMusicU())
+    if (!m_client->hasMusicU() || m_sessionExpired)
         return;
-    if (dailyServiceDay(m_clock()) == m_dailyDay)
+    const QDateTime now = m_clock();
+    const QDate day = dailyServiceDay(now);
+    if (day == m_dailyDay)
+        return;
+    if (m_dailyTriedAt.isValid() && dailyServiceDay(m_dailyTriedAt) == day && m_dailyTriedAt.secsTo(now) < 10 * 60)
         return;
     fetchDaily();
-    // 历史页开过（或启动时恢复过）：日期表也换成新的一天，开着的页面才会出现「今天」
-    if (!m_personal.value("dailyHistory").isNull())
-        requestDailyHistory();
 }
 
 // 上次的首屏值先放上（只放骨架里有的键，旧版本缓存里多出来的字段不带进来）。

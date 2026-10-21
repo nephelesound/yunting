@@ -381,7 +381,8 @@ def anonymous():
 def personal(hot_tracks):
     # playlistDetails：按需加载的歌单曲目 { "<id>": { tracks, description } }，快照里为空，由应用的 Store 填
     # likedIds：全部红心曲目 id，登录后由 /api/song/like/get 填
-    data = {"account": None, "daily": None, "heart": None, "radar": None, "liked": None, "likedIds": [],
+    # dailyHistory：历史日推，打开每日推荐页时按需取，快照里不带
+    data = {"account": None, "daily": None, "dailyHistory": None, "heart": None, "radar": None, "liked": None, "likedIds": [],
             "mine": [], "recent": None, "cloud": None, "subscribed": [], "playlistDetails": {}}
     account = get("api/nuser/account/get", personal=True) if COOKIE else {}
     profile = account.get("profile") or {}

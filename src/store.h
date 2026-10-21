@@ -351,7 +351,8 @@ private:
     QVariantMap m_similarSeed;
     bool m_similarFired = false;
     double m_heartSeedId = 0;        // 心动模式当前（或在途）的种子：红心第一首
-    QDate m_dailyDay;                // 最近一次请求每日推荐所属的服务日；无效 = 还没请求过
+    QDate m_dailyDay;                // 手里的每日推荐属于哪个服务日；无效 = 还没取到过
+    QDateTime m_dailyTriedAt;        // 最近一次请求每日推荐的时刻（取不到时据此隔一阵再试）
     bool m_online = true;
     bool m_sessionExpired = false;
     QNetworkInformation *m_netInfo = nullptr;

@@ -225,15 +225,21 @@ void Store::patchPlaylistCard(double id, const QVariantList &tracks, const QStri
 void Store::fetchDaily()
 {
     // 6:00 前取到的仍是前一天的列表：日期标签跟着服务日走，不跟回包时的墙钟。
-    const QDate day = dailyServiceDay(m_clock());
-    m_dailyDay = day;   // 请求发出就算这天取过：失败留给断网恢复的 refresh()，不每分钟重试
+    const QDateTime now = m_clock();
+    const QDate day = dailyServiceDay(now);
+    m_dailyTriedAt = now;
+    // 历史日推看过（或从缓存恢复了）：日期表跟着重取。换日或隔天重启后，表里才有前一天
+    if (!m_personal.value("dailyHistory").isNull())
+        requestDailyHistory();
     const quint64 token = m_requests.begin(QStringLiteral("daily"));
-    fetch("api/v3/discovery/recommend/songs", {}, true,
-          [this, day, token](const QJsonDocument &doc, bool ok) {
+    fetchAlways("api/v3/discovery/recommend/songs", {}, true,
+                [this, day, token](const QJsonDocument &doc, bool ok) {
         // 换日前后各有一个请求：旧服务日的回包不能盖掉新的
         if (!m_requests.current(QStringLiteral("daily"), token))
             return;
-        if (ok) {
+        // 没取到：旧列表留着，m_dailyDay 不动，checkDailyRollover 过一阵再试
+        const QJsonValue code = doc.object().value("code");
+        if (ok && (code.isUndefined() || code.toInt() == 200)) {
             // Python 的 strftime("%m月%d日").lstrip("0")：去掉月份的补零
             QString date = day.toString(QStringLiteral("MM月dd日"));
             if (date.startsWith(u'0'))
@@ -253,6 +259,7 @@ void Store::fetchDaily()
             const auto parsed = sdk::parseTracks(take(arr(data, "dailySongs"), 30), privileges);
             if (!parsed)
                 return;
+            m_dailyDay = day;
             QVariantList tracks;
             tracks.reserve(parsed.value->size());
             for (const sdk::Track &track : *parsed.value)
@@ -313,16 +320,14 @@ void Store::requestDailyHistoryDate(const QString &date)
             emit requestFailed(key, QStringLiteral("暂时取不到这一天的推荐"));
             return;
         }
+        // 网易偶尔回 200 却没有歌：当失败（可重试），不存成「这一天没有推荐」
         const auto parsed = sdk::parseTracks(arr(body(doc).value("data").toObject(), "songs"), {});
-        if (!parsed)
+        if (!parsed || parsed.value->empty()) {
+            emit requestFailed(key, QStringLiteral("暂时取不到这一天的推荐"));
             return;
+        }
+        // 只放这一天；日期表没取过就不写 dates，界面据此还会去要日期表
         QVariantMap history = m_personal.value("dailyHistory").toMap();
-        if (!history.contains("dates"))
-            history.insert("dates", QVariantList{});
-        if (!history.contains("description"))
-            history.insert("description", QString{});
-        if (!history.contains("noHistoryMessage"))
-            history.insert("noHistoryMessage", QString{});
         QVariantMap byDate = history.value("byDate").toMap();
         byDate.insert(date, QVariantMap{{"tracks", sdk::tracksToVariantList(*parsed.value)}});
         history.insert("byDate", byDate);

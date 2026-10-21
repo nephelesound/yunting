@@ -180,6 +180,8 @@ private slots:
         m_client = nullptr;
         delete m_api;
         m_api = nullptr;
+        // 每个测试从空缓存开始：Store 会从缓存恢复上一个测试留下的首屏与个人数据
+        QDir(m_dir.filePath("cache")).removeRecursively();
     }
 
     // 业务码 -460 的歌词回包不能当成「没有歌词」永久缓存
@@ -986,13 +988,22 @@ private slots:
         m_store = new Store(m_client, nullptr, [&now] { return now; });
 
         int dailyRequests = 0;
+        int historyRequests = 0;
+        bool dailyFails = false;
         m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
             if (req.path == "/api/nuser/account/get") {
                 respond(200, json(QJsonObject{
                     {"code", 200},
                     {"profile", QJsonObject{{"userId", 42}, {"nickname", "n"}}}}));
+            } else if (req.path == "/api/discovery/recommend/songs/history/recent") {
+                ++historyRequests;
+                respond(200, json(QJsonObject{{"code", 200}, {"data", QJsonObject{{"dates", QJsonArray{}}}}}));
             } else if (req.path == "/api/v3/discovery/recommend/songs") {
                 ++dailyRequests;
+                if (dailyFails) {
+                    respond(500, "{\"code\":500}");
+                    return;
+                }
                 respond(200, json(QJsonObject{
                     {"code", 200},
                     {"data", QJsonObject{
@@ -1015,16 +1026,34 @@ private slots:
         QCOMPARE(dailyRequests, 1);
         QCOMPARE(dailyDate(), QStringLiteral("10月20日"));
 
-        // 6:00：重取，日期跟着换
+        // 历史日推看过：之后每次取每日推荐，日期表都跟着重取（隔天重启时缓存里的表是旧的）
+        m_store->request(QStringLiteral("dailyHistory"));
+        QVERIFY(waitUntil([&] { return !m_store->personal().value("dailyHistory").isNull(); }));
+        QCOMPARE(historyRequests, 1);
+
+        // 6:00 重取但服务器出错：旧列表留着；下一分钟不再打，10 分钟后再试
+        dailyFails = true;
         now = QDateTime(QDate(2026, 10, 21), QTime(6, 0));
         QMetaObject::invokeMethod(m_store, "checkDailyRollover");
-        QVERIFY(waitUntil([&] { return dailyRequests == 2 && dailyId() == 102; }));
-        QCOMPARE(dailyDate(), QStringLiteral("10月21日"));
-
-        // 同一天再对表：不重复取
+        QVERIFY(waitUntil([&] { return dailyRequests == 2 && historyRequests == 2; }));
+        QTest::qWait(100);
+        QCOMPARE(dailyDate(), QStringLiteral("10月20日"));
+        now = QDateTime(QDate(2026, 10, 21), QTime(6, 1));
         QMetaObject::invokeMethod(m_store, "checkDailyRollover");
         QTest::qWait(100);
         QCOMPARE(dailyRequests, 2);
+
+        dailyFails = false;
+        now = QDateTime(QDate(2026, 10, 21), QTime(6, 10));
+        QMetaObject::invokeMethod(m_store, "checkDailyRollover");
+        QVERIFY(waitUntil([&] { return dailyRequests == 3 && dailyId() == 103; }));
+        QCOMPARE(dailyDate(), QStringLiteral("10月21日"));
+
+        // 取到了：同一天再对表，不重复取
+        now = QDateTime(QDate(2026, 10, 21), QTime(6, 30));
+        QMetaObject::invokeMethod(m_store, "checkDailyRollover");
+        QTest::qWait(100);
+        QCOMPARE(dailyRequests, 3);
     }
 
     // 历史日推：日期表与某天的曲目各走一次；刷新日期表时已经取回的某天曲目留着
@@ -1047,17 +1076,28 @@ private slots:
                 ++calls["detail"];
                 const QString date = QUrlQuery(QString::fromLatin1(req.query))
                                          .queryItemValue(QStringLiteral("date"));
-                respond(200, json(QJsonObject{
-                    {"code", 200},
-                    {"data", QJsonObject{
-                        {"songs", QJsonArray{QJsonObject{
-                            {"id", date == QLatin1String("2026-10-20") ? 11.0 : 12.0},
-                            {"name", "song"}, {"ar", QJsonArray{}}, {"al", QJsonObject{}},
-                            {"dt", 1000}}}}}}}));
+                // 10-18：网易回 200 却没有歌
+                const QJsonArray songs = date == QLatin1String("2026-10-18") ? QJsonArray{} : QJsonArray{QJsonObject{
+                    {"id", date == QLatin1String("2026-10-20") ? 11.0 : 12.0},
+                    {"name", "song"}, {"ar", QJsonArray{}}, {"al", QJsonObject{}}, {"dt", 1000}}};
+                respond(200, json(QJsonObject{{"code", 200}, {"data", QJsonObject{{"songs", songs}}}}));
             } else {
                 respond(200, "{\"code\":200}");
             }
         };
+        const auto history = [this] { return m_store->personal().value("dailyHistory").toMap(); };
+
+        // 先打开了某一天（日期表还没取）：只放这一天，不写 dates，界面据此还会去要日期表
+        m_store->request(QStringLiteral("dailyHistory:2026-10-19"));
+        QVERIFY(waitUntil([&] { return history().value("byDate").toMap().contains(QStringLiteral("2026-10-19")); }));
+        QVERIFY(!history().contains(QStringLiteral("dates")));
+
+        // 空回包当失败，不存成「这一天没有推荐」
+        QSignalSpy failed(m_store, &Store::requestFailed);
+        m_store->request(QStringLiteral("dailyHistory:2026-10-18"));
+        QVERIFY(waitUntil([&] { return failed.count() == 1; }));
+        QCOMPARE(failed.first().first().toString(), QStringLiteral("dailyHistory:2026-10-18"));
+        QVERIFY(!history().value("byDate").toMap().contains(QStringLiteral("2026-10-18")));
 
         m_store->request(QStringLiteral("dailyHistory"));
         QVERIFY(waitUntil([&] {
