@@ -158,15 +158,16 @@ void Session::loginWithCookie(const QString &raw)
     }
 
     m_client->adoptCookies(QJsonDocument(jar));
-    // 与 refreshSession 用同一个接口校验：能换到新 cookie 才算这个 MUSIC_U 有效。
+    // 用账号接口校验：拿到 profile 才算这个 MUSIC_U 有效。不能用 login/token/refresh，
+    // 浏览器里复制的有效 MUSIC_U 也会被它回 301（issue #3）。
     // 失败时清掉它，否则它留在钥匙串里，下次启动就成了「会话过期」。
     const quint64 generation = ++m_cookieGeneration;
-    m_client->postWeapi(QStringLiteral("login/token/refresh"), {}, true,
-                        [this, generation](const QJsonDocument &doc, bool ok) {
+    m_client->get(QStringLiteral("api/nuser/account/get"), {}, true,
+                  [this, generation](const QJsonDocument &doc, bool ok) {
         if (generation != m_cookieGeneration)
             return;
-        const int code = ok ? doc.object().value(QStringLiteral("code")).toInt() : 0;
-        if (!ok || code != 200) {
+        const QJsonObject profile = doc.object().value(QStringLiteral("profile")).toObject();
+        if (!ok || profile.value(QStringLiteral("userId")).toDouble() <= 0) {
             m_client->clearAuthCookies();
             emit loginFailed(ok ? QStringLiteral("Cookie 无效或已过期，请从浏览器重新复制")
                                 : QStringLiteral("连不上服务器，请稍后再试"));

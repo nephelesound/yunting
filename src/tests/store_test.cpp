@@ -637,13 +637,17 @@ private slots:
         QCOMPARE(m_client->cookieJar().value("__csrf"), QStringLiteral("session-csrf"));
     }
 
-    // 网页端 Cookie：整段 Cookie 头或只粘 MUSIC_U 的值都能登进来；校验走 login/token/refresh
+    // 网页端 Cookie：整段 Cookie 头或只粘 MUSIC_U 的值都能登进来；校验走 nuser/account/get
     void cookieLoginAcceptsHeaderAndBareToken()
     {
         QByteArray seenCookie;
         m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
-            if (req.path == "/weapi/login/token/refresh")
-                seenCookie = req.headers;
+            if (req.path == "/api/nuser/account/get") {
+                if (seenCookie.isEmpty())
+                    seenCookie = req.headers;
+                respond(200, "{\"code\":200,\"profile\":{\"userId\":42}}");
+                return;
+            }
             respond(200, "{\"code\":200}");
         };
 
@@ -664,7 +668,7 @@ private slots:
     void cookieLoginRejectsInvalidCookie()
     {
         m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
-            if (req.path == "/weapi/login/token/refresh") {
+            if (req.path == "/api/nuser/account/get") {
                 respond(200, "{\"code\":301}");
                 return;
             }
@@ -685,7 +689,7 @@ private slots:
         FakeApi::Responder pending;
         int unikeyRequests = 0;
         m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
-            if (req.path == "/weapi/login/token/refresh") {
+            if (req.path == "/api/nuser/account/get") {
                 pending = respond;
                 return;
             }
@@ -711,7 +715,7 @@ private slots:
         FakeApi::Responder pending;
         int polls = 0;
         m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
-            if (req.path == "/weapi/login/token/refresh") {
+            if (req.path == "/api/nuser/account/get") {
                 pending = respond;
                 return;
             }
@@ -731,7 +735,7 @@ private slots:
         QVERIFY(waitUntil([&] { return bool(pending); }, 5000));
         session.start();
         QVERIFY(waitUntil([&] { return polls > 0; }, 5000));
-        pending(200, "{\"code\":200}");
+        pending(200, "{\"code\":200,\"profile\":{\"userId\":42}}");
         QVERIFY(waitUntil([&] { return session.state() == "done"; }, 5000));
         const int after = polls;
         QTest::qWait(2500);   // 轮询间隔 2 秒
