@@ -68,6 +68,7 @@ build/stock/kdeglobals build/dark/kdeglobals:
 SHOTS = home:page=home home-anon:account=anonymous,page=home charts:page=charts \
         daily:listKey=daily,page=list hot:listKey=hot,page=list nowplaying:page=nowplaying mine-anon:account=anonymous,page=mine \
         worst-home:fixture=worst,page=home worst-daily:fixture=worst,listKey=daily,page=list worst-charts:fixture=worst,page=charts \
+        worst-daily-day:fixture=worst,listKey=dailyHistory:2026-10-16,page=list worst-daily-pending:fixture=worst,listKey=dailyHistory:2026-10-15,page=list \
         worst-nowplaying:fixture=worst,page=nowplaying worst-comments:fixture=worst,nowPlayingPane=comments,page=nowplaying \
         worst-voice:fixture=worst,nowPlayingPane=comments,page=nowplaying,voiceAt=https://example.invalid/voice-1.m4a@9 empty-home:fixture=empty,page=home empty-daily:fixture=empty,listKey=daily,page=list \
         one-home:fixture=one,page=home one-daily:fixture=one,listKey=daily,page=list \

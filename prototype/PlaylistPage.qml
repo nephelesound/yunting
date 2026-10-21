@@ -19,11 +19,11 @@ ScreenFrame {
     property var list
     property real currentId   // 正在播放的曲目 id；不在本列表里就没有高亮
     property bool vip
-    property string listKey   // 失败重试用：root.listKey
+    property string listKey   // 这一页显示的列表（失败时用它重试）；每日推荐切换日期时就地换成那一天的
     // 自己的歌单可以进入排序模式：每行固定显示上移 / 下移，提交一次后退出
     property bool reordering: false
     property string pane: "tracks"   // tracks | comments（只有歌单有评论）
-    kept: ["pane"]
+    kept: ["pane", "listKey"]
     // 歌单（含榜单、红心、雷达这些本身就是歌单的）才有评论；专辑、电台、每日推荐没有
     readonly property var commentThread: (page.list.listId || 0) > 0 && !page.list.isAlbum && !page.list.paging
         ? Source.commentThread("playlist", page.list.listId) : null
@@ -283,6 +283,18 @@ ScreenFrame {
                         { key: "comments", text: page.commentCount > 0 ? "评论 " + Format.count(page.commentCount) : "评论" }]
                 current: page.pane
                 onActivated: key => page.pane = key
+            }
+            // 每日推荐：今天与历史日推（黑胶 VIP 才有）。只有今天时没有可选的，不显示。
+            // 换的是同一份列表的日子，与听歌排行的「一周 / 一月」同一档小筛选（窄窗也放得下 6 项）
+            Pivot {
+                objectName: "dailyDays"
+                visible: (page.list.days || []).length > 1
+                items: page.list.days || []
+                current: page.listKey
+                rowHeight: Tokens.height8
+                fontSize: Tokens.textBase
+                spacing: Tokens.space4
+                onActivated: key => page.listKey = key
             }
 
             ListView {

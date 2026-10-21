@@ -270,6 +270,10 @@ var worst = {
             { kind: "mv", id: 1, vid: "", name: "我想要两颗西柚（Live）- 2023 网易云音乐年度盛典现场版 官方完整版 MV", cover: BROKEN, artist: "茄子蛋 / 告五人", duration: 3725, playCount: 99999999999 },
             { kind: "video", id: 0, vid: "A1B2", name: "x", cover: "", artist: "", duration: 0, playCount: 0 }] },
         daily: { date: "10月17日", day: "17", tracks: worstTracks.slice(0, 30) },
+        // 历史日推：接口给最近 5 次（跨年、个位数的日子都有）；一天取到了、一天取到但为空、其余还没取
+        dailyHistory: { dates: ["2026-10-16", "2026-10-15", "2026-10-09", "2026-01-01", "2025-12-31"],
+                        description: "您已尊享查看60天内近5次历史日推的特权", noHistoryMessage: "",
+                        byDate: { "2026-10-16": { tracks: worstTracks.slice(2, 12) }, "2026-10-09": { tracks: [] } } },
         // 种子与下一首的封面不同：首页入口与列表页取的必须是同一张（不是种子那张）
         heart: { seed: worstTracks[1], tracks: [worstTracks[1], Object.assign({}, worstTracks[2], { cover: C1 })] },
         radar: { id: 3136952023, name: "私人雷达", description: "今天《我想要两颗西柚（Live）- 2023 网易云音乐年度盛典现场版》爱不释耳", cover: BROKEN, tracks: worstTracks.slice(0, 30) },
@@ -302,6 +306,7 @@ var empty = {
     personal: {
         account: { id: 1002, name: "新用户", vip: false, avatar: "" },
         daily: { date: "10月17日", day: "17", tracks: [] },
+        dailyHistory: { dates: [], description: "", noHistoryMessage: "黑胶VIP可查看近期5次历史记录，明天再来就会有哦", byDate: {} },
         heart: { seed: null, tracks: [] },
         radar: { id: 3136952023, name: "私人雷达", description: "", cover: "", tracks: [] },
         similar: { seed: null, tracks: [] },
@@ -374,6 +379,7 @@ var one = {
         savedAlbums: { more: false, next: 1, count: 1, items: [{ id: 1, name: "雨", cover: C2, artist: "A", artistId: 1, size: 1 }] },
         savedMvs: { more: false, next: 1, count: 1, items: [{ kind: "mv", id: 1, vid: "", name: "雨", cover: C2, artist: "A", duration: 221, playCount: 1 }] },
         daily: { date: "10月17日", day: "17", tracks: oneTrack },
+        dailyHistory: { dates: ["2026-10-16"], description: "", noHistoryMessage: "", byDate: { "2026-10-16": { tracks: oneTrack } } },
         heart: { seed: oneTrack[0], tracks: oneTrack },
         radar: { id: 3136952023, name: "私人雷达", description: "今天《雨》爱不释耳", cover: C2, tracks: oneTrack },
         similar: { seed: oneTrack[0], tracks: oneTrack },

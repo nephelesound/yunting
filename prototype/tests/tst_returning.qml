@@ -18,10 +18,10 @@ Item {
             Source.snapshot = snapshotComponent.createObject(root);
         }
 
-        function makeWindow() {
+        function makeWindow(fixture) {
             const component = Qt.createComponent("../main.qml");
             verify(component.status === Component.Ready, component.errorString());
-            const window = component.createObject(root, { backend: null, width: 1280, height: 800, visible: true });
+            const window = component.createObject(root, { backend: null, fixture: fixture || "", width: 1280, height: 800, visible: true });
             verify(window !== null);
             return window;
         }
@@ -55,6 +55,24 @@ Item {
             window.switchPivot("search");
             compare(frame(window).query, "晴天");
             window.close();
+        }
+
+        // 每日推荐切到历史的某一天：列表换成那一天的；进别的页再返回，还是那一天
+        function test_daily_day_survives_a_round_trip() {
+            const window = makeWindow("worst");
+            window.open("list", "daily");
+            const days = findChild(frame(window), "dailyDays");
+            tryVerify(() => days.visible);
+            const tab = days.children.find(c => c.text === "10月16日");
+            verify(tab !== undefined);
+            mouseClick(tab);
+            tryVerify(() => frame(window).list.tracks.length === 10);
+            window.open("artist", "artist:1");
+            window.goBack();
+            tryCompare(frame(window), "listKey", "dailyHistory:2026-10-16");
+            compare(frame(window).list.tracks.length, 10);
+            window.close();
+            Source.snapshot.fixture = "";   // 快照是单例里共用的，下一个测试用默认数据
         }
 
         // 用户先动了滚动，就不再跳到旧位置

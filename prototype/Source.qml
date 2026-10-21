@@ -811,6 +811,27 @@ QtObject {
     function firstCover(tracks) { return tracks.length > 0 ? tracks[0].cover : ""; }
     function songs(n) { return { value: String(n), label: "首" }; }
 
+    // 历史日推：{ dates（新的在前）, noHistoryMessage, byDate }；登录后第一次读时要一次，没取到是 null
+    function dailyHistory() {
+        const h = source.p.dailyHistory;
+        if (!h) {
+            if (source.account)
+                source.need("dailyHistory");
+            return null;
+        }
+        return { dates: h.dates || [], noHistoryMessage: h.noHistoryMessage || "", byDate: h.byDate || {} };
+    }
+    // 每日推荐页的日期切换：今天，然后是服务器给的历史日子。没有历史时只有今天一项
+    function dailyDays(history) {
+        return [{ key: "daily", text: "今天" }].concat((history ? history.dates : [])
+            .map(date => ({ key: "dailyHistory:" + date, text: source.dayLabel(date) })));
+    }
+    // "2026-10-09" → "10月9日"
+    function dayLabel(date) {
+        const parts = date.split("-");
+        return parts.length === 3 ? Number(parts[1]) + "月" + Number(parts[2]) + "日" : date;
+    }
+
     // 首页第一排：为你推荐的入口。每项 { key, title, caption, cover | symbol, locked }
     function homeEntries(loggedIn) {
         const p = source.pe;
@@ -860,11 +881,17 @@ QtObject {
     function list(key) {
         const p = source.pe;
         switch (key) {
-        case "daily": return {
-            heading: "每日推荐", cover: source.sized(source.firstCover(p.daily.tracks), 560), tracks: p.daily.tracks,
-            showReason: true,
-            facts: [{ label: p.daily.date }, source.songs(p.daily.tracks.length)],
-            description: "根据你的口味生成，每天 6:00 更新", emptyText: "今天的推荐还在生成，稍后再来" };
+        case "daily": {
+            // 没有历史日推（不是黑胶 VIP，或刚开始用）时，服务器给一句原因，跟在说明后面
+            const history = source.dailyHistory();
+            const why = history && history.dates.length === 0 ? history.noHistoryMessage : "";
+            return {
+                heading: "每日推荐", cover: source.sized(source.firstCover(p.daily.tracks), 560), tracks: p.daily.tracks,
+                showReason: true, days: source.dailyDays(history),
+                facts: [{ label: p.daily.date }, source.songs(p.daily.tracks.length)],
+                description: "根据你的口味生成，每天 6:00 更新" + (why ? "。" + why : ""),
+                emptyText: "今天的推荐还在生成，稍后再来" };
+        }
         case "radar": return {
             heading: "私人雷达", cover: source.sized(p.radar.cover, 560), tracks: p.radar.tracks,
             facts: [source.songs(p.radar.tracks.length)],
@@ -931,6 +958,21 @@ QtObject {
                          playlistId: owned ? id : 0,
                          failed: Boolean(source.failure(key)),
                          emptyText: source.live ? "正在取回曲目…" : "这个歌单的曲目还没取到" };
+            }
+            // 历史日推的某一天：key = "dailyHistory:<YYYY-MM-DD>"，与请求同一个 key（重试也用它）
+            if (key.startsWith("dailyHistory:")) {
+                const date = key.slice(13);
+                const history = source.dailyHistory();
+                const day = history ? history.byDate[date] : undefined;
+                if (day === undefined)   // 取到过（哪怕是空的）就不再要
+                    source.need(key);
+                const tracks = day ? day.tracks : [];
+                return { heading: "每日推荐", cover: source.sized(source.firstCover(tracks), 560), tracks: tracks,
+                         showReason: true, days: source.dailyDays(history),
+                         facts: [{ label: source.dayLabel(date) }].concat(day ? [source.songs(tracks.length)] : []),
+                         description: "",
+                         failed: day === undefined && Boolean(source.failure(key)),
+                         emptyText: day === undefined ? "正在取回这一天的推荐…" : "这一天没有推荐" };
             }
             if (key === "searchSongs") {
                 const r = source.searchResult;
