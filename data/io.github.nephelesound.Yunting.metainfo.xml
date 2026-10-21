@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.27" date="2026-10-21">
+      <description>
+        <p>The daily recommendations page can show past days: a row of dates above the tracks (today and the recent days NetEase keeps, for black vinyl VIP members) switches the list to that day. A client left running now refetches the daily recommendations after the 6:00 rollover.</p>
+        <p xml:lang="zh_CN">每日推荐页可以看历史日推：曲目上方一排日期（今天和网易保留的最近几次，黑胶 VIP 才有），点一下换成那一天的歌。客户端一直开着时，过了 6:00 会自己换成新一天的推荐。</p>
+      </description>
+    </release>
     <release version="0.6.26" date="2026-10-21">
       <description>
         <p>The window background now uses the same colours as the title bar, so the title bar and the page read as one surface without a seam.</p>
