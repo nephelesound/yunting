@@ -65,6 +65,9 @@ explicit NcmClient(QObject *parent = nullptr, bool loadCookies = true);
     // 退出登录：移除 MUSIC_U / __csrf / NMTID 并落盘；匿名设备 cookie 不保留（我们只用这三个）
     void clearAuthCookies();
 
+    // Cookie 登录：整套换掉这三个并存储，不合并（只粘 MUSIC_U 时不能留着上个账号的 __csrf）
+    void replaceAuthCookies(const QMap<QString, QString> &credentials);
+
     // Form POST with an explicit client cookie context. Used only by endpoints
     // whose entitlement differs by client context (song download).
     void postFormWithContext(const QString &path, const QUrlQuery &form, bool personal,
@@ -75,6 +78,10 @@ explicit NcmClient(QObject *parent = nullptr, bool loadCookies = true);
     // 语义层的在途去重在 Store.request（key 在它那里才知道）；这里每个请求都发。
     // 依赖 jar 的个人请求必须在 ready() 之后。
     void get(const QString &path, const QUrlQuery &query, bool personal, GetCallback callback);
+
+    // 同 get，但用一套还没进 jar 的凭据：Cookie 登录先校验再落盘。jar 不动，Set-Cookie 不收。
+    void getWithCredentials(const QString &path, const QMap<QString, QString> &credentials,
+                            GetCallback callback);
 
     // 网易的短链（163cn.tv）：GET 一次、不跟随跳转，回调它指向的地址；失败回调空 QUrl。
     // 不带 cookie，不重试；照样经过流量计。
@@ -129,9 +136,11 @@ signals:
     void requestFinished(bool ok, bool networkFailure);
 
 private:
-    // 发起一次尝试；retrying 表示这是重试（成功/终局只发一次回调与信号）
+    // 发起一次尝试；retrying 表示这是重试（成功/终局只发一次回调与信号）。
+    // credentials 非空时用它代替 jar（见 getWithCredentials）。
     void startGet(const QString &path, const QUrlQuery &query, bool personal,
-                  int attempt, bool retrying, GetCallback callback);
+                  int attempt, bool retrying, GetCallback callback,
+                  const QMap<QString, QString> &credentials = {});
     static bool isNetworkError(const QNetworkReply &reply);
     void postRaw(const QUrl &url, const QByteArray &body, const QString &cookie, ResponseCallback callback,
                  bool keepCookies = true);
@@ -139,6 +148,7 @@ private:
     void keepSetCookies(class QNetworkReply *reply, quint64 generation);
     // 同 snapshot.py 的 cookie_header()：只带这三个；空 value 跳过
     QString cookieHeader(bool personal, const QString &context = {}) const;
+    static QString cookieHeader(const QMap<QString, QString> &credentials, const QString &context);
 
     CookieVault *m_vault;
     QNetworkAccessManager *m_nam;

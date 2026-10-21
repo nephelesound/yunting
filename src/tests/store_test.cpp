@@ -662,25 +662,31 @@ private slots:
         bare.loginWithCookie(QStringLiteral("  bare-token-value  "));
         QVERIFY(waitUntil([&] { return bare.state() == "done"; }, 5000));
         QCOMPARE(m_client->cookieJar().value("MUSIC_U"), QStringLiteral("bare-token-value"));
+        // 换的是整套凭据：上一个账号的 __csrf 不能跟着新 MUSIC_U 留下
+        QVERIFY(!m_client->cookieJar().contains("__csrf"));
     }
 
-    // 无效的 Cookie 不能留在钥匙串里：否则下次启动就是「会话过期」
+    // 校验没过（301、风控）：粘贴的 Cookie 不进 jar，原来的登录原样留着
     void cookieLoginRejectsInvalidCookie()
     {
-        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
-            if (req.path == "/api/nuser/account/get") {
-                respond(200, "{\"code\":301}");
-                return;
-            }
-            respond(200, "{\"code\":200}");
-        };
-        Session session(m_client, m_store);
-        QSignalSpy failed(&session, &Session::loginFailed);
-        session.loginWithCookie(QStringLiteral("MUSIC_U=bad-cookie"));
-        QVERIFY(waitUntil([&] { return failed.count() == 1; }, 5000));
-        QVERIFY(session.state() != QLatin1String("done"));
-        QVERIFY(!m_client->hasMusicU());
-        QVERIFY(!failed.first().at(0).toString().isEmpty());
+        for (const QByteArray &reply : {QByteArray("{\"code\":301}"), QByteArray("{\"code\":250}")}) {
+            m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+                if (req.path == "/api/nuser/account/get") {
+                    respond(200, reply);
+                    return;
+                }
+                respond(200, "{\"code\":200}");
+            };
+            Session session(m_client, m_store);
+            QSignalSpy failed(&session, &Session::loginFailed);
+            session.loginWithCookie(QStringLiteral("MUSIC_U=bad-cookie"));
+            QVERIFY(waitUntil([&] { return failed.count() == 1; }, 5000));
+            // 失败后回到扫码：等那次取码落地（这里的假回包没有 unikey），session 才能析构
+            QVERIFY(waitUntil([&] { return session.state() == "error"; }, 5000));
+            QCOMPARE(m_client->cookieJar().value("MUSIC_U"), QStringLiteral("test"));
+            QCOMPARE(m_client->cookieJar().value("__csrf"), QStringLiteral("csrf"));
+            QCOMPARE(failed.first().at(0).toString().contains(u"无效"), reply.contains("301"));
+        }
     }
 
     // 校验还在路上时关掉对话框：迟到的失败回包不能报错，也不能在没有界面时重开扫码
@@ -707,6 +713,8 @@ private slots:
         QCOMPARE(session.state(), QStringLiteral("idle"));
         QCOMPARE(failed.count(), 0);
         QCOMPARE(unikeyRequests, 0);
+        // 校验过了才落盘：关掉对话框不会留下没验过的 Cookie
+        QCOMPARE(m_client->cookieJar().value("MUSIC_U"), QStringLiteral("test"));
     }
 
     // 校验期间又开了一张码（关掉再打开对话框）：Cookie 登录成了，那张码就不再轮询

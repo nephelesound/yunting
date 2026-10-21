@@ -11,39 +11,41 @@
 namespace {
 constexpr int PollMs = 2000;
 
-void appendCookies(QJsonArray &jar, const QString &raw)
+// 803 的 cookie 可能是 "MUSIC_U=…; __csrf=…" 这一种字符串（新版接口），
+// 也可能是 Set-Cookie 风格的属性串；只取我们需要的三个键。
+QMap<QString, QString> authCookies(const QString &raw)
 {
-    // 803 的 cookie 可能是 "MUSIC_U=…; __csrf=…" 这一种字符串（新版接口），
-    // 也可能是 Set-Cookie 风格的属性串；只取我们需要的三个键。
+    QMap<QString, QString> cookies;
     for (const QString &part : raw.split(u';')) {
-        const QString pair = part.section(u';', 0, 0).trimmed();
-        if (pair.isEmpty())
-            continue;
+        const QString pair = part.trimmed();
         const QString name = pair.section(u'=', 0, 0).trimmed();
         if (name == QLatin1String("MUSIC_U") || name == QLatin1String("__csrf")
             || name == QLatin1String("NMTID")) {
-            jar.append(QJsonObject{{name, pair.mid(name.length() + 1)}});
+            cookies.insert(name, pair.mid(name.length() + 1));
         }
     }
+    return cookies;
+}
+
+void appendCookies(QJsonArray &jar, const QString &raw)
+{
+    const QMap<QString, QString> cookies = authCookies(raw);
+    for (auto it = cookies.cbegin(); it != cookies.cend(); ++it)
+        jar.append(QJsonObject{{it.key(), it.value()}});
 }
 
 // 网页端复制的 Cookie：整段 Cookie 头，或只粘 MUSIC_U 的值（浏览器里叫 MUSIC_U 的那一格）。
 // 认不出 MUSIC_U 时返回空表。
-QJsonArray cookieJarFrom(const QString &raw)
+QMap<QString, QString> credentialsFrom(const QString &raw)
 {
-    QJsonArray jar;
     if (!raw.contains(u'=')) {
         const QString token = raw.trimmed();
-        if (!token.isEmpty())
-            jar.append(QJsonObject{{QStringLiteral("MUSIC_U"), token}});
-        return jar;
+        if (token.isEmpty())
+            return {};
+        return {{QStringLiteral("MUSIC_U"), token}};
     }
-    appendCookies(jar, raw);
-    for (const QJsonValue &c : jar) {
-        if (c.toObject().contains(QStringLiteral("MUSIC_U")))
-            return jar;
-    }
-    return {};
+    const QMap<QString, QString> cookies = authCookies(raw);
+    return cookies.value(QStringLiteral("MUSIC_U")).isEmpty() ? QMap<QString, QString>() : cookies;
 }
 } // namespace
 
@@ -122,9 +124,8 @@ void Session::refreshSession()
     }
     m_refreshing = true;
     const quint64 generation = ++m_refreshGeneration;
-    // The reference service uses this endpoint through its default transport; the
-    // Web MUSIC_U context is accepted by /weapi. Cookies arrive as Set-Cookie and
-    // are persisted by NcmClient before this callback runs.
+    // 只有扫码登录的 MUSIC_U 能这样续期：网页端复制的 MUSIC_U 在这里一律回 301（issue #3），
+    // 那种会话过期了只能重新登录。新 cookie 经 Set-Cookie 下发，回调之前 NcmClient 已经存好。
     m_client->postWeapi(QStringLiteral("login/token/refresh"), {}, true,
                         [this, generation](const QJsonDocument &doc, bool ok) {
         if (generation != m_refreshGeneration)
@@ -132,7 +133,7 @@ void Session::refreshSession()
         m_refreshing = false;
         const int code = ok ? doc.object().value(QStringLiteral("code")).toInt() : 0;
         if (!ok || code != 200 || !m_client->hasMusicU()) {
-            emit refreshFailed(QStringLiteral("登录状态刷新失败，请重新扫码"));
+            emit refreshFailed(QStringLiteral("登录状态刷新失败，请重新登录"));
             return;
         }
         m_store->refresh();
@@ -142,8 +143,8 @@ void Session::refreshSession()
 
 void Session::loginWithCookie(const QString &raw)
 {
-    const QJsonArray jar = cookieJarFrom(raw);
-    if (jar.isEmpty()) {
+    const QMap<QString, QString> credentials = credentialsFrom(raw);
+    if (credentials.isEmpty()) {
         emit loginFailed(QStringLiteral("没有识别到 MUSIC_U：请粘贴整段 Cookie，或 MUSIC_U 的值"));
         return;
     }
@@ -157,24 +158,29 @@ void Session::loginWithCookie(const QString &raw)
         emit qrContentChanged();
     }
 
-    m_client->adoptCookies(QJsonDocument(jar));
     // 用账号接口校验：拿到 profile 才算这个 MUSIC_U 有效。不能用 login/token/refresh，
     // 浏览器里复制的有效 MUSIC_U 也会被它回 301（issue #3）。
-    // 失败时清掉它，否则它留在钥匙串里，下次启动就成了「会话过期」。
+    // 校验过了才写进 jar：失败、断网或中途关掉对话框时，原来的登录状态原样留着。
     const quint64 generation = ++m_cookieGeneration;
-    m_client->get(QStringLiteral("api/nuser/account/get"), {}, true,
-                  [this, generation](const QJsonDocument &doc, bool ok) {
+    m_client->getWithCredentials(QStringLiteral("api/nuser/account/get"), credentials,
+                                 [this, generation, credentials](const QJsonDocument &doc, bool ok) {
         if (generation != m_cookieGeneration)
             return;
-        const QJsonObject profile = doc.object().value(QStringLiteral("profile")).toObject();
-        if (!ok || profile.value(QStringLiteral("userId")).toDouble() <= 0) {
-            m_client->clearAuthCookies();
-            emit loginFailed(ok ? QStringLiteral("Cookie 无效或已过期，请从浏览器重新复制")
-                                : QStringLiteral("连不上服务器，请稍后再试"));
+        const QJsonObject root = doc.object();
+        const int code = root.value(QStringLiteral("code")).toInt(200);
+        if (!ok || root.value(QStringLiteral("profile")).toObject()
+                           .value(QStringLiteral("userId")).toDouble() <= 0) {
+            if (!ok)
+                emit loginFailed(QStringLiteral("连不上服务器，请稍后再试"));
+            else if (code == 200 || code == 301)
+                emit loginFailed(QStringLiteral("Cookie 无效或已过期，请从浏览器重新复制"));
+            else   // 风控（250）、限流（-460）等：Cookie 未必有问题
+                emit loginFailed(QStringLiteral("网易暂时拒绝了登录（%1），请稍后再试").arg(code));
             // 这张二维码的轮询已经停了：回到扫码流程，对话框不至于停在空二维码上
             start();
             return;
         }
+        m_client->replaceAuthCookies(credentials);
         // 校验期间可能又开了一张码（关掉再打开对话框）：登录成了就不再轮询它
         ++m_generation;
         m_polling = false;

@@ -27,7 +27,7 @@ public:
     // 用现有 MUSIC_U 刷新登录 cookie；成功后重拉首屏。会话过期时自动尝试一次。
     Q_INVOKABLE void refreshSession();
     // 网页端 Cookie 登录：粘贴整段 Cookie（MUSIC_U=…; __csrf=…）或只粘贴 MUSIC_U 的值。
-    // 经 nuser/account/get 校验：成功发 done 并重拉首屏，失败清掉无效凭据并发 loginFailed。
+    // 经 nuser/account/get 校验，通过了才写进 jar：成功发 done 并重拉首屏，失败发 loginFailed。
     Q_INVOKABLE void loginWithCookie(const QString &raw);
 
 signals:

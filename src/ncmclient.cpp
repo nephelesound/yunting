@@ -222,6 +222,19 @@ void NcmClient::clearAuthCookies()
     persistJar();
 }
 
+void NcmClient::replaceAuthCookies(const QMap<QString, QString> &credentials)
+{
+    ++m_authGeneration;
+    for (const char *name : {"MUSIC_U", "__csrf", "NMTID"}) {
+        const QString value = credentials.value(QLatin1String(name));
+        if (value.isEmpty())
+            m_jar.remove(QLatin1String(name));
+        else
+            m_jar.insert(QLatin1String(name), value);
+    }
+    persistJar();
+}
+
 bool NcmClient::flushCredentials(int timeoutMs)
 {
     return m_vault->waitForPending(timeoutMs);
@@ -359,14 +372,18 @@ QString NcmClient::cookieHeader(bool personal, const QString &contextOverride) c
 {
     // 客户端身份对匿名请求也要带上（登录二维码也走同一客户端栈）；认证 cookie 只在
     // personal 时发送。评论写入会校验完整 appver，截断版本会回 250「设备存在安全风险」。
+    return cookieHeader(personal ? m_jar : QMap<QString, QString>(), contextOverride);
+}
+
+QString NcmClient::cookieHeader(const QMap<QString, QString> &credentials,
+                                const QString &contextOverride)
+{
     QString header;
-    if (personal) {
-        for (const char *name : {"MUSIC_U", "__csrf", "NMTID"}) {
-            const QString value = m_jar.value(QLatin1String(name));
-            if (!value.isEmpty())
-                header += (header.isEmpty() ? QString() : QLatin1String("; "))
-                    + QLatin1String(name) + u'=' + value;
-        }
+    for (const char *name : {"MUSIC_U", "__csrf", "NMTID"}) {
+        const QString value = credentials.value(QLatin1String(name));
+        if (!value.isEmpty())
+            header += (header.isEmpty() ? QString() : QLatin1String("; "))
+                + QLatin1String(name) + u'=' + value;
     }
     const QString context = contextOverride.isEmpty()
         ? ncm::client::cookieContext() : contextOverride;
@@ -487,6 +504,12 @@ void NcmClient::get(const QString &path, const QUrlQuery &query, bool personal, 
     startGet(path, query, personal, 0, false, std::move(callback));
 }
 
+void NcmClient::getWithCredentials(const QString &path, const QMap<QString, QString> &credentials,
+                                   GetCallback callback)
+{
+    startGet(path, {}, true, 0, false, std::move(callback), credentials);
+}
+
 void NcmClient::resolveRedirect(const QUrl &url, std::function<void(const QUrl &target)> callback)
 {
     if (!m_traffic.admit(QStringLiteral("GET"), url.host() + url.path(), url.query(), m_clock.elapsed())) {
@@ -515,7 +538,8 @@ void NcmClient::resolveRedirect(const QUrl &url, std::function<void(const QUrl &
 }
 
 void NcmClient::startGet(const QString &path, const QUrlQuery &query, bool personal,
-                         int attempt, bool retrying, GetCallback callback)
+                         int attempt, bool retrying, GetCallback callback,
+                         const QMap<QString, QString> &credentials)
 {
     QUrl url(m_apiBase + path);
     url.setQuery(query);
@@ -530,7 +554,8 @@ void NcmClient::startGet(const QString &path, const QUrlQuery &query, bool perso
     // 会混进之后的个人请求，网易就按匿名处理、回 301。cookie 只由 m_jar 管理（见 keepSetCookies）
     req.setAttribute(QNetworkRequest::CookieLoadControlAttribute, QNetworkRequest::Manual);
     req.setAttribute(QNetworkRequest::CookieSaveControlAttribute, QNetworkRequest::Manual);
-    const QString cookie = cookieHeader(personal);
+    const QString cookie = credentials.isEmpty() ? cookieHeader(personal)
+                                                 : cookieHeader(credentials, {});
     if (!cookie.isEmpty()) {
         req.setRawHeader("Cookie", cookie.toUtf8());
     }
@@ -549,7 +574,8 @@ void NcmClient::startGet(const QString &path, const QUrlQuery &query, bool perso
     const quint64 authGeneration = m_authGeneration;
     QNetworkReply *reply = m_nam->get(req);
     connect(reply, &QNetworkReply::finished, this,
-            [this, reply, callback, path, query, personal, attempt, timer, authGeneration]
+            [this, reply, callback, path, query, personal, attempt, timer, authGeneration,
+             credentials]
     {
         reply->deleteLater();
         const bool networkError = isNetworkError(*reply);
@@ -566,10 +592,11 @@ void NcmClient::startGet(const QString &path, const QUrlQuery &query, bool perso
         // 重试只会放大风控，必须按业务失败直接交给调用方。
         const bool retryable = (networkError || status >= 500) && !businessReject;
         if (retryable && attempt < MaxRetries && callbackContextAlive()) {
-            QTimer::singleShot(RetryDelaysMs[attempt], this, [this, path, query, personal, attempt, callback] {
+            QTimer::singleShot(RetryDelaysMs[attempt], this,
+                               [this, path, query, personal, attempt, callback, credentials] {
                 if (!callbackContextAlive())
                     return;
-                startGet(path, query, personal, attempt + 1, true, std::move(callback));
+                startGet(path, query, personal, attempt + 1, true, std::move(callback), credentials);
             });
             return;
         }
@@ -593,7 +620,8 @@ void NcmClient::startGet(const QString &path, const QUrlQuery &query, bool perso
                                        << "status=" << status;
         }
         const bool ok = parsed && status > 0 && status < 400;
-        keepSetCookies(reply, authGeneration);
+        if (credentials.isEmpty())
+            keepSetCookies(reply, authGeneration);
         emit requestFinished(ok, networkError);
         if (callback && callbackContextAlive())
             callback(doc, ok);
