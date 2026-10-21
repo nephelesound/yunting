@@ -61,10 +61,13 @@ QString Store::privacyMessage(const QJsonObject &body)
         ? message : QString();
 }
 
-Store::Store(NcmClient *client, QObject *parent)
-    : QObject(parent), m_client(client),
+Store::Store(NcmClient *client, QObject *parent, std::function<QDateTime()> clock)
+    : QObject(parent), m_client(client), m_clock(std::move(clock)),
       m_cache(QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/queries.db")
 {
+    if (!m_clock)
+        m_clock = [] { return QDateTime::currentDateTime(); };
+
     // 骨架先就位：形状永远完整，QML 绑定不会踩到缺键（值本身仍可为 null / 空表）
     m_data = QVariantMap{
         {"toplists", QVariantList{}},
@@ -129,6 +132,7 @@ Store::Store(NcmClient *client, QObject *parent)
     m_personal = QVariantMap{
         {"account", nullVariant()},
         {"daily", nullVariant()},
+        {"dailyHistory", nullVariant()},
         {"heart", nullVariant()},
         {"radar", nullVariant()},
         {"liked", nullVariant()},
@@ -170,6 +174,11 @@ Store::Store(NcmClient *client, QObject *parent)
     m_writeDebounce.setSingleShot(true);
     m_writeDebounce.setInterval(300);
     connect(&m_writeDebounce, &QTimer::timeout, this, &Store::flushDebouncedWrites);
+    // 每日推荐在 6:00 换日：挂过换日点的客户端自己重取。对的是墙钟而不是定一个 6:00 的
+    // 闹钟——单次定时器走单调时钟，睡眠跨过 6:00 后会在醒来时再等完剩余时间。
+    m_dailyTimer.setInterval(60 * 1000);
+    connect(&m_dailyTimer, &QTimer::timeout, this, &Store::checkDailyRollover);
+    m_dailyTimer.start();
     // 系统说网络恢复（离线→在线沿）：还上离线期间欠的那次刷新
     if (QNetworkInformation::loadDefaultBackend()) {
         m_netInfo = QNetworkInformation::instance();
@@ -196,6 +205,26 @@ void Store::connectionRegained()
     setOnline(true);
     m_refreshOwed = false;
     refresh();
+}
+
+// 每日推荐在 6:00 换日（界面上的文案也是这么写的）：0:00–5:59 取到的仍是前一天的列表。
+QDate Store::dailyServiceDay(const QDateTime &now)
+{
+    const QDate date = now.date();
+    return now.time().hour() < 6 ? date.addDays(-1) : date;
+}
+
+// 每分钟对墙钟：跨过换日点就重取一次。睡眠或改时区后醒来，最多一分钟就能补上。
+void Store::checkDailyRollover()
+{
+    if (!m_client->hasMusicU())
+        return;
+    if (dailyServiceDay(m_clock()) == m_dailyDay)
+        return;
+    fetchDaily();
+    // 历史页开过（或启动时恢复过）：日期表也换成新的一天，开着的页面才会出现「今天」
+    if (!m_personal.value("dailyHistory").isNull())
+        requestDailyHistory();
 }
 
 // 上次的首屏值先放上（只放骨架里有的键，旧版本缓存里多出来的字段不带进来）。

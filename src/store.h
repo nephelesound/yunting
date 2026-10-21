@@ -4,6 +4,8 @@
 // scripts/check_contract.py 把关。
 #include "ncmclient.h"
 #include "querycache.h"
+#include <QDate>
+#include <QDateTime>
 #include <QHash>
 #include <QJsonArray>
 #include <QJsonObject>
@@ -56,7 +58,9 @@ class Store : public QObject {
     // 持有 MUSIC_U 但账号接口说没有会话（无 profile / 301）；登录成功或 refresh 拿到账号后回 false
     Q_PROPERTY(bool sessionExpired READ sessionExpired NOTIFY sessionExpiredChanged)
 public:
-    explicit Store(NcmClient *client, QObject *parent = nullptr);
+    // clock：当前墙钟（默认读系统时间）；测试替换它来跨过每日推荐的换日点
+    explicit Store(NcmClient *client, QObject *parent = nullptr,
+                   std::function<QDateTime()> clock = {});
 
     QVariantMap data() const { return m_data; }
     QVariantMap personal() const { return m_personal; }
@@ -160,6 +164,8 @@ private slots:
     void requestFinished(bool ok, bool networkFailure);
     // QNetworkInformation 的离线→在线沿：恢复后拉一次首屏（每次离线期间只欠一次）
     void connectionRegained();
+    // 每分钟对一次墙钟：跨过 6:00 的换日点就重取每日推荐
+    void checkDailyRollover();
 
 private:
     // 发一条首屏请求并计数；waitForInitial 等计数归零
@@ -173,6 +179,11 @@ private:
     void fetchAnonymousPlaylists();
     void patchPlaylistCard(double id, const QVariantList &tracks, const QString &description);
     void fetchDaily();
+    // 历史日推：可用日期（新的在前）与某一天的曲目
+    void requestDailyHistory();
+    void requestDailyHistoryDate(const QString &date);
+    // 每日推荐在 6:00 换日：0:00–5:59 仍属于前一天（与界面上的「每天 6:00 更新」一致）
+    static QDate dailyServiceDay(const QDateTime &now);
     void fetchUserLists(double uid);
     void fetchLiked(const QJsonObject &likedList);
     void putLiked(const QVariantMap &liked);
@@ -328,6 +339,7 @@ private:
     void setSessionExpired(bool expired);
 
     NcmClient *m_client;
+    std::function<QDateTime()> m_clock;
     CloudUploader *m_cloudUploader = nullptr;
     QVariantMap m_data;
     QVariantMap m_personal;
@@ -339,6 +351,7 @@ private:
     QVariantMap m_similarSeed;
     bool m_similarFired = false;
     double m_heartSeedId = 0;        // 心动模式当前（或在途）的种子：红心第一首
+    QDate m_dailyDay;                // 最近一次请求每日推荐所属的服务日；无效 = 还没请求过
     bool m_online = true;
     bool m_sessionExpired = false;
     QNetworkInformation *m_netInfo = nullptr;
@@ -364,5 +377,6 @@ private:
     };
     QHash<QString, CommentLikeState> m_commentLikes; // kind:ownerId:commentId 的防抖/在途意图
     QTimer m_writeDebounce;
+    QTimer m_dailyTimer;             // 每分钟对墙钟，跨过 6:00 就重取每日推荐
     QHash<QString, std::function<void()>> m_debouncedWrites;
 };

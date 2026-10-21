@@ -965,8 +965,133 @@ private:
             ids.append(t.toMap().value("id").toDouble());
         return ids;
     }
+    double dailyId() const
+    {
+        const QVariantList tracks =
+            m_store->personal().value("daily").toMap().value("tracks").toList();
+        return tracks.isEmpty() ? 0 : tracks.first().toMap().value("id").toDouble();
+    }
+    QString dailyDate() const
+    {
+        return m_store->personal().value("daily").toMap().value("date").toString();
+    }
 
 private slots:
+    // 客户端挂过 6:00：服务日一变就重取每日推荐；0:00–5:59 仍属于前一天，不重取。
+    // 睡眠跨过换日点时定时器可能晚到，所以对的是墙钟，醒来后一分钟内补上。
+    void dailyRefreshesAfterTheSixOClockRollover()
+    {
+        QDateTime now(QDate(2026, 10, 20), QTime(23, 0));
+        delete m_store;
+        m_store = new Store(m_client, nullptr, [&now] { return now; });
+
+        int dailyRequests = 0;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/nuser/account/get") {
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"profile", QJsonObject{{"userId", 42}, {"nickname", "n"}}}}));
+            } else if (req.path == "/api/v3/discovery/recommend/songs") {
+                ++dailyRequests;
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"data", QJsonObject{
+                        {"dailySongs", QJsonArray{QJsonObject{
+                            {"id", 100.0 + dailyRequests}, {"name", "song"},
+                            {"ar", QJsonArray{}}, {"al", QJsonObject{}}, {"dt", 1000}}}}}}}));
+            } else {
+                respond(200, "{\"code\":200}");
+            }
+        };
+
+        m_store->refresh();
+        QVERIFY(waitUntil([&] { return dailyRequests == 1 && dailyId() == 101; }));
+        QCOMPARE(dailyDate(), QStringLiteral("10月20日"));
+
+        // 过了午夜但没到 6:00：服务端还没换日，不重取
+        now = QDateTime(QDate(2026, 10, 21), QTime(3, 0));
+        QMetaObject::invokeMethod(m_store, "checkDailyRollover");
+        QTest::qWait(100);
+        QCOMPARE(dailyRequests, 1);
+        QCOMPARE(dailyDate(), QStringLiteral("10月20日"));
+
+        // 6:00：重取，日期跟着换
+        now = QDateTime(QDate(2026, 10, 21), QTime(6, 0));
+        QMetaObject::invokeMethod(m_store, "checkDailyRollover");
+        QVERIFY(waitUntil([&] { return dailyRequests == 2 && dailyId() == 102; }));
+        QCOMPARE(dailyDate(), QStringLiteral("10月21日"));
+
+        // 同一天再对表：不重复取
+        QMetaObject::invokeMethod(m_store, "checkDailyRollover");
+        QTest::qWait(100);
+        QCOMPARE(dailyRequests, 2);
+    }
+
+    // 历史日推：日期表与某天的曲目各走一次；刷新日期表时已经取回的某天曲目留着
+    void dailyHistoryDatesAndDays()
+    {
+        QHash<QString, int> calls;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/discovery/recommend/songs/history/recent") {
+                ++calls["recent"];
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"data", QJsonObject{
+                        // 第二次取（换了一天）：10-21 进来，10-19 掉出去
+                        {"dates", calls["recent"] == 1
+                             ? QJsonArray{QStringLiteral("2026-10-20"), QStringLiteral("2026-10-19")}
+                             : QJsonArray{QStringLiteral("2026-10-21"), QStringLiteral("2026-10-20")}},
+                        {"description", "desc"},
+                        {"noHistoryMessage", "none"}}}}));
+            } else if (req.path == "/api/discovery/recommend/songs/history/detail") {
+                ++calls["detail"];
+                const QString date = QUrlQuery(QString::fromLatin1(req.query))
+                                         .queryItemValue(QStringLiteral("date"));
+                respond(200, json(QJsonObject{
+                    {"code", 200},
+                    {"data", QJsonObject{
+                        {"songs", QJsonArray{QJsonObject{
+                            {"id", date == QLatin1String("2026-10-20") ? 11.0 : 12.0},
+                            {"name", "song"}, {"ar", QJsonArray{}}, {"al", QJsonObject{}},
+                            {"dt", 1000}}}}}}}));
+            } else {
+                respond(200, "{\"code\":200}");
+            }
+        };
+
+        m_store->request(QStringLiteral("dailyHistory"));
+        QVERIFY(waitUntil([&] {
+            return m_store->personal().value("dailyHistory").toMap().value("dates").toList().size() == 2;
+        }));
+        QCOMPARE(m_store->personal().value("dailyHistory").toMap().value("description").toString(),
+                 QStringLiteral("desc"));
+
+        m_store->request(QStringLiteral("dailyHistory:2026-10-20"));
+        QVERIFY(waitUntil([&] {
+            return m_store->personal().value("dailyHistory").toMap().value("byDate").toMap()
+                       .value("2026-10-20").toMap().value("tracks").toList().size() == 1;
+        }));
+        QCOMPARE(m_store->personal().value("dailyHistory").toMap().value("byDate").toMap()
+                     .value("2026-10-20").toMap().value("tracks").toList().first().toMap()
+                     .value("id").toDouble(), 11.0);
+
+        m_store->request(QStringLiteral("dailyHistory:2026-10-19"));
+        QVERIFY(waitUntil([&] {
+            return m_store->personal().value("dailyHistory").toMap().value("byDate").toMap()
+                .contains(QStringLiteral("2026-10-19"));
+        }));
+
+        // 换日时日期表再取一次：还在表里的那天留着，掉出去的丢掉（byDate 存在缓存里，不丢会越积越多）
+        m_store->request(QStringLiteral("dailyHistory"));
+        QVERIFY(waitUntil([&] {
+            return m_store->personal().value("dailyHistory").toMap().value("dates").toList().value(0)
+                == QStringLiteral("2026-10-21");
+        }));
+        const QVariantMap byDate = m_store->personal().value("dailyHistory").toMap().value("byDate").toMap();
+        QVERIFY(byDate.contains(QStringLiteral("2026-10-20")));
+        QVERIFY(!byDate.contains(QStringLiteral("2026-10-19")));
+    }
+
     // 心动模式以红心第一首为种子：新点的红心排到第一，心动模式跟着换；取消后换回原来的第一首
     void heartFollowsTheFirstLikedSong()
     {

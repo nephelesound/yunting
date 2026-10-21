@@ -204,6 +204,10 @@ void Store::request(const QString &key)
                                      parts.value(3).toLongLong()); }},
         {QStringLiteral("lyricsNew:"), [](Store &s, const QString &k) {
              s.requestLyricsNew(k.section(u':', 1).toDouble()); }},
+        {QStringLiteral("dailyHistory:"), [](Store &s, const QString &k) {
+             s.requestDailyHistoryDate(k.section(u':', 1)); }},
+        {QStringLiteral("dailyHistory"), [](Store &s, const QString &) {
+             s.requestDailyHistory(); }},
         {QStringLiteral("discover:newSongs"), [](Store &s, const QString &k) {
              if (k == QLatin1String("discover:newSongs")) s.requestNewSongs(); }},
         {QStringLiteral("discover:newAlbums"), [](Store &s, const QString &k) {

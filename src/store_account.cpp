@@ -224,11 +224,18 @@ void Store::patchPlaylistCard(double id, const QVariantList &tracks, const QStri
 
 void Store::fetchDaily()
 {
-    fetch("api/v3/discovery/recommend/songs", {}, true, [this](const QJsonDocument &doc, bool ok) {
+    // 6:00 前取到的仍是前一天的列表：日期标签跟着服务日走，不跟回包时的墙钟。
+    const QDate day = dailyServiceDay(m_clock());
+    m_dailyDay = day;   // 请求发出就算这天取过：失败留给断网恢复的 refresh()，不每分钟重试
+    const quint64 token = m_requests.begin(QStringLiteral("daily"));
+    fetch("api/v3/discovery/recommend/songs", {}, true,
+          [this, day, token](const QJsonDocument &doc, bool ok) {
+        // 换日前后各有一个请求：旧服务日的回包不能盖掉新的
+        if (!m_requests.current(QStringLiteral("daily"), token))
+            return;
         if (ok) {
-            const QDate today = QDate::currentDate();
             // Python 的 strftime("%m月%d日").lstrip("0")：去掉月份的补零
-            QString date = today.toString(QStringLiteral("MM月dd日"));
+            QString date = day.toString(QStringLiteral("MM月dd日"));
             if (date.startsWith(u'0'))
                 date.remove(0, 1);
             const QJsonObject data = body(doc).value("data").toObject();
@@ -253,10 +260,73 @@ void Store::fetchDaily()
                     track, reasons.value(static_cast<double>(track.id))));
             put("daily", QVariantMap{
                              {"date", date},
-                             {"day", QString::number(today.day())},
+                             {"day", QString::number(day.day())},
                              {"tracks", tracks},
                          }, true);
         }
+    });
+}
+
+void Store::requestDailyHistory()
+{
+    const quint64 token = m_requests.begin(QStringLiteral("dailyHistory"));
+    fetchAlways("api/discovery/recommend/songs/history/recent", {}, true,
+                [this, token](const QJsonDocument &doc, bool ok) {
+        if (!m_requests.current(QStringLiteral("dailyHistory"), token))
+            return;
+        const QJsonValue code = doc.object().value("code");
+        if (!ok || (!code.isUndefined() && code.toInt() != 200)) {
+            emit requestFailed(QStringLiteral("dailyHistory"), QStringLiteral("暂时取不到历史日推"));
+            return;
+        }
+        const QJsonObject data = body(doc).value("data").toObject();
+        QVariantList dates;
+        for (const QJsonValue &value : arr(data, "dates"))
+            dates.append(value.toString());
+        // 换日期表与说明；已经取回的某天曲目留着，掉出日期表的那些丢掉（它们也存在缓存里，不丢会越积越多）
+        QVariantMap history = m_personal.value("dailyHistory").toMap();
+        QVariantMap byDate;
+        const QVariantMap fetched = history.value("byDate").toMap();
+        for (const QVariant &date : std::as_const(dates))
+            if (fetched.contains(date.toString()))
+                byDate.insert(date.toString(), fetched.value(date.toString()));
+        history.insert("dates", dates);
+        history.insert("description", data.value("description").toString());
+        history.insert("noHistoryMessage", data.value("noHistoryMessage").toString());
+        history.insert("byDate", byDate);
+        put("dailyHistory", history, true);
+    });
+}
+
+void Store::requestDailyHistoryDate(const QString &date)
+{
+    if (date.isEmpty())
+        return;
+    const QString key = QStringLiteral("dailyHistory:") + date;
+    const quint64 token = m_requests.begin(key);
+    fetchAlways("api/discovery/recommend/songs/history/detail", query({{"date", date}}), true,
+                [this, date, key, token](const QJsonDocument &doc, bool ok) {
+        if (!m_requests.current(key, token))
+            return;
+        const QJsonValue code = doc.object().value("code");
+        if (!ok || (!code.isUndefined() && code.toInt() != 200)) {
+            emit requestFailed(key, QStringLiteral("暂时取不到这一天的推荐"));
+            return;
+        }
+        const auto parsed = sdk::parseTracks(arr(body(doc).value("data").toObject(), "songs"), {});
+        if (!parsed)
+            return;
+        QVariantMap history = m_personal.value("dailyHistory").toMap();
+        if (!history.contains("dates"))
+            history.insert("dates", QVariantList{});
+        if (!history.contains("description"))
+            history.insert("description", QString{});
+        if (!history.contains("noHistoryMessage"))
+            history.insert("noHistoryMessage", QString{});
+        QVariantMap byDate = history.value("byDate").toMap();
+        byDate.insert(date, QVariantMap{{"tracks", sdk::tracksToVariantList(*parsed.value)}});
+        history.insert("byDate", byDate);
+        put("dailyHistory", history, true);
     });
 }
 

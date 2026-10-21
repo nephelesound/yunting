@@ -105,6 +105,7 @@
 | `personal.savedArtists` | `library:artists[:<next>]` | 分页：`{ more,next,count,items:[{id,name,cover,alias,albums,mvs}] }` |
 | `personal.savedAlbums` | `library:albums[:<next>]` | 分页：`{ more,next,count,items:[{id,name,cover,artist,artistId,size}] }` |
 | `personal.savedMvs` | `library:mvs[:<next>]` | 分页：`{ more,next,count,items:[{kind,id,vid,name,cover,artist,duration,playCount}] }`；`kind=mv` 时 `id` 为数字、`vid` 为空；`kind=video` 时 `id` 为 0、`vid` 为字符串 |
+| `personal.dailyHistory` | `dailyHistory` / `dailyHistory:<YYYY-MM-DD>` | `{ dates:[string], description, noHistoryMessage, byDate:{ "<date>": { tracks:[Track] } } }`；`dailyHistory` 取可用日期（新的在前，接口只给最近几次），某一天的曲目按需取，取到前 `byDate` 里没有这一天；没有历史时 `dates:[]`，原因在 `noHistoryMessage` |
 | `data.notices` | `notify:notices[:<next>]` | 分页：`{ more,next,items:[{id,time,user,text,resource}] }` |
 | `data.commentNotices` | `notify:comments[:<next>]` | 分页：`{ more,next,total,items:[{id,time,user,content,repliedContent,resource}] }` |
 | `data.forwards` | `notify:forwards[:<next>]` | 分页：`{ more,next,newCount,items:[{id,time,user,message,resource}] }` |
