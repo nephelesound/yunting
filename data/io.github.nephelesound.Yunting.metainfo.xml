@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.28" date="2026-10-22">
+      <description>
+        <p>Signing in with a Cookie copied from the browser no longer reports a valid Cookie as invalid or expired.</p>
+        <p xml:lang="zh_CN">用浏览器里复制的 Cookie 登录时，有效的 Cookie 不再被判成无效或已过期。</p>
+      </description>
+    </release>
     <release version="0.6.27" date="2026-10-21">
       <description>
         <p>The daily recommendations page can show past days: a row of dates above the tracks (today and the recent days NetEase keeps, for black vinyl VIP members) switches the list to that day. A client left running now refetches the daily recommendations after the 6:00 rollover.</p>

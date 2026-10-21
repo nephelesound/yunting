@@ -2,6 +2,12 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.28] - 2026-10-22
+
+### 修复
+- 「用 Cookie 登录」把浏览器里复制的有效 Cookie 一律判成「无效或已过期」（[#3](https://github.com/nephelesound/yunting/issues/3)）：原来用 `login/token/refresh` 校验，这个接口对网页端的 MUSIC_U 也回 301。现在改用账号接口校验，能取到账号就算登录成功。
+- Cookie 校验通过之后才存起来：校验失败、断网或中途关掉对话框，原来的登录状态都原样保留，不再被清掉，也不会留下没验过的 Cookie；只粘 MUSIC_U 时，上一个账号的 `__csrf` 不再跟着留下。网易因风控或限流拒绝时，提示「网易暂时拒绝了登录」并附上错误码，不再一律说 Cookie 无效。
+
 ## [0.6.27] - 2026-10-21
 
 ### 新增
