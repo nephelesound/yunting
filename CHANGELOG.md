@@ -2,6 +2,15 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.29] - 2026-10-23
+
+### 新增
+- 登录对话框恢复「客户端扫码 / 网页扫码」切换：网页扫码（`type=1`）与 netease-cloud-music-gtk4 用的是同一种会话，客户端扫码（`type=3`）仍是默认。切换时自动换一张二维码，取码与轮询的会话类型始终一致。
+
+### 修复
+- 「用 Cookie 登录」认得浏览器和开发者工具实际产生的各种粘贴格式（[#3](https://github.com/nephelesound/yunting/issues/3)）：Cookie 表格的 `MUSIC_U<TAB>值`、`MUSIC_U: 值`、带引号的 Set-Cookie、`Cookie:` 前缀、换行分隔的多行 Cookie，以及整段 URL 编码。
+- Cookie 校验失败时提示实际识别到的 MUSIC_U 长度，明显偏短会提示可能没有复制完整；`--verbose` 也会记录校验结果与长度，便于排查。
+
 ## [0.6.28] - 2026-10-22
 
 ### 修复

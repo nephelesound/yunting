@@ -16,6 +16,8 @@ AppDialog {
     required property var session   // 鸭子类型：SimSession 或 C++ Session
 
     readonly property string state: dialog.session.state
+    // 两套扫码会话二选一：客户端（type=3，默认）与网页（type=1，gtk 客户端同款）
+    readonly property bool webMode: dialog.session.loginMode === "web"
     // 「用 Cookie 登录」：拿不到手机时，用浏览器里已登录的那份 Cookie
     property bool cookieOpen: false
     property string cookieError: ""
@@ -105,6 +107,31 @@ AppDialog {
             font.pixelSize: Tokens.textSm
             color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             wrapMode: Text.Wrap
+        }
+
+        // 两套会话：客户端（type=3）与网页（type=1）。切换时 Session 重新取码，二维码与轮询的类型保持一致
+        RowLayout {
+            Layout.alignment: Qt.AlignHCenter
+            spacing: Tokens.space2
+            ButtonGroup { id: loginModeGroup; exclusive: true }
+            Button {
+                id: loginModeClient
+                objectName: "loginModeClient"
+                text: "客户端扫码"
+                checkable: true
+                checked: !dialog.webMode
+                ButtonGroup.group: loginModeGroup
+                onClicked: dialog.session.loginMode = "client"
+            }
+            Button {
+                id: loginModeWeb
+                objectName: "loginModeWeb"
+                text: "网页扫码"
+                checkable: true
+                checked: dialog.webMode
+                ButtonGroup.group: loginModeGroup
+                onClicked: dialog.session.loginMode = "web"
+            }
         }
 
         // 扫不了码时（手机不在手边、扫码被风控拦下）：浏览器里已登录的 Cookie 也能登进来

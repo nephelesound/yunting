@@ -666,6 +666,76 @@ private slots:
         QVERIFY(!m_client->cookieJar().contains("__csrf"));
     }
 
+    // 网页端粘贴的 Cookie 不止请求头一种格式：DevTools 表格（名字和值之间是空白）、
+    // `MUSIC_U: 值`、带引号的 Set-Cookie、`Cookie:` 前缀、换行分隔、整段 URL 编码都要认出来
+    void cookieLoginAcceptsCommonPasteFormats()
+    {
+        m_api->handler = [](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path.endsWith("/nuser/account/get"))
+                respond(200, "{\"code\":200,\"profile\":{\"userId\":42}}");
+            else
+                respond(200, "{\"code\":200}");
+        };
+        const QList<QPair<QString, QString>> cases{
+            {QStringLiteral("MUSIC_U\tweb-cookie"), QStringLiteral("web-cookie")},
+            {QStringLiteral("MUSIC_U web-cookie"), QStringLiteral("web-cookie")},
+            {QStringLiteral("MUSIC_U: web-cookie"), QStringLiteral("web-cookie")},
+            {QStringLiteral("MUSIC_U = \"web-cookie\"; Path=/; HttpOnly"), QStringLiteral("web-cookie")},
+            {QStringLiteral("Cookie: MUSIC_U=web-cookie; __csrf=web-csrf"), QStringLiteral("web-cookie")},
+            {QStringLiteral("MUSIC_U=web-cookie\n__csrf=web-csrf"), QStringLiteral("web-cookie")},
+            {QStringLiteral("MUSIC_U%3Dweb-cookie%3B%20__csrf%3Dweb-csrf"), QStringLiteral("web-cookie")},
+        };
+        // 每次登录成功还会让 Store 重拉一次账号；流量计限制同一读请求 1 秒 3 次，
+        // 所以逐个用例之间留出窗口，免得校验被当成循环请求拦下
+        for (int i = 0; i < cases.size(); ++i) {
+            const auto &c = cases.at(i);
+            Session session(m_client, m_store);
+            session.loginWithCookie(c.first);
+            QVERIFY2(waitUntil([&] { return session.state() == "done"; }, 5000),
+                     qPrintable(c.first));
+            QCOMPARE(m_client->cookieJar().value("MUSIC_U"), c.second);
+            QTest::qWait(1100);
+        }
+    }
+
+    // 两套扫码会话：客户端 type=3（默认），网页 type=1（gtk 客户端同款）。
+    // 切换后重新取码，取码与轮询的类型必须一致。
+    void qrLoginModeSelectsType()
+    {
+        QStringList unikeyQueries;
+        QStringList pollQueries;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/login/qrcode/unikey") {
+                unikeyQueries.append(QString::fromUtf8(req.query));
+                respond(200, "{\"code\":200,\"unikey\":\"qr-key\"}");
+                return;
+            }
+            if (req.path == "/api/login/qrcode/client/login") {
+                pollQueries.append(QString::fromUtf8(req.query));
+                respond(200, "{\"code\":801}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+        Session session(m_client, m_store);
+        QCOMPARE(session.loginMode(), QStringLiteral("client"));
+        session.start();
+        QVERIFY(waitUntil([&] { return !unikeyQueries.isEmpty(); }, 5000));
+        QVERIFY(unikeyQueries.last().contains("type=3"));
+
+        session.setLoginMode(QStringLiteral("web"));
+        QCOMPARE(session.loginMode(), QStringLiteral("web"));
+        QVERIFY(waitUntil([&] { return unikeyQueries.size() == 2; }, 5000));
+        QVERIFY(unikeyQueries.last().contains("type=1"));
+        QVERIFY(waitUntil([&] { return !pollQueries.isEmpty(); }, 5000));
+        QVERIFY(pollQueries.last().contains("type=1"));
+
+        // 未知模式不改状态，也不重新取码
+        session.setLoginMode(QStringLiteral("nonsense"));
+        QCOMPARE(session.loginMode(), QStringLiteral("web"));
+        session.cancel();
+    }
+
     // 校验没过（301、风控）：粘贴的 Cookie 不进 jar，原来的登录原样留着
     void cookieLoginRejectsInvalidCookie()
     {

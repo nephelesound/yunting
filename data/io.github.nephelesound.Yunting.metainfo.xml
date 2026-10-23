@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.29" date="2026-10-23">
+      <description>
+        <p>Sign-in can use the web QR session (type=1, the same session netease-cloud-music-gtk4 uses) as well as the client session (type=3), and pasted Cookies are accepted in the formats browsers and DevTools actually produce.</p>
+        <p xml:lang="zh_CN">登录可以选网页扫码（type=1，与 netease-cloud-music-gtk4 同一种会话）或客户端扫码；粘贴的 Cookie 支持浏览器与开发者工具实际产生的各种格式。</p>
+      </description>
+    </release>
     <release version="0.6.28" date="2026-10-22">
       <description>
         <p>Signing in with a Cookie copied from the browser no longer reports a valid Cookie as invalid or expired.</p>
