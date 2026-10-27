@@ -133,6 +133,14 @@ private slots:
             QJsonObject{{"code", 200}, {"lrc", lyricObject(QStringLiteral("[00:01.00]x"))}}, 7);
         QVERIFY2(normal.ok(), qPrintable(normal.error.message));
         QVERIFY(!normal.value->pureMusic);
+        QVERIFY(!normal.value->uncollected);
+
+        // 有歌词但网易没有收录：空歌词是确定结果，不是瞬时空包
+        const auto uncollected = parseSongLyrics(
+            QJsonObject{{"code", 200}, {"uncollected", true}, {"lrc", lyricObject(QString{})}}, 7);
+        QVERIFY2(uncollected.ok(), qPrintable(uncollected.error.message));
+        QVERIFY(!uncollected.value->pureMusic);
+        QVERIFY(uncollected.value->uncollected);
     }
 
     void nonOkCodeIsApiError()

@@ -181,14 +181,19 @@ ScreenFrame {
             boundsBehavior: Flickable.StopAtBounds
 
             property bool browsing: false      // 用户在手动看别处
+            // 当前句原文的高度（折行后高于一个行格）：委托在排版定下来后写进来，follow 用它居中
+            property real currentTextHeight: page.pitch
 
-            // 目标位置：让第 i 句的顶边落在中线那一行（借 positionViewAtIndex 量，再还原，交给动画）
+            // 目标位置：让第 i 句的顶边落在中线那一行（借 positionViewAtIndex 量，再还原，交给动画）。
+            // 折成两行的句子比一个行格高：把多出来的高度对半分，原文的中心仍停在中线那一行
+            //（译文挂在下面，不参与对齐）。
             function follow(animated) {
                 if (lyrics.browsing || lyrics.count === 0 || !lyrics.visible || page.lyricIndex < 0)
                     return;
                 const from = lyrics.contentY;
                 lyrics.positionViewAtIndex(page.lyricIndex, ListView.Beginning);
-                const to = lyrics.contentY - lyrics.focusOffset;
+                const extra = Math.max(0, (lyrics.currentTextHeight - page.pitch) / 2);
+                const to = lyrics.contentY - lyrics.focusOffset + extra;
                 lyrics.contentY = from;
                 followAnimation.stop();
                 if (!animated) {
@@ -272,8 +277,19 @@ ScreenFrame {
                 readonly property bool current: index === page.lyricIndex
                 readonly property string translation: modelData.tr || ""
                 width: ListView.view.width
-                // 有译文的句子占两行网格：原文贴第一行底边，译文贴第二行顶边，读起来是一组
-                height: line.translation.length > 0 ? 2 * page.pitch : page.pitch
+                // 原文按需折行（36px 的两行正好是两个行格），译文再占自己的行格：
+                // 窄窗、宽字体或低分屏下，长句不再被省略号截掉后半句
+                readonly property real textHeight: Math.max(page.pitch, original.implicitHeight)
+                readonly property real translationHeight:
+                    line.translation.length > 0 ? Math.max(page.pitch, translationLabel.implicitHeight) : 0
+                height: line.textHeight + line.translationHeight
+                // 当前句换成 36px 后要重新排版（可能多折一行）：高度定下来再对一次中线，
+                // 否则 follow 用的是换字号前的旧高度，当前句会停低一行。
+                onCurrentChanged: if (line.current) lyrics.currentTextHeight = line.textHeight
+                onTextHeightChanged: if (line.current) {
+                    lyrics.currentTextHeight = line.textHeight;
+                    Qt.callLater(() => lyrics.follow(false));
+                }
 
                 // 可点：悬停时整行淡色调 + 右侧这句的时间；点击跳到这句，右键出菜单。
                 // 没有时间轴的歌词（t < 0）无处可跳：不响应悬停与点击
@@ -294,8 +310,8 @@ ScreenFrame {
                     }
                 }
                 Rectangle {
+                    objectName: "linePlate"
                     anchors.fill: parent
-                    anchors.leftMargin: -Tokens.space2
                     radius: Tokens.radius
                     color: Qt.alpha(Kirigami.Theme.highlightColor, lineHover.hovered ? Tokens.tintHover : 0)
                     Behavior on color { ColorAnimation { duration: Tokens.motionFast } }
@@ -311,30 +327,30 @@ ScreenFrame {
                     color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                 }
 
-                // 每句都按展示字号排版，非当前句用 scale 缩到 24/36：换句时只动 transform 与颜色，不重排文字
+                // 字号直接切换，不用 scale 缩小：36px 的字光栅化后缩到 24px，低分屏上笔画会糊
+                //（字体的 hinting 按 36px 算，再按 0.67 重采样）。当前句 36、其余 24 与设计一致。
+                // 长句折行，不再用省略号截掉后半句。
                 Label {
                     id: original
-                    readonly property real rest: Tokens.text2xl / Tokens.text4xl
-                    width: parent.width / original.scale   // 缩小后仍占满列宽，省略号落在列的右缘
-                    height: page.pitch
+                    objectName: "lyricText"
+                    width: parent.width
+                    height: line.textHeight
                     verticalAlignment: line.translation.length > 0 ? Text.AlignBottom : Text.AlignVCenter
-                    transformOrigin: line.translation.length > 0 ? Item.BottomLeft : Item.Left
-                    scale: line.current ? 1 : original.rest
                     text: line.modelData.text
-                    font.pixelSize: Tokens.text4xl
+                    font.pixelSize: line.current ? Tokens.text4xl : Tokens.text2xl
                     // 常规字重：当前句靠字号与颜色突出。Medium 在各家字体里差别最大（HarmonyOS Sans 的 Medium 很轻，
                     // Noto Sans CJK 的 Medium 接近粗体），换台机器整页歌词就显得发黑
                     font.weight: Font.Normal
                     // 没有时间轴的歌词没有「当前句」可比，整篇按正文色读
                     color: line.current || !line.seekable ? Kirigami.Theme.textColor : Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
-                    elide: Text.ElideRight
-                    Behavior on scale { NumberAnimation { duration: Tokens.motionBase; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut } }
+                    wrapMode: Text.Wrap
                     Behavior on color { ColorAnimation { duration: Tokens.motionBase } }
 
-                    // 逐字歌词：同样的字用强调色、按唱到的位置从左裁出一段，盖在当前句上
+                    // 逐字歌词：同样的字用强调色、按唱到的位置从左裁出一段，盖在当前句上。
+                    // 折行的句子不画：裁剪宽度是按单行算的，对不上换行位置。
                     Item {
-                        visible: line.current && page.timed
-                        width: original.contentWidth * page.fill
+                        visible: line.current && page.timed && original.lineCount <= 1
+                        width: Math.min(original.contentWidth, original.width) * page.fill
                         height: parent.height
                         clip: true
                         Label {
@@ -344,19 +360,20 @@ ScreenFrame {
                             text: original.text
                             font: original.font
                             color: Kirigami.Theme.highlightColor
-                            elide: Text.ElideRight
                         }
                     }
                 }
                 Label {
+                    id: translationLabel
                     visible: line.translation.length > 0
-                    y: page.pitch
+                    y: line.textHeight
                     width: parent.width
+                    height: line.translationHeight
                     topPadding: Tokens.space1
                     text: line.translation
                     font.pixelSize: Tokens.textBase
                     color: Qt.alpha(Kirigami.Theme.textColor, line.current ? 1 : Tokens.muted)
-                    elide: Text.ElideRight
+                    wrapMode: Text.Wrap
                     Behavior on color { ColorAnimation { duration: Tokens.motionBase } }
                 }
             }

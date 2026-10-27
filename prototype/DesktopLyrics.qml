@@ -9,7 +9,7 @@
 // 系统的 ToolButton，几组之间只用间距分开：字号、「样式」菜单（字色、唱到的字的颜色、文字阴影）、
 // 第二行（开着时图标是强调色）、复位、锁定、关闭。菜单开在自己的窗口里（popupType: Window）：
 // 歌词窗口很矮，菜单留在窗口里会被裁成方角、挤成一团。文字阴影默认关，可选柔和 / 浓，总是黑色。
-// 锁定后点击穿透，在播放条关掉再打开即解锁。样式与位置只在应用里记住（persist），原型与截图不读不写。
+// 锁定后点击穿透，从托盘菜单解锁；锁定状态会记住，关掉再打开不会自己解开。样式与位置只在应用里记住（persist），原型与截图不读不写。
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -89,6 +89,10 @@ Window {
     property real dragBottomGap
 
     title: "桌面歌词 — 云听"   // KDE 窗口标题的写法：「内容 — 应用」
+    // 不要成为主窗口的 transient 子窗口：否则主窗口收起（迷你模式、托盘隐藏）时，
+    // 窗口管理器会把桌面歌词一起藏掉，而 visible 仍是 true——状态显示为开着，人却看不见。
+    // 显式写 null 覆盖 QML 对嵌套 Window 自动设置的 transientParent。
+    transientParent: null
     color: "transparent"
     width: Math.min(2 * Tokens.trackColumn + Tokens.measureMax, lyricsWindow.screenWidth - 2 * Tokens.space6)   // 至多 960
     height: Tokens.space1 + tools.implicitHeight + Tokens.space2 + textColumn.implicitHeight
@@ -147,10 +151,8 @@ Window {
             lyricsWindow.layerShell.makeOverlay(lyricsWindow, 2 | 4 /* bottom | left */, 0, false, "yunting-lyrics");
             lyricsWindow.placeSaved();
         }
-        if (!lyricsWindow.visible) {
-            lyricsWindow.locked = false;
+        if (!lyricsWindow.visible)
             lyricsWindow.endDrag();
-        }
     }
     // 字号变了窗口变高：位置按下边距保持，重新夹一次
     onHeightChanged: if (lyricsWindow.visible) lyricsWindow.placeSaved()
@@ -169,6 +171,7 @@ Window {
                 property int colorIndex: 0
                 property int shadowLevel: 0
                 property bool showSecond: true
+                property bool locked: false
                 property int left: -1
                 property int bottomGap: 2 * Tokens.height12
             }
@@ -178,6 +181,7 @@ Window {
                 lyricsWindow.colorIndex = Math.max(0, Math.min(lyricsWindow.fills.length - 1, saved.colorIndex));
                 lyricsWindow.shadowLevel = Math.max(0, Math.min(Tokens.desktopShadows.length - 1, saved.shadowLevel));
                 lyricsWindow.showSecond = saved.showSecond;
+                lyricsWindow.locked = saved.locked;
                 lyricsWindow.left = saved.left;
                 lyricsWindow.bottomGap = saved.bottomGap;
                 persisted.restored = true;
@@ -187,6 +191,7 @@ Window {
             Binding { when: persisted.restored; target: saved; property: "colorIndex"; value: lyricsWindow.colorIndex }
             Binding { when: persisted.restored; target: saved; property: "shadowLevel"; value: lyricsWindow.shadowLevel }
             Binding { when: persisted.restored; target: saved; property: "showSecond"; value: lyricsWindow.showSecond }
+            Binding { when: persisted.restored; target: saved; property: "locked"; value: lyricsWindow.locked }
             Binding { when: persisted.restored; target: saved; property: "left"; value: lyricsWindow.left }
             Binding { when: persisted.restored; target: saved; property: "bottomGap"; value: lyricsWindow.bottomGap }
         }
@@ -288,6 +293,7 @@ Window {
                     onClicked: styleMenu.popup(styleButton, 0, styleButton.height)
                     Menu {
                         id: styleMenu
+                        objectName: "styleMenu"
                         popupType: Popup.Window
                         // 菜单是系统菜单的样子，不跟着按钮所在的底板配色
                         Kirigami.Theme.colorSet: Kirigami.Theme.Window
@@ -307,17 +313,38 @@ Window {
                         MenuSeparator {}
                         Menu {
                             id: fillMenu
+                            objectName: "fillMenu"
                             title: "唱到的字"
                             popupType: Popup.Window
                             // 每种颜色前一个实心圆点，就是这种颜色
                             Instantiator {
+                                objectName: "fillItems"
                                 model: lyricsWindow.fillNames
                                 delegate: MenuItem {
+                                    id: fillItem
                                     required property int index
                                     required property string modelData
                                     text: modelData
-                                    icon.name: "media-record-symbolic"
-                                    icon.color: lyricsWindow.fills[index]
+                                    // Breeze 的 media-record-symbolic 是写死红色的图标，icon.color 染不上色
+                                    //（六种颜色都显示成红点）。这里直接画一个同尺寸的圆点：颜色就是
+                                    // fills[index]，白点在浅色菜单上也能靠描边看见。
+                                    contentItem: RowLayout {
+                                        spacing: Tokens.space2
+                                        Rectangle {
+                                            implicitWidth: Tokens.iconSm
+                                            implicitHeight: Tokens.iconSm
+                                            radius: width / 2
+                                            color: lyricsWindow.fills[fillItem.index]
+                                            border.width: Tokens.line
+                                            border.color: Qt.alpha(Kirigami.Theme.textColor, 0.35)
+                                        }
+                                        Label {
+                                            Layout.fillWidth: true
+                                            text: fillItem.modelData
+                                            elide: Text.ElideRight
+                                            verticalAlignment: Text.AlignVCenter
+                                        }
+                                    }
                                     checkable: true
                                     checked: lyricsWindow.colorIndex === index
                                     onTriggered: lyricsWindow.colorIndex = index
@@ -362,7 +389,7 @@ Window {
                 }
                 Tool {
                     iconName: "object-locked-symbolic"
-                    text: "锁定（鼠标穿透；在播放条关掉再打开即解锁）"
+                    text: "锁定（鼠标穿透；从托盘解锁）"
                     onClicked: lyricsWindow.locked = true
                 }
                 Tool {

@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.30" date="2026-10-27">
+      <description>
+        <p>Desktop lyrics stay visible when the main window is hidden to the tray or switched to the mini player, remember their lock state, and can be toggled and locked from the tray menu. The tray also offers liking the current track and opening the mini player. Long lyrics wrap instead of being elided, non-current lines render at their real size on low-DPI screens, songs whose lyrics NetEase has not collected say "No lyrics" instead of offering a retry, the desktop-lyrics colour dots use their own colours, the fullscreen cover makes the window actually fullscreen, and the Cookie login hint no longer clips.</p>
+        <p xml:lang="zh_CN">主窗口收起到托盘或切到迷你播放器时桌面歌词保持显示，锁定状态会被记住，并可从托盘开关与锁定；托盘还新增喜欢当前歌曲和迷你播放器。长歌词改为折行，低分屏上非当前句按实际字号排版；网易未收录歌词的歌曲显示「暂无歌词」而不是「点此重试」；桌面歌词的颜色圆点按各自颜色绘制；全屏封面会让窗口真正全屏；Cookie 登录提示不再被截断。</p>
+      </description>
+    </release>
     <release version="0.6.29" date="2026-10-23">
       <description>
         <p>Sign-in can use the web QR session (type=1, the same session netease-cloud-music-gtk4 uses) as well as the client session (type=3), and pasted Cookies are accepted in the formats browsers and DevTools actually produce.</p>

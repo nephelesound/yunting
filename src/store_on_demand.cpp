@@ -269,8 +269,11 @@ void Store::requestLyrics(const QString &key, double songId)
                 }
                 const sdk::SongLyrics &lyrics = *parsed.value;
                 // 网易偶尔会回「HTTP 200 + code 200 + 空 lrc」而不是错误；这种空包不能当成
-                // 「这首歌没有歌词」永久缓存，否则会一直显示「暂无歌词」。纯音乐/明确无歌词才落盘。
-                if (lyrics.lrc.isEmpty() && lyrics.tlyric.isEmpty() && !lyrics.pureMusic) {
+                // 「这首歌没有歌词」永久缓存，否则会一直显示「暂无歌词」。纯音乐/明确无歌词/未收录
+                // 才是确定结果：uncollected 是有歌词但网易没有收录，按「暂无歌词」缓存，别让页面一直
+                // 显示「没取到，点此重试」——再重试也是同一个空结果。
+                if (lyrics.lrc.isEmpty() && lyrics.tlyric.isEmpty() && !lyrics.pureMusic
+                    && !lyrics.uncollected) {
                     done({}, false);
                     return;
                 }

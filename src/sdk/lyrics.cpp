@@ -64,13 +64,15 @@ Result<SongLyrics> parseSongLyrics(const QJsonObject &root, qint64 songId)
     JsonReader flags(root);
     const bool pureMusic = flags.boolean("pureMusic");
     const bool noLyric = flags.boolean("nolyric");
+    const bool uncollected = flags.boolean("uncollected");
     if (!flags.ok())
         return parseFailure<SongLyrics>(QString::fromLatin1(LyricsPath), flags,
-                                        QStringLiteral("pureMusic/nolyric"));
+                                        QStringLiteral("pureMusic/nolyric/uncollected"));
 
     SongLyrics lyrics;
     lyrics.songId = songId;
     lyrics.pureMusic = pureMusic || noLyric;
+    lyrics.uncollected = uncollected;
     lyrics.lrc = *lrc.value;
     lyrics.tlyric = *tlyric.value;
     lyrics.yrc = *yrc.value;

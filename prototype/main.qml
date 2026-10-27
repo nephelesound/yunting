@@ -9,6 +9,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Window
 import org.kde.kirigami as Kirigami
 import org.kde.kirigamiaddons.formcard as FormCard
 
@@ -261,6 +262,10 @@ Kirigami.ApplicationWindow {
         ignoreUnknownSignals: true
         function onNextRequested() { playback.next(); }
         function onPreviousRequested() { playback.previous(); }
+        function onLikeToggleRequested() { Actions.toggleLike(root.currentTrack); }
+        function onMiniRequested() { root.enterMini(); }
+        function onDesktopLyricsToggleRequested() { root.desktopLyricsShown = !root.desktopLyricsShown; }
+        function onDesktopLyricsLockToggleRequested() { desktopLyrics.locked = !desktopLyrics.locked; }
     }
 
     // 有托盘时，关窗口 = 隐藏到托盘、继续播放；托盘「退出」或 Ctrl+Q 才真正退出
@@ -783,7 +788,7 @@ Kirigami.ApplicationWindow {
         else if (root.startOverlay === "quality")
             Qt.callLater(() => playerBar.openQualityMenu());
         else if (root.startOverlay === "fullscreen")
-            root.fullscreenShown = true;
+            root.fullscreenShown = true;   // 截图只看覆盖物，不真的切窗口全屏（qmlshot 的窗口尺寸固定）
         else if (root.startOverlay === "share")
             Qt.callLater(() => root.shareTrack(root.currentTrack || shown().tracks[0]));
         else if (root.startOverlay === "reorder")
@@ -1119,6 +1124,25 @@ Kirigami.ApplicationWindow {
     }
     // 桌面歌词与迷你播放器：独立的顶层窗口，状态（显示与否）由主窗口持有
     property bool desktopLyricsShown: false
+    // 托盘菜单与界面是同一份状态：菜单勾选跟着这里走，点菜单也改这里
+    Binding {
+        when: root.backend !== null && root.backend.tray !== undefined
+        target: root.backend ? root.backend.tray : null
+        property: "desktopLyricsShown"
+        value: root.desktopLyricsShown
+    }
+    Binding {
+        when: root.backend !== null && root.backend.tray !== undefined
+        target: root.backend ? root.backend.tray : null
+        property: "desktopLyricsLocked"
+        value: desktopLyrics.locked
+    }
+    Binding {
+        when: root.backend !== null && root.backend.tray !== undefined
+        target: root.backend ? root.backend.tray : null
+        property: "liked"
+        value: root.currentTrack !== null && Source.isLiked(root.currentTrack.id)
+    }
 
     // 看 MV 时屏幕常亮（放歌时不睡眠由 C++ 直接跟着 AudioEngine 设，屏幕照常熄灭）
     property bool videoPlaying: false
@@ -1129,7 +1153,26 @@ Kirigami.ApplicationWindow {
         when: target !== null
     }
     property bool fullscreenShown: false
+    // 全屏封面要把窗口本身切到全屏（只铺一层覆盖物，窗口还带边框和面板，不叫全屏）。
+    // 退出时回到进入前的状态：最大化过的窗口还原成最大化，否则还原成普通窗口。
+    property int fullscreenReturnVisibility: Window.Windowed
+    function setFullscreen(on) {
+        if (on === root.fullscreenShown)
+            return;
+        if (on) {
+            root.fullscreenReturnVisibility = root.visibility;
+            root.fullscreenShown = true;
+            root.showFullScreen();
+        } else {
+            root.fullscreenShown = false;
+            if (root.fullscreenReturnVisibility === Window.Maximized)
+                root.showMaximized();
+            else
+                root.showNormal();
+        }
+    }
     DesktopLyrics {
+        id: desktopLyrics
         visible: root.desktopLyricsShown
         track: root.currentTrack
         elapsed: playback.engine.position
@@ -1146,7 +1189,7 @@ Kirigami.ApplicationWindow {
         track: root.currentTrack
         playing: playback.engine.playing
         elapsed: playback.engine.position
-        onCloseRequested: root.fullscreenShown = false
+        onCloseRequested: root.setFullscreen(false)
         onToggleRequested: playback.engine.toggle()
         onPreviousRequested: playback.previous()
         onNextRequested: playback.next()
@@ -1238,13 +1281,13 @@ Kirigami.ApplicationWindow {
         sequences: ["Esc", StandardKey.Back]
         onActivated: {
             if (root.fullscreenShown)
-                root.fullscreenShown = false;
+                root.setFullscreen(false);
             else
                 root.goBack();
         }
     }
     Shortcut { sequence: "Ctrl+L"; onActivated: root.toggleNowPlaying() }
-    Shortcut { sequence: "F11"; onActivated: root.fullscreenShown = !root.fullscreenShown }
+    Shortcut { sequence: "F11"; onActivated: root.setFullscreen(!root.fullscreenShown) }
     TapHandler {
         acceptedButtons: Qt.BackButton
         onTapped: root.goBack()
@@ -1376,7 +1419,7 @@ Kirigami.ApplicationWindow {
         onMiniRequested: root.enterMini()
         onShareRequested: root.shareTrack(root.currentTrack)
         onCommentsRequested: root.openComments()
-        onFullscreenRequested: root.fullscreenShown = true
+        onFullscreenRequested: root.setFullscreen(true)
         liked: root.currentTrack !== null && Source.isLiked(root.currentTrack.id)
         nowPlayingShown: root.page === "nowplaying"
         onPlayPauseRequested: playback.engine.toggle()

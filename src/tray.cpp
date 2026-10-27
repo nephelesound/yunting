@@ -37,22 +37,34 @@ Tray::Tray(AudioEngine *audio, QObject *parent)
         menu->removeAction(a);
     m_trackAction = menu->addSection(QString());   // section：不可点
     m_playAction = menu->addAction(QString());
+    m_likeAction = menu->addAction(QIcon::fromTheme(QStringLiteral("love-symbolic")), QString());
     QAction *prev = menu->addAction(QIcon::fromTheme(QStringLiteral("media-skip-backward")),
                                     QStringLiteral("上一首"));
     QAction *next = menu->addAction(QIcon::fromTheme(QStringLiteral("media-skip-forward")),
                                     QStringLiteral("下一首"));
+    menu->addSeparator();
+    m_lyricsAction = menu->addAction(QStringLiteral("桌面歌词"));
+    m_lyricsAction->setCheckable(true);
+    m_lyricsLockAction = menu->addAction(QStringLiteral("锁定桌面歌词"));
+    m_lyricsLockAction->setCheckable(true);
+    QAction *mini = menu->addAction(QIcon::fromTheme(QStringLiteral("window-minimize-pip")),
+                                    QStringLiteral("迷你播放器"));
 
     // KStatusNotifierItem 默认只在弹出前追加自己的「恢复/最小化」「退出」项（文案随 locale、
-    // 恢复/最小化与左键重复）；关掉它，菜单完全自持：DESIGN 的五行 + 自带 退出 行为等价
-    // （qApp->quit()）的「退出」。
+    // 恢复/最小化与左键重复）；关掉它，菜单完全自持，退出项等价于 qApp->quit()。
     m_item->setStandardActionsEnabled(false);
+    menu->addSeparator();
     QAction *quit = menu->addAction(QIcon::fromTheme(QStringLiteral("application-exit")),
                                     QStringLiteral("退出"));
     connect(quit, &QAction::triggered, qApp, &QCoreApplication::quit);
 
     connect(m_playAction, &QAction::triggered, m_audio, &AudioEngine::toggle);
+    connect(m_likeAction, &QAction::triggered, this, &Tray::likeToggleRequested);
     connect(prev, &QAction::triggered, this, &Tray::previousRequested);
     connect(next, &QAction::triggered, this, &Tray::nextRequested);
+    connect(m_lyricsAction, &QAction::triggered, this, &Tray::desktopLyricsToggleRequested);
+    connect(m_lyricsLockAction, &QAction::triggered, this, &Tray::desktopLyricsLockToggleRequested);
+    connect(mini, &QAction::triggered, this, &Tray::miniRequested);
 
     // 中键播放/暂停（secondaryActivate）；滚轮音量 ±5%，直接作用于 AudioEngine
     connect(m_item, &KStatusNotifierItem::secondaryActivateRequested, m_audio, &AudioEngine::toggle);
@@ -66,6 +78,8 @@ Tray::Tray(AudioEngine *audio, QObject *parent)
     connect(m_audio, &AudioEngine::playingChanged, this, &Tray::refreshPlayAction);
     refreshTrackUi();
     refreshPlayAction();
+    refreshLikeAction();
+    refreshLyricsActions();
 }
 
 void Tray::setAssociatedWindow(QWindow *window)
@@ -76,6 +90,33 @@ void Tray::setAssociatedWindow(QWindow *window)
 void Tray::notify(const QString &message)
 {
     m_item->showMessage(QGuiApplication::applicationDisplayName(), message, iconName());
+}
+
+void Tray::setLiked(bool liked)
+{
+    if (liked == m_liked)
+        return;
+    m_liked = liked;
+    refreshLikeAction();
+    emit likedChanged();
+}
+
+void Tray::setDesktopLyricsShown(bool shown)
+{
+    if (shown == m_desktopLyricsShown)
+        return;
+    m_desktopLyricsShown = shown;
+    refreshLyricsActions();
+    emit desktopLyricsShownChanged();
+}
+
+void Tray::setDesktopLyricsLocked(bool locked)
+{
+    if (locked == m_desktopLyricsLocked)
+        return;
+    m_desktopLyricsLocked = locked;
+    refreshLyricsActions();
+    emit desktopLyricsLockedChanged();
 }
 
 void Tray::refreshTrackUi()
@@ -89,9 +130,24 @@ void Tray::refreshTrackUi()
     m_trackAction->setText(row);
     m_item->setToolTip(iconName(), t.isEmpty() ? QGuiApplication::applicationDisplayName() : name,
                        t.isEmpty() ? QStringLiteral("未在播放") : artist);
+    refreshLikeAction();
 }
 
 void Tray::refreshPlayAction()
 {
     m_playAction->setText(m_audio->playing() ? QStringLiteral("暂停") : QStringLiteral("播放"));
+}
+
+void Tray::refreshLikeAction()
+{
+    const bool hasTrack = !m_audio->track().isEmpty();
+    m_likeAction->setEnabled(hasTrack);
+    m_likeAction->setText(m_liked ? QStringLiteral("取消喜欢") : QStringLiteral("喜欢"));
+}
+
+void Tray::refreshLyricsActions()
+{
+    m_lyricsAction->setChecked(m_desktopLyricsShown);
+    m_lyricsLockAction->setEnabled(m_desktopLyricsShown);
+    m_lyricsLockAction->setChecked(m_desktopLyricsLocked);
 }

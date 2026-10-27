@@ -658,6 +658,62 @@ Item {
             verify(pasteTarget.text.indexOf(p.page.lines[1].text) === 0);
         }
 
+        // 长句折行，不再用省略号截掉后半句（窄窗、宽字体、低分屏都靠这一条）
+        function test_longLyricWrapsInsteadOfEliding() {
+            const saved = Source.snapshot;
+            const longText = "很长的一句歌词，要在半屏宽度里折成两行".repeat(4);
+            Source.snapshot = {
+                data: Object.assign({}, saved.data, { lyrics: { "9090": { lines: [{ t: 0, text: longText }], pureMusic: false } } }),
+                personal: saved.personal,
+            };
+            try {
+                const page = createTemporaryObject(nowPlayingComponent, root, {
+                    track: { id: 9090, name: "歌", artist: "歌手", cover: "", dur: 300 }, elapsed: 0 });
+                const view = findChild(page, "lyrics");
+                tryVerify(() => view.count === 1 && view.itemAtIndex(0) !== null);
+                const line = view.itemAtIndex(0);
+                const text = findChild(line, "lyricText");
+                verify(text !== null);
+                verify(line.textHeight > page.pitch, "长句占不止一个行格");
+                verify(text.lineCount > 1, "长句折行，而不是单行省略");
+            } finally {
+                Source.snapshot = saved;
+            }
+        }
+
+        // 折行的当前句仍以封面中线为中心（follow 用换字号、折行后的高度重新对齐）
+        function test_wrappedCurrentLineStaysCentered() {
+            const saved = Source.snapshot;
+            const longText = "很长的一句歌词，要在半屏宽度里折成两行".repeat(4);
+            Source.snapshot = {
+                data: Object.assign({}, saved.data, { lyrics: { "9091": { lines: [{ t: 0, text: longText }], pureMusic: false } } }),
+                personal: saved.personal,
+            };
+            try {
+                const page = createTemporaryObject(nowPlayingComponent, root, {
+                    track: { id: 9091, name: "歌", artist: "歌手", cover: "", dur: 300 }, elapsed: 0 });
+                const view = findChild(page, "lyrics");
+                tryVerify(() => view.count === 1 && view.itemAtIndex(0) !== null);
+                const line = view.itemAtIndex(0);
+                const text = findChild(line, "lyricText");
+                const focusCenter = view.mapToItem(page, 0, 0).y + view.focusOffset + page.pitch / 2;
+                tryVerify(() => Math.abs(text.mapToItem(page, 0, text.height / 2).y - focusCenter) <= 2,
+                          1000, "当前句的中心落在中线那一行");
+            } finally {
+                Source.snapshot = saved;
+            }
+        }
+
+        // 歌词行的悬停底板不能越过列表左缘：列表 clip 会切掉超出的部分，圆角就没了
+        function test_lyricHoverPlateStaysInsideTheList() {
+            const p = lyricsPage();
+            const line = p.view.itemAtIndex(2);
+            verify(line !== null);
+            const plate = findChild(line, "linePlate");
+            verify(plate !== null);
+            verify(plate.mapToItem(p.view, 0, 0).x >= -0.5, "悬停底板不越过列表左缘");
+        }
+
         // 正在播放页的大封面：微圆角、向下偏的微投影；播放 / 暂停时封面不动（状态由播放条表达）
         function test_coverHasASteadySoftShadow() {
             const page = createTemporaryObject(nowPlayingComponent, root, {

@@ -30,6 +30,7 @@ struct SongLyrics {
     QString yrc;       // yrc.lyric
     QString ytlrc;     // ytlrc.lyric
     bool pureMusic = false; // pureMusic || nolyric (legacy /api/song/lyric)
+    bool uncollected = false; // the song has vocals but NetEase has no lyrics for it
 };
 
 // Validates the API envelope (code != 200 is an Api error, as the transport

@@ -564,6 +564,30 @@ private slots:
         QVERIFY(lyricsOf(12).value("lines").toList().isEmpty());
     }
 
+    // 有歌词但网易没有收录（uncollected）：也是确定结果，缓存后显示「暂无歌词」，
+    // 不再让页面显示「没取到，点此重试」（重试只会得到同一个空结果）
+    void uncollectedEmptyLyricsIsCachedAsNoLyrics()
+    {
+        int lyricRequests = 0;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/song/lyric") {
+                ++lyricRequests;
+                respond(200, "{\"code\":200,\"uncollected\":true,\"lrc\":{\"lyric\":\"\"}}");
+                return;
+            }
+            respond(200, "{\"code\":200}");
+        };
+
+        m_store->request(QStringLiteral("lyrics:13"));
+        QVERIFY(waitUntil([&] { return lyricRequests >= 1; }));
+        QVERIFY(waitUntil([&] { return !lyricsOf(13).isEmpty(); }));
+        QVERIFY(!lyricsOf(13).value("pureMusic").toBool());
+        QVERIFY(lyricsOf(13).value("lines").toList().isEmpty());
+        m_store->request(QStringLiteral("lyrics:13"));
+        QTest::qWait(150);
+        QCOMPARE(lyricRequests, 1);   // 命中的是永久缓存
+    }
+
     // 对方设置隐私是预期状态：页面内显示，不发 requestFailed（否则会弹全局错误）
     void followersPrivacyIsInlineRestriction()
     {

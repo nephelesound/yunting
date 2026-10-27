@@ -155,12 +155,13 @@ AppDialog {
             objectName: "cookieLoginField"
             visible: dialog.cookieOpen
             label: "Cookie"
-            placeholderText: "粘贴浏览器里的 Cookie（MUSIC_U=…; __csrf=…），或只粘贴 MUSIC_U 的值"
+            placeholderText: "MUSIC_U 或整段 Cookie"
         }
         Label {
             Layout.fillWidth: true
             visible: dialog.cookieOpen && dialog.cookieError.length === 0
-            text: "Cookie 等同于账号密码：只粘贴你自己的，也不要发给任何人"
+            text: "粘贴浏览器里的 Cookie（MUSIC_U=…; __csrf=…），或只粘贴 MUSIC_U 的值。"
+                  + "Cookie 等同于账号密码：只粘贴你自己的，也不要发给任何人"
             font.pixelSize: Tokens.textSm
             color: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
             wrapMode: Text.Wrap

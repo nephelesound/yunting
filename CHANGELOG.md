@@ -2,6 +2,20 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.30] - 2026-10-27
+
+### 新增
+- 托盘菜单加入喜欢 / 取消喜欢当前歌曲、迷你播放器，以及桌面歌词的开关与锁定（[#5](https://github.com/nephelesound/yunting/issues/5)）。桌面歌词的锁定状态会记住，关掉再打开不再自己解锁。
+
+### 修复
+- 桌面歌词不再跟着主窗口一起被藏掉：主窗口收起到托盘或进入迷你模式时，桌面歌词保持显示，播放条上的状态与实际一致（[#4](https://github.com/nephelesound/yunting/issues/4)）。
+- 长歌词在窄窗、宽字体下折行显示，不再用省略号截掉后半句；非当前句按 24px 直接排版，不再把 36px 的字缩小，低分屏上不再发糊（[#6](https://github.com/nephelesound/yunting/issues/6)）。
+- 网易没有收录歌词（`uncollected`）的歌曲不再显示「歌词没取到，点此重试」，改为「暂无歌词」（[#6](https://github.com/nephelesound/yunting/issues/6)）。
+- 桌面歌词「唱到的字」菜单的颜色圆点恢复各自的颜色：Breeze 的 `media-record-symbolic` 是写死红色的，之前六种颜色都显示成红点（[#6](https://github.com/nephelesound/yunting/issues/6)）。
+- Cookie 登录的完整说明移到输入框下方可换行的提示里，窄对话框或宽字体下不再被截断（[#6](https://github.com/nephelesound/yunting/issues/6)）。
+- 歌词行的悬停底板不再越过列表左缘，圆角不会被列表裁掉（[#6](https://github.com/nephelesound/yunting/issues/6)）。
+- F11 与全屏封面按钮现在真的把窗口切到全屏，退出时回到原来的普通 / 最大化状态（[#6](https://github.com/nephelesound/yunting/issues/6)）。
+
 ## [0.6.29] - 2026-10-23
 
 ### 新增
