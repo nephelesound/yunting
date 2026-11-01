@@ -497,6 +497,40 @@ Item {
             compare(tooWide, []);
         }
 
+        // 列表里找（issue #9）：几个词各自对上歌名 / 别名 / 歌手 / 专辑之一；
+        // Esc 先清空不返回；排序按完整顺序提交，进排序就不筛
+        function test_filterNarrowsWhatPlays() {
+            const tracks = [root.track,
+                            Object.assign({}, root.track, { id: 900002, name: "稻香", album: "魔杰座", alias: "Rice Field" }),
+                            Object.assign({}, root.track, { id: 900003, name: "江南", artist: "林俊杰", album: "第二天堂" })];
+            const page = createTemporaryObject(listPageComponent, root, { loggedIn: true,
+                list: { heading: "音乐云盘", cover: "", facts: [], description: "", tracks: tracks, listId: 2, owned: true, ranked: true } });
+            const field = findChild(page, "listFilter");
+            verify(field.visible);
+
+            field.forceActiveFocus();
+            keyClick(Qt.Key_R);
+            keyClick(Qt.Key_I);
+            compare(page.shownTracks.map(t => t.id), [900002], "别名不分大小写");
+            field.text = "周杰伦  叶惠美";
+            compare(page.shownTracks.map(t => t.id), [900001], "每个词都要对上，对上哪一栏都行");
+
+            field.text = "不存在";
+            compare(page.shownTracks, []);
+            keyClick(Qt.Key_Escape);
+            compare(page.filter, "", "Esc 先清空");
+            compare(page.shownTracks.length, 3);
+
+            page.filter = "江南";
+            const row = findChild(page, "trackList").itemAtIndex(0);
+            compare(row.modelData.id, 900003);
+            compare(row.rank, 3, "榜单筛过之后名次照旧");
+            verify(page.findsInPage, "Ctrl+F 归筛选框");
+            page.reordering = true;
+            compare(page.shownTracks.length, 3, "排序时看到完整的列");
+            verify(!page.findsInPage, "排序时 Ctrl+F 交给全局搜索");
+        }
+
         // 在途的下载只看 DownloadManager.active：点了就算在下（不等进度），在下时再点不重复下，
         // 取消后 active 里那条消失就回到「未下载」，不留页面自己的一份。
         function test_downloadStateFollowsManagerActive() {

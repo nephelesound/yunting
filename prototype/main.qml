@@ -1276,7 +1276,12 @@ Kirigami.ApplicationWindow {
     Shortcut { sequence: "Right"; onActivated: playback.engine.seek(playback.engine.position + 5) }
     Shortcut { sequence: "Ctrl+Left"; onActivated: playback.previous() }
     Shortcut { sequence: "Ctrl+Right"; onActivated: playback.next() }
-    Shortcut { sequences: [StandardKey.Find]; onActivated: root.switchPivot("search") }
+    // 页里有自己的搜索框（列表页的筛选、搜索页）时 Ctrl+F 归它，其余页去搜索
+    Shortcut {
+        sequences: [StandardKey.Find]
+        enabled: !(root.pageStack.currentItem as ScreenFrame)?.findsInPage
+        onActivated: root.switchPivot("search")
+    }
     Shortcut {
         sequences: ["Esc", StandardKey.Back]
         onActivated: {
@@ -1467,10 +1472,10 @@ Kirigami.ApplicationWindow {
             vip: root.vip
             parentText: root.parentName
             currentId: root.currentTrack ? root.currentTrack.id : 0
-            // 播放的就是这一页显示的那份列表
-            onActivated: index => root.play(playlistPage.list.tracks, index)
-            onPlayAllRequested: root.play(playlistPage.list.tracks, 0)
-            onShuffleRequested: root.play(playlistPage.list.tracks, Math.floor(Math.random() * playlistPage.list.tracks.length))
+            // 播放的就是这一页显示的那份列表（筛选时是筛出来的那些）
+            onActivated: index => root.play(playlistPage.shownTracks, index)
+            onPlayAllRequested: root.play(playlistPage.shownTracks, 0)
+            onShuffleRequested: root.play(playlistPage.shownTracks, Math.floor(Math.random() * playlistPage.shownTracks.length))
             onLeaveRequested: root.goBack()
             onLoginRequested: root.requestLogin()
             onRenameRequested: (id, name) => playlistNameDialog.ask(id, name, null)

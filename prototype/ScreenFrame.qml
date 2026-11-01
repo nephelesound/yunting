@@ -27,6 +27,9 @@ Kirigami.Page {
     // 把要记住的属性名放进 kept（枢轴 pane、搜索词等）。main.qml 离开时存 saveView()，回来时 restoreView()
     property Flickable scroller: null
     property var kept: []
+    // 页里有自己的搜索框（Kirigami.SearchField 自带 Ctrl+F）时为 true，main.qml 的 Ctrl+F 就让开，
+    // 两个同键快捷键会互相抵消
+    property bool findsInPage: false
     function saveView() {
         const props = {};
         for (const name of screen.kept)

@@ -14,6 +14,7 @@ ScreenFrame {
     id: page
     scroller: collections
     kept: ["query", "collection"]
+    findsInPage: true   // Ctrl+F 回到上面的搜索框
 
     property string query
     onQueryChanged: Source.search(page.query)

@@ -23,7 +23,26 @@ ScreenFrame {
     // 自己的歌单可以进入排序模式：每行固定显示上移 / 下移，提交一次后退出
     property bool reordering: false
     property string pane: "tracks"   // tracks | comments（只有歌单有评论）
-    kept: ["pane", "listKey"]
+    // 在这一列里找：歌名、别名、歌手、专辑都算，空格分开的几个词都要对上（不分大小写）
+    property string filter: ""
+    kept: ["pane", "listKey", "filter"]
+    // 分页的列表（电台）只取到一部分，在里面找会漏，不给找
+    readonly property bool filterable: !page.list.paging && (page.list.tracks || []).length > 0
+    readonly property var filterWords: page.filterable
+        ? page.filter.toLowerCase().split(/\s+/).filter(word => word !== "") : []
+    // 这一页显示的曲目：播放、随机播放、定位都对着它，播放的就是看到的那份
+    readonly property var shownTracks: {
+        const all = page.list.tracks || [];
+        if (page.filterWords.length === 0)
+            return all;
+        return all.filter(t => {
+            const text = [t.name, t.alias, t.artist, t.album].join("\n").toLowerCase();
+            return page.filterWords.every(word => text.includes(word));
+        });
+    }
+    findsInPage: filterField.visible && filterField.enabled
+    // 排序按完整顺序提交，排序时不筛选
+    onReorderingChanged: if (page.reordering) page.filter = ""
     // 歌单（含榜单、红心、雷达这些本身就是歌单的）才有评论；专辑、电台、每日推荐没有
     readonly property var commentThread: (page.list.listId || 0) > 0 && !page.list.isAlbum && !page.list.paging
         ? Source.commentThread("playlist", page.list.listId) : null
@@ -102,14 +121,14 @@ ScreenFrame {
                 spacing: Tokens.space2
 
                 AccentButton {
-                    enabled: page.list.tracks.length > 0
+                    enabled: page.shownTracks.length > 0
                     icon.name: "media-playback-start"
                     text: "播放"   // 在曲目列表上方，放的就是这一列；窗格 280 宽，留给后面带状态的动作
                     onClicked: page.playAllRequested()
                 }
                 // 与歌手页同一排：随机播放只留图标（悬停有提示），窗格 280 宽放得下其余带状态的动作
                 IconButton {
-                    enabled: page.list.tracks.length > 1
+                    enabled: page.shownTracks.length > 1
                     icon.name: "media-playlist-shuffle"
                     text: "随机播放"
                     onClicked: page.shuffleRequested()
@@ -277,28 +296,58 @@ ScreenFrame {
             Layout.fillHeight: true
             spacing: Tokens.space3
 
-            Pivot {
-                visible: page.commentThread !== null
-                items: [{ key: "tracks", text: "曲目" },
-                        { key: "comments", text: page.commentCount > 0 ? "评论 " + Format.count(page.commentCount) : "评论" }]
-                current: page.pane
-                onActivated: key => page.pane = key
-            }
-            // 每日推荐：今天与历史日推（黑胶 VIP 才有）。只有今天时没有可选的，不显示。
-            // 换的是同一份列表的日子，与听歌排行的「一周 / 一月」同一档小筛选（窄窗也放得下 6 项）
-            Pivot {
-                objectName: "dailyDays"
-                visible: (page.list.days || []).length > 1
-                items: page.list.days || []
-                current: page.listKey
-                rowHeight: Tokens.height8
-                fontSize: Tokens.textBase
+            // 列表上方一排：左边枢轴（曲目 | 评论，或日推的日子），右边在列表里找，右缘对齐列表右缘
+            RowLayout {
+                visible: page.commentThread !== null || (page.list.days || []).length > 1 || page.filterable
+                Layout.fillWidth: true
+                Layout.rightMargin: Tokens.pageMargin
                 spacing: Tokens.space4
-                onActivated: key => page.listKey = key
+
+                Pivot {
+                    id: tracksPivot
+                    visible: page.commentThread !== null
+                    items: [{ key: "tracks", text: "曲目" },
+                            { key: "comments", text: page.commentCount > 0 ? "评论 " + Format.count(page.commentCount) : "评论" }]
+                    current: page.pane
+                    onActivated: key => page.pane = key
+                }
+                // 每日推荐：今天与历史日推（黑胶 VIP 才有）。只有今天时没有可选的，不显示。
+                // 换的是同一份列表的日子，与听歌排行的「一周 / 一月」同一档小筛选（窄窗也放得下 6 项）
+                Pivot {
+                    id: days
+                    objectName: "dailyDays"
+                    visible: (page.list.days || []).length > 1
+                    items: page.list.days || []
+                    current: page.listKey
+                    rowHeight: Tokens.height8
+                    fontSize: Tokens.textBase
+                    spacing: Tokens.space4
+                    onActivated: key => page.listKey = key
+                }
+                Item { Layout.fillWidth: true }
+                // 边输入边筛；Esc 先清空，空着再按才返回。Ctrl+F 用 SearchField 自带的（见 findsInPage）
+                Kirigami.SearchField {
+                    id: filterField
+                    objectName: "listFilter"
+                    visible: page.filterable
+                    enabled: !page.reordering
+                    // 与左栏同宽；窄窗里让给日推的日子，自己缩短
+                    Layout.fillWidth: true
+                    Layout.maximumWidth: Tokens.trackColumn
+                    implicitHeight: Tokens.height10
+                    placeholderText: "筛选歌名、歌手、专辑"
+                    autoAccept: false
+                    text: page.filter
+                    onTextChanged: page.filter = text
+                    onTextEdited: page.pane = "tracks"   // 在评论里打字也是要找歌
+                    Keys.onShortcutOverride: event => event.accepted = event.key === Qt.Key_Escape && filterField.text !== ""
+                    Keys.onEscapePressed: filterField.clear()
+                }
             }
 
             ListView {
                 id: tracks
+                objectName: "trackList"
                 visible: page.pane === "tracks" || page.commentThread === null
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -308,8 +357,10 @@ ScreenFrame {
                 spacing: Tokens.space2
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
-                // 与歌手页 / 评论区同一种模型：列表更新只增量追加，滚回顶部不会发生
-                model: GrowingModel { values: page.list.tracks }
+                // 与歌手页 / 评论区同一种模型：列表更新只增量追加，滚回顶部不会发生。
+                // 筛选不是追加：筛着时直接按行数重建一次，GrowingModel 照旧跟着完整的列
+                model: page.filterWords.length > 0 ? page.shownTracks.length : fullList
+                GrowingModel { id: fullList; values: page.list.tracks }
                 currentIndex: -1
                 ScrollBar.vertical: AppScrollBar {}
                 WheelScroll { flickable: tracks }
@@ -325,13 +376,14 @@ ScreenFrame {
                 LocateCurrent {
                     parent: tracks
                     view: tracks
-                    index: page.list.tracks.findIndex(t => t.id === page.currentId)
+                    index: page.shownTracks.findIndex(t => t.id === page.currentId)
                 }
 
                 delegate: TrackTile {
-                    modelData: page.list.tracks[index] || ({ id: 0, name: "", artist: "", dur: 0, fee: 0, cover: "" })
+                    modelData: page.shownTracks[index] || ({ id: 0, name: "", artist: "", dur: 0, fee: 0, cover: "" })
                     width: tracks.width - tracks.rightMargin
                     ranked: page.list.ranked || false
+                    rank: page.filterWords.length > 0 ? page.list.tracks.findIndex(t => t.id === modelData.id) + 1 : index + 1
                     current: modelData.id === page.currentId
                     showReason: page.list.showReason || false
                     showAlbum: !(page.list.isAlbum || false) && page.list.showAlbum !== false
@@ -348,8 +400,9 @@ ScreenFrame {
                     anchors.centerIn: parent
                     width: parent.width - 2 * Tokens.pageMargin
                     visible: tracks.count === 0
-                    icon.name: "view-media-playlist"
-                    text: page.list.failed ? "曲目取不到，点此重试" : (page.list.emptyText || "这里还没有歌")
+                    icon.name: page.filterWords.length > 0 ? "edit-find" : "view-media-playlist"
+                    text: page.filterWords.length > 0 ? "列表里没有" + Source.quoted(page.filter.trim())
+                        : page.list.failed ? "曲目取不到，点此重试" : (page.list.emptyText || "这里还没有歌")
                     HoverHandler { enabled: page.list.failed === true; cursorShape: Qt.PointingHandCursor }
                     TapHandler {
                         enabled: page.list.failed === true

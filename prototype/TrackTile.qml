@@ -17,6 +17,7 @@ AbstractButton {
 
     property bool current
     property bool ranked
+    property int rank: tile.index + 1   // 筛选过的榜单里，行号不是名次
     property bool locked // 匿名会话下的 VIP 曲：可见，点击时提示登录
     property string note // 这一行在当下场景里的说明（例如一起听时「对方不能播放」）：弱化的标签，跟在音质后面
 
@@ -90,7 +91,7 @@ AbstractButton {
             Label {
                 anchors.fill: parent
                 visible: !tile.current
-                text: tile.index + 1
+                text: tile.rank
                 horizontalAlignment: Text.AlignRight
                 verticalAlignment: Text.AlignVCenter
                 font.pixelSize: Tokens.textBase
