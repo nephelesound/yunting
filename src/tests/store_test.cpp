@@ -859,6 +859,37 @@ private slots:
         QCOMPARE(requests, 0);
     }
 
+    // 云盘要取全（#9：在云盘里找歌，取不到的就找不到）：一页 200 首，一直取到 count 为止
+    void cloudFetchesEveryPage()
+    {
+        constexpr int total = 1250;
+        int pages = 0;
+        m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
+            if (req.path == "/api/nuser/account/get") {
+                respond(200, json(QJsonObject{{"code", 200}, {"profile", QJsonObject{{"userId", 42}, {"nickname", "n"}}}}));
+                return;
+            }
+            if (req.path != "/api/v1/cloud/get") {
+                respond(200, "{\"code\":200}");
+                return;
+            }
+            ++pages;
+            const QUrlQuery query(QString::fromLatin1(req.query));
+            const int offset = query.queryItemValue(QStringLiteral("offset")).toInt();
+            const int limit = query.queryItemValue(QStringLiteral("limit")).toInt();
+            QJsonArray data;
+            for (int i = offset; i < std::min(offset + limit, total); ++i)
+                data.append(QJsonObject{{"songId", i + 1}, {"songName", QStringLiteral("歌 %1").arg(i)}});
+            respond(200, json(QJsonObject{{"code", 200}, {"count", total}, {"size", 1}, {"maxSize", 2},
+                                          {"data", data}}));
+        };
+
+        m_store->refresh();
+        QVERIFY(waitUntil([&] { return !m_store->personal().value("cloud").isNull(); }));
+        QCOMPARE(m_store->personal().value("cloud").toMap().value("tracks").toList().size(), total);
+        QCOMPARE(pages, 7);
+    }
+
     // 页面退栈时 id 会短暂归零：这些 key 不能发网络请求，也不能报失败。
     void zeroIdsNeverHitNetwork()
     {

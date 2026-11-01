@@ -536,7 +536,7 @@ void Store::fetchTail()
                                   {"tracks", sdk::tracksToVariantList(*parsed.value)}}, true);
     });
 
-    // 云盘用 offset 分页：接口单页上限 200，逐页取到 count 或空页为止（最多 1000 首）
+    // 云盘用 offset 分页：接口单页上限 200，逐页取到 count 或空页为止。要取全：云盘页的筛选只在取到的歌里找
     fetchCloudPage(std::make_shared<CloudState>());
 }
 
@@ -569,8 +569,7 @@ void Store::fetchCloudPage(const std::shared_ptr<CloudState> &state)
                 state->tracks.append(ncmCloudTrack(x.toObject()));
             state->offset += items.size();
         }
-        if (ok && !arr(resp, "data").isEmpty() && state->offset < state->count
-            && state->offset < 1000) {
+        if (ok && !arr(resp, "data").isEmpty() && state->offset < state->count) {
             fetchCloudPage(state);
             return;
         }
