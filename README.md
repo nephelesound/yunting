@@ -127,7 +127,19 @@ flatpak install --user yunting-x86_64.flatpak
 
 ### Arch Linux
 
-云听目前不在 AUR 上（AUR 暂停了新账号注册），所以用 `yay` 或 `paru` 搜不到。请用仓库里的 PKGBUILD 从 GitHub 构建，安装最新的发布版本：
+云听已收录进 AUR：[`yunting`](https://aur.archlinux.org/packages/yunting)，由 [@ilovesusu](https://github.com/ilovesusu) 维护，更新可能比 GitHub 发布晚一些。用 `yay` 或 `paru` 安装：
+
+```bash
+yay -S yunting
+# 或
+paru -S yunting
+```
+
+- 更新：`yay -Syu`（或 `paru -Syu`）
+- 卸载：`sudo pacman -R yunting`
+- 如果以前装过 `yunting-git`（从主干构建的旧包）：安装 `yunting` 时 pacman 会提示替换它
+
+也可以不用 AUR 助手，直接用仓库里的 PKGBUILD 构建：
 
 ```bash
 sudo pacman -S --needed base-devel git
@@ -136,11 +148,7 @@ cd yunting/packaging/aur
 makepkg -si
 ```
 
-`makepkg` 会从官方仓库安装依赖，下载 PKGBUILD 中指定版本的源码，构建并通过测试后交给 pacman 安装。
-
-- 更新：进入 `yunting/packaging/aur`，运行 `git pull && makepkg -si`
-- 卸载：`sudo pacman -R yunting`
-- 如果以前装过 `yunting-git`（从主干构建的旧包）：照上面的步骤安装即可，pacman 会提示用 `yunting` 替换它
+`makepkg` 会从官方仓库安装依赖，下载 PKGBUILD 中指定版本的源码，构建并通过测试后交给 pacman 安装；更新时进入 `yunting/packaging/aur`，运行 `git pull && makepkg -si`。
 
 ### 从源码构建
 
