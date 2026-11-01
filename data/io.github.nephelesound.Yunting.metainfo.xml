@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.31" date="2026-10-31">
+      <description>
+        <p>Track lists such as the cloud drive, liked songs, playlists and albums can be filtered in place by title, alias, artist or album. Playing and shuffling follow the filtered rows, charts keep their ranks, Ctrl+F focuses the filter, and Esc clears it. On the search page, Ctrl+F now returns to the search field.</p>
+        <p xml:lang="zh_CN">音乐云盘、我喜欢的音乐、歌单与专辑等列表可以按歌名、别名、歌手或专辑就地筛选；播放与随机播放跟随筛出来的歌，榜单保留原名次，Ctrl+F 聚焦筛选框，Esc 清空。搜索页按 Ctrl+F 回到搜索框。</p>
+      </description>
+    </release>
     <release version="0.6.30" date="2026-10-27">
       <description>
         <p>Desktop lyrics stay visible when the main window is hidden to the tray or switched to the mini player, remember their lock state, and can be toggled and locked from the tray menu. The tray also offers liking the current track and opening the mini player. Long lyrics wrap instead of being elided, non-current lines render at their real size on low-DPI screens, songs whose lyrics NetEase has not collected say "No lyrics" instead of offering a retry, the desktop-lyrics colour dots use their own colours, the fullscreen cover makes the window actually fullscreen, and the Cookie login hint no longer clips.</p>
