@@ -912,6 +912,23 @@ private slots:
         QCOMPARE(pages, 8);
     }
 
+    // 0.6.31 及更早的个人快照带着歌单详情。恢复它们会让歌单页拿着旧曲目、不再去取
+    void legacySnapshotDoesNotRestorePlaylistDetails()
+    {
+        delete m_store;
+        m_store = nullptr;
+        {
+            QueryCache legacy(QStandardPaths::writableLocation(QStandardPaths::CacheLocation)
+                              + QStringLiteral("/queries.db"));
+            legacy.remember(QStringLiteral("screen:personal"), QVariantMap{
+                {"playlistDetails", QVariantMap{{"501", QVariantMap{{"tracks", QVariantList{QVariantMap{{"id", 1}}}}}}}},
+                {"likedIds", QVariantList{7}}});
+        }
+        m_store = new Store(m_client);
+        QCOMPARE(m_store->personal().value("likedIds").toList().size(), 1);   // 其余照常恢复
+        QVERIFY(m_store->personal().value("playlistDetails").toMap().isEmpty());
+    }
+
     // 页面退栈时 id 会短暂归零：这些 key 不能发网络请求，也不能报失败。
     void zeroIdsNeverHitNetwork()
     {

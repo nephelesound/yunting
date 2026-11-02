@@ -254,7 +254,9 @@ void Store::restoreScreen()
             it = cachedData.erase(it);
     }
     overlay(m_data, cachedData);
-    const QVariantMap cachedPersonal = m_cache.peek(personalKey()).toMap();
+    QVariantMap cachedPersonal = m_cache.peek(personalKey()).toMap();
+    // 0.6.31 及更早的快照带着歌单详情：恢复它们会让歌单页拿着旧曲目不再取，也绕过 putKeyed 的上限
+    cachedPersonal.remove(QStringLiteral("playlistDetails"));
     const double cachedUid = cachedPersonal.value("account").toMap().value("id").toDouble();
     // 登录态下个人快照可能属于上一个账号（例如换了 cookie 启动）：宁可不显示，也不串号。
     // 没有 UID 的旧缓存或匿名快照照常恢复。

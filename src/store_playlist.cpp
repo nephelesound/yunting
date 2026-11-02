@@ -440,6 +440,7 @@ void Store::deletePlaylist(double id)
         removeFrom("subscribed");
         QVariantMap details = m_personal.value("playlistDetails").toMap();
         details.remove(num(id));
+        m_keyedOrder[QStringLiteral("playlistDetails")].removeAll(num(id));
         put("playlistDetails", details, true);
         m_cache.forget(QStringLiteral("playlist:") + num(id));
         emit playlistChanged(id);
