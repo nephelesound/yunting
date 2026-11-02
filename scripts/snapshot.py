@@ -379,7 +379,8 @@ def anonymous():
 
 
 def personal(hot_tracks):
-    # playlistDetails：按需加载的歌单曲目 { "<id>": { tracks, description } }，快照里为空，由应用的 Store 填
+    # playlistDetails：按需加载的歌单详情 { "<id>": { tracks, description, … } }；应用里由 Store 按需填，
+    # 快照只预放前几个推荐歌单（原型没有后端可取）
     # likedIds：全部红心曲目 id，登录后由 /api/song/like/get 填
     # dailyHistory：历史日推，打开每日推荐页时按需取，快照里不带
     data = {"account": None, "daily": None, "dailyHistory": None, "heart": None, "radar": None, "liked": None, "likedIds": [],
@@ -443,16 +444,20 @@ def personal(hot_tracks):
 
         recommended = get("api/v1/discovery/recommend/resource", personal=True).get("recommend") or []
         data["playlists"] = [playlist_card(p, "picUrl") for p in recommended]
-        # 前 6 个推荐歌单补完整曲目和一句简介；其余保持空，原型里点开再取
+        # 卡片不带曲目（与应用一样，点开再取）。原型没有后端可取：前 6 个的详情预先放进 playlistDetails，
+        # 形状同应用 request("playlist:<id>") 取回的
+        for card in data["playlists"]:
+            card["tracks"] = []
+            card["description"] = ""
         for card in data["playlists"][:6]:
             pl_resp = get(f"api/v6/playlist/detail?id={card['id']}&n=1000", personal=True)
             pl = pl_resp["playlist"]
-            card["tracks"] = complete_playlist(pl, personal=True,
-                                               privileges=pl_resp.get("privileges") or [])
-            card["description"] = (pl.get("description") or "").split("\n")[0]
-        for card in data["playlists"][6:]:
-            card["tracks"] = []
-            card["description"] = ""
+            data["playlistDetails"][str(card["id"])] = {
+                "tracks": complete_playlist(pl, personal=True, privileges=pl_resp.get("privileges") or []),
+                "description": (pl.get("description") or "").split("\n")[0],
+                "name": pl.get("name") or "", "cover": sized(pl.get("coverImgUrl"), 400),
+                "count": pl.get("trackCount") or 0, "privacy": pl.get("privacy") or 0,
+                "tags": pl.get("tags") or [], "id": card["id"]}
 
         recent_resp = get("api/play-record/song/list?limit=300", personal=True)
         record = recent_resp.get("data") or {}

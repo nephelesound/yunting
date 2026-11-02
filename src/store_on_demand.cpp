@@ -125,6 +125,8 @@ void Store::request(const QString &key)
              s.requestSimilarSongs(k, k.section(u':', 1).toDouble()); }},
         {QStringLiteral("similarPlaylists:"), [](Store &s, const QString &k) {
              s.requestSimilarPlaylists(k, k.section(u':', 1).toDouble()); }},
+        {QStringLiteral("cloud"), [](Store &s, const QString &) {
+             s.requestCloud(); }},
         {QStringLiteral("defaultSearch"), [](Store &s, const QString &) {
              s.requestDefaultSearch(); }},
         {QStringLiteral("friendsListening"), [](Store &s, const QString &) {
@@ -339,12 +341,8 @@ void Store::requestPlaylist(const QString &key, double playlistId)
             });
         },
         [this, playlistId](const QVariant &detail) {
-            QVariantMap details = m_personal.value("playlistDetails").toMap();
-            details.insert(num(playlistId), detail);
-            put("playlistDetails", details, true);
-            // 推荐歌单的卡片也换成完整曲目：从列表页返回后再点一次不用重新等
-            patchPlaylistCard(playlistId, detail.toMap().value("tracks").toList(),
-                              detail.toMap().value("description").toString());
+            // 只留最近几个：再打开更早的那个时 QueryCache 里还有，直接给
+            putKeyed("playlistDetails", num(playlistId), detail, true);
         });
 }
 

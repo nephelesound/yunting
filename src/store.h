@@ -177,7 +177,6 @@ private:
     void fetchAccount();
     void fetchPublicPersonal();
     void fetchAnonymousPlaylists();
-    void patchPlaylistCard(double id, const QVariantList &tracks, const QString &description);
     void fetchDaily();
     // 历史日推：可用日期（新的在前）与某一天的曲目
     void requestDailyHistory();
@@ -194,8 +193,10 @@ private:
     void fetchRadar();
     void fetchTail();
     // 云盘分页的共享状态：递归回调只持有 state，不形成 shared_ptr 自环
+    // 首屏只取第一页（「我的」入口要的首数与容量都在里面）；打开云盘页时 request("cloud") 才取全
     struct CloudState;
     void fetchCloudPage(const std::shared_ptr<CloudState> &state);
+    void requestCloud();
     void refreshCloud();
     // 歌单 / 红心的完整曲目：playlist.tracks 最多约 1000 条，其余用 trackIds + SDK 歌曲详情补齐
     using TracksCallback = std::function<void(const QVariantList &, const QJsonObject &, bool)>;
@@ -330,8 +331,10 @@ private:
 
     // 归一化结果写回 m_data / m_personal 并 NOTIFY
     void put(const char *key, const QVariant &value, bool personalSide);
-    // 按 id 存的详情槽：m_data[slot][id] = value，只留最近 8 个 id（最久未写的先丢）
-    void putKeyed(const char *slot, const QString &id, const QVariant &value);
+    // 按 id 存的详情槽：m_data[slot][id] = value（personalSide 时在 m_personal），只留最近 8 个 id（最久未写的先丢）
+    void putKeyed(const char *slot, const QString &id, const QVariant &value, bool personalSide = false);
+    // 个人快照落盘：按需详情（playlistDetails）不进，它们各自在 QueryCache 里有一行
+    void persistPersonal();
     // 分页槽：第一页（append 为 false）整槽换成这一页；之后的页把 itemsKey 下的条目接在已有的后面
     //（按 id/vid 去重：缓存命中后再刷新会把同一页送来两次），其余字段（more、next、计数）取这一页的
     void putPage(const char *key, QVariantMap page, bool append, bool personalSide, const char *itemsKey = "items");
@@ -341,6 +344,8 @@ private:
     NcmClient *m_client;
     std::function<QDateTime()> m_clock;
     CloudUploader *m_cloudUploader = nullptr;
+    bool m_cloudLoading = false;   // 正在逐页取全；取全之后 request("cloud") 不再发请求
+    bool m_cloudComplete = false;
     QVariantMap m_data;
     QVariantMap m_personal;
     QVariantMap m_emptyPersonal;     // 个人骨架（换账号时清回它）

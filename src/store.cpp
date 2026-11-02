@@ -266,7 +266,7 @@ void Store::put(const char *key, const QVariant &value, bool personalSide)
 {
     if (personalSide) {
         m_personal.insert(QLatin1String(key), value);
-        m_cache.remember(personalKey(), m_personal);
+        persistPersonal();
         emit personalChanged();
     } else {
         m_data.insert(QLatin1String(key), value);
@@ -277,18 +277,18 @@ void Store::put(const char *key, const QVariant &value, bool personalSide)
 
 // 多个页面可能同时读同一类详情的不同 id：各存各的，不能互相覆盖（单槽时两边会互相换掉、
 // 再各自重取，形成请求循环）。每个槽只留最近 8 个 id，写入一个就淘汰最久没写的。
-void Store::putKeyed(const char *slot, const QString &id, const QVariant &value)
+void Store::putKeyed(const char *slot, const QString &id, const QVariant &value, bool personalSide)
 {
     constexpr qsizetype kept = 8;
     const QString name = QLatin1String(slot);
-    QVariantMap all = m_data.value(name).toMap();
+    QVariantMap all = (personalSide ? m_personal : m_data).value(name).toMap();
     QStringList &order = m_keyedOrder[name];
     order.removeAll(id);
     order.append(id);
     while (order.size() > kept)
         all.remove(order.takeFirst());
     all.insert(id, value);
-    put(slot, all, false);
+    put(slot, all, personalSide);
 }
 
 void Store::putPage(const char *key, QVariantMap page, bool append, bool personalSide, const char *itemsKey)
@@ -326,6 +326,13 @@ void Store::persistScreenData()
             screen.insert(name, m_data.value(name));
     }
     m_cache.remember(QStringLiteral("screen:data"), screen);
+}
+
+void Store::persistPersonal()
+{
+    QVariantMap screen = m_personal;
+    screen.remove(QStringLiteral("playlistDetails"));
+    m_cache.remember(personalKey(), screen);
 }
 
 void Store::refresh()
@@ -389,8 +396,11 @@ void Store::resetPersonal()
     m_similarFired = false;
     m_similarSeed.clear();
     m_heartSeedId = 0;
+    m_cloudLoading = false;   // 旧账号的云盘续取回包会被 epoch 丢掉
+    m_cloudComplete = false;
+    m_keyedOrder.remove(QStringLiteral("playlistDetails"));
     m_personal = m_emptyPersonal;
-    m_cache.remember(personalKey(), m_personal);
+    persistPersonal();
     emit personalChanged();
 }
 

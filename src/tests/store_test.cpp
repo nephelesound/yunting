@@ -859,16 +859,25 @@ private slots:
         QCOMPARE(requests, 0);
     }
 
-    // 云盘要取全（#9：在云盘里找歌，取不到的就找不到）：一页 200 首，一直取到 count 为止
-    void cloudFetchesEveryPage()
+    // 首屏只取首屏看得见的：推荐歌单只要卡片（曾经每次启动预取 6 个歌单、两万多首），云盘只要第一页。
+    // 打开云盘页才逐页取全（#9：筛选只在取到的歌里找），取全之后再要也不再请求
+    void startupFetchesOnlyTheFirstScreen()
     {
         constexpr int total = 1250;
         int pages = 0;
+        QSet<QString> details;
         m_api->handler = [&](const FakeApi::Request &req, const FakeApi::Responder &respond) {
             if (req.path == "/api/nuser/account/get") {
                 respond(200, json(QJsonObject{{"code", 200}, {"profile", QJsonObject{{"userId", 42}, {"nickname", "n"}}}}));
                 return;
             }
+            if (req.path == "/api/v1/discovery/recommend/resource") {
+                respond(200, json(QJsonObject{{"code", 200}, {"recommend", QJsonArray{
+                    QJsonObject{{"id", 501}, {"name", "推荐"}, {"picUrl", "http://cover"}, {"trackCount", 3000}}}}}));
+                return;
+            }
+            if (req.path == "/api/v6/playlist/detail")
+                details.insert(QUrlQuery(QString::fromLatin1(req.query)).queryItemValue(QStringLiteral("id")));
             if (req.path != "/api/v1/cloud/get") {
                 respond(200, "{\"code\":200}");
                 return;
@@ -884,10 +893,23 @@ private slots:
                                           {"data", data}}));
         };
 
+        const auto cloud = [&] { return m_store->personal().value("cloud").toMap(); };
+        QSignalSpy settled(m_store, &Store::settled);
         m_store->refresh();
-        QVERIFY(waitUntil([&] { return !m_store->personal().value("cloud").isNull(); }));
-        QCOMPARE(m_store->personal().value("cloud").toMap().value("tracks").toList().size(), total);
-        QCOMPARE(pages, 7);
+        QVERIFY(waitUntil([&] { return !settled.isEmpty() && !cloud().isEmpty(); }));
+        QCOMPARE(m_store->personal().value("playlists").toList().size(), 1);
+        QVERIFY2(!details.contains(QStringLiteral("501")), "推荐歌单的曲目点开再取");
+        QCOMPARE(pages, 1);
+        QCOMPARE(cloud().value("count").toInt(), total);
+        QCOMPARE(cloud().value("tracks").toList().size(), 200);
+
+        m_store->request(QStringLiteral("cloud"));
+        m_store->request(QStringLiteral("cloud"));   // 在取：不另起一轮
+        QVERIFY(waitUntil([&] { return cloud().value("tracks").toList().size() == total; }));
+        QCOMPARE(pages, 8);
+        m_store->request(QStringLiteral("cloud"));   // 取全了：不再请求
+        QTest::qWait(100);
+        QCOMPARE(pages, 8);
     }
 
     // 页面退栈时 id 会短暂归零：这些 key 不能发网络请求，也不能报失败。

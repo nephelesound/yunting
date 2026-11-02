@@ -916,14 +916,15 @@ QtObject {
                 description: "", folder: source.downloads ? source.downloads.directory : "",
                 emptyText: "还没有下载的歌：在歌曲的菜单里点「下载」" };
         }
-        case "cloud": return {
+        case "cloud":
+            source.need("cloud");   // 首屏只有第一页；打开才取全（取全之后 Store 不再发请求）
+            return {
             heading: "音乐云盘", cover: source.sized(source.firstCover(source.cloud.tracks), 560), tracks: source.cloud.tracks,
             facts: [source.songs(source.cloud.count), { value: source.fileSize(source.cloud.size), label: "/ " + source.fileSize(source.cloud.maxSize) }],
             description: "", uploadable: true, emptyText: "云盘里还没有歌：点「上传」把本机的歌传上来" };
         default: {
-            // 推荐歌单：key = "playlist:<序号>"，快照只带了前几个的曲目
-            // 歌单：key = "playlist:<id>"，推荐歌单与「我的」歌单都可以。曲目先看卡片自带的（快照），
-            // 再看按需取回的 playlistDetails；都没有就向 live 要一次
+            // 歌单：key = "playlist:<id>"，推荐歌单与「我的」歌单都可以。卡片不带曲目，
+            // 曲目在按需取回的 playlistDetails 里；还没有就向 live 要一次
             if (key.startsWith("playlist:")) {
                 // 卡片可能来自推荐歌单、我的歌单或排行榜；都没有时用按需取回的详情（它自带名称与封面）
                 const id = Number(key.slice(9));
@@ -934,10 +935,10 @@ QtObject {
                 const detail = (p.playlistDetails || {})[id] || {};
                 const card = source.playlists.concat(source.myPlaylists, source.toplists).find(pl => pl.id === id)
                     || { id: id, name: detail.name || "", cover: detail.cover || "", count: detail.count || 0 };
-                const tracks = (card.tracks && card.tracks.length > 0) ? card.tracks : detail.tracks || [];
+                const tracks = detail.tracks || [];
                 // 只在详情还没取回时要一次：取回来是空歌单（tracks 为 []）也算取到了，
                 // 否则每次 put 触发重新求值都会再发一次，空歌单会让请求无限翻倍
-                if (tracks.length === 0 && detail.tracks === undefined)
+                if (detail.tracks === undefined)
                     source.need(key);
                 const mine = source.myPlaylists.find(pl => pl.id === id);
                 const owned = mine !== undefined && mine.owned && id !== (p.liked.id || 0);

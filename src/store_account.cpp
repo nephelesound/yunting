@@ -206,22 +206,6 @@ void Store::fetchAnonymousPlaylists()
     });
 }
 
-// 给 personal.playlists 里某张卡补上曲目与简介。按 id 找当前值再改，
-// 几个详情请求先后返回时不会互相覆盖
-void Store::patchPlaylistCard(double id, const QVariantList &tracks, const QString &description)
-{
-    QVariantList cards = m_personal.value("playlists").toList();
-    for (QVariant &v : cards) {
-        QVariantMap card = v.toMap();
-        if (card.value("id").toDouble() == id) {
-            card.insert("tracks", tracks);
-            card.insert("description", description);
-            v = card;
-        }
-    }
-    put("playlists", cards, true);
-}
-
 void Store::fetchDaily()
 {
     // 6:00 前取到的仍是前一天的列表：日期标签跟着服务日走，不跟回包时的墙钟。
@@ -506,17 +490,9 @@ void Store::fetchTail()
             card.insert("description", QString{});
             cards.append(card);
         }
+        // 首页磁贴只用封面、名字与推荐理由。曲目点开再取（request("playlist:<id>")，按 id 缓存）：
+        // 推荐歌单动辄几千首，预取 6 个曾是每次启动两万多首、8 MB 的个人快照
         put("playlists", cards, true);
-        // 前 6 个补完整曲目和一句简介；其余保持空，点开再取。
-        // 这是首页磁贴的预览数据，不截 30 首：点进去就是完整歌单，不需要再等一次按需加载。
-        for (int i = 0; i < cards.size() && i < 6; ++i) {
-            const double id = cards.at(i).toMap().value("id").toDouble();
-            fetchPlaylistTracks(id, true,
-                                [this, id](const QVariantList &tracks, const QJsonObject &pl, bool detailOk) {
-                if (detailOk)
-                    patchPlaylistCard(id, tracks, ncmFirstLine(pl.value("description").toString()));
-            });
-        }
     });
 
     fetch("api/play-record/song/list", query({{"limit", "300"}}), true,
@@ -536,12 +512,16 @@ void Store::fetchTail()
                                   {"tracks", sdk::tracksToVariantList(*parsed.value)}}, true);
     });
 
-    // 云盘用 offset 分页：接口单页上限 200，逐页取到 count 或空页为止。要取全：云盘页的筛选只在取到的歌里找
-    fetchCloudPage(std::make_shared<CloudState>());
+    // 云盘：「我的」入口只要首数与容量，第一页就带着；其余等打开云盘页（request("cloud")）再取
+    fetchCloudPage(std::make_shared<CloudState>(m_requests.begin(QStringLiteral("cloud")), false));
+    m_cloudLoading = false;
+    m_cloudComplete = false;
 }
 
 
 struct Store::CloudState {
+    quint64 token;
+    bool full;   // 逐页取到 count 为止；否则只取第一页
     QVariantList tracks;
     double count = 0;
     double size = 0;
@@ -549,33 +529,50 @@ struct Store::CloudState {
     int offset = 0;
 };
 
-void Store::refreshCloud()
+void Store::requestCloud()
 {
-    fetchCloudPage(std::make_shared<CloudState>());
+    if (!m_client->hasMusicU() || m_cloudLoading || m_cloudComplete)
+        return;
+    refreshCloud();
 }
 
+void Store::refreshCloud()
+{
+    m_cloudLoading = true;
+    m_cloudComplete = false;
+    fetchCloudPage(std::make_shared<CloudState>(m_requests.begin(QStringLiteral("cloud")), true));
+}
+
+// offset 分页，接口单页上限 200。每页落地就放上去：长云盘边取边显示，已有的行不动
 void Store::fetchCloudPage(const std::shared_ptr<CloudState> &state)
 {
-    fetch("api/v1/cloud/get",
-          query({{"limit", "200"}, {"offset", QString::number(state->offset)}}), true,
-          [this, state](const QJsonDocument &doc, bool ok) {
-        const QJsonObject resp = body(doc);
-        if (ok) {
-            state->count = resp.value("count").toDouble();
-            state->size = resp.value("size").toDouble();
-            state->maxSize = std::floor(resp.value("maxSize").toDouble());
-            const QJsonArray items = arr(resp, "data");
-            for (const QJsonValue &x : items)
-                state->tracks.append(ncmCloudTrack(x.toObject()));
-            state->offset += items.size();
-        }
-        if (ok && !arr(resp, "data").isEmpty() && state->offset < state->count) {
-            fetchCloudPage(state);
+    fetchAlways("api/v1/cloud/get",
+                query({{"limit", "200"}, {"offset", QString::number(state->offset)}}), true,
+                [this, state](const QJsonDocument &doc, bool ok) {
+        if (!m_requests.current(QStringLiteral("cloud"), state->token))
+            return;
+        if (!requestFailure(doc, ok).isEmpty()) {   // 失败保留已有的；下次打开云盘页再取
+            m_cloudLoading = false;
             return;
         }
+        const QJsonObject resp = body(doc);
+        state->count = resp.value("count").toDouble();
+        state->size = resp.value("size").toDouble();
+        state->maxSize = std::floor(resp.value("maxSize").toDouble());
+        const QJsonArray items = arr(resp, "data");
+        for (const QJsonValue &x : items)
+            state->tracks.append(ncmCloudTrack(x.toObject()));
+        state->offset += items.size();
         put("cloud", QVariantMap{{"count", state->count},
                                  {"size", state->size},
                                  {"maxSize", state->maxSize},
                                  {"tracks", state->tracks}}, true);
+        const bool more = !items.isEmpty() && state->offset < state->count;
+        if (state->full && more) {
+            fetchCloudPage(state);
+            return;
+        }
+        m_cloudLoading = false;
+        m_cloudComplete = !more;
     });
 }
