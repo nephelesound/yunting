@@ -2,6 +2,17 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.32] - 2026-11-01
+
+### 修复
+- 音乐云盘不再只载入前 1000 首：打开云盘页时会把全部歌曲取完，边取边显示，筛选能找到所有上传的歌（[#9](https://github.com/nephelesound/yunting/issues/9)）。
+
+### 优化
+- 启动只取首屏看得见的数据：首页推荐歌单不再在启动时预取全部曲目（推荐歌单动辄几千首，曾让每次启动多出上万首曲目、本地缓存多出数 MB），点开时再取；云盘启动时只取第一页，打开云盘页才取全。启动请求更少，缓存写盘更小。
+
+### 文档
+- Arch Linux 可以从 AUR 安装 [`yunting`](https://aur.archlinux.org/packages/yunting)（由 @ilovesusu 维护）。
+
 ## [0.6.31] - 2026-10-31
 
 ### 新增

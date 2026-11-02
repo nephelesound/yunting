@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.32" date="2026-11-01">
+      <description>
+        <p>The cloud drive loads every uploaded song when its page opens, so filtering finds all of them. Startup fetches only what the first screen shows: recommended playlists load their tracks when opened, and the cloud drive loads its first page, which means fewer requests and a much smaller local cache.</p>
+        <p xml:lang="zh_CN">音乐云盘在打开时载入全部上传的歌，筛选能找到每一首。启动只取首屏看得见的数据：推荐歌单点开再取曲目，云盘启动时只取第一页，请求更少，本地缓存小得多。</p>
+      </description>
+    </release>
     <release version="0.6.31" date="2026-10-31">
       <description>
         <p>Track lists such as the cloud drive, liked songs, playlists and albums can be filtered in place by title, alias, artist or album. Playing and shuffling follow the filtered rows, charts keep their ranks, Ctrl+F focuses the filter, and Esc clears it. On the search page, Ctrl+F now returns to the search field.</p>
