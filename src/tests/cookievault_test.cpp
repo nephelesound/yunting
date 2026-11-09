@@ -21,6 +21,21 @@ private slots:
         qputenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent");
     }
 
+    // 钥匙串请求在途时 vault 就被销毁（退出、测试里短命的客户端）：libsecret 的回调稍后才回来，
+    // 不能落在已经删掉的任务上（曾让 retry_test 偶发段错误，也让打包时的测试失败）
+    void vaultDestroyedWhileKeychainJobInFlight()
+    {
+        QTemporaryDir dir;
+        qputenv("XDG_DATA_HOME", dir.path().toUtf8());
+        for (int i = 0; i < 5; ++i) {
+            auto *vault = new CookieVault;
+            vault->load();   // 首个操作是钥匙串探测；任务的 start 排在事件队列里
+            QCoreApplication::processEvents();   // 请求真发出去（回调要十几毫秒才回来）
+            delete vault;
+        }
+        QTest::qWait(500);   // 等回调都回来。旧写法在这里访问已删除的任务（ASan 下必报 heap-use-after-free）
+    }
+
     // 换服务名（开发、测试）时后备文件也换掉：迁移不能读走、删掉日常使用的那个文件
     void serviceOverrideLeavesTheDailyFileAlone()
     {

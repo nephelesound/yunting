@@ -19,6 +19,19 @@
 Q_LOGGING_CATEGORY(lcVault, "yunting.vault", QtWarningMsg)
 
 namespace {
+// 钥匙串任务不挂在 vault 名下：qtkeychain 不取消在途请求，libsecret 的回调可能在 vault 销毁之后才回来，
+// 随 vault 一起删掉的任务会在回调里被访问（retry_test 偶发段错误）。任务 finished 后自己删（autoDelete 默认开），
+// 连接以 vault 为上下文，vault 先走时自动断开
+template <typename Job>
+Job *keychainJob(const QString &service, const QString &key)
+{
+    auto *job = new Job(service);
+    job->setKey(key);
+    return job;
+}
+} // namespace
+
+namespace {
 // 开发与测试用 YUNTING_KEYCHAIN_SERVICE 换一个服务名，不碰日常使用的存储。
 // 换名要同时换掉后备文件：否则迁移会读走并删除日常的那个文件
 QString serviceOverride()
@@ -59,8 +72,7 @@ void CookieVault::pump()
             return;
         // 首个操作兼作钥匙串可用性探测（读一次）；等 finished 里按结论重放
         m_probeInFlight = true;
-        auto *probe = new QKeychain::ReadPasswordJob(m_service, this);
-        probe->setKey(m_key);
+        auto *probe = keychainJob<QKeychain::ReadPasswordJob>(m_service, m_key);
         connect(probe, &QKeychain::ReadPasswordJob::finished, this, [this, probe] {
             m_probeInFlight = false;
             // EntryNotFound 是好答案：钥匙串在、还没有条目。其余错误（无会话总线、
@@ -70,7 +82,6 @@ void CookieVault::pump()
             m_mode = keychainOk ? Mode::Keychain : Mode::File;
             if (!keychainOk)
                 logFallback(probe->errorString().toUtf8().constData());
-            probe->deleteLater();
             m_busy = false;
             pump();
         });
@@ -140,8 +151,7 @@ void CookieVault::migrate()
 
 void CookieVault::runSave(const QByteArray &json)
 {
-    auto *job = new QKeychain::WritePasswordJob(m_service, this);
-    job->setKey(m_key);
+    auto *job = keychainJob<QKeychain::WritePasswordJob>(m_service, m_key);
     job->setBinaryData(json);
     connect(job, &QKeychain::WritePasswordJob::finished, this, [this, json](QKeychain::Job *done) {
         const bool ok = done->error() == QKeychain::NoError;
@@ -152,7 +162,6 @@ void CookieVault::runSave(const QByteArray &json)
             m_mode = Mode::File;
             stored = writeFile(json);
         }
-        done->deleteLater();
         m_busy = false;
         pump();
         emit saved(stored);
@@ -163,8 +172,7 @@ void CookieVault::runSave(const QByteArray &json)
 
 void CookieVault::readKeychain()
 {
-    auto *job = new QKeychain::ReadPasswordJob(m_service, this);
-    job->setKey(m_key);
+    auto *job = keychainJob<QKeychain::ReadPasswordJob>(m_service, m_key);
     connect(job, &QKeychain::ReadPasswordJob::finished, this, [this, job](QKeychain::Job *done) {
         // 读失败不能当「无条目」：空 jar 会让随后的匿名 NMTID 落盘，覆盖真凭据。
         // EntryNotFound 才是权威的「还没有条目」。
@@ -173,7 +181,6 @@ void CookieVault::readKeychain()
         if (readError)
             qCWarning(lcVault) << "keychain read failed:" << done->errorString();
         const QByteArray data = done->error() == QKeychain::NoError ? job->binaryData() : QByteArray();
-        done->deleteLater();
         m_busy = false;
         pump();
         if (readError)
@@ -195,8 +202,7 @@ bool CookieVault::waitForPending(int timeoutMs)
 
 void CookieVault::writeMigrated(const QByteArray &json)
 {
-    auto *job = new QKeychain::WritePasswordJob(m_service, this);
-    job->setKey(m_key);
+    auto *job = keychainJob<QKeychain::WritePasswordJob>(m_service, m_key);
     job->setBinaryData(json);
     connect(job, &QKeychain::WritePasswordJob::finished, this, [this, json](QKeychain::Job *done) {
         if (done->error() == QKeychain::NoError) {
@@ -209,7 +215,6 @@ void CookieVault::writeMigrated(const QByteArray &json)
             qCWarning(lcVault) << "cookie migration write failed:" << done->errorString();
             m_mode = Mode::File;
         }
-        done->deleteLater();
         m_busy = false;
         pump();
         emit migrated();
