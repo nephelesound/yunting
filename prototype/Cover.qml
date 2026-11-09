@@ -38,6 +38,11 @@ Item {
         asynchronous: true
         visible: false
         onStatusChanged: cover.watchLoading()
+        // 加载中途换图，状态一直是 Loading、不发 statusChanged；内存里有的图又会跳过 Loading 直接 Ready。都从换图这一刻重新算
+        onSourceChanged: {
+            cover.waited = false;
+            cover.watchLoading();
+        }
     }
 
     // 只有真在等网络的封面才淡入。磁盘缓存里的几毫秒就解码好了，页面每次导航都重建，

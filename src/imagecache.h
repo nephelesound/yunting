@@ -1,7 +1,6 @@
 #pragma once
 // 封面图片的磁盘缓存：QML 的 Image 都经引擎的网络管理器取图，这里给它挂上磁盘缓存。
-// 网易的封面地址里带图片指纹和尺寸参数，同一个地址的内容永远不变，所以优先用缓存（PreferCache）：
-// 看过的封面再也不发请求，离线时也能显示。
+// 网易的封面响应带 max-age 一年，地址里又有图片指纹和尺寸参数，所以看过的封面一年内不再发请求，离线也能显示。
 #include <QNetworkAccessManager>
 #include <QNetworkDiskCache>
 #include <QQmlNetworkAccessManagerFactory>
@@ -13,6 +12,8 @@ public:
     using QNetworkDiskCache::QNetworkDiskCache;
 
     QIODevice *data(const QUrl &url) override;
+    QIODevice *prepare(const QNetworkCacheMetaData &metaData) override;
+    void updateMetaData(const QNetworkCacheMetaData &metaData) override;
 
 private:
     bool m_refreshing = false;   // updateMetaData 自己会再调 data()
