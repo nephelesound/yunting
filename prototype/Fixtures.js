@@ -132,7 +132,11 @@ var worst = {
             { id: 1, name: "飙升榜", cover: C2, update: "每天更新", count: 100, preview: [{ name: "我想要两颗西柚（Live）- 2023 网易云音乐年度盛典现场版", artist: "茄子蛋 / 告五人 / 草东没有派对 / 落日飞车" }, { name: "雨", artist: "A" }] },
             { id: 2, name: "网易云中文说唱榜单（每周五 0 点更新，数据来自全平台播放与收藏）", cover: "", update: "每周五更新", count: 50, preview: [] },
             { id: 3, name: "新歌榜", cover: BROKEN, update: "", count: 0, preview: [{ name: "😭", artist: "🌙" }, { name: "x", artist: "y" }, { name: "z", artist: "w" }] },
-        ],
+            // 官方榜多于 4 个、更多榜单多于 8 个：上带要多排几行，不能压到热歌榜上（#10）
+            { id: 4, name: "原创榜", cover: C1, update: "每周五更新", count: 100, preview: [{ name: "a", artist: "b" }] },
+            { id: 5, name: "热歌榜", cover: C2, update: "每周四更新", count: 200, preview: [{ name: "c", artist: "d" }] },
+            { id: 6, name: "荣耀音乐热歌榜", cover: C1, update: "更新33首", count: 100, preview: [{ name: "e", artist: "f" }] },
+        ].concat([7, 8, 9, 10, 11, 12, 13, 14].map(id => ({ id: id, name: "更多榜 " + id, cover: id % 2 ? C1 : C2, update: "每天更新", count: 50, preview: [] }))),
         playlist: { id: 3778678, name: "网易云音乐 2026 年度听歌报告：你最常在深夜循环的 200 首歌", cover: "", description: "这是一段非常长的歌单简介，包含换行。\n第二段说明它是怎么生成的，以及更新频率、数据口径、收录规则和版权说明，足够把三行占满还溢出。", count: 12345, plays: 99999999999 },
         tracks: worstTracks.slice(0, 200),
         lyrics: { "903": { lines: worstLyrics, pureMusic: false } },   // 原型的「正在播放」是热歌榜第 3 首
