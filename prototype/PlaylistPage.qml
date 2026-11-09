@@ -326,16 +326,21 @@ ScreenFrame {
                 }
                 Item { Layout.fillWidth: true }
                 // 边输入边筛；Esc 先清空，空着再按才返回。Ctrl+F 用 SearchField 自带的（见 findsInPage）
+                // 筛选是偶尔用的：平时窄、与这排枢轴同高，不抢日子的位置；在输入或筛着时才展开到左栏宽
                 Kirigami.SearchField {
                     id: filterField
                     objectName: "listFilter"
+                    readonly property bool open: filterField.activeFocus || filterField.text !== ""
+                    property real openWidth: filterField.open ? Tokens.trackColumn : Tokens.tileLg
+                    Behavior on openWidth { NumberAnimation { duration: Tokens.motionFast; easing.type: Easing.OutCubic } }
                     visible: page.filterable
                     enabled: !page.reordering
-                    // 与左栏同宽；窄窗里让给日推的日子，自己缩短
+                    // 窄窗里让给日推的日子，自己缩短
                     Layout.fillWidth: true
-                    Layout.maximumWidth: Tokens.trackColumn
-                    implicitHeight: Tokens.height10
-                    placeholderText: "筛选歌名、歌手、专辑"
+                    Layout.preferredWidth: filterField.openWidth
+                    Layout.maximumWidth: filterField.openWidth
+                    implicitHeight: Tokens.height8
+                    placeholderText: "筛选歌曲"   // 收起时只有 160 宽；歌名、歌手、专辑都能对上
                     autoAccept: false
                     text: page.filter
                     onTextChanged: page.filter = text

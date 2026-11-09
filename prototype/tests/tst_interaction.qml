@@ -507,13 +507,19 @@ Item {
                 list: { heading: "音乐云盘", cover: "", facts: [], description: "", tracks: tracks, listId: 2, owned: true, ranked: true } });
             const field = findChild(page, "listFilter");
             verify(field.visible);
+            tryCompare(field, "width", Tokens.tileLg, 1000, "平时收窄");
 
             field.forceActiveFocus();
+            tryCompare(field, "width", Tokens.trackColumn, 1000, "输入时展开");
             keyClick(Qt.Key_R);
             keyClick(Qt.Key_I);
             compare(page.shownTracks.map(t => t.id), [900002], "别名不分大小写");
             field.text = "周杰伦  叶惠美";
             compare(page.shownTracks.map(t => t.id), [900001], "每个词都要对上，对上哪一栏都行");
+            findChild(page, "trackList").forceActiveFocus();
+            wait(Tokens.motionFast * 2);
+            compare(field.width, Tokens.trackColumn, "离开时还在筛，保持展开");
+            field.forceActiveFocus();
 
             field.text = "不存在";
             compare(page.shownTracks, []);
