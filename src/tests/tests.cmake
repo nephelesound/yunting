@@ -23,6 +23,10 @@ qt_add_executable(querycache_test tests/querycache_test.cpp querycache.h queryca
 target_link_libraries(querycache_test PRIVATE Qt6::Core Qt6::Sql Qt6::Test Qt6::Network)
 add_test(NAME querycache COMMAND querycache_test)
 
+qt_add_executable(imagecache_test tests/imagecache_test.cpp imagecache.h imagecache.cpp)
+target_link_libraries(imagecache_test PRIVATE Qt6::Core Qt6::Network Qt6::Qml Qt6::Test)
+add_test(NAME imagecache COMMAND imagecache_test)
+
 qt_add_executable(form_test tests/form_test.cpp json_util.h)
 target_link_libraries(form_test PRIVATE Qt6::Core Qt6::Test)
 add_test(NAME form COMMAND form_test)

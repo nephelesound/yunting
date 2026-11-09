@@ -71,7 +71,7 @@ qt_add_executable(yunting
     ${YUNTING_SDK_SOURCES}
     session.h session.cpp
     querycache.h querycache.cpp
-    imagecache.h
+    imagecache.h imagecache.cpp
     json_util.h
     normalize.h normalize.cpp
     audioengine.h audioengine.cpp

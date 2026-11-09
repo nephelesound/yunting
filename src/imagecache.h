@@ -1,40 +1,27 @@
 #pragma once
-// 封面图片的磁盘缓存：QML 的 Image 都经引擎的网络管理器取图，这里给它挂上标准的 QNetworkDiskCache。
+// 封面图片的磁盘缓存：QML 的 Image 都经引擎的网络管理器取图，这里给它挂上磁盘缓存。
 // 网易的封面地址里带图片指纹和尺寸参数，同一个地址的内容永远不变，所以优先用缓存（PreferCache）：
 // 看过的封面再也不发请求，离线时也能显示。
 #include <QNetworkAccessManager>
 #include <QNetworkDiskCache>
-#include <QNetworkRequest>
 #include <QQmlNetworkAccessManagerFactory>
-#include <utility>
+
+// 按最近使用淘汰的磁盘缓存。QNetworkDiskCache 满了按文件的创建时间删最老的，常看的封面反而最先被删；
+// 命中时重写一次条目（updateMetaData 会新建文件），它就成了最新的。重写一张大封面要几百 KB，所以一天最多一次
+class CoverCache : public QNetworkDiskCache {
+public:
+    using QNetworkDiskCache::QNetworkDiskCache;
+
+    QIODevice *data(const QUrl &url) override;
+
+private:
+    bool m_refreshing = false;   // updateMetaData 自己会再调 data()
+};
 
 class ImageCacheFactory : public QQmlNetworkAccessManagerFactory {
-    class CachingManager : public QNetworkAccessManager {
-    public:
-        using QNetworkAccessManager::QNetworkAccessManager;
-
-    protected:
-        QNetworkReply *createRequest(Operation op, const QNetworkRequest &original, QIODevice *data) override
-        {
-            QNetworkRequest req(original);
-            req.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::PreferCache);
-            return QNetworkAccessManager::createRequest(op, req, data);
-        }
-    };
-
 public:
-    explicit ImageCacheFactory(QString cacheDir)
-        : m_cacheDir(std::move(cacheDir)) {}
-
-    QNetworkAccessManager *create(QObject *parent) override
-    {
-        auto *nam = new CachingManager(parent);
-        auto *cache = new QNetworkDiskCache(nam);
-        cache->setCacheDirectory(m_cacheDir);
-        cache->setMaximumCacheSize(512LL * 1024 * 1024);
-        nam->setCache(cache);
-        return nam;
-    }
+    explicit ImageCacheFactory(QString cacheDir);
+    QNetworkAccessManager *create(QObject *parent) override;
 
 private:
     QString m_cacheDir;
