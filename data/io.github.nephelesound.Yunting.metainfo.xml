@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.35" date="2026-11-09">
+      <description>
+        <p>Covers you have seen before appear at once instead of fading in again on every visit; only covers still coming from the network fade in. When the cover cache is full, the covers you have not looked at for longest go first, and the cache can now grow to 1 GB.</p>
+        <p xml:lang="zh_CN">看过的封面直接出现，不再每次回到页面都淡入一遍；只有还在从网络取的封面才淡入。封面缓存满了先删最久没看的，上限提到 1 GB。</p>
+      </description>
+    </release>
     <release version="0.6.34" date="2026-11-08">
       <description>
         <p>The filter field on track lists is quieter: it matches the height of its row, stays narrow until you use it, and sits on a soft tonal background instead of a solid white box, in both light and dark themes. In narrow windows it moves below the daily recommendation days instead of being squeezed out of sight.</p>
