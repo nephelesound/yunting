@@ -514,20 +514,23 @@ Item {
             keyClick(Qt.Key_R);
             keyClick(Qt.Key_I);
             compare(page.shownTracks.map(t => t.id), [900002], "别名不分大小写");
-            field.text = "周杰伦  叶惠美";
+            // 中文打不了 keyClick：从页面这边设，顺带验证页面 → 输入框的同步（直接给 field.text 赋值会断掉这条绑定）
+            page.filter = "周杰伦  叶惠美";
+            compare(field.text, page.filter);
             compare(page.shownTracks.map(t => t.id), [900001], "每个词都要对上，对上哪一栏都行");
             findChild(page, "trackList").forceActiveFocus();
             wait(Tokens.motionFast * 2);
             compare(field.width, Tokens.trackColumn, "离开时还在筛，保持展开");
             field.forceActiveFocus();
 
-            field.text = "不存在";
+            page.filter = "不存在";
             compare(page.shownTracks, []);
             keyClick(Qt.Key_Escape);
             compare(page.filter, "", "Esc 先清空");
             compare(page.shownTracks.length, 3);
 
             page.filter = "江南";
+            compare(field.text, "江南", "Esc 之后绑定还在");
             const row = findChild(page, "trackList").itemAtIndex(0);
             compare(row.modelData.id, 900003);
             compare(row.rank, 3, "榜单筛过之后名次照旧");
@@ -535,6 +538,26 @@ Item {
             page.reordering = true;
             compare(page.shownTracks.length, 3, "排序时看到完整的列");
             verify(!page.findsInPage, "排序时 Ctrl+F 交给全局搜索");
+            verify(field.opacity < 1, "排序时看得出筛选用不了");
+        }
+
+        // 窄窗里日推的日子占满一排：筛选框换到下一行，不被挤成一条
+        function test_filterWrapsBelowCrowdedDays() {
+            const days = ["今天", "10月16日", "10月15日", "10月9日", "10月8日", "12月31日"]
+                .map((text, i) => ({ key: i === 0 ? "daily" : "dailyHistory:" + i, text: text }));
+            const page = createTemporaryObject(listPageComponent, root, { width: 800, loggedIn: true, listKey: "daily",
+                list: { heading: "每日推荐", cover: "", facts: [], description: "", tracks: [root.track], days: days } });
+            const field = findChild(page, "listFilter");
+            const dayRow = findChild(page, "dailyDays");
+            tryVerify(() => dayRow.width > 0 && field.width > 0);
+            verify(field.width >= Tokens.tileLg, "宽 " + field.width);
+            const fieldTop = field.mapToItem(page, 0, 0).y;
+            const daysBottom = dayRow.mapToItem(page, 0, dayRow.height).y;
+            verify(fieldTop >= daysBottom, "筛选框在日子下面：" + fieldTop + " < " + daysBottom);
+
+            page.width = 1280;
+            tryVerify(() => Math.abs(field.mapToItem(page, 0, 0).y - dayRow.mapToItem(page, 0, 0).y) < Tokens.height8,
+                      1000, "宽窗里同一排");
         }
 
         // 在途的下载只看 DownloadManager.active：点了就算在下（不等进度），在下时再点不重复下，

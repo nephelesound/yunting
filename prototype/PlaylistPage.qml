@@ -296,12 +296,20 @@ ScreenFrame {
             Layout.fillHeight: true
             spacing: Tokens.space3
 
-            // 列表上方一排：左边枢轴（曲目 | 评论，或日推的日子），右边在列表里找，右缘对齐列表右缘
-            RowLayout {
+            // 列表上方一排：左边枢轴（曲目 | 评论，或日推的日子），右边在列表里找，右缘对齐列表右缘。
+            // 窄窗里日子占满一排时，筛选框换到下一行靠右，不被挤成一条
+            GridLayout {
+                id: listBar
+                readonly property bool crowded: listBar.width < (tracksPivot.visible ? tracksPivot.implicitWidth + listBar.columnSpacing : 0)
+                    + (days.visible ? days.implicitWidth + listBar.columnSpacing : 0) + Tokens.tileLg
                 visible: page.commentThread !== null || (page.list.days || []).length > 1 || page.filterable
                 Layout.fillWidth: true
+                // 单列时子项都有上限，推出来的最大宽会把这一排卡窄，crowded 就再也变不回 false
+                Layout.maximumWidth: Number.POSITIVE_INFINITY
                 Layout.rightMargin: Tokens.pageMargin
-                spacing: Tokens.space4
+                columns: listBar.crowded ? 1 : 4
+                columnSpacing: Tokens.space4
+                rowSpacing: Tokens.space2
 
                 Pivot {
                     id: tracksPivot
@@ -324,7 +332,7 @@ ScreenFrame {
                     spacing: Tokens.space4
                     onActivated: key => page.listKey = key
                 }
-                Item { Layout.fillWidth: true }
+                Item { visible: !listBar.crowded; Layout.fillWidth: true }
                 // 边输入边筛；Esc 先清空，空着再按才返回。Ctrl+F 用 SearchField 自带的（见 findsInPage）
                 // 筛选是偶尔用的：平时窄、与这排枢轴同高，不抢日子的位置；在输入或筛着时才展开到左栏宽
                 Kirigami.SearchField {
@@ -335,13 +343,17 @@ ScreenFrame {
                     Behavior on openWidth { NumberAnimation { duration: Tokens.motionFast; easing.type: Easing.OutCubic } }
                     visible: page.filterable
                     enabled: !page.reordering
-                    // 窄窗里让给日推的日子，自己缩短
+                    opacity: filterField.enabled ? 1 : Tokens.fadedHover   // 淡色调面不随 enabled 变，排序时得看得出用不了
+                    Layout.alignment: Qt.AlignRight
                     Layout.fillWidth: true
+                    // 不设最小宽：它会撑宽整排，crowded 就永远算不出来；放不下 160 时由 crowded 换行
                     Layout.preferredWidth: filterField.openWidth
                     Layout.maximumWidth: filterField.openWidth
                     implicitHeight: Tokens.height8
+                    // 桌面样式给的是 disabledTextColor，在淡色调面上太淡；放大镜跟着它
+                    placeholderTextColor: Qt.alpha(Kirigami.Theme.textColor, Tokens.muted)
                     // Breeze 的输入框是实心白底（桌面样式写死 View 配色，palette 改不动），在封面氛围色上像贴上去的一块；
-                    // 换成与中性标签同一种淡色调面，聚焦时加 Breeze 焦点框同粗的强调色边
+                    // 换成与中性标签同一种淡色调面，聚焦时加 Breeze 焦点框同粗的强调色边（聚焦时还会展开，不靠加粗边框指示）
                     background: Rectangle {
                         radius: Tokens.radius
                         color: Qt.alpha(Kirigami.Theme.textColor, filterField.hovered && !filterField.activeFocus ? Tokens.tonalHover : Tokens.tonal)
