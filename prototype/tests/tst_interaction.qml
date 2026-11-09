@@ -541,6 +541,20 @@ Item {
             verify(field.opacity < 1, "排序时看得出筛选用不了");
         }
 
+        // 缓存里的封面一就绪就显示，不再淡入：否则回到看过的页面，每张封面都像重新下载了一遍
+        function test_cachedCoverAppearsWithoutFade() {
+            const props = { width: 96, height: 96, pixelSize: 96, source: Qt.resolvedUrl("../../data/io.github.nephelesound.Yunting.svg") };
+            const first = createTemporaryObject(Qt.createComponent("../Cover.qml"), root, props);
+            tryVerify(() => findChild(first, "coverTexture").source !== null, 2000, "第一次（含加载图片插件）");
+            first.destroy();
+
+            // 回到看过的页面：内存里已经没有（换个尺寸让内存缓存对不上），要从磁盘重读、解码，但很快
+            const cover = createTemporaryObject(Qt.createComponent("../Cover.qml"), root, Object.assign({}, props, { pixelSize: 95 }));
+            const texture = findChild(cover, "coverTexture");
+            tryVerify(() => texture.source !== null, 2000, "图片就绪");
+            compare(texture.opacity, 1);
+        }
+
         // 窄窗里日推的日子占满一排：筛选框换到下一行，不被挤成一条
         function test_filterWrapsBelowCrowdedDays() {
             const days = ["今天", "10月16日", "10月15日", "10月9日", "10月8日", "12月31日"]

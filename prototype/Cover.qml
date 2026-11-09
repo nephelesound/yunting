@@ -37,10 +37,30 @@ Item {
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
         visible: false
+        onStatusChanged: cover.watchLoading()
     }
 
-    // 图片到了再淡入（只动 opacity）：换歌、列表滚动加载时封面不会「啪」地跳出来
+    // 只有真在等网络的封面才淡入。磁盘缓存里的几毫秒就解码好了，页面每次导航都重建，
+    // 若照样淡入，回到看过的页面时每张封面都像重新下载了一遍
+    property bool waited: false
+    function watchLoading() {
+        if (image.status === Image.Loading) {
+            cover.waited = false;
+            patience.restart();
+        } else {
+            patience.stop();
+        }
+    }
+    Component.onCompleted: cover.watchLoading()   // 首次设的 source 不一定触发 onStatusChanged
+    Timer {
+        id: patience
+        interval: Tokens.motionFast
+        onTriggered: cover.waited = true
+    }
+
+    // 等来的图片淡入（只动 opacity）：换歌、列表滚动加载时封面不会「啪」地跳出来
     Kirigami.ShadowedTexture {
+        objectName: "coverTexture"
         anchors.fill: parent
         source: image.status === Image.Ready ? image : null
         radius: cover.radius
@@ -50,6 +70,7 @@ Item {
         shadow.color: Qt.alpha("black", Tokens.contactShadowOpacity)
         opacity: image.status === Image.Ready ? 1 : 0
         Behavior on opacity {
+            enabled: cover.waited
             NumberAnimation { duration: Tokens.motionBase; easing.type: Easing.BezierSpline; easing.bezierCurve: Tokens.easeOut }
         }
     }
