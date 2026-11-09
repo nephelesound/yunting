@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.33" date="2026-11-08">
+      <description>
+        <p>On the charts page, the official chart cards no longer cover the hot chart below them when NetEase lists more official charts than before. The page scrolls when the charts do not fit in the window, so every chart stays reachable.</p>
+        <p xml:lang="zh_CN">排行榜页的官方榜卡片不再压住下面的热歌榜：网易给的官方榜变多时，上面一带按实际榜数排行。窗口放不下时整页可以滚动，每个榜都点得到。</p>
+      </description>
+    </release>
     <release version="0.6.32" date="2026-11-01">
       <description>
         <p>The cloud drive loads every uploaded song when its page opens, so filtering finds all of them. Startup fetches only what the first screen shows: recommended playlists load their tracks when opened, and the cloud drive loads its first page, which means fewer requests and a much smaller local cache.</p>
