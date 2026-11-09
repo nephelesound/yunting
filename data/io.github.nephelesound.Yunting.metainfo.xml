@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.34" date="2026-11-08">
+      <description>
+        <p>The filter field on track lists is quieter: it matches the height of its row, stays narrow until you use it, and sits on a soft tonal background instead of a solid white box, in both light and dark themes. In narrow windows it moves below the daily recommendation days instead of being squeezed out of sight.</p>
+        <p xml:lang="zh_CN">列表页的筛选框更安静：与所在一排同高，用的时候才展开，不再是一块实心白框，改为淡色调底，浅色、深色主题下都融进页面。窄窗里它换到每日推荐的日子下面一行，不再被挤得看不见。</p>
+      </description>
+    </release>
     <release version="0.6.33" date="2026-11-08">
       <description>
         <p>On the charts page, the official chart cards no longer cover the hot chart below them when NetEase lists more official charts than before. The page scrolls when the charts do not fit in the window, so every chart stays reachable.</p>
