@@ -21,6 +21,18 @@ ScreenFrame {
     property bool playing
     property string pane: "lyrics"   // lyrics | comments | wiki | similar
 
+    // 当前句的强调色副本：与原文同样排版，外面套裁剪只露出唱过的部分
+    component SungCopy: Label {
+        required property Label source
+        width: source.width
+        height: source.height
+        verticalAlignment: source.verticalAlignment
+        wrapMode: source.wrapMode
+        text: source.text
+        font: source.font
+        color: Kirigami.Theme.highlightColor
+    }
+
     // 逐字填色要逐帧走（引擎的进度更新得没那么勤）：播放时每帧前进，与引擎偏差大或暂停时对齐（与桌面歌词同一做法）
     property real clock: 0
     onElapsedChanged: if (!page.playing || Math.abs(page.elapsed - page.clock) > 0.35) page.clock = page.elapsed
@@ -346,20 +358,40 @@ ScreenFrame {
                     wrapMode: Text.Wrap
                     Behavior on color { ColorAnimation { duration: Tokens.motionBase } }
 
-                    // 逐字歌词：同样的字用强调色、按唱到的位置从左裁出一段，盖在当前句上。
-                    // 折行的句子不画：裁剪宽度是按单行算的，对不上换行位置。
-                    Item {
-                        visible: line.current && page.timed && original.lineCount <= 1
-                        width: Math.min(original.contentWidth, original.width) * page.fill
-                        height: parent.height
-                        clip: true
-                        Label {
-                            width: original.width
-                            height: original.height
-                            verticalAlignment: original.verticalAlignment
-                            text: original.text
-                            font: original.font
-                            color: Kirigami.Theme.highlightColor
+                    // 逐字歌词：同样的字用强调色盖在当前句上，只露出唱过的部分。唱过的宽度 = fill × 各行字宽之和，
+                    // 按行依次分下去：前面的行整行露出，正在唱的行露一段。折成几行的长句也跟着换行走
+                    readonly property bool singing: line.current && page.timed
+                    // 每行排出来的位置与字宽，排版时收集。只有当前句要用：成为当前句时字号变大，必然重排一次。
+                    // 几何没变就不换数组，免得下面的副本整批重建
+                    property var rows: []
+                    property var laying: []
+                    onLineLaidOut: row => {
+                        if (!line.current)
+                            return;
+                        if (row.number === 0)
+                            original.laying = [];
+                        original.laying.push({ y: row.y, height: row.height, width: row.implicitWidth });
+                        if (row.isLast && JSON.stringify(original.laying) !== JSON.stringify(original.rows))
+                            original.rows = original.laying;
+                    }
+                    // 与 Text 自己放文字的算法一致：在去掉上下内边距的区域里按竖直对齐放
+                    readonly property real rowsTop: {
+                        const room = original.height - original.topPadding - original.bottomPadding - original.contentHeight;
+                        return original.topPadding + (original.verticalAlignment === Text.AlignBottom ? room : room / 2);
+                    }
+                    readonly property real sungWidth: page.fill * original.rows.reduce((sum, r) => sum + r.width, 0)
+                    Repeater {
+                        model: original.singing ? original.rows : []
+                        delegate: Item {
+                            required property var modelData
+                            required property int index
+                            readonly property real before: original.rows.slice(0, index).reduce((sum, r) => sum + r.width, 0)
+                            objectName: "sungRow"
+                            y: original.rowsTop + modelData.y
+                            width: Math.max(0, Math.min(modelData.width, original.sungWidth - before))
+                            height: modelData.height
+                            clip: true
+                            SungCopy { source: original; y: -parent.y }
                         }
                     }
                 }

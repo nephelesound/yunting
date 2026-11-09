@@ -36,13 +36,23 @@ for (var i = 7; i <= 1200; i++)
     worstTracks.push(t(900 + i, "第 " + i + " 首：平凡的一天", "毛不易", "平凡的一天", 240, i % 3 === 0 ? 1 : 8, i % 7 === 0 ? "" : C1,
                        { quality: i % 2 ? "lossless" : "", reason: i % 5 === 0 ? "最近常听" : "" }));
 
+// 逐字时间：每 6 个字一段，整句在 8 秒里唱完
+function wordsOf(text, t) {
+    const words = [];
+    for (let i = 0; i < text.length; i += 6)
+        words.push({ t: t + 8 * i / text.length, d: 8 * Math.min(6, text.length - i) / text.length, text: text.slice(i, i + 6) });
+    return words;
+}
+function sung(t, text, tr) { return { t: t, text: text, tr: tr, words: wordsOf(text, t) }; }
+
 var worstLyrics = [
-    { t: 0, text: "作词 : Official髭男dism　作曲 : Official髭男dism　编曲 : Official髭男dism / 蔦谷好位置", tr: "" },
-    { t: 10, text: "もっと違う設定で もっと違う関係で 出会える世界線 選べたらよかった（更长的一句日文歌词，看它在半屏宽度里会不会被截断）",
-      tr: "如果能选择一个以不同的设定、不同的关系相遇的世界线就好了（同样很长的一句译文，看它会不会被截断）" },
-    { t: 20, text: "纯音乐，请欣赏", tr: "" },
-    { t: 30, text: "", tr: "" },
-    { t: 40, text: "最后一句", tr: "the last line" },
+    sung(0, "作词 : Official髭男dism　作曲 : Official髭男dism　编曲 : Official髭男dism / 蔦谷好位置", ""),
+    // 折成几行的长句：逐字填色要跟着换行走
+    sung(10, "もっと違う設定で もっと違う関係で 出会える世界線 選べたらよかった（更长的一句日文歌词，看它在半屏宽度里会不会被截断）",
+         "如果能选择一个以不同的设定、不同的关系相遇的世界线就好了（同样很长的一句译文，看它会不会被截断）"),
+    sung(20, "纯音乐，请欣赏", ""),
+    sung(30, "", ""),
+    sung(40, "最后一句", "the last line"),
 ];
 
 // 头像挂件：取自网易云官方客户端的样例数据（真实的图）；坏链接那位挂件也是坏链接
