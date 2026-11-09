@@ -2,6 +2,11 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.36] - 2026-11-09
+
+### 修复
+- 折成两行以上的长句歌词不再丢掉逐字填色（[#6](https://github.com/nephelesound/yunting/issues/6)）：0.6.30 起长句改为折行显示，折行的当前句却整句不填色。现在逐行填：唱过的行整行填满，正在唱的那行填到唱到的位置。
+
 ## [0.6.35] - 2026-11-09
 
 ### 优化

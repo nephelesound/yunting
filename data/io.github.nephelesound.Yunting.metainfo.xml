@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.36" date="2026-11-09">
+      <description>
+        <p>Long lyric lines that wrap onto several rows keep their word-by-word highlight: rows already sung fill completely and the row being sung fills up to the current word.</p>
+        <p xml:lang="zh_CN">折成几行的长句歌词保留逐字填色：唱过的行整行填满，正在唱的那行填到唱到的位置。</p>
+      </description>
+    </release>
     <release version="0.6.35" date="2026-11-09">
       <description>
         <p>Covers you have seen before appear at once instead of fading in again on every visit; only covers still coming from the network fade in. When the cover cache is full, the covers you have not looked at for longest go first, and the cache can now grow to 1 GB.</p>
