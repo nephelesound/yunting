@@ -131,6 +131,33 @@ private slots:
         QCOMPARE(savedOk, 0);
     }
 
+    // 钥匙串不可用时迁移只报 migrated：随后那次 save() 只收到它自己的一个 saved，旧文件里的数据原样留着直到被它覆盖
+    void fileModeMigrationLeavesSavedToSave()
+    {
+        QTemporaryDir dir;
+        qputenv("XDG_DATA_HOME", dir.path().toUtf8());
+        CookieVault probe;
+        QVERIFY(QDir().mkpath(QFileInfo(probe.fallbackPath()).path()));
+        QFile legacy(probe.fallbackPath());
+        QVERIFY(legacy.open(QIODevice::WriteOnly));
+        legacy.write(R"({"MUSIC_U":"old"})");
+        legacy.close();
+
+        CookieVault vault;
+        QList<bool> saves;
+        int migrations = 0;
+        connect(&vault, &CookieVault::saved, this, [&](bool ok) { saves << ok; });
+        connect(&vault, &CookieVault::migrated, this, [&] { ++migrations; });
+        vault.migrate();
+        vault.save(R"({"MUSIC_U":"new"})");
+        QTRY_COMPARE(saves.size(), 1);
+        QTest::qWait(50);
+        QCOMPARE(saves, QList<bool>{true});
+        QCOMPARE(migrations, 1);
+        QVERIFY(legacy.open(QIODevice::ReadOnly));
+        QCOMPARE(legacy.readAll(), QByteArray(R"({"MUSIC_U":"new"})"));
+    }
+
     void migrateWithoutFileEmitsOnce()
     {
         QTemporaryDir dir;

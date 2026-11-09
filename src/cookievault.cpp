@@ -93,6 +93,11 @@ void CookieVault::pump()
     // File 模式的操作是同步的：一次清空队列（否则后续操作没人再 pump，ready 永远不来）
     while (!m_pending.isEmpty() && m_mode == Mode::File) {
         const Op op = m_pending.takeFirst();
+        if (op.migration) {
+            // 迁移的来源就是后备文件本身，没有可搬的：不重写、不报 saved（那是给 save() 的）
+            emit migrated();
+            continue;
+        }
         if (op.write) {
             emit saved(writeFile(op.json));
         } else {
@@ -103,8 +108,6 @@ void CookieVault::pump()
             else
                 emit loadFailed();
         }
-        if (op.migration)
-            emit migrated();
     }
     if (m_pending.isEmpty())
         return;
