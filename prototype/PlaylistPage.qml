@@ -340,6 +340,14 @@ ScreenFrame {
                     Layout.preferredWidth: filterField.openWidth
                     Layout.maximumWidth: filterField.openWidth
                     implicitHeight: Tokens.height8
+                    // Breeze 的输入框是实心白底（桌面样式写死 View 配色，palette 改不动），在封面氛围色上像贴上去的一块；
+                    // 换成与中性标签同一种淡色调面，聚焦时加 Breeze 焦点框同粗的强调色边
+                    background: Rectangle {
+                        radius: Tokens.radius
+                        color: Qt.alpha(Kirigami.Theme.textColor, filterField.hovered && !filterField.activeFocus ? Tokens.tonalHover : Tokens.tonal)
+                        border.width: filterField.activeFocus ? Tokens.line : 0
+                        border.color: Kirigami.Theme.highlightColor
+                    }
                     placeholderText: "筛选歌曲"   // 收起时只有 160 宽；歌名、歌手、专辑都能对上
                     autoAccept: false
                     text: page.filter
