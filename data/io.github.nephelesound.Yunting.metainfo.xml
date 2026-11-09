@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.37" date="2026-11-09">
+      <description>
+        <p>Fixes a rare crash when the login store was torn down while a system keychain request was still in flight, which could also fail the tests when building the package from source.</p>
+        <p xml:lang="zh_CN">修复钥匙串请求还在途时登录状态被销毁导致的偶发崩溃；从源码打包时的测试也不会再因此失败。</p>
+      </description>
+    </release>
     <release version="0.6.36" date="2026-11-09">
       <description>
         <p>Long lyric lines that wrap onto several rows keep their word-by-word highlight: rows already sung fill completely and the row being sung fills up to the current word.</p>
