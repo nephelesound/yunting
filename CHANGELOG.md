@@ -2,6 +2,11 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.38] - 2026-11-18
+
+### 修复
+- 部分系统上一开始放歌，云听就被直接杀掉（SIGKILL），没有任何报错（#11）。这些系统上 xdg-desktop-portal 没读到 rtkit 的设置，把实时调度的时间预算报成 0（上游 xdg-desktop-portal#2110）；PipeWire 照此把进程的实时时限设成 0，音频线程一转成实时，内核就杀掉整个进程。现在云听启动时先问一下这个预算，是 0 就不申请实时调度，歌照常放。想从根上修好，可以重启 xdg-desktop-portal（`systemctl --user restart xdg-desktop-portal`），并确认装了 rtkit。
+
 ## [0.6.37] - 2026-11-09
 
 ### 修复

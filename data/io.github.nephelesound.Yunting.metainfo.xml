@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.38" date="2026-11-18">
+      <description>
+        <p>Fixes the app being killed the moment playback starts on systems whose desktop portal reports a realtime budget of zero: audio now plays without realtime scheduling there.</p>
+        <p xml:lang="zh_CN">修复部分系统上门户把实时预算报成 0 时，一放歌云听就被杀掉的问题：这种情况下不再申请实时调度，歌照常放。</p>
+      </description>
+    </release>
     <release version="0.6.37" date="2026-11-09">
       <description>
         <p>Fixes a rare crash when the login store was torn down while a system keychain request was still in flight, which could also fail the tests when building the package from source.</p>
