@@ -86,6 +86,7 @@ qt_add_executable(yunting
     diagnostics.h diagnostics.cpp
     uifont.h uifont.cpp
     powerinhibitor.h powerinhibitor.cpp
+    realtimebudget.h realtimebudget.cpp
     crypto.h crypto.cpp
     perf.h perf.cpp
     layershellhelper.h layershellhelper.cpp

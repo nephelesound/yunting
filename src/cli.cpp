@@ -15,6 +15,7 @@
 #include "mvvideo.h"
 #include "ncmclient.h"
 #include "powerinhibitor.h"
+#include "realtimebudget.h"
 #include "sdk/listen_together.h"
 #include "session.h"
 #include "store.h"
@@ -1021,6 +1022,7 @@ int run(QApplication &app)
     // 接在上面的处理器之后：日志照常输出，另记一份最近的警告给「关于」页的诊断信息
     Diagnostics::install();
     installQuitSignals();
+    RealtimeBudget::refuseZero();   // 在任何 mpv 实例之前
 
     const bool anonymous = cli.parser.isSet(cli.anonymous);
     NcmClient client(nullptr, !anonymous);
