@@ -16,6 +16,12 @@ bool present(const QDBusConnection &bus, const QString &service)
     return bus.isConnected() && bus.interface()->isServiceRegistered(service);
 }
 
+// 门户还没起来、但能被总线拉起：module-rt 第一次出声时它多半已经在了，所以也问它（Get 会把它拉起来）
+bool activatable(const QDBusConnection &bus, const QString &service)
+{
+    return bus.isConnected() && bus.interface()->activatableServiceNames().value().contains(service);
+}
+
 std::optional<qint64> advertisedBudget(QDBusConnection bus, const QString &service, const QString &path,
                                        const QString &interface)
 {
@@ -25,7 +31,9 @@ std::optional<qint64> advertisedBudget(QDBusConnection bus, const QString &servi
     const QDBusMessage reply = bus.call(get, QDBus::Block, 1000);
     if (reply.type() != QDBusMessage::ReplyMessage)
         return std::nullopt;   // 读不到时 module-rt 用自己的默认值，不会是 0
-    return reply.arguments().value(0).value<QDBusVariant>().variant().toLongLong();
+    bool ok = false;
+    const qint64 value = reply.arguments().value(0).value<QDBusVariant>().variant().toLongLong(&ok);
+    return ok ? std::optional(value) : std::nullopt;
 }
 
 } // namespace
@@ -38,14 +46,15 @@ void RealtimeBudget::refuseZero()
     const QString portal = QStringLiteral("org.freedesktop.portal.Desktop");
     const QString rtkit = QStringLiteral("org.freedesktop.RealtimeKit1");
     std::optional<qint64> advertised;
-    if (present(QDBusConnection::sessionBus(), portal))
+    if (present(QDBusConnection::sessionBus(), portal) || activatable(QDBusConnection::sessionBus(), portal))
         advertised = advertisedBudget(QDBusConnection::sessionBus(), portal,
                                       QStringLiteral("/org/freedesktop/portal/desktop"),
                                       QStringLiteral("org.freedesktop.portal.Realtime"));
     else if (present(QDBusConnection::systemBus(), rtkit))
         advertised = advertisedBudget(QDBusConnection::systemBus(), rtkit, QStringLiteral("/org/freedesktop/RealtimeKit1"),
                                       rtkit);
-    // 继承来的硬限制已经是 0（启动它的进程踩过同一个坑）也一样：rtkit 照批，批了就被杀
+    // 继承来的硬限制已经是 0（启动它的进程踩过同一个坑）也一样：rtkit 照批，批了就被杀。
+    // 用户自己有实时权限（realtime 组）时 module-rt 不经 rtkit，这个开关拦不住，硬限制也抬不回来，进程里没有办法
     rlimit inherited{};
     const bool inheritedZero = getrlimit(RLIMIT_RTTIME, &inherited) == 0 && inherited.rlim_max == 0;
     if ((advertised && *advertised <= 0) || inheritedZero) {
