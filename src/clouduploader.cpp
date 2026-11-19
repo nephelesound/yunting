@@ -19,7 +19,8 @@ constexpr auto DefaultLbs = "https://wanproxy.127.net/lbs";
 constexpr auto CloudBucket = "jd-musicrep-privatecloud-audio-public";
 constexpr auto Bitrate = "999000";
 
-bool responseOk(const NcmClient::Response &response, QJsonObject *body, QString *message)
+bool responseOk(const NcmClient::Response &response, QJsonObject *body, QString *message,
+                bool publishing = false)
 {
     if (!response.ok) {
         if (response.networkFailure)
@@ -32,7 +33,7 @@ bool responseOk(const NcmClient::Response &response, QJsonObject *body, QString 
     }
     const QJsonObject object = response.doc.object();
     const int code = object.value(QStringLiteral("code")).toInt();
-    if (code != 200) {
+    if (code != 200 && !(publishing && code == 201)) {
         *message = object.value(QStringLiteral("message")).toString();
         if (message->isEmpty())
             *message = object.value(QStringLiteral("msg")).toString();
@@ -47,6 +48,13 @@ bool responseOk(const NcmClient::Response &response, QJsonObject *body, QString 
 QString objectKeyPath(const QString &key)
 {
     return QString::fromLatin1(QUrl::toPercentEncoding(key));
+}
+
+QString opaqueId(const QJsonValue &value)
+{
+    if (value.isString())
+        return value.toString();
+    return value.isDouble() ? QString::number(value.toInteger()) : QString();
 }
 
 } // namespace
@@ -177,18 +185,102 @@ void CloudUploader::checkUpload()
             QJsonObject body;
             QString message;
             if (!responseOk(response, &body, &message)) {
-                fail(message);
+                fail(QStringLiteral("检查文件失败：%1").arg(message));
                 return;
             }
-            m_songId = qint64(body.value(QStringLiteral("songId")).toDouble());
+            const QJsonValue needUpload = body.value(QStringLiteral("needUpload"));
+            if (!needUpload.isBool()) {
+                fail(QStringLiteral("文件检查未返回上传标识"));
+                return;
+            }
+            if (!needUpload.toBool()) {
+                checkImport();
+                return;
+            }
+            m_uploadSongId = opaqueId(body.value(QStringLiteral("songId")));
+            if (m_uploadSongId.isEmpty()) {
+                fail(QStringLiteral("文件检查未返回歌曲登记标识"));
+                return;
+            }
             allocateToken();
         });
 }
 
-void CloudUploader::allocateToken()
+void CloudUploader::checkImport()
+{
+    const QJsonArray songs{QJsonObject{
+        {QStringLiteral("md5"), m_md5}, {QStringLiteral("songId"), -2},
+        {QStringLiteral("bitrate"), 999000}, {QStringLiteral("fileSize"), m_size}}};
+    QUrlQuery form;
+    form.addQueryItem(QStringLiteral("uploadType"), QStringLiteral("0"));
+    form.addQueryItem(QStringLiteral("songs"), QString::fromUtf8(QJsonDocument(songs).toJson(QJsonDocument::Compact)));
+    const quint64 generation = m_generation;
+    m_client->postForm(QStringLiteral("api/cloud/upload/check/v2"), form, true,
+        [this, generation](const NcmClient::Response &response) {
+            if (generation != m_generation)
+                return;
+            QJsonObject body;
+            QString message;
+            if (!responseOk(response, &body, &message)) {
+                fail(QStringLiteral("检查导入失败：%1").arg(message));
+                return;
+            }
+            const QJsonArray items = body.value(QStringLiteral("data")).toArray();
+            const QJsonObject item = items.size() == 1 ? items.first().toObject() : QJsonObject();
+            const int status = item.value(QStringLiteral("upload")).toInt(-1);
+            if (status == 2) {
+                fail(QStringLiteral("服务器不允许将这首歌曲导入云盘"));
+                return;
+            }
+            const QString songId = opaqueId(item.value(QStringLiteral("songId")));
+            if ((status != 0 && status != 1) || songId.isEmpty()) {
+                fail(QStringLiteral("云盘导入检查结果不完整"));
+                return;
+            }
+            importSong(songId);
+        });
+}
+
+void CloudUploader::importSong(const QString &songId)
+{
+    const QJsonArray songs{QJsonObject{
+        {QStringLiteral("songId"), songId}, {QStringLiteral("bitrate"), 999000},
+        {QStringLiteral("song"), songNameFromPath(m_filePath)},
+        {QStringLiteral("artist"), QStringLiteral("未知艺术家")},
+        {QStringLiteral("album"), QStringLiteral("未知专辑")},
+        {QStringLiteral("fileName"), m_filename}}};
+    QUrlQuery form;
+    form.addQueryItem(QStringLiteral("uploadType"), QStringLiteral("0"));
+    form.addQueryItem(QStringLiteral("songs"), QString::fromUtf8(QJsonDocument(songs).toJson(QJsonDocument::Compact)));
+    const quint64 generation = m_generation;
+    m_client->postForm(QStringLiteral("api/cloud/user/song/import"), form, true,
+        [this, generation](const NcmClient::Response &response) {
+            if (generation != m_generation)
+                return;
+            QJsonObject body;
+            QString message;
+            if (!responseOk(response, &body, &message)) {
+                fail(QStringLiteral("导入歌曲失败：%1").arg(message));
+                return;
+            }
+            const QJsonArray successful = body.value(QStringLiteral("data")).toObject()
+                .value(QStringLiteral("successSongs")).toArray();
+            const QJsonValue id = successful.isEmpty() ? QJsonValue()
+                : successful.first().toObject().value(QStringLiteral("song")).toObject().value(QStringLiteral("songId"));
+            const qint64 importedId = id.isString() ? id.toString().toLongLong() : id.toInteger();
+            if (importedId <= 0) {
+                fail(QStringLiteral("服务器未确认歌曲导入成功"));
+                return;
+            }
+            reset();
+            emit finished(importedId);
+        });
+}
+
+void CloudUploader::allocateToken(bool forUpload)
 {
     const QJsonObject payload{
-        {QStringLiteral("bucket"), QString::fromLatin1(CloudBucket)},
+        {QStringLiteral("bucket"), forUpload ? QString::fromLatin1(CloudBucket) : QString()},
         {QStringLiteral("ext"), m_ext},
         {QStringLiteral("filename"), objectNameFromPath(m_filePath)},
         {QStringLiteral("local"), false},
@@ -200,20 +292,35 @@ void CloudUploader::allocateToken()
     const quint64 generation = m_generation;
     m_client->postWeapi(
         QStringLiteral("nos/token/alloc"), payload, true,
-        [this, generation](const NcmClient::Response &response) {
+        [this, generation, forUpload](const NcmClient::Response &response) {
             if (generation != m_generation)
                 return;
             QJsonObject body;
             QString message;
             if (!responseOk(response, &body, &message)) {
-                fail(message);
+                fail(QStringLiteral("申请上传凭据失败：%1").arg(message));
                 return;
             }
             const QJsonObject result = body.value(QStringLiteral("result")).toObject();
+            if (!forUpload) {
+                // Only the empty-bucket allocation supplies the registration ID.
+                // The audio-bucket credentials below are for the file transfer.
+                const QJsonValue resourceId = result.value(QStringLiteral("resourceId"));
+                m_resourceId.clear();
+                if (resourceId.isString())
+                    m_resourceId = resourceId.toString();
+                else if (resourceId.isDouble() && resourceId.toInteger() > 0)
+                    m_resourceId = QString::number(resourceId.toInteger());
+                if (m_resourceId.isEmpty()) {
+                    fail(QStringLiteral("歌曲登记凭据不完整"));
+                    return;
+                }
+                allocateToken(true);
+                return;
+            }
             m_objectKey = result.value(QStringLiteral("objectKey")).toString();
             m_token = result.value(QStringLiteral("token")).toString();
-            m_resourceId = result.value(QStringLiteral("resourceId")).toString();
-            if (m_objectKey.isEmpty() || m_token.isEmpty() || m_resourceId.isEmpty()) {
+            if (m_objectKey.isEmpty() || m_token.isEmpty()) {
                 fail(QStringLiteral("上传凭据不完整"));
                 return;
             }
@@ -303,7 +410,7 @@ void CloudUploader::saveInfo()
 {
     QUrlQuery form;
     form.addQueryItem(QStringLiteral("md5"), m_md5);
-    form.addQueryItem(QStringLiteral("songid"), QString::number(m_songId));
+    form.addQueryItem(QStringLiteral("songid"), m_uploadSongId);
     form.addQueryItem(QStringLiteral("filename"), m_filename);
     form.addQueryItem(QStringLiteral("song"), songNameFromPath(m_filePath));
     form.addQueryItem(QStringLiteral("album"), QStringLiteral("未知专辑"));
@@ -320,10 +427,11 @@ void CloudUploader::saveInfo()
             QJsonObject body;
             QString message;
             if (!responseOk(response, &body, &message)) {
-                fail(message);
+                fail(QStringLiteral("登记歌曲失败：%1").arg(message));
                 return;
             }
-            const qint64 songId = qint64(body.value(QStringLiteral("songId")).toDouble());
+            const QJsonValue id = body.value(QStringLiteral("songId"));
+            const qint64 songId = id.isString() ? id.toString().toLongLong() : id.toInteger();
             if (songId > 0)
                 m_songId = songId;
             if (m_songId <= 0) {
@@ -336,19 +444,18 @@ void CloudUploader::saveInfo()
 
 void CloudUploader::publish()
 {
-    QUrlQuery form;
-    form.addQueryItem(QStringLiteral("songid"), QString::number(m_songId));
+    const QJsonObject payload{{QStringLiteral("songid"), QString::number(m_songId)}};
 
     const quint64 generation = m_generation;
-    m_client->postForm(
-        QStringLiteral("api/cloud/pub/v2"), form, true,
+    m_client->postWeapi(
+        QStringLiteral("cloud/pub/v2"), payload, true,
         [this, generation](const NcmClient::Response &response) {
             if (generation != m_generation)
                 return;
             QJsonObject body;
             QString message;
-            if (!responseOk(response, &body, &message)) {
-                fail(message);
+            if (!responseOk(response, &body, &message, true)) {
+                fail(QStringLiteral("发布歌曲失败：%1").arg(message));
                 return;
             }
             const qint64 songId = m_songId;
@@ -381,6 +488,7 @@ void CloudUploader::reset()
     m_objectKey.clear();
     m_token.clear();
     m_resourceId.clear();
+    m_uploadSongId.clear();
     m_size = 0;
     m_songId = 0;
     m_data.clear();

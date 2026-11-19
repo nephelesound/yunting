@@ -3,11 +3,14 @@
 //
 // Steps (all with the stored Web cookie):
 //   1. POST /api/cloud/upload/check       md5/length/bitrate -> needUpload, songId
-//   2. POST /weapi/nos/token/alloc        audio token/objectKey/resourceId
+//   2. POST /weapi/nos/token/alloc        empty bucket -> registration resourceId
+//      POST /weapi/nos/token/alloc        audio bucket -> transfer token/objectKey
 //   3. GET  https://wanproxy.127.net/lbs  upload host for the bucket
 //   4. POST <lbs>/<bucket>/<objectKey>    raw bytes, x-nos-token + Content-MD5
 //   5. POST /api/upload/cloud/info/v2     metadata -> songId
-//   6. POST /api/cloud/pub/v2             publish
+//   6. POST /weapi/cloud/pub/v2           publish (200 / 201)
+// If needUpload=false, use /api/cloud/upload/check/v2 followed by
+// /api/cloud/user/song/import instead of allocating tokens or publishing.
 //
 // No eapi, no retries. A failed step aborts the whole upload; partial files are
 // not re-used. Maximum accepted size matches the Web limit (100 MiB).
@@ -48,7 +51,9 @@ signals:
 private:
     void fail(const QString &message);
     void checkUpload();
-    void allocateToken();
+    void checkImport();
+    void importSong(const QString &songId);
+    void allocateToken(bool forUpload = false);
     void fetchLbs();
     void startUpload(const QString &host);
     void saveInfo();
@@ -70,6 +75,7 @@ private:
     QString m_objectKey;
     QString m_token;
     QString m_resourceId;
+    QString m_uploadSongId;
     qint64 m_size = 0;
     qint64 m_songId = 0;
     QByteArray m_data;
