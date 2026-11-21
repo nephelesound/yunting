@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.39" date="2026-11-21">
+      <description>
+        <p>Fixes the About window turning mint green under warm color schemes such as Material You pinks: it now uses the same colors as the main window. The mini player's border no longer turns greenish either.</p>
+        <p xml:lang="zh_CN">修复暖色配色（例如 Material You 的粉色方案）下「关于」窗口底色变成青绿色的问题：现在与主窗口用同一种底色。迷你播放器的边框也不再偏绿。</p>
+      </description>
+    </release>
     <release version="0.6.38" date="2026-11-18">
       <description>
         <p>Fixes the app being killed the moment playback starts on systems whose desktop portal reports a realtime budget of zero: audio now plays without realtime scheduling there.</p>
