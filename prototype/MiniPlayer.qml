@@ -52,7 +52,8 @@ Window {
         radius: Tokens.radiusLg
         color: Kirigami.Theme.backgroundColor
         border.width: Tokens.line
-        border.color: Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, Kirigami.Theme.frameContrast)
+        // 按 RGB 混合：linearInterpolation 在 HSL 里插值色相，暖色方案里底色与文字的色相分在 0° 两侧时会混出绿色
+        border.color: Kirigami.ColorUtils.tintWithAlpha(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, Kirigami.Theme.frameContrast)
         shadow.size: Tokens.space2
         shadow.yOffset: Tokens.space1
         shadow.color: Qt.rgba(0, 0, 0, 0.3)

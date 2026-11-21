@@ -17,7 +17,16 @@ Kirigami.ApplicationWindow {
     minimumHeight: Tokens.measureMax
     pageStack.globalToolBar.style: Kirigami.ApplicationHeaderStyle.None
 
+    // 底色与主窗口一样取 Header 组（见 main.qml），卡片是 View 组。不用 FormCardPage 自带的底：它是 Window 与
+    // View 两色在 HSL 里各取一半，色相不处理 0°/360° 回绕，两种粉色（356° 与 8°）会混出青色
+    background: Rectangle {
+        Kirigami.Theme.colorSet: Kirigami.Theme.Header
+        Kirigami.Theme.inherit: false
+        color: Kirigami.Theme.backgroundColor
+    }
+
     pageStack.initialPage: FormCard.AboutPage {
+        background: null
         // 「使用的库」是一长串卡片，对用户没用；版本信息在「复制诊断信息」里
         showLibraries: false
         FormCard.FormHeader {
