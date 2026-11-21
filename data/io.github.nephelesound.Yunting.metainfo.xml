@@ -76,6 +76,12 @@
   </screenshots>
   <!-- 只留最近几版；完整历史在 CHANGELOG.md -->
   <releases>
+    <release version="0.6.40" date="2026-11-21">
+      <description>
+        <p>Fixes cloud uploads always failing with an "incomplete upload credentials" error: numeric resource IDs from the service are now read correctly. Files the cloud already has are imported instantly instead of being uploaded again.</p>
+        <p xml:lang="zh_CN">修复上传到云盘总是失败、提示「上传凭据不完整」的问题：现在能正确读取服务器以数字返回的资源编号。云盘里已有的文件直接导入（秒传），不再重新上传。</p>
+      </description>
+    </release>
     <release version="0.6.39" date="2026-11-21">
       <description>
         <p>Fixes the About window turning mint green under warm color schemes such as Material You pinks: it now uses the same colors as the main window. The mini player's border no longer turns greenish either.</p>

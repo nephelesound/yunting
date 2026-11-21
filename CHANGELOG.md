@@ -2,6 +2,12 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.40] - 2026-11-21
+
+### 修复
+- 上传歌曲到云盘总是失败，提示「上传凭据不完整」（[#12](https://github.com/nephelesound/yunting/issues/12)）：服务器会用数字返回上传凭据里的资源编号，云听却只认文字形式，把它当成了空值。现在两种形式都认，长编号也不会丢精度；登记歌曲用的编号和传文件用的凭据也改为分开申请。感谢 @March7th0721 的修复（[#13](https://github.com/nephelesound/yunting/pull/13)）。
+- 云盘里已经有同一个文件时，不再重新上传一遍，改为直接导入（秒传）；服务器不允许导入时会说明原因。
+
 ## [0.6.39] - 2026-11-21
 
 ### 修复
