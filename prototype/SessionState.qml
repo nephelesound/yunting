@@ -10,6 +10,7 @@ Item {
 
     required property var window
     required property var player      // Playback
+    required property var mmapSaved
 
     readonly property int maxQueue: 500   // 队列存成 JSON；太长的队列只留当前曲目附近的 500 首，配置文件不至于膨胀
     readonly property var pivots: ["home", "mine", "search"]
@@ -20,7 +21,6 @@ Item {
         property string queue: "[]"
         property int index: -1
         property string origin: ""
-        property real position: 0
         property real volume: 0.7
         property bool muted: false
         property string quality: "auto"
@@ -50,11 +50,12 @@ Item {
         } catch (e) {
             queue = [];
         }
+        let stored = persisted.mmapSaved.position;
         if (queue.length > 0 && saved.index >= 0) {
             persisted.player.restore(queue, saved.index);
             persisted.player.origin = saved.origin;
             engine.playing = false;
-            engine.seek(saved.position);
+            engine.seek(stored);
         }
         if (persisted.pivots.includes(saved.page))
             persisted.window.switchPivot(saved.page);
@@ -75,7 +76,7 @@ Item {
     Binding { when: persisted.restored; target: saved; property: "queue"; value: JSON.stringify(persisted.player.queue.slice(persisted.windowStart, persisted.windowStart + persisted.maxQueue)) }
     Binding { when: persisted.restored; target: saved; property: "index"; value: persisted.player.index - persisted.windowStart }
     Binding { when: persisted.restored; target: saved; property: "origin"; value: persisted.player.origin }
-    Binding { when: persisted.restored; target: saved; property: "position"; value: Math.floor(persisted.player.engine.position) }
+    Binding { when: persisted.restored; target: persisted.mmapSaved; property: "position"; value: persisted.player.engine.position }
     Binding { when: persisted.restored; target: saved; property: "volume"; value: persisted.player.engine.volume }
     Binding { when: persisted.restored; target: saved; property: "muted"; value: persisted.player.engine.muted }
     Binding { when: persisted.restored; target: saved; property: "quality"; value: persisted.player.engine.quality }
