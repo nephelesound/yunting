@@ -7,6 +7,7 @@
 #include "clipboardhelper.h"
 #include "diagnostics.h"
 #include "downloadmanager.h"
+#include "mmapsaved.h"
 #include "imagecache.h"
 #include "layershellhelper.h"
 #include "links.h"
@@ -944,10 +945,11 @@ int runGui(const CommandLine &cli, QApplication &app, Backend &backend)
     KLocalization::setupLocalizedContext(&engine);
     ImageCacheFactory imageCache(imageCacheDir);
     engine.setNetworkAccessManagerFactory(&imageCache);
-    // main.qml 用 root.backend.{store,audio,voice,session,mpris,tray,layerShell,power,clipboard,diagnostics} 取后端；QVariantMap 的 key 就是属性名
+    // main.qml 用 root.backend.{store,audio,voice,session,mpris,tray,layerShell,power,clipboard,diagnostics,mmapSaved} 取后端；QVariantMap 的 key 就是属性名
     LayerShellHelper layerShell;
     ClipboardHelper clipboard;
     VoicePlayer voice;
+    MmapSaved mmapSaved(QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + "/yunting.position");
     // 系统睡眠：睡前暂停（醒来保持暂停）；醒来重建两个播放器的音频输出，否则睡前开着的流可能
     // 一直不出声、换歌也不行，只能重开应用（issue #1）
     SystemSleep sleep;
@@ -972,6 +974,7 @@ int runGui(const CommandLine &cli, QApplication &app, Backend &backend)
                            {"diagnostics", QVariant::fromValue<QObject *>(&diagnostics)},
                            {"listenTogether", QVariant::fromValue<QObject *>(&listenTogether)},
                            {"voice", QVariant::fromValue<QObject *>(&voice)},
+                           {"mmapSaved", QVariant::fromValue<QObject *>(&mmapSaved)},
                            {"downloads", QVariant::fromValue<QObject *>(&downloads)}};
     engine.setInitialProperties({{"backend", backendMap}});
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,

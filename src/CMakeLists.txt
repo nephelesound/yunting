@@ -83,6 +83,7 @@ qt_add_executable(yunting
     mpris.h mpris.cpp
     tray.h tray.cpp
     clipboardhelper.h
+    mmapsaved.h
     diagnostics.h diagnostics.cpp
     uifont.h uifont.cpp
     powerinhibitor.h powerinhibitor.cpp

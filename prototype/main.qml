@@ -296,6 +296,7 @@ Kirigami.ApplicationWindow {
         sourceComponent: SessionState {
             window: root
             player: playback
+            mmapSaved: root.backend.mmapSaved
         }
     }
 
